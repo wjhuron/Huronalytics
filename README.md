@@ -58,7 +58,7 @@ crontab -e
 - `build.py` - Build script that generates HTML from Excel data
 - `sync.sh` - Git commit and push helper
 - `data/` - Downloaded Excel data
-- `output/` - Generated HTML files
+- `docs/` - Generated HTML files (deployed via GitHub Pages)
 
 ## Repository
 

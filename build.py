@@ -13,7 +13,7 @@ import html
 
 # Configuration
 EXCEL_FILE = "data/2025_26_MLB_Offseason.xlsx"
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "docs"
 
 TEAM_INFO = {
     'ARI': {'name': 'Arizona Diamondbacks', 'short': 'Diamondbacks'},
