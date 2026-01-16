@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Huronalytics - 2025-26 MLB Offseason Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+/* Huronalytics Styles */
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #111;
+    --bg-tertiary: #1a1a1a;
+    --text-primary: #f0f0f0;
+    --text-secondary: #888;
+    --text-muted: #555;
+    --accent: #c41e3a;
+    --accent-light: #e63757;
+    --accent-dim: #8b1528;
+    --border: #2a2a2a;
+    --green: #3d9942;
+    --red: #c73e4d;
+    --blue: #3b7dd8;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+/* Header */
+.header {
+    padding: 1.5rem 3rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--bg-primary);
+    z-index: 100;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.logo span {
+    color: var(--accent-light);
+}
+
+.nav {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+
+.nav a:hover, .nav a.active {
+    color: var(--text-primary);
+}
+
+/* Search */
+.search-container {
+    position: relative;
+}
+
+.search-input {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    color: var(--text-primary);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    width: 250px;
+    transition: border-color 0.2s, width 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    width: 300px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+    z-index: 200;
+}
+
+.search-results.active {
+    display: block;
+}
+
+.search-result-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-result-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-player {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.search-result-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Hero */
+.hero {
+    padding: 3rem;
+    background: linear-gradient(135deg, var(--accent-dim) 0%, var(--bg-primary) 60%);
+    border-bottom: 1px solid var(--border);
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+}
+
+.hero p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Team Header (for team pages) */
+.team-header {
+    padding: 3rem;
+    background: linear-gradient(135deg, var(--accent) 0%, #1a0a0a 100%);
+    border-bottom: 3px solid var(--accent-light);
+}
+
+.team-name {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+}
+
+.team-subtitle {
+    color: rgba(255,255,255,0.7);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Teams Grid */
+.teams-section {
+    padding: 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+
+.team-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: border-color 0.2s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.team-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.team-card.current {
+    border-color: var(--accent-light);
+    background: var(--accent-dim);
+}
+
+.team-abbr {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent-light);
+}
+
+.team-name {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Feeds */
+.feeds-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 2rem 3rem;
+}
+
+@media (max-width: 1200px) {
+    .feeds-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.feed {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.feed-header {
+    padding: 1rem 1.25rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.feed-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.feed-body {
+    max-height: 700px;
+    overflow-y: auto;
+}
+
+.feed-item {
+    display: grid;
+    grid-template-columns: 50px 55px 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    align-items: baseline;
+    transition: background 0.2s;
+}
+
+.feed-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.feed-item:last-child {
+    border-bottom: none;
+}
+
+.feed-team {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--accent-light);
+    font-size: 0.8rem;
+}
+
+.feed-date {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.feed-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.feed-player {
+    color: var(--text-primary);
+}
+
+.feed-category {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.feed-category.signing { color: var(--green); }
+.feed-category.trade { color: var(--blue); }
+.feed-category.waiver { color: #9b59b6; }
+.feed-category.lost { color: var(--red); }
+
+.load-more {
+    padding: 1rem;
+    text-align: center;
+    border-top: 1px solid var(--border);
+}
+
+.load-more-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.5rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.load-more-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+/* Accordion */
+.accordion-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.accordion-section {
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.accordion-header {
+    background: var(--bg-secondary);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.accordion-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.accordion-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.accordion-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+}
+
+.accordion-icon {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    transition: transform 0.3s;
+}
+
+.accordion-section.open .accordion-icon {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    display: none;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border);
+}
+
+.accordion-section.open .accordion-content {
+    display: block;
+}
+
+.transaction-list {
+    padding: 0;
+    list-style: none;
+}
+
+.transaction-item {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    align-items: baseline;
+}
+
+.transaction-item:last-child {
+    border-bottom: none;
+}
+
+.transaction-item:hover {
+    background: var(--bg-secondary);
+}
+
+.transaction-list .subheader {
+    padding: 0.5rem 1.5rem;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'JetBrains Mono', monospace;
+    border-bottom: 1px solid var(--border);
+    list-style: none;
+}
+
+.tx-date {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.tx-player {
+    color: var(--text-primary);
+}
+
+/* Footer */
+.footer {
+    padding: 2rem 3rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.footer a {
+    color: var(--accent-light);
+    text-decoration: none;
+}
+
+/* Scrollbars */
+.feed-body::-webkit-scrollbar,
+.accordion-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.feed-body::-webkit-scrollbar-track,
+.accordion-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.feed-body::-webkit-scrollbar-thumb,
+.accordion-content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header {
+        padding: 1rem 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .nav {
+        gap: 1rem;
+    }
+    
+    .search-input {
+        width: 180px;
+    }
+    
+    .search-input:focus {
+        width: 200px;
+    }
+    
+    .hero, .teams-section, .feeds-container {
+        padding: 1.5rem;
+    }
+    
+    .hero h1 {
+        font-size: 1.75rem;
+    }
+    
+    .team-header {
+        padding: 2rem 1.5rem;
+    }
+    
+    .team-header .team-name {
+        font-size: 2rem;
+    }
+    
+    .accordion-container {
+        padding: 1rem;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="index.html" class="logo">huron<span>alytics</span></a>
+        <nav class="nav">
+            <a href="index.html" class="active">Home</a>
+            <a href="teams.html">All Teams</a>
+            <a href="about.html">About</a>
+            <div class="search-container">
+                <span class="search-icon">⌕</span>
+                <input type="text" class="search-input" placeholder="Search players..." id="searchInput">
+                <div class="search-results" id="searchResults"></div>
+            </div>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <h1>2025-26 MLB Offseason Tracker</h1>
+        <p>Comprehensive transaction tracking across all 30 MLB organizations</p>
+    </section>
+
+    <section class="teams-section">
+        <div class="section-header">
+            <h2 class="section-title">Teams</h2>
+        </div>
+        <div class="teams-grid">
+            <a href="ari.html" class="team-card"><span class="team-abbr">ARI</span><span class="team-name">Diamondbacks</span></a>
+            <a href="ath.html" class="team-card"><span class="team-abbr">ATH</span><span class="team-name">Athletics</span></a>
+            <a href="atl.html" class="team-card"><span class="team-abbr">ATL</span><span class="team-name">Braves</span></a>
+            <a href="bal.html" class="team-card"><span class="team-abbr">BAL</span><span class="team-name">Orioles</span></a>
+            <a href="bos.html" class="team-card"><span class="team-abbr">BOS</span><span class="team-name">Red Sox</span></a>
+            <a href="chc.html" class="team-card"><span class="team-abbr">CHC</span><span class="team-name">Cubs</span></a>
+            <a href="chw.html" class="team-card"><span class="team-abbr">CHW</span><span class="team-name">White Sox</span></a>
+            <a href="cin.html" class="team-card"><span class="team-abbr">CIN</span><span class="team-name">Reds</span></a>
+            <a href="cle.html" class="team-card"><span class="team-abbr">CLE</span><span class="team-name">Guardians</span></a>
+            <a href="col.html" class="team-card"><span class="team-abbr">COL</span><span class="team-name">Rockies</span></a>
+            <a href="det.html" class="team-card"><span class="team-abbr">DET</span><span class="team-name">Tigers</span></a>
+            <a href="hou.html" class="team-card"><span class="team-abbr">HOU</span><span class="team-name">Astros</span></a>
+            <a href="kcr.html" class="team-card"><span class="team-abbr">KCR</span><span class="team-name">Royals</span></a>
+            <a href="laa.html" class="team-card"><span class="team-abbr">LAA</span><span class="team-name">Angels</span></a>
+            <a href="lad.html" class="team-card"><span class="team-abbr">LAD</span><span class="team-name">Dodgers</span></a>
+            <a href="mia.html" class="team-card"><span class="team-abbr">MIA</span><span class="team-name">Marlins</span></a>
+            <a href="mil.html" class="team-card"><span class="team-abbr">MIL</span><span class="team-name">Brewers</span></a>
+            <a href="min.html" class="team-card"><span class="team-abbr">MIN</span><span class="team-name">Twins</span></a>
+            <a href="nym.html" class="team-card"><span class="team-abbr">NYM</span><span class="team-name">Mets</span></a>
+            <a href="nyy.html" class="team-card"><span class="team-abbr">NYY</span><span class="team-name">Yankees</span></a>
+            <a href="phi.html" class="team-card"><span class="team-abbr">PHI</span><span class="team-name">Phillies</span></a>
+            <a href="pit.html" class="team-card"><span class="team-abbr">PIT</span><span class="team-name">Pirates</span></a>
+            <a href="sdp.html" class="team-card"><span class="team-abbr">SDP</span><span class="team-name">Padres</span></a>
+            <a href="sea.html" class="team-card"><span class="team-abbr">SEA</span><span class="team-name">Mariners</span></a>
+            <a href="sfg.html" class="team-card"><span class="team-abbr">SFG</span><span class="team-name">Giants</span></a>
+            <a href="stl.html" class="team-card"><span class="team-abbr">STL</span><span class="team-name">Cardinals</span></a>
+            <a href="tbr.html" class="team-card"><span class="team-abbr">TBR</span><span class="team-name">Rays</span></a>
+            <a href="tex.html" class="team-card"><span class="team-abbr">TEX</span><span class="team-name">Rangers</span></a>
+            <a href="tor.html" class="team-card"><span class="team-abbr">TOR</span><span class="team-name">Blue Jays</span></a>
+            <a href="wsh.html" class="team-card"><span class="team-abbr">WSH</span><span class="team-name">Nationals</span></a>
+        </div>
+    </section>
+
+    <div class="feeds-container">
+        <div class="feed">
+            <div class="feed-header">
+                <span class="feed-title">MLB Transactions</span>
+            </div>
+            <div class="feed-body">
+                <div class="feed-item">
+                    <span class="feed-team">CHC</span>
+                    <span class="feed-date">1/14</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Alex Bregman (BOS)</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIN</span>
+                    <span class="feed-date">1/14</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Vidal Bruján (ATL, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">ARI</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Nolan Arenado (STL, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHC</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">CF Justin Dean (SFG, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">LAD</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Andy Ibáñez (DET)</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Dylan Jasso (NYY, AA)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">CF Brendan Jones (NYY, AA)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">CF Dillon Lewis (NYY, A+)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Juan Matheus (NYY, A+)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">NYY</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">LHSP Ryan Weathers (MIA, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">PHI</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Chase Shugart (PIT, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">PIT</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Francisco Loreto (PHI, CPX)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">STL</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Ryne Stanek (NYM)</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">STL</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHSP Jack Martinez (ARI)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">TBR</span>
+                    <span class="feed-date">1/12</span>
+                    <div class="feed-content">
+                        <span class="feed-player">LHSP Ken Waldichuk (ATL, AAA)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">TBR</span>
+                    <span class="feed-date">1/12</span>
+                    <div class="feed-content">
+                        <span class="feed-player">2B Brett Wisely (ATL, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">ARI</span>
+                    <span class="feed-date">1/10</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHSP Josh Grosz (COL, A+)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">ATL</span>
+                    <span class="feed-date">1/10</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Tyler Kinley*</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">COL</span>
+                    <span class="feed-date">1/10</span>
+                    <div class="feed-content">
+                        <span class="feed-player">LF Jake McCarthy (ARI, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">ATL</span>
+                    <span class="feed-date">1/9</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP George Soriano (BAL, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">LAD</span>
+                    <span class="feed-date">1/9</span>
+                    <div class="feed-content">
+                        <span class="feed-player">SS Ryan Fitzgerald (MIN, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">NYY</span>
+                    <span class="feed-date">1/9</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Kaleb Ort (HOU, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">TEX</span>
+                    <span class="feed-date">1/9</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Zak Kent (STL, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">WSH</span>
+                    <span class="feed-date">1/9</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Paxton Schultz (TOR, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">ATL</span>
+                    <span class="feed-date">1/8</span>
+                    <div class="feed-content">
+                        <span class="feed-player"><s>LHSP Ken Waldichuk (ATH, AAA)</s></span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+            </div>
+            <div class="load-more">
+                <button class="load-more-btn" onclick="loadMore('mlb')">Load More</button>
+            </div>
+        </div>
+
+        <div class="feed">
+            <div class="feed-header">
+                <span class="feed-title">All Recent Transactions</span>
+            </div>
+            <div class="feed-body">
+                <div class="feed-item">
+                    <span class="feed-team">BAL</span>
+                    <span class="feed-date">1/14</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RF Jhonkensy Noel (MLB)</span>
+                        <span class="feed-category ">Outrighted</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHC</span>
+                    <span class="feed-date">1/14</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Alex Bregman (BOS)</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIN</span>
+                    <span class="feed-date">1/14</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Vidal Bruján (ATL, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">ARI</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Nolan Arenado (STL, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHC</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">CF Justin Dean (SFG, MLB)</span>
+                        <span class="feed-category waiver">Waiver Claims</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHW</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RF Jeremias Aponte (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHW</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">INF Juan Berroteran</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHW</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">2B Igor Escobar (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHW</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">C Juan Oviedo (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CHW</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">LHRP Andy Peralta (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">CLE</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">DH Carter Kieboom (LAA, MLB)</span>
+                        <span class="feed-category signing">MiLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">LAD</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Andy Ibáñez (DET)</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Dylan Jasso (NYY, AA)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">CF Brendan Jones (NYY, AA)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">CF Dillon Lewis (NYY, A+)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">MIA</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Juan Matheus (NYY, A+)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">NYY</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">LHSP Ryan Weathers (MIA, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">PHI</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Chase Shugart (PIT, MLB)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">PIT</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">3B Francisco Loreto (PHI, CPX)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">STL</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Ryne Stanek (NYM)</span>
+                        <span class="feed-category signing">MLB Signings</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">STL</span>
+                    <span class="feed-date">1/13</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHSP Jack Martinez (ARI)</span>
+                        <span class="feed-category trade">Traded For</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">COL</span>
+                    <span class="feed-date">1/12</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Leonardi Almonte (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">COL</span>
+                    <span class="feed-date">1/12</span>
+                    <div class="feed-content">
+                        <span class="feed-player">1B Jjam Alvarez (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">COL</span>
+                    <span class="feed-date">1/12</span>
+                    <div class="feed-content">
+                        <span class="feed-player">1B Jarol Capellan (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-team">COL</span>
+                    <span class="feed-date">1/12</span>
+                    <div class="feed-content">
+                        <span class="feed-player">RHRP Brailyn Compres (DSL)</span>
+                        <span class="feed-category ">Released</span>
+                    </div>
+                </div>
+            </div>
+            <div class="load-more">
+                <button class="load-more-btn" onclick="loadMore('all')">Load More</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>Built by <a href="#">@huronalytics</a> | Data updated daily during the offseason</p>
+    </footer>
+
+    <script>
+// Search functionality
+const searchData = [{"entry": "3B Jesus Valdez* (AAA)", "team": "ARI", "category": "MiLB Signings", "date": null, "team_page": "ari.html"}, {"entry": "C Aramis Garc\u00eda* (MLB)", "team": "ARI", "category": "MiLB Signings", "date": null, "team_page": "ari.html"}, {"entry": "LHSP Avery Short* (AAA)", "team": "ARI", "category": "MiLB Signings", "date": null, "team_page": "ari.html"}, {"entry": "RHRP Jonatan Berna* (AA)", "team": "ARI", "category": "MiLB Signings", "date": null, "team_page": "ari.html"}, {"entry": "2B Ildemaro Vargas* (MLB)", "team": "ARI", "category": "MiLB Signings", "date": null, "team_page": "ari.html"}, {"entry": "RHRP Luis Carrasco* (A+)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "RHRP Jared Johnson* (A+)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "RHRP Edgar Sanchez* (AA)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "LHSP James Gonzalez* (AA)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "RHSP Jose Dicochea* (A)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "CF Junior Perez* (AAA)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "LHRP Domingo Robles* (AAA)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "2B Euribiel Angeles* (AAA)", "team": "ATH", "category": "MiLB Signings", "date": null, "team_page": "ath.html"}, {"entry": "RHSP Carlos Carrasco* (MLB)", "team": "ATL", "category": "MiLB Signings", "date": null, "team_page": "atl.html"}, {"entry": "RHRP Luis Vargas* (AA)", "team": "ATL", "category": "MiLB Signings", "date": null, "team_page": "atl.html"}, {"entry": "RHSP Darius Vines* (MLB)", "team": "ATL", "category": "MiLB Signings", "date": null, "team_page": "atl.html"}, {"entry": "SS Jos\u00e9 Barrero* (MLB)", "team": "BAL", "category": "MiLB Signings", "date": null, "team_page": "bal.html"}, {"entry": "LHRP Michael Sansone* (AA)", "team": "BOS", "category": "MiLB Signings", "date": null, "team_page": "bos.html"}, {"entry": "RHRP Reidis Sena* (AA)", "team": "BOS", "category": "MiLB Signings", "date": null, "team_page": "bos.html"}, {"entry": "RHSP Tyler Schlaffer* (AA)", "team": "CHC", "category": "MiLB Signings", "date": null, "team_page": "chc.html"}, {"entry": "RHRP Ben Peoples* (AAA)", "team": "CHW", "category": "MiLB Signings", "date": null, "team_page": "chw.html"}, {"entry": "SS Alexander Vargas* (AA)", "team": "CIN", "category": "MiLB Signings", "date": null, "team_page": "cin.html"}, {"entry": "RHSP Nestor Lorant* (A+)", "team": "CIN", "category": "MiLB Signings", "date": null, "team_page": "cin.html"}, {"entry": "RHSP Julian Garcia* (AA)", "team": "CIN", "category": "MiLB Signings", "date": null, "team_page": "cin.html"}, {"entry": "LF Ivan Johnson* (AAA)", "team": "CIN", "category": "MiLB Signings", "date": null, "team_page": "cin.html"}, {"entry": "C Austin Hedges* (MLB)", "team": "CLE", "category": "MLB Signings", "date": null, "team_page": "cle.html"}, {"entry": "RF Wilfredo Antunez* (AA)", "team": "CLE", "category": "MiLB Signings", "date": null, "team_page": "cle.html"}, {"entry": "LHRP Steven P\u00e9rez* (AA)", "team": "CLE", "category": "MiLB Signings", "date": null, "team_page": "cle.html"}, {"entry": "C Cameraon Barstad* (AA)", "team": "CLE", "category": "MiLB Signings", "date": null, "team_page": "cle.html"}, {"entry": "3B Dayan Frias* (AAA)", "team": "CLE", "category": "MiLB Signings", "date": null, "team_page": "cle.html"}, {"entry": "RHRP Francis Rivera* (A+)", "team": "COL", "category": "MiLB Signings", "date": null, "team_page": "col.html"}, {"entry": "RHRP Brayan Castillo* (AAA)", "team": "COL", "category": "MiLB Signings", "date": null, "team_page": "col.html"}, {"entry": "C Jose Cordova* (AA)", "team": "COL", "category": "MiLB Signings", "date": null, "team_page": "col.html"}, {"entry": "RHSP Manuel Olivares* (A)", "team": "COL", "category": "MiLB Signings", "date": null, "team_page": "col.html"}, {"entry": "RF GJ Hill* (AA)", "team": "COL", "category": "MiLB Signings", "date": null, "team_page": "col.html"}, {"entry": "RHRP Moises Rodriguez* (A+)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "C Sergio Tapia* (A)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "1B Eduardo Valencia* (AAA)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "RHRP Troy Watson* (AAA)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "RHRP Matt Seelinger* (AAA)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "RHRP Marco Jimenez* (A+)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "RHRP Yosber Sanchez* (AA)", "team": "DET", "category": "MiLB Signings", "date": null, "team_page": "det.html"}, {"entry": "SS Edwin D\u00edaz* (AAA)", "team": "HOU", "category": "MiLB Signings", "date": null, "team_page": "hou.html"}, {"entry": "RHRP Railin Perez* (AA)", "team": "HOU", "category": "MiLB Signings", "date": null, "team_page": "hou.html"}, {"entry": "RHRP Julio Rodriguez* (AA)", "team": "HOU", "category": "MiLB Signings", "date": null, "team_page": "hou.html"}, {"entry": "RHRP Juan Martinez* (A+)", "team": "KCR", "category": "MiLB Signings", "date": null, "team_page": "kcr.html"}, {"entry": "CF Rudy Martin* (AAA)", "team": "KCR", "category": "MiLB Signings", "date": null, "team_page": "kcr.html"}, {"entry": "~~RHRP Sam Ryan* (AA)~~", "team": "LAA", "category": "MiLB Signings", "date": null, "team_page": "laa.html"}, {"entry": "C Nelson Quiroz* (AA)", "team": "LAD", "category": "MiLB Signings", "date": null, "team_page": "lad.html"}, {"entry": "C Frank Rodriguez* (AAA)", "team": "LAD", "category": "MiLB Signings", "date": null, "team_page": "lad.html"}, {"entry": "RHRP Jos\u00e9 Rodriguez* (AAA)", "team": "LAD", "category": "MiLB Signings", "date": null, "team_page": "lad.html"}, {"entry": "LHRP Christian Suarez* (AA)", "team": "LAD", "category": "MiLB Signings", "date": null, "team_page": "lad.html"}, {"entry": "LHRP Justin King* (AAA)", "team": "MIA", "category": "MiLB Signings", "date": null, "team_page": "mia.html"}, {"entry": "LHSP Thomas Pannone* (AAA)", "team": "MIL", "category": "MiLB Signings", "date": null, "team_page": "mil.html"}, {"entry": "C David Garc\u00eda* (A+)", "team": "MIL", "category": "MiLB Signings", "date": null, "team_page": "mil.html"}, {"entry": "C Darrien Miller* (AA)", "team": "MIL", "category": "MiLB Signings", "date": null, "team_page": "mil.html"}, {"entry": "C Ram\u00f3n Rodr\u00edguez* (AA)", "team": "MIL", "category": "MiLB Signings", "date": null, "team_page": "mil.html"}, {"entry": "RHSP Garrett Stallings* (AAA)", "team": "MIL", "category": "MiLB Signings", "date": null, "team_page": "mil.html"}, {"entry": "RHRP J.B. Bukauskas* (MLB)", "team": "MIL", "category": "MiLB Signings", "date": null, "team_page": "mil.html"}, {"entry": "RHRP Paul Blackburn*", "team": "NYY", "category": "MLB Signings", "date": null, "team_page": "nyy.html"}, {"entry": "RHRP Luis Velasquez* (AA)", "team": "NYY", "category": "MiLB Signings", "date": null, "team_page": "nyy.html"}, {"entry": "RHRP Gabriel Barbosa* (AA)", "team": "PHI", "category": "MiLB Signings", "date": null, "team_page": "phi.html"}, {"entry": "RHRP Andrew Bechtold* (AAA)", "team": "PHI", "category": "MiLB Signings", "date": null, "team_page": "phi.html"}, {"entry": "SS Erick Brito* (AAA)", "team": "PHI", "category": "MiLB Signings", "date": null, "team_page": "phi.html"}, {"entry": "RHRP Jarod Bayless* (AAA)", "team": "PIT", "category": "MiLB Signings", "date": null, "team_page": "pit.html"}, {"entry": "SS Francisco Acu\u00f1a* (AAA)", "team": "SDP", "category": "MiLB Signings", "date": null, "team_page": "sdp.html"}, {"entry": "C Rodolfo Dur\u00e1n* (AAA)", "team": "SDP", "category": "MiLB Signings", "date": null, "team_page": "sdp.html"}, {"entry": "2B Clay Dungan* (AAA)", "team": "SDP", "category": "MiLB Signings", "date": null, "team_page": "sdp.html"}, {"entry": "~~RHRP Eiker Huizi* (A+)~~", "team": "SDP", "category": "MiLB Signings", "date": null, "team_page": "sdp.html"}, {"entry": "C Victor Duarte* (A+)", "team": "SDP", "category": "MiLB Signings", "date": null, "team_page": "sdp.html"}, {"entry": "LHRP Omar Cruz* (MLB)", "team": "SDP", "category": "MiLB Signings", "date": null, "team_page": "sdp.html"}, {"entry": "RHRP Nick Davila* (AA)", "team": "SEA", "category": "MiLB Signings", "date": null, "team_page": "sea.html"}, {"entry": "RHSP Adam Leverett* (AAA)", "team": "SEA", "category": "MiLB Signings", "date": null, "team_page": "sea.html"}, {"entry": "C Logan Porter* (MLB)", "team": "SFG", "category": "MiLB Signings", "date": null, "team_page": "sfg.html"}, {"entry": "SS Osleivis Basabe* (AAA)", "team": "SFG", "category": "MiLB Signings", "date": null, "team_page": "sfg.html"}, {"entry": "RHRP Aaron Holiday* (A+)", "team": "STL", "category": "MiLB Signings", "date": null, "team_page": "stl.html"}, {"entry": "~~1B Matt Lloyd* (AAA)~~", "team": "STL", "category": "MiLB Signings", "date": null, "team_page": "stl.html"}, {"entry": "RHSP Hancel Rinc\u00f3n* (AA)", "team": "STL", "category": "MiLB Signings", "date": null, "team_page": "stl.html"}, {"entry": "C Andy Yerzy* (AAA)", "team": "STL", "category": "MiLB Signings", "date": null, "team_page": "stl.html"}, {"entry": "RHRP Gerson Moreno* (AAA)", "team": "STL", "category": "MiLB Signings", "date": null, "team_page": "stl.html"}, {"entry": "RHRP Kodi Whitley* (AAA)", "team": "TBR", "category": "MiLB Signings", "date": null, "team_page": "tbr.html"}, {"entry": "RHRP Peyton Gray* (AAA)", "team": "TEX", "category": "MiLB Signings", "date": null, "team_page": "tex.html"}, {"entry": "SS Richie Martin* (AAA)", "team": "TEX", "category": "MiLB Signings", "date": null, "team_page": "tex.html"}, {"entry": "RHSP Trey Supak* (AAA)", "team": "TEX", "category": "MiLB Signings", "date": null, "team_page": "tex.html"}, {"entry": "1B Frainyer Chavez* (AAA)", "team": "TEX", "category": "MiLB Signings", "date": null, "team_page": "tex.html"}, {"entry": "RHRP Daniel Missaki* (AA)", "team": "TEX", "category": "MiLB Signings", "date": null, "team_page": "tex.html"}, {"entry": "3B Keyber Rodriguez* (AAA)", "team": "TEX", "category": "MiLB Signings", "date": null, "team_page": "tex.html"}, {"entry": "RHRP Diego Dominguez* (A)", "team": "TOR", "category": "MiLB Signings", "date": null, "team_page": "tor.html"}, {"entry": "RHSP Richard Gallardo* (AA)", "team": "TOR", "category": "MiLB Signings", "date": null, "team_page": "tor.html"}, {"entry": "LF Yohendrick Pinango* (AAA)", "team": "TOR", "category": "MiLB Signings", "date": null, "team_page": "tor.html"}, {"entry": "RF Je'Von Ward* (AA)", "team": "TOR", "category": "MiLB Signings", "date": null, "team_page": "tor.html"}, {"entry": "RF Eloy Jim\u00e9nez* (AAA)", "team": "TOR", "category": "MiLB Signings", "date": null, "team_page": "tor.html"}, {"entry": "LF Jefferson Pe\u00f1a (CPX)", "team": "ARI", "category": "Released", "date": "9/5", "team_page": "ari.html"}, {"entry": "RHP Connor O'Hara", "team": "CIN", "category": "Released", "date": "9/5", "team_page": "cin.html"}, {"entry": "RHRP Declan Cronin (AAA)", "team": "MIA", "category": "Released", "date": "9/6", "team_page": "mia.html"}, {"entry": "CF Albert Almora Jr. (AAA)", "team": "ARI", "category": "Released", "date": "9/7", "team_page": "ari.html"}, {"entry": "LHSP Kaleb Sophy (A)", "team": "CHW", "category": "Released", "date": "9/7", "team_page": "chw.html"}, {"entry": "LF Jacob Hurtubise (MLB)", "team": "HOU", "category": "Released", "date": "9/7", "team_page": "hou.html"}, {"entry": "RHRP Daniel Beles (DSL)", "team": "TEX", "category": "Released", "date": "9/7", "team_page": "tex.html"}, {"entry": "RHRP Masahiro Fukuda (DSL)", "team": "TEX", "category": "Released", "date": "9/7", "team_page": "tex.html"}, {"entry": "RHRP Angel Gomez (DSL)", "team": "TEX", "category": "Released", "date": "9/7", "team_page": "tex.html"}, {"entry": "LHRP Emmanuel Martinez (DSL)", "team": "TEX", "category": "Released", "date": "9/7", "team_page": "tex.html"}, {"entry": "RHSP Oscar Romero (DSL)", "team": "TEX", "category": "Released", "date": "9/7", "team_page": "tex.html"}, {"entry": "RHRP Maykel Sanchez (DSL)", "team": "TEX", "category": "Released", "date": "9/7", "team_page": "tex.html"}, {"entry": "SS Juan Corniel (AAA)", "team": "ARI", "category": "Released", "date": "9/8", "team_page": "ari.html"}, {"entry": "RHRP Benjamin Arias (A+)", "team": "STL", "category": "Released", "date": "9/8", "team_page": "stl.html"}, {"entry": "RHRP Jordan Mikel (AAA)", "team": "CHW", "category": "Released", "date": "9/9", "team_page": "chw.html"}, {"entry": "RHRP Carson Rudd (AAA)", "team": "CIN", "category": "Retired", "date": "9/9", "team_page": "cin.html"}, {"entry": "RHRP Justin Garza (MLB)", "team": "NYM", "category": "Elected MiLB FA", "date": "9/9", "team_page": "nym.html"}, {"entry": "RHRP Darlin Mendez (CPX)", "team": "SDP", "category": "Released", "date": "9/9", "team_page": "sdp.html"}, {"entry": "RHRP Luis Cabrera (DSL)", "team": "BOS", "category": "Released", "date": "9/11", "team_page": "bos.html"}, {"entry": "CF Rafi Montesino (DSL)", "team": "BOS", "category": "Released", "date": "9/11", "team_page": "bos.html"}, {"entry": "3B Kenyon Simmons (DSL)", "team": "BOS", "category": "Released", "date": "9/11", "team_page": "bos.html"}, {"entry": "RHRP Wilmer Flores (A)", "team": "DET", "category": "Released", "date": "9/11", "team_page": "det.html"}, {"entry": "2B Garrett Hampson (MLB)", "team": "STL", "category": "Released", "date": "9/11", "team_page": "stl.html"}, {"entry": "RHSP Jimmy Endersby (AAA)", "team": "ARI", "category": "Released", "date": "9/12", "team_page": "ari.html"}, {"entry": "RHSP Yodrian Beltre (DSL)", "team": "BOS", "category": "Released", "date": "9/12", "team_page": "bos.html"}, {"entry": "RHRP Dan Altavilla (MLB)", "team": "CHW", "category": "Released", "date": "9/12", "team_page": "chw.html"}, {"entry": "3B Gery Holguin (A)", "team": "MIL", "category": "Released", "date": "9/12", "team_page": "mil.html"}, {"entry": "RHRP Eliander Alcalde (A)", "team": "TOR", "category": "Released", "date": "9/12", "team_page": "tor.html"}, {"entry": "RHRP Luis Qui\u00f1ones (AAA)", "team": "TOR", "category": "Released", "date": "9/12", "team_page": "tor.html"}, {"entry": "RHRP Giomar Diaz (A+)", "team": "ATL", "category": "Released", "date": "9/13", "team_page": "atl.html"}, {"entry": "RHRP Seth Martinez (MLB)", "team": "MIA", "category": "Elected MiLB FA", "date": "9/13", "team_page": "mia.html"}, {"entry": "CF Jose Paulino (DSL)", "team": "KCR", "category": "Released", "date": "9/15", "team_page": "kcr.html"}, {"entry": "2B Orelvis Martinez (AAA)", "team": "TOR", "category": "Released", "date": "9/15", "team_page": "tor.html"}, {"entry": "RHRP Marvin Rojas (DSL)", "team": "KCR", "category": "Released", "date": "9/16", "team_page": "kcr.html"}, {"entry": "CF Marshall Toole (TBR, A)", "team": "NYY", "category": "Traded Away", "date": "9/17", "team_page": "nyy.html"}, {"entry": "CF Marshall Toole (NYY, A)", "team": "TBR", "category": "Traded For", "date": "9/17", "team_page": "tbr.html"}, {"entry": "RHRP Anthony De Sclafani (MLB)", "team": "ARI", "category": "Released", "date": "9/18", "team_page": "ari.html"}, {"entry": "RHRP Codi Heuer (MLB)", "team": "DET", "category": "Released", "date": "9/18", "team_page": "det.html"}, {"entry": "RHRP Tyler Davis (A+)", "team": "KCR", "category": "Released", "date": "9/18", "team_page": "kcr.html"}, {"entry": "RHRP Nicholas Regalado (AA)", "team": "KCR", "category": "Released", "date": "9/18", "team_page": "kcr.html"}, {"entry": "RHRP Mauricio Veliz (AA)", "team": "KCR", "category": "Released", "date": "9/18", "team_page": "kcr.html"}, {"entry": "RHRP Wilkins Matos (DSL)", "team": "SDP", "category": "Released", "date": "9/18", "team_page": "sdp.html"}, {"entry": "LHRP Andersson Barvosa (TOR, DSL)", "team": "TBR", "category": "MiLB Signings", "date": "9/18", "team_page": "tbr.html"}, {"entry": "RHRP Nate Pearson (MLB)", "team": "CHC", "category": "Released", "date": "9/21", "team_page": "chc.html"}, {"entry": "RHRP Jorge Herrera (CPX)", "team": "KCR", "category": "Released", "date": "9/21", "team_page": "kcr.html"}, {"entry": "LHRP Andr\u00e9s Parra (CPX)", "team": "BAL", "category": "Released", "date": "9/22", "team_page": "bal.html"}, {"entry": "LHRP Trey McGough (AAA)", "team": "CHW", "category": "Released", "date": "9/22", "team_page": "chw.html"}, {"entry": "RHRP Ike Buxton (AA)", "team": "MIA", "category": "Released", "date": "9/22", "team_page": "mia.html"}, {"entry": "RHRP Bayden Root (AA)", "team": "MIL", "category": "Released", "date": "9/22", "team_page": "mil.html"}, {"entry": "LF Korey Holland (AAA)", "team": "LAA", "category": "Released", "date": "9/24", "team_page": "laa.html"}, {"entry": "RHP Seo-jun Moon (KOR)", "team": "TOR", "category": "2025 Intl Signings", "date": "9/24", "team_page": "tor.html"}, {"entry": "2B Orelvis Martinez (TOR, AAA)", "team": "WSH", "category": "MiLB Signings", "date": "9/24", "team_page": "wsh.html"}, {"entry": "RHRP Jesus Camejo (A)", "team": "ARI", "category": "Released", "date": "9/28", "team_page": "ari.html"}, {"entry": "RHRP Eliazar De Los Santos (CPX)", "team": "ATH", "category": "Released", "date": "9/28", "team_page": "ath.html"}, {"entry": "1B Yanki Jean-Baptiste (A)", "team": "CLE", "category": "Released", "date": "9/28", "team_page": "cle.html"}, {"entry": "RF Justin Boyd (AAA)", "team": "CLE", "category": "Released", "date": "9/28", "team_page": "cle.html"}, {"entry": "SS Sergio Alc\u00e1ntara (MLB)", "team": "ARI", "category": "Elected MiLB FA", "date": "9/29", "team_page": "ari.html"}, {"entry": "CF Jordyn Adams (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "9/29", "team_page": "bal.html"}, {"entry": "RHRP Scott Blewett (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "9/29", "team_page": "bal.html"}, {"entry": "3B Vimael Mach\u00edn (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "9/29", "team_page": "bal.html"}, {"entry": "2B Terrin Vavra (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "9/29", "team_page": "bal.html"}, {"entry": "RF Connor Joe (MLB)", "team": "CIN", "category": "Elected MiLB FA", "date": "9/29", "team_page": "cin.html"}, {"entry": "RHRP Triston McKenzie (MLB)", "team": "CLE", "category": "Elected MiLB FA", "date": "9/29", "team_page": "cle.html"}, {"entry": "1B Keston Hiura (MLB)", "team": "COL", "category": "Elected MiLB FA", "date": "9/29", "team_page": "col.html"}, {"entry": "RHRP Jordan Weems (MLB)", "team": "HOU", "category": "Elected MiLB FA", "date": "9/29", "team_page": "hou.html"}, {"entry": "RHRP Nick Hernandez (MLB)", "team": "HOU", "category": "Elected MiLB FA", "date": "9/29", "team_page": "hou.html"}, {"entry": "SS Scott Kingery (MLB)", "team": "LAA", "category": "Elected MiLB FA", "date": "9/29", "team_page": "laa.html"}, {"entry": "LHSP Brandon Knarr (AA)", "team": "MIL", "category": "Released", "date": "9/29", "team_page": "mil.html"}, {"entry": "RHRP Aidan Maldonado (A+)", "team": "MIL", "category": "Released", "date": "9/29", "team_page": "mil.html"}, {"entry": "RHRP Noah Davis (MLB)", "team": "MIN", "category": "Elected MiLB FA", "date": "9/29", "team_page": "min.html"}, {"entry": "RHRP Brooks Kriske (MLB)", "team": "MIN", "category": "Elected MiLB FA", "date": "9/29", "team_page": "min.html"}, {"entry": "RHRP Darren McCaughan (MLB)", "team": "MIN", "category": "Elected MiLB FA", "date": "9/29", "team_page": "min.html"}, {"entry": "RHRP Kevin Herget (MLB)", "team": "NYM", "category": "Elected MiLB FA", "date": "9/29", "team_page": "nym.html"}, {"entry": "LHRP Richard Lovelady (MLB)", "team": "NYM", "category": "Elected MiLB FA", "date": "9/29", "team_page": "nym.html"}, {"entry": "CF Jose Siri (MLB)", "team": "NYM", "category": "Elected MiLB FA", "date": "9/29", "team_page": "nym.html"}, {"entry": "RHP Frandy Lora (DOM)", "team": "NYM", "category": "2025 Intl Signings", "date": "9/29", "team_page": "nym.html"}, {"entry": "RHP Alsy Torres (DOM)", "team": "NYM", "category": "2025 Intl Signings", "date": "9/29", "team_page": "nym.html"}, {"entry": "C Matt Thaiss (MLB)", "team": "TBR", "category": "Elected MiLB FA", "date": "9/29", "team_page": "tbr.html"}, {"entry": "C Ricardo Genov\u00e9s (AA)", "team": "TBR", "category": "Released", "date": "9/29", "team_page": "tbr.html"}, {"entry": "RHRP Jos\u00e9 Ruiz (MLB)", "team": "TEX", "category": "Elected MiLB FA", "date": "9/29", "team_page": "tex.html"}, {"entry": "RHP Jean Ballesteros (COL)", "team": "TEX", "category": "2025 Intl Signings", "date": "9/29", "team_page": "tex.html"}, {"entry": "C Esmeiquel Arrieche (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "RHRP Antony De Los Santos (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "RHRP Edwin Francisco (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "C Carlos Garc\u00eda (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "RHRP Erinyel Marquez (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "1B Endry Reyes (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "RHRP Manuel Suero (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "3B Nestor Urbina (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "RHSP Alexander Valiente (DSL)", "team": "TOR", "category": "Released", "date": "9/29", "team_page": "tor.html"}, {"entry": "2B Darren Baker (AAA)", "team": "WSH", "category": "Released", "date": "9/29", "team_page": "wsh.html"}, {"entry": "RHP Luis Mantilla (CUB)", "team": "ATL", "category": "2025 Intl Signings", "date": "9/30", "team_page": "atl.html"}, {"entry": "RHRP Corbin Martin (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "9/30", "team_page": "bal.html"}, {"entry": "RHRP Bryse Wilson (MLB)", "team": "CHW", "category": "Elected MiLB FA", "date": "9/30", "team_page": "chw.html"}, {"entry": "INF Noel Brito (DOM)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "RHP David Colina (VEN)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "RHP Vismar Dagnino (MEX)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "RHP Adrianyer Lopez (VEN)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "RHP Juan Ramirez (VEN)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "INF Oscar Rivas (VEN)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "OF Yuaxander Silveira (CUB)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "RHP Samil Valdivieso (VEN)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "RHP Victor Vizcaya (VEN)", "team": "HOU", "category": "2025 Intl Signings", "date": "9/30", "team_page": "hou.html"}, {"entry": "3B Harold Castro (AAA)", "team": "KCR", "category": "Released", "date": "9/30", "team_page": "kcr.html"}, {"entry": "RHP Randy Guzman (DOM)", "team": "NYM", "category": "2025 Intl Signings", "date": "9/30", "team_page": "nym.html"}, {"entry": "RHRP Jake Woodford (MLB)", "team": "ARI", "category": "Elected MiLB FA", "date": "10/1", "team_page": "ari.html"}, {"entry": "RHSP Luis F. Castillo (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "10/1", "team_page": "bal.html"}, {"entry": "RHRP Chris Devenski (MLB)", "team": "NYM", "category": "Elected MiLB FA", "date": "10/1", "team_page": "nym.html"}, {"entry": "1B Trenton Brooks (MLB)", "team": "SDP", "category": "Elected MiLB FA", "date": "10/1", "team_page": "sdp.html"}, {"entry": "LHRP Joe Jacques (AAA)", "team": "SEA", "category": "Elected MiLB FA", "date": "10/1", "team_page": "sea.html"}, {"entry": "C Jos\u00e9 Herrera (MLB)", "team": "ARI", "category": "Elected MiLB FA", "date": "10/2", "team_page": "ari.html"}, {"entry": "RHP Jareth Rayo (NIC)", "team": "ATH", "category": "2025 Intl Signings", "date": "10/2", "team_page": "ath.html"}, {"entry": "C Jason Delay (AAA)", "team": "ATL", "category": "Elected MiLB FA", "date": "10/2", "team_page": "atl.html"}, {"entry": "RHRP Alexis D\u00edaz (MLB)", "team": "ATL", "category": "Elected MiLB FA", "date": "10/2", "team_page": "atl.html"}, {"entry": "RHRP Dane Dunning (MLB)", "team": "ATL", "category": "Elected MiLB FA", "date": "10/2", "team_page": "atl.html"}, {"entry": "CF Jarred Kelenic (MLB)", "team": "ATL", "category": "Elected MiLB FA", "date": "10/2", "team_page": "atl.html"}, {"entry": "SS Luke Williams (MLB)", "team": "ATL", "category": "Elected MiLB FA", "date": "10/2", "team_page": "atl.html"}, {"entry": "RHRP Tyson Miller (AAA)", "team": "CHC", "category": "Elected MiLB FA", "date": "10/2", "team_page": "chc.html"}, {"entry": "SS Jacob Amaya (MLB)", "team": "CHW", "category": "Elected MiLB FA", "date": "10/2", "team_page": "chw.html"}, {"entry": "RHRP Mike Clevinger (MLB)", "team": "CHW", "category": "Elected MiLB FA", "date": "10/2", "team_page": "chw.html"}, {"entry": "CF Sam Hilliard (MLB)", "team": "COL", "category": "Elected MiLB FA", "date": "10/2", "team_page": "col.html"}, {"entry": "RHRP Tayler Scott (MLB)", "team": "HOU", "category": "Elected MiLB FA", "date": "10/2", "team_page": "hou.html"}, {"entry": "SS Zack Short (MLB)", "team": "HOU", "category": "Elected MiLB FA", "date": "10/2", "team_page": "hou.html"}, {"entry": "DH Francisco Caldera (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "C Diego Campos (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "C Miguel Flores (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "RHRP Rafael Gonzalez (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "RHRP Eddy Mota (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "RHSP Jesus Nu\u00f1ez (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "SS Cliuver Puello (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "RHRP Jhosue Rodriguez (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "RHRP Adrian Ruiz (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "RHRP Dionel Villalobos (DSL)", "team": "HOU", "category": "Released", "date": "10/2", "team_page": "hou.html"}, {"entry": "LHRP Jos\u00e9 Quijada (MLB)", "team": "LAA", "category": "Elected MiLB FA", "date": "10/2", "team_page": "laa.html"}, {"entry": "RHRP Luarbert Arias (MLB)", "team": "MIA", "category": "Elected MiLB FA", "date": "10/2", "team_page": "mia.html"}, {"entry": "C Sebastian Maldonado (VEN)", "team": "SDP", "category": "2025 Intl Signings", "date": "10/2", "team_page": "sdp.html"}, {"entry": "RHRP Zac McCleve (A)", "team": "TBR", "category": "Released", "date": "10/2", "team_page": "tbr.html"}, {"entry": "RF Joshua Palacios (MLB)", "team": "CHW", "category": "Elected MiLB FA", "date": "10/3", "team_page": "chw.html"}, {"entry": "C Adafel Montiel (VEN)", "team": "COL", "category": "2025 Intl Signings", "date": "10/3", "team_page": "col.html"}, {"entry": "RHRP Manuel Mendoza (DSL)", "team": "HOU", "category": "Released", "date": "10/3", "team_page": "hou.html"}, {"entry": "RHRP Carlos Mateo (CPX)", "team": "KCR", "category": "Released", "date": "10/3", "team_page": "kcr.html"}, {"entry": "LHSP Bruce Zimmermann (MLB)", "team": "MIL", "category": "Elected MiLB FA", "date": "10/3", "team_page": "mil.html"}, {"entry": "RHSP Nabil Crismatt (MLB)", "team": "ARI", "category": "Elected MiLB FA", "date": "10/6", "team_page": "ari.html"}, {"entry": "LHRP \u00c1ngel Perdomo (MLB)", "team": "ATH", "category": "Elected MiLB FA", "date": "10/6", "team_page": "ath.html"}, {"entry": "C Sandy Le\u00f3n (MLB)", "team": "ATL", "category": "Elected MiLB FA", "date": "10/6", "team_page": "atl.html"}, {"entry": "C David Ba\u00f1uelos (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "10/6", "team_page": "bal.html"}, {"entry": "3B Emmanuel Rivera (MLB)", "team": "BAL", "category": "Elected MiLB FA", "date": "10/6", "team_page": "bal.html"}, {"entry": "C Ali S\u00e1nchez (MLB)", "team": "BOS", "category": "Elected MiLB FA", "date": "10/6", "team_page": "bos.html"}, {"entry": "RHRP Wander Suero (MLB)", "team": "NYM", "category": "Elected MiLB FA", "date": "10/6", "team_page": "nym.html"}, {"entry": "RHRP Carl Edwards Jr. (MLB)", "team": "TEX", "category": "Elected MiLB FA", "date": "10/6", "team_page": "tex.html"}, {"entry": "RHP Jhonaiker Castillo (VEN)", "team": "CLE", "category": "2025 Intl Signings", "date": "10/7", "team_page": "cle.html"}, {"entry": "RHRP Nick Burdi (MLB)", "team": "BOS", "category": "Elected MiLB FA", "date": "10/8", "team_page": "bos.html"}, {"entry": "RHSP Luke House (NCAA)", "team": "CLE", "category": "MiLB Signings", "date": "10/8", "team_page": "cle.html"}, {"entry": "RHP Jose Navarrete (MEX)", "team": "CIN", "category": "2025 Intl Signings", "date": "10/9", "team_page": "cin.html"}, {"entry": "LHP Junior Pe\u00f1a (DOM)", "team": "LAD", "category": "2025 Intl Signings", "date": "10/9", "team_page": "lad.html"}, {"entry": "RHRP Erasmo Ram\u00edrez (MLB)", "team": "MIN", "category": "Elected MiLB FA", "date": "10/9", "team_page": "min.html"}, {"entry": "1B Peyton Carr (A+)", "team": "MIN", "category": "Released", "date": "10/9", "team_page": "min.html"}, {"entry": "RHRP Yarison Ruiz (CPX)", "team": "NYY", "category": "Released", "date": "10/9", "team_page": "nyy.html"}, {"entry": "RHP Lan-Hong Su (TWN)", "team": "SDP", "category": "2025 Intl Signings", "date": "10/9", "team_page": "sdp.html"}, {"entry": "1B Abraham Toro (MLB)", "team": "BOS", "category": "Elected MiLB FA", "date": "10/10", "team_page": "bos.html"}, {"entry": "RHP Steven Garcia (DOM)", "team": "BOS", "category": "2025 Intl Signings", "date": "10/10", "team_page": "bos.html"}, {"entry": "RHP Sebastian Rondon (VEN)", "team": "BOS", "category": "2025 Intl Signings", "date": "10/10", "team_page": "bos.html"}, {"entry": "RHP Hicter Ruiz (DOM)", "team": "BOS", "category": "2025 Intl Signings", "date": "10/10", "team_page": "bos.html"}, {"entry": "LHP Cristopher Silvestre (DOM)", "team": "BOS", "category": "2025 Intl Signings", "date": "10/10", "team_page": "bos.html"}, {"entry": "RHRP Carlos Hern\u00e1ndez (MLB)", "team": "CLE", "category": "Elected MiLB FA", "date": "10/10", "team_page": "cle.html"}, {"entry": "RHRP Engel Daniel Peralta (A)", "team": "HOU", "category": "Released", "date": "10/10", "team_page": "hou.html"}, {"entry": "LHRP Matt Mikulski (A+)", "team": "MIN", "category": "Released", "date": "10/10", "team_page": "min.html"}, {"entry": "RHRP Anthony Narvaez (A)", "team": "MIN", "category": "Released", "date": "10/10", "team_page": "min.html"}, {"entry": "RHRP Anthony Pulido (CPX)", "team": "MIN", "category": "Released", "date": "10/10", "team_page": "min.html"}, {"entry": "RHRP Tyler Stasiowski (A)", "team": "MIN", "category": "Released", "date": "10/10", "team_page": "min.html"}, {"entry": "RF Bryan De La Cruz (MLB)", "team": "NYY", "category": "Elected MiLB FA", "date": "10/10", "team_page": "nyy.html"}, {"entry": "RHRP Devin Sweet (AAA)", "team": "PHI", "category": "Elected MiLB FA", "date": "10/10", "team_page": "phi.html"}, {"entry": "2B Donovan Walton (MLB)", "team": "PHI", "category": "Elected MiLB FA", "date": "10/10", "team_page": "phi.html"}, {"entry": "3B Fernando Hernandez (DSL)", "team": "PHI", "category": "Released", "date": "10/10", "team_page": "phi.html"}, {"entry": "CF Leody Taveras (MLB)", "team": "SEA", "category": "Elected MiLB FA", "date": "10/10", "team_page": "sea.html"}, {"entry": "LHSP Tucker Davidson (AAA)", "team": "MIL", "category": "Released", "date": "10/12", "team_page": "mil.html"}, {"entry": "RF Will Robertson (PIT, MLB)", "team": "CHW", "category": "Lost off Waivers", "date": "10/13", "team_page": "chw.html"}, {"entry": "~~RF Will Robertson (CHW, MLB)~~", "team": "PIT", "category": "Waiver Claims", "date": "10/13", "team_page": "pit.html"}, {"entry": "RHRP Trevor Richards (MLB)", "team": "ARI", "category": "Elected MiLB FA", "date": "10/14", "team_page": "ari.html"}, {"entry": "RHRP Keegan Thompson (AAA)", "team": "CHC", "category": "Elected MiLB FA", "date": "10/14", "team_page": "chc.html"}, {"entry": "RHRP Randy Wynne (MLB)", "team": "CIN", "category": "Elected MiLB FA", "date": "10/14", "team_page": "cin.html"}, {"entry": "LF Akil Baddoo (MLB)", "team": "DET", "category": "Elected MiLB FA", "date": "10/14", "team_page": "det.html"}, {"entry": "C Chad Wallach (MLB)", "team": "LAA", "category": "Elected MiLB FA", "date": "10/14", "team_page": "laa.html"}, {"entry": "C Eric Haase (MLB)", "team": "MIL", "category": "Elected MiLB FA", "date": "10/14", "team_page": "mil.html"}, {"entry": "RHRP Ever Ure\u00f1a (DSL)", "team": "MIL", "category": "Released", "date": "10/14", "team_page": "mil.html"}, {"entry": "CF Dominic Fletcher (MLB)", "team": "CHW", "category": "Elected MiLB FA", "date": "10/15", "team_page": "chw.html"}, {"entry": "LF Corey Julks (MLB)", "team": "CHW", "category": "Elected MiLB FA", "date": "10/15", "team_page": "chw.html"}, {"entry": "C Tom\u00e1s Nido (MLB)", "team": "DET", "category": "Elected MiLB FA", "date": "10/15", "team_page": "det.html"}, {"entry": "CF Ryan Kreidler (PIT, MLB)", "team": "MIN", "category": "Waiver Claims", "date": "10/15", "team_page": "min.html"}, {"entry": "CF Ryan Kreidler (MIN, MLB)", "team": "PIT", "category": "Lost off Waivers", "date": "10/15", "team_page": "pit.html"}, {"entry": "RHP Ismael Sanchez (DOM)", "team": "TBR", "category": "2025 Intl Signings", "date": "10/15", "team_page": "tbr.html"}, {"entry": "RHRP Jeffrey Amparo (CPX)", "team": "ARI", "category": "Released", "date": "10/16", "team_page": "ari.html"}, {"entry": "RHRP Eriner Batista (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "RHRP Robinson Javier (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "LHRP Reykelly Rubi (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "RHRP Ezequiel Sosa (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "RHRP Rafael Suero (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "2B Cleudis Valenzuela (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "RHRP Esmerlyn Valenzuela (DSL)", "team": "BAL", "category": "Released", "date": "10/16", "team_page": "bal.html"}, {"entry": "RHP Roberto Pe\u00f1a (CUB)", "team": "NYM", "category": "2025 Intl Signings", "date": "10/17", "team_page": "nym.html"}, {"entry": "RHP Angel Castillo (VEN)", "team": "TBR", "category": "2025 Intl Signings", "date": "10/17", "team_page": "tbr.html"}, {"entry": "RHSP Erick Fedde (MLB)", "team": "MIL", "category": "Elected MiLB FA", "date": "10/18", "team_page": "mil.html"}, {"entry": "~~C Austin Nola (COL, MLB)~~", "team": "ATL", "category": "MiLB Signings", "date": "10/20", "team_page": "atl.html"}, {"entry": "RHP Gabriel Fuentes (VEN)", "team": "BAL", "category": "2025 Intl Signings", "date": "10/20", "team_page": "bal.html"}, {"entry": "LHP Christian Rojas (VEN)", "team": "BAL", "category": "2025 Intl Signings", "date": "10/20", "team_page": "bal.html"}, {"entry": "LHP Scarling Sterling (DOM)", "team": "BAL", "category": "2025 Intl Signings", "date": "10/20", "team_page": "bal.html"}, {"entry": "RHSP Jos\u00e9 De Le\u00f3n (MLB)", "team": "BOS", "category": "Elected MiLB FA", "date": "10/20", "team_page": "bos.html"}, {"entry": "RHP Antonio Gonzalez (VEN)", "team": "CLE", "category": "2025 Intl Signings", "date": "10/20", "team_page": "cle.html"}, {"entry": "RHRP Nate Pearson (CHC)", "team": "HOU", "category": "MLB Signings", "date": "10/20", "team_page": "hou.html"}, {"entry": "RHP Micheal Morfe (VEN)", "team": "LAD", "category": "2025 Intl Signings", "date": "10/20", "team_page": "lad.html"}, {"entry": "LHRP Joe Jacques (SEA, AAA)", "team": "NYM", "category": "MiLB Signings", "date": "10/20", "team_page": "nym.html"}, {"entry": "LHP Juan Santillan (MEX)", "team": "STL", "category": "2025 Intl Signings", "date": "10/20", "team_page": "stl.html"}, {"entry": "LHP David Colmenares (VEN)", "team": "CHW", "category": "2025 Intl Signings", "date": "10/21", "team_page": "chw.html"}, {"entry": "RHP Kendry Garcia (DOM)", "team": "CHW", "category": "2025 Intl Signings", "date": "10/21", "team_page": "chw.html"}, {"entry": "INF Dionys Medina (DOM)", "team": "CHW", "category": "2025 Intl Signings", "date": "10/21", "team_page": "chw.html"}, {"entry": "RHP Jonathan Durantt (VEN)", "team": "ATH", "category": "2025 Intl Signings", "date": "10/22", "team_page": "ath.html"}, {"entry": "RHRP Connor Brogdon (MLB)", "team": "LAA", "category": "Elected MiLB FA", "date": "10/22", "team_page": "laa.html"}, {"entry": "RHRP Carson Fulmer (MLB)", "team": "LAA", "category": "Elected MiLB FA", "date": "10/22", "team_page": "laa.html"}, {"entry": "DH Carter Kieboom (MLB)", "team": "LAA", "category": "Elected MiLB FA", "date": "10/22", "team_page": "laa.html"}, {"entry": "LHRP Sammy Peralta (MIL, MLB)", "team": "LAA", "category": "Lost off Waivers", "date": "10/22", "team_page": "laa.html"}, {"entry": "LHRP Sammy Peralta (LAA, MLB)", "team": "MIL", "category": "Waiver Claims", "date": "10/22", "team_page": "mil.html"}, {"entry": "C Matt Donlan (AA)", "team": "BOS", "category": "Retired", "date": "10/23", "team_page": "bos.html"}, {"entry": "LHRP Connor Thomas (MLB)", "team": "MIL", "category": "Elected MiLB FA", "date": "10/23", "team_page": "mil.html"}, {"entry": "LHRP Richard Lovelady*", "team": "NYM", "category": "MLB Signings", "date": "10/23", "team_page": "nym.html"}, {"entry": "RHP Maximin Medina (DOM)", "team": "WSH", "category": "2025 Intl Signings", "date": "10/23", "team_page": "wsh.html"}, {"entry": "RHP Sammy Zarraga (VEN)", "team": "DET", "category": "2025 Intl Signings", "date": "10/24", "team_page": "det.html"}, {"entry": "RHRP Nick DeCarlo (A)", "team": "MIL", "category": "Released", "date": "10/24", "team_page": "mil.html"}, {"entry": "RHRP Alvaro Gamez (DSL)", "team": "TBR", "category": "Released", "date": "10/24", "team_page": "tbr.html"}, {"entry": "C Jason Delay (ATL, AAA)", "team": "BOS", "category": "MiLB Signings", "date": "10/27", "team_page": "bos.html"}, {"entry": "RHP Nick Putnam (NCAA)", "team": "LAD", "category": "MiLB Signings", "date": "10/27", "team_page": "lad.html"}, {"entry": "RHRP Eduardo Salazar (MLB)", "team": "WSH", "category": "Elected MiLB FA", "date": "10/29", "team_page": "wsh.html"}, {"entry": "RHRP Mason Thompson (MLB)", "team": "WSH", "category": "Elected MiLB FA", "date": "10/29", "team_page": "wsh.html"}, {"entry": "LHRP Shinnosuke Ogasawara (MLB)", "team": "WSH", "category": "Outrighted", "date": "10/29", "team_page": "wsh.html"}, {"entry": "RHRP Diego Areinamo (DSL)", "team": "ATL", "category": "Released", "date": "10/30", "team_page": "atl.html"}, {"entry": "RHSP Anferni Gonzalez (DSL)", "team": "ATL", "category": "Released", "date": "10/30", "team_page": "atl.html"}, {"entry": "1B Hojans Hernandez (DSL)", "team": "ATL", "category": "Released", "date": "10/30", "team_page": "atl.html"}, {"entry": "LHRP Yansel Marine (DSL)", "team": "ATL", "category": "Released", "date": "10/30", "team_page": "atl.html"}, {"entry": "CF Abraham Cohen (DSL)", "team": "BAL", "category": "Released", "date": "10/30", "team_page": "bal.html"}, {"entry": "C Ian Francis (NCAA)", "team": "CIN", "category": "MiLB Signings", "date": "10/30", "team_page": "cin.html"}, {"entry": "C Tom\u00e1s Nido* (MLB)", "team": "DET", "category": "MiLB Signings", "date": "10/30", "team_page": "det.html"}, {"entry": "RHP Brad Rudis (NCAA)", "team": "MIN", "category": "MiLB Signings", "date": "10/30", "team_page": "min.html"}, {"entry": "RHP Roniel Joseph (DOM)", "team": "BAL", "category": "2025 Intl Signings", "date": "10/31", "team_page": "bal.html"}, {"entry": "RHP Jose Gonzalez (MEX)", "team": "CHC", "category": "2025 Intl Signings", "date": "10/31", "team_page": "chc.html"}, {"entry": "RHRP Ian Gibaut (MLB)", "team": "CIN", "category": "Elected MiLB FA", "date": "10/31", "team_page": "cin.html"}, {"entry": "3B Santiago Espinal (MLB)", "team": "CIN", "category": "Elected MiLB FA", "date": "10/31", "team_page": "cin.html"}, {"entry": "C Henry Hunter (NCAA)", "team": "CIN", "category": "MiLB Signings", "date": "10/31", "team_page": "cin.html"}, {"entry": "LHRP Lucas Gilbreath (MLB)", "team": "COL", "category": "Elected MiLB FA", "date": "10/31", "team_page": "col.html"}, {"entry": "3B Aaron Schunk (MLB)", "team": "COL", "category": "Elected MiLB FA", "date": "10/31", "team_page": "col.html"}, {"entry": "RHRP Dugan Darnell (PIT, MLB)", "team": "COL", "category": "Lost off Waivers", "date": "10/31", "team_page": "col.html"}, {"entry": "RHSP Peter Lambert (NPB)", "team": "HOU", "category": "MiLB Signings", "date": "10/31", "team_page": "hou.html"}, {"entry": "~~RHRP Dugan Darnell (COL, MLB)~~", "team": "PIT", "category": "Waiver Claims", "date": "10/31", "team_page": "pit.html"}, {"entry": "RHRP Damian Alcala (DSL)", "team": "TBR", "category": "Released", "date": "10/31", "team_page": "tbr.html"}, {"entry": "RHRP Yeison Silgado (DSL)", "team": "TBR", "category": "Released", "date": "10/31", "team_page": "tbr.html"}, {"entry": "RHRP Jean Tamayo (DSL)", "team": "TBR", "category": "Released", "date": "10/31", "team_page": "tbr.html"}, {"entry": "C Jorge Alfaro (MLB)", "team": "WSH", "category": "Elected MiLB FA", "date": "10/31", "team_page": "wsh.html"}, {"entry": "RHRP Michael Correa (DSL)", "team": "STL", "category": "Released", "date": "11/1", "team_page": "stl.html"}, {"entry": "OF Saul Figuereo (DOM)", "team": "STL", "category": "2025 Intl Signings", "date": "11/1", "team_page": "stl.html"}, {"entry": "OF Andey Garrido (CUB)", "team": "STL", "category": "2025 Intl Signings", "date": "11/1", "team_page": "stl.html"}, {"entry": "LHRP Jalen Beeks", "team": "ARI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "ari.html"}, {"entry": "RHSP Zac Gallen", "team": "ARI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "ari.html"}, {"entry": "C James McCann", "team": "ARI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "ari.html"}, {"entry": "RHRP Jos\u00e9 Leclerc", "team": "ATH", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "ath.html"}, {"entry": "RHRP Scott McGough", "team": "ATH", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "ath.html"}, {"entry": "LHRP Sean Newcomb", "team": "ATH", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "ath.html"}, {"entry": "RHRP Raisel Iglesias", "team": "ATL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "atl.html"}, {"entry": "RHSP Charlie Morton", "team": "ATL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "atl.html"}, {"entry": "DH Marcell Ozuna", "team": "ATL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "atl.html"}, {"entry": "RHRP Connor Seabold", "team": "ATL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "atl.html"}, {"entry": "RHSP Zach Eflin", "team": "BAL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bal.html"}, {"entry": "C Gary S\u00e1nchez", "team": "BAL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bal.html"}, {"entry": "RHSP Tomoyuki Sugano", "team": "BAL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bal.html"}, {"entry": "LHRP Steven Matz", "team": "BOS", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bos.html"}, {"entry": "RHSP Dustin May", "team": "BOS", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bos.html"}, {"entry": "RF Rob Refsnyder", "team": "BOS", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bos.html"}, {"entry": "LHRP Justin Wilson", "team": "BOS", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "bos.html"}, {"entry": "RHRP Ryan Brasier", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "2B Willi Castro", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "RHSP Aaron Civale", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "RHRP Brad Keller", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "LHRP Drew Pomeranz", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "LHRP Taylor Rogers", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "1B Carlos Santana", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "RHSP Michael Soroka", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "LHRP Caleb Thielbar", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "RF Kyle Tucker", "team": "CHC", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chc.html"}, {"entry": "LHRP Tyler Alexander", "team": "CHW", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chw.html"}, {"entry": "RHRP Miguel Castro", "team": "CHW", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chw.html"}, {"entry": "CF Michael A. Taylor", "team": "CHW", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "chw.html"}, {"entry": "3B Miguel And\u00fajar", "team": "CIN", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cin.html"}, {"entry": "RHSP Zack Littell", "team": "CIN", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cin.html"}, {"entry": "RHSP Nick Martinez", "team": "CIN", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cin.html"}, {"entry": "LHSP Wade Miley", "team": "CIN", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cin.html"}, {"entry": "RHRP Emilio Pag\u00e1n", "team": "CIN", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cin.html"}, {"entry": "RHRP Jakob Junis", "team": "CLE", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cle.html"}, {"entry": "CF Lane Thomas", "team": "CLE", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "cle.html"}, {"entry": "SS Orlando Arcia", "team": "COL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "col.html"}, {"entry": "RHSP Germ\u00e1n M\u00e1rquez", "team": "COL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "col.html"}, {"entry": "RHSP Alex Cobb", "team": "DET", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "det.html"}, {"entry": "RHRP Kyle Finnegan", "team": "DET", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "det.html"}, {"entry": "RHRP Tommy Kahnle", "team": "DET", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "det.html"}, {"entry": "RHRP Rafael Montero", "team": "DET", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "det.html"}, {"entry": "RHSP Chris Paddack", "team": "DET", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "det.html"}, {"entry": "2B Gleyber Torres", "team": "DET", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "det.html"}, {"entry": "C Victor Caratini", "team": "HOU", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "hou.html"}, {"entry": "RHRP Craig Kimbrel", "team": "HOU", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "hou.html"}, {"entry": "2B Brendan Rodgers", "team": "HOU", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "hou.html"}, {"entry": "LHSP Framber Valdez", "team": "HOU", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "hou.html"}, {"entry": "2B Adam Frazier", "team": "KCR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "kcr.html"}, {"entry": "RHRP Hunter Harvey", "team": "KCR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "kcr.html"}, {"entry": "C Luke Maile", "team": "KCR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "kcr.html"}, {"entry": "RF Mike Yastrzemski", "team": "KCR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "kcr.html"}, {"entry": "LHSP Tyler Anderson", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "LHRP Andrew Chafin", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "RHRP Luis Garc\u00eda", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "RHSP Kyle Hendricks", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "RHRP Kenley Jansen", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "3B Yo\u00e1n Moncada", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "2B Luis Rengifo", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "RHRP Hunter Strickland", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "RF Chris Taylor", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "RHRP Jos\u00e9 Ure\u00f1a", "team": "LAA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "laa.html"}, {"entry": "LF Michael Conforto", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "LHSP Andrew Heaney", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "3B Enrique Hern\u00e1ndez", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "LHSP Clayton Kershaw", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "RHRP Michael Kopech", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "2B Miguel Rojas", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "RHRP Kirby Yates", "team": "LAD", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "lad.html"}, {"entry": "RHRP Shelby Miller", "team": "MIL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "mil.html"}, {"entry": "LHSP Jordan Montgomery", "team": "MIL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "mil.html"}, {"entry": "C Christian V\u00e1zquez", "team": "MIN", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "min.html"}, {"entry": "RHSP Griffin Canning", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "RHRP Ryan Helsley", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "DH Starling Marte", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "CF Cedric Mullins", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "RHRP Tyler Rogers", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "LHRP Gregory Soto", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "RHRP Ryne Stanek", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "DH Jesse Winker", "team": "NYM", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nym.html"}, {"entry": "RHRP Paul Blackburn", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "1B Paul Goldschmidt", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "CF Trent Grisham", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "3B Amed Rosario", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "RF Austin Slater", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "RHRP Luke Weaver", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "RHRP Devin Williams", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "LHRP Ryan Yarbrough", "team": "NYY", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "nyy.html"}, {"entry": "RHSP Walker Buehler", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "LF Max Kepler", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "LHRP Tim Mayza", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "C J.T. Realmuto", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "RHRP David Robertson", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "RHRP Jordan Romano", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "DH Kyle Schwarber", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "LHSP Ranger Su\u00e1rez", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "RHRP Lou Trivino", "team": "PHI", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "phi.html"}, {"entry": "DH Andrew McCutchen", "team": "PIT", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "pit.html"}, {"entry": "LF Tommy Pham", "team": "PIT", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "pit.html"}, {"entry": "1B Luis Arraez", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "RHSP Dylan Cease", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "LHSP Nestor Cortes", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "2B Jose Iglesias", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "RHSP Michael King", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "C Mart\u00edn Maldonado", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "1B Ryan O'Hearn", "team": "SDP", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sdp.html"}, {"entry": "LHRP Caleb Ferguson", "team": "SEA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sea.html"}, {"entry": "RHRP Luke Jackson", "team": "SEA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sea.html"}, {"entry": "1B Josh Naylor", "team": "SEA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sea.html"}, {"entry": "3B Eugenio Su\u00e1rez", "team": "SEA", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sea.html"}, {"entry": "DH Wilmer Flores", "team": "SFG", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sfg.html"}, {"entry": "1B Dominic Smith", "team": "SFG", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sfg.html"}, {"entry": "RHSP Justin Verlander", "team": "SFG", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "sfg.html"}, {"entry": "RHSP Miles Mikolas", "team": "STL", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "stl.html"}, {"entry": "RHSP Adrian Houser", "team": "TBR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tbr.html"}, {"entry": "LF Coco Montes", "team": "TBR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tbr.html"}, {"entry": "RHRP Shawn Armstrong", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "LHSP Patrick Corbin", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "LHRP Danny Coulombe", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "RHRP Jon Gray", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "RHSP Merrill Kelly", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "RHSP Tyler Mahle", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "RHRP Chris Martin", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "RHRP Phil Maton", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "LHRP Hoby Milner", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "2B Dylan Moore", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "1B Donovan Solano", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "1B Rowdy Tellez", "team": "TEX", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tex.html"}, {"entry": "RHSP Chris Bassitt", "team": "TOR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tor.html"}, {"entry": "SS Bo Bichette", "team": "TOR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tor.html"}, {"entry": "RHRP Seranthony Dom\u00ednguez", "team": "TOR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tor.html"}, {"entry": "1B Ty France", "team": "TOR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tor.html"}, {"entry": "SS Isiah Kiner-Falefa", "team": "TOR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tor.html"}, {"entry": "RHSP Max Scherzer", "team": "TOR", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "tor.html"}, {"entry": "LHRP Ryan Borucki (MLB)", "team": "TOR", "category": "Elected MiLB FA", "date": "11/2", "team_page": "tor.html"}, {"entry": "3B Michael Stefanic (MLB)", "team": "TOR", "category": "Elected MiLB FA", "date": "11/2", "team_page": "tor.html"}, {"entry": "DH Josh Bell", "team": "WSH", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "wsh.html"}, {"entry": "3B Paul DeJong", "team": "WSH", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "wsh.html"}, {"entry": "RHRP Derek Law", "team": "WSH", "category": "Elected MLB FA/Non-tendered", "date": "11/2", "team_page": "wsh.html"}, {"entry": "RHRP Pedro Figueroa (CPX)", "team": "BAL", "category": "Released", "date": "11/3", "team_page": "bal.html"}, {"entry": "RHP Jean Henriquez", "team": "BAL", "category": "MiLB Signings", "date": "11/3", "team_page": "bal.html"}, {"entry": "RF Ryan Vilade (TBR, MLB)", "team": "CIN", "category": "Traded Away", "date": "11/3", "team_page": "cin.html"}, {"entry": "RHSP Michael Lorenzen", "team": "KCR", "category": "Elected MLB FA/Non-tendered", "date": "11/3", "team_page": "kcr.html"}, {"entry": "C Danny Jansen", "team": "MIL", "category": "Elected MLB FA/Non-tendered", "date": "11/3", "team_page": "mil.html"}, {"entry": "RHSP Brandon Woodruff", "team": "MIL", "category": "Elected MLB FA/Non-tendered", "date": "11/3", "team_page": "mil.html"}, {"entry": "RHSP Coleman Crow (AAA)", "team": "MIL", "category": "Added to 40-Man", "date": "11/3", "team_page": "mil.html"}, {"entry": "RHRP Juan Figaro (DSL)", "team": "MIN", "category": "Released", "date": "11/3", "team_page": "min.html"}, {"entry": "1B Jamesson Val (DSL)", "team": "MIN", "category": "Released", "date": "11/3", "team_page": "min.html"}, {"entry": "RHP Darlin Mejia (DOM)", "team": "PIT", "category": "2025 Intl Signings", "date": "11/3", "team_page": "pit.html"}];  // Limit for performance
+
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+
+if (searchInput && searchResults) {
+    searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        
+        if (query.length < 2) {
+            searchResults.classList.remove('active');
+            return;
+        }
+        
+        const matches = searchData.filter(t => 
+            t.entry.toLowerCase().includes(query)
+        ).slice(0, 10);
+        
+        if (matches.length === 0) {
+            searchResults.innerHTML = '<div class="search-result-item"><div class="search-result-detail">No results found</div></div>';
+        } else {
+            searchResults.innerHTML = matches.map(t => `
+                <a href="${t.team_page}" class="search-result-item">
+                    <div class="search-result-player">${t.entry}</div>
+                    <div class="search-result-detail">${t.team} - ${t.category}${t.date ? ' (' + t.date + ')' : ''}</div>
+                </a>
+            `).join('');
+        }
+        
+        searchResults.classList.add('active');
+    });
+    
+    searchInput.addEventListener('blur', function() {
+        setTimeout(() => searchResults.classList.remove('active'), 200);
+    });
+    
+    searchInput.addEventListener('focus', function() {
+        if (this.value.length >= 2) {
+            searchResults.classList.add('active');
+        }
+    });
+}
+
+// Load more functionality (placeholder)
+function loadMore(type) {
+    console.log('Load more:', type);
+    // In a real implementation, this would fetch more data
+    alert('Load more functionality coming soon!');
+}
+
+    </script>
+</body>
+</html>
