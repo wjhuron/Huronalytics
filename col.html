@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colorado Rockies - Huronalytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+/* Huronalytics Styles */
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #111;
+    --bg-tertiary: #1a1a1a;
+    --text-primary: #f0f0f0;
+    --text-secondary: #888;
+    --text-muted: #555;
+    --accent: #c41e3a;
+    --accent-light: #e63757;
+    --accent-dim: #8b1528;
+    --border: #2a2a2a;
+    --green: #3d9942;
+    --red: #c73e4d;
+    --blue: #3b7dd8;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+/* Header */
+.header {
+    padding: 1.5rem 3rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--bg-primary);
+    z-index: 100;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.logo span {
+    color: var(--accent-light);
+}
+
+.nav {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+
+.nav a:hover, .nav a.active {
+    color: var(--text-primary);
+}
+
+/* Search */
+.search-container {
+    position: relative;
+}
+
+.search-input {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    color: var(--text-primary);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    width: 250px;
+    transition: border-color 0.2s, width 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    width: 300px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+    z-index: 200;
+}
+
+.search-results.active {
+    display: block;
+}
+
+.search-result-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-result-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-player {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.search-result-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Hero */
+.hero {
+    padding: 3rem;
+    background: linear-gradient(135deg, var(--accent-dim) 0%, var(--bg-primary) 60%);
+    border-bottom: 1px solid var(--border);
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+}
+
+.hero p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Team Header (for team pages) */
+.team-header {
+    padding: 3rem;
+    background: linear-gradient(135deg, var(--accent) 0%, #1a0a0a 100%);
+    border-bottom: 3px solid var(--accent-light);
+}
+
+.team-name {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+}
+
+.team-subtitle {
+    color: rgba(255,255,255,0.7);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Teams Grid */
+.teams-section {
+    padding: 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+
+.team-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: border-color 0.2s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.team-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.team-card.current {
+    border-color: var(--accent-light);
+    background: var(--accent-dim);
+}
+
+.team-abbr {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent-light);
+}
+
+.team-name {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Feeds */
+.feeds-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 2rem 3rem;
+}
+
+@media (max-width: 1200px) {
+    .feeds-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.feed {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.feed-header {
+    padding: 1rem 1.25rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.feed-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.feed-body {
+    max-height: 700px;
+    overflow-y: auto;
+}
+
+.feed-item {
+    display: grid;
+    grid-template-columns: 50px 55px 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    align-items: baseline;
+    transition: background 0.2s;
+}
+
+.feed-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.feed-item:last-child {
+    border-bottom: none;
+}
+
+.feed-team {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--accent-light);
+    font-size: 0.8rem;
+}
+
+.feed-date {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.feed-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.feed-player {
+    color: var(--text-primary);
+}
+
+.feed-category {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.feed-category.signing { color: var(--green); }
+.feed-category.trade { color: var(--blue); }
+.feed-category.waiver { color: #9b59b6; }
+.feed-category.lost { color: var(--red); }
+
+.load-more {
+    padding: 1rem;
+    text-align: center;
+    border-top: 1px solid var(--border);
+}
+
+.load-more-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.5rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.load-more-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+/* Accordion */
+.accordion-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.accordion-section {
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.accordion-header {
+    background: var(--bg-secondary);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.accordion-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.accordion-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.accordion-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+}
+
+.accordion-icon {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    transition: transform 0.3s;
+}
+
+.accordion-section.open .accordion-icon {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    display: none;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border);
+}
+
+.accordion-section.open .accordion-content {
+    display: block;
+}
+
+.transaction-list {
+    padding: 0;
+    list-style: none;
+}
+
+.transaction-item {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    align-items: baseline;
+}
+
+.transaction-item:last-child {
+    border-bottom: none;
+}
+
+.transaction-item:hover {
+    background: var(--bg-secondary);
+}
+
+.transaction-list .subheader {
+    padding: 0.5rem 1.5rem;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'JetBrains Mono', monospace;
+    border-bottom: 1px solid var(--border);
+    list-style: none;
+}
+
+.tx-date {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.tx-player {
+    color: var(--text-primary);
+}
+
+/* Footer */
+.footer {
+    padding: 2rem 3rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.footer a {
+    color: var(--accent-light);
+    text-decoration: none;
+}
+
+/* Scrollbars */
+.feed-body::-webkit-scrollbar,
+.accordion-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.feed-body::-webkit-scrollbar-track,
+.accordion-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.feed-body::-webkit-scrollbar-thumb,
+.accordion-content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header {
+        padding: 1rem 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .nav {
+        gap: 1rem;
+    }
+    
+    .search-input {
+        width: 180px;
+    }
+    
+    .search-input:focus {
+        width: 200px;
+    }
+    
+    .hero, .teams-section, .feeds-container {
+        padding: 1.5rem;
+    }
+    
+    .hero h1 {
+        font-size: 1.75rem;
+    }
+    
+    .team-header {
+        padding: 2rem 1.5rem;
+    }
+    
+    .team-header .team-name {
+        font-size: 2rem;
+    }
+    
+    .accordion-container {
+        padding: 1rem;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="index.html" class="logo">huron<span>alytics</span></a>
+        <nav class="nav">
+            <a href="index.html">Home</a>
+            <a href="teams.html" class="active">All Teams</a>
+            <a href="about.html">About</a>
+            <div class="search-container">
+                <span class="search-icon">⌕</span>
+                <input type="text" class="search-input" placeholder="Search players..." id="searchInput">
+            </div>
+        </nav>
+    </header>
+
+    <div class="team-header">
+        <h1 class="team-name">Colorado Rockies</h1>
+        <p class="team-subtitle">2025-26 Offseason Transactions</p>
+    </div>
+
+    <div class="accordion-container">
+        <div class="accordion-section open">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    MLB Free Agents / Non-tendered
+                    <span class="accordion-count">5</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">11/2</span>
+                        <span class="tx-player">SS Orlando Arcia → MIN (MiLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/2</span>
+                        <span class="tx-player">RHSP Germán Márquez</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/4</span>
+                        <span class="tx-player">2B Kyle Farmer</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">2B Thairo Estrada</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/21</span>
+                        <span class="tx-player">1B Michael Toglia → CIN (MiLB)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    MLB Signings
+                    <span class="accordion-count">1</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">RHSP Michael Lorenzen (KCR)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Trades
+                    <span class="accordion-count">5</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="subheader">Acquired</li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/18</span>
+                        <span class="tx-player">LHRP Brennan Bernardino (BOS, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">1/10</span>
+                        <span class="tx-player">LF Jake McCarthy (ARI, MLB)</span>
+                    </li>
+                    <li class="subheader">Traded Away</li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/18</span>
+                        <span class="tx-player">CF Braiden Ward (BOS, AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/19</span>
+                        <span class="tx-player">LHRP Ryan Rolison (ATL, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">1/10</span>
+                        <span class="tx-player">RHSP Josh Grosz (ARI, A+)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Waiver Claims
+                    <span class="accordion-count">3</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">11/5</span>
+                        <span class="tx-player">1B Troy Jonhston (MIA, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHRP Garrett Acton (TBR, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">1/7</span>
+                        <span class="tx-player">RHRP Keegan Thompson (CIN, AAA)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Lost off Waivers
+                    <span class="accordion-count">3</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">10/31</span>
+                        <span class="tx-player">RHRP Dugan Darnell (PIT, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/5</span>
+                        <span class="tx-player">RHRP Anthony Molina (ATL, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/5</span>
+                        <span class="tx-player">C Drew Romo (BAL, MLB)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    MiLB Free Agents
+                    <span class="accordion-count">26</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">9/29</span>
+                        <span class="tx-player">1B Keston Hiura (MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">10/2</span>
+                        <span class="tx-player">CF Sam Hilliard (MLB) → KT (KBO)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">10/31</span>
+                        <span class="tx-player">LHRP Lucas Gilbreath (MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">10/31</span>
+                        <span class="tx-player">3B Aaron Schunk (MLB) → ATL (MiLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHRP Luis Amoroso (A+)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">CF Trevor Boone (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">LF Sean Bouchard (MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHSP Biembenido Brito (CPX)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHSP Kyle Brnovich (AAA) → PHI (MiLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RF Jesus Bugarin (A+)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHRP Tyler Burch (AA) → NYM (MiLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">2B Julio Carreras (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">C Daniel Cope (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHSP Xzavion Curry (MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">LF Juan Guerrero (AA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHRP Karl Kauffmann (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">LHRP Antoine Kelly (AAA) → LAD (MiLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">SS Owen Miller (MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">C Ronaiker Palma (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHRP Alan Perdomo (A+)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">2B Jean Perez (A+)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHSP Andrew Quezada (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">LHRP Felix Ramires (A+)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">LHRP Matt Turner (AAA) → NYY (MiLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/6</span>
+                        <span class="tx-player">RHRP Connor Van Scoyoc (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/7</span>
+                        <span class="tx-player">1B Warming Bernabel (MLB) → WSH (MiLB)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    MiLB Signings
+                    <span class="accordion-count">15</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">RHRP Francis Rivera* (A+)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">RHRP Brayan Castillo* (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">C Jose Cordova* (AA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">RHSP Manuel Olivares* (A)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">RF GJ Hill* (AA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/14</span>
+                        <span class="tx-player">CF Drew Avans (MIL, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/21</span>
+                        <span class="tx-player">LHRP Parker Mushinski (CLE, AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/25</span>
+                        <span class="tx-player">LHSP Adam Laskey (MIA, AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/1</span>
+                        <span class="tx-player">RHRP John Brebbia (BOS, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/5</span>
+                        <span class="tx-player">RHRP Eiberson Castellano (PHI, AA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/8</span>
+                        <span class="tx-player">SS Nicky Lopez (CHC, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/9</span>
+                        <span class="tx-player">SS Chad Stevens (LAA, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/17</span>
+                        <span class="tx-player">C Brett Sullivan (PIT, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/21</span>
+                        <span class="tx-player">3B Vimael Machín (BAL, MLB)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">1/8</span>
+                        <span class="tx-player">INF Jack O&#x27;Dowd (PION)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    International Signings
+                    <span class="accordion-count">2</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">10/3</span>
+                        <span class="tx-player">C Adafel Montiel (VEN)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/22</span>
+                        <span class="tx-player">INF William Ferrufino (NIC)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Released
+                    <span class="accordion-count">1</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">11/12</span>
+                        <span class="tx-player">RHRP Roansy Contreras (MLB) → Rakuten (NPB)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Added to 40-Man
+                    <span class="accordion-count">3</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">11/18</span>
+                        <span class="tx-player">LHRP Welinton Herrera (AA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/18</span>
+                        <span class="tx-player">RHSP Gabriel Hughes (AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">11/18</span>
+                        <span class="tx-player">LF Sterlin Thompson (AAA)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Rule-5 Draft
+                    <span class="accordion-count">5</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="subheader">Additions</li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/10</span>
+                        <span class="tx-player">RHRP RJ Petit (DET, AAA)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/10</span>
+                        <span class="tx-player">RHRP TJ Shook (NYM, AAA)</span>
+                    </li>
+                    <li class="subheader">Losses</li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/10</span>
+                        <span class="tx-player">RHRP Brady Hill (WSH, A)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/10</span>
+                        <span class="tx-player">RHSP Bryan Mena (PIT, A)</span>
+                    </li>
+                    <li class="transaction-item">
+                        <span class="tx-date">12/10</span>
+                        <span class="tx-player">RHRP Luke Taggart (DET, A+)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Retired
+                    <span class="accordion-count">1</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item">
+                        <span class="tx-date">12/10</span>
+                        <span class="tx-player">SS Nolan Clifford (AAA)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+    <section class="teams-section">
+        <div class="section-header">
+            <h2 class="section-title">Other Teams</h2>
+        </div>
+        <div class="teams-grid">
+            <a href="ari.html" class="team-card"><span class="team-abbr">ARI</span><span class="team-name">Diamondbacks</span></a>
+            <a href="ath.html" class="team-card"><span class="team-abbr">ATH</span><span class="team-name">Athletics</span></a>
+            <a href="atl.html" class="team-card"><span class="team-abbr">ATL</span><span class="team-name">Braves</span></a>
+            <a href="bal.html" class="team-card"><span class="team-abbr">BAL</span><span class="team-name">Orioles</span></a>
+            <a href="bos.html" class="team-card"><span class="team-abbr">BOS</span><span class="team-name">Red Sox</span></a>
+            <a href="chc.html" class="team-card"><span class="team-abbr">CHC</span><span class="team-name">Cubs</span></a>
+            <a href="chw.html" class="team-card"><span class="team-abbr">CHW</span><span class="team-name">White Sox</span></a>
+            <a href="cin.html" class="team-card"><span class="team-abbr">CIN</span><span class="team-name">Reds</span></a>
+            <a href="cle.html" class="team-card"><span class="team-abbr">CLE</span><span class="team-name">Guardians</span></a>
+            <a href="col.html" class="team-card current"><span class="team-abbr">COL</span><span class="team-name">Rockies</span></a>
+            <a href="det.html" class="team-card"><span class="team-abbr">DET</span><span class="team-name">Tigers</span></a>
+            <a href="hou.html" class="team-card"><span class="team-abbr">HOU</span><span class="team-name">Astros</span></a>
+            <a href="kcr.html" class="team-card"><span class="team-abbr">KCR</span><span class="team-name">Royals</span></a>
+            <a href="laa.html" class="team-card"><span class="team-abbr">LAA</span><span class="team-name">Angels</span></a>
+            <a href="lad.html" class="team-card"><span class="team-abbr">LAD</span><span class="team-name">Dodgers</span></a>
+            <a href="mia.html" class="team-card"><span class="team-abbr">MIA</span><span class="team-name">Marlins</span></a>
+            <a href="mil.html" class="team-card"><span class="team-abbr">MIL</span><span class="team-name">Brewers</span></a>
+            <a href="min.html" class="team-card"><span class="team-abbr">MIN</span><span class="team-name">Twins</span></a>
+            <a href="nym.html" class="team-card"><span class="team-abbr">NYM</span><span class="team-name">Mets</span></a>
+            <a href="nyy.html" class="team-card"><span class="team-abbr">NYY</span><span class="team-name">Yankees</span></a>
+            <a href="phi.html" class="team-card"><span class="team-abbr">PHI</span><span class="team-name">Phillies</span></a>
+            <a href="pit.html" class="team-card"><span class="team-abbr">PIT</span><span class="team-name">Pirates</span></a>
+            <a href="sdp.html" class="team-card"><span class="team-abbr">SDP</span><span class="team-name">Padres</span></a>
+            <a href="sea.html" class="team-card"><span class="team-abbr">SEA</span><span class="team-name">Mariners</span></a>
+            <a href="sfg.html" class="team-card"><span class="team-abbr">SFG</span><span class="team-name">Giants</span></a>
+            <a href="stl.html" class="team-card"><span class="team-abbr">STL</span><span class="team-name">Cardinals</span></a>
+            <a href="tbr.html" class="team-card"><span class="team-abbr">TBR</span><span class="team-name">Rays</span></a>
+            <a href="tex.html" class="team-card"><span class="team-abbr">TEX</span><span class="team-name">Rangers</span></a>
+            <a href="tor.html" class="team-card"><span class="team-abbr">TOR</span><span class="team-name">Blue Jays</span></a>
+            <a href="wsh.html" class="team-card"><span class="team-abbr">WSH</span><span class="team-name">Nationals</span></a>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>Built by <a href="#">@huronalytics</a> | Data updated daily during the offseason</p>
+    </footer>
+
+    <script src="search.js"></script>
+    <script>
+        function toggleAccordion(header) {
+            const section = header.parentElement;
+            section.classList.toggle('open');
+        }
+    </script>
+</body>
+</html>
