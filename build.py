@@ -49,7 +49,7 @@ TEAM_INFO = {
 }
 
 # Columns for MLB feed
-MLB_RELEVANT_COLS = ['MLB Signings', 'Extensions', 'Traded For', 'Traded Away', 'Waiver Claims', 'Lost off Waivers']
+MLB_RELEVANT_COLS = ['MLB Signing', 'Extension', 'Traded For', 'Traded Away', 'Waiver Claim', 'Lost off Waivers']
 
 # Columns to skip (paired columns)
 SKIP_COLS = ['New Team']
@@ -64,7 +64,7 @@ ACCORDION_SECTIONS = [
     {'title': 'Lost off Waivers', 'columns': ['Lost off Waivers']},
     {'title': 'MiLB Free Agents', 'columns': ['Elected MiLB FA'], 'paired_col': 'New Team'},
     {'title': 'MiLB Signings', 'columns': ['MiLB Signings']},
-    {'title': 'International Signings', 'columns': ['2025 Intl Signings']},
+    {'title': 'International Signings', 'columns': ['Intl Amateur Signings']},
     {'title': 'Released', 'columns': ['Released'], 'paired_col': 'New Team'},
     {'title': 'Outrighted', 'columns': ['Outrighted']},
     {'title': 'Added to 40-Man', 'columns': ['Added to 40-Man']},
