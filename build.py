@@ -1176,9 +1176,9 @@ def generate_search_js(all_transactions):
             'date': t['date'],
             'team_page': f"{t['team_abbr'].lower()}.html"
         })
-    
+
     return f'''// Search functionality
-const searchData = {json.dumps(search_data[:500])};  // Limit for performance
+const searchData = {json.dumps(search_data)};  // All transactions searchable
 
 const searchInput = document.getElementById('searchInput');
 const searchResults = document.getElementById('searchResults');
