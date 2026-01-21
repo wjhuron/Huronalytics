@@ -216,6 +216,52 @@ body {
     font-weight: 600;
 }
 
+/* Key Section */
+.key-section {
+    padding: 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.key-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.key-group {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+}
+
+.key-heading {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent-light);
+    margin-bottom: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.key-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.key-list li {
+    font-size: 0.85rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    padding: 0.25rem 0;
+}
+
+.key-list li strong {
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
 .teams-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -565,8 +611,6 @@ body {
         <a href="index.html" class="logo">huron<span>alytics</span></a>
         <nav class="nav">
             <a href="index.html">Home</a>
-            <a href="teams.html" class="active">All Teams</a>
-            <a href="about.html">About</a>
             <div class="search-container">
                 <span class="search-icon">⌕</span>
                 <input type="text" class="search-input" placeholder="Search players..." id="searchInput">

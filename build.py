@@ -392,8 +392,6 @@ def generate_team_page(team_abbr, team_data, all_transactions, css_content):
         <a href="index.html" class="logo">huron<span>alytics</span></a>
         <nav class="nav">
             <a href="index.html">Home</a>
-            <a href="teams.html" class="active">All Teams</a>
-            <a href="about.html">About</a>
             <div class="search-container">
                 <span class="search-icon">⌕</span>
                 <input type="text" class="search-input" placeholder="Search players..." id="searchInput">
@@ -493,8 +491,6 @@ def generate_homepage(all_transactions, css_content, search_js):
         <a href="index.html" class="logo">huron<span>alytics</span></a>
         <nav class="nav">
             <a href="index.html" class="active">Home</a>
-            <a href="teams.html">All Teams</a>
-            <a href="about.html">About</a>
             <div class="search-container">
                 <span class="search-icon">⌕</span>
                 <input type="text" class="search-input" placeholder="Search players..." id="searchInput">
@@ -513,6 +509,39 @@ def generate_homepage(all_transactions, css_content, search_js):
             <h2 class="section-title">Teams</h2>
         </div>
 {team_grid}
+    </section>
+
+    <section class="key-section">
+        <div class="section-header">
+            <h2 class="section-title">Key</h2>
+        </div>
+        <div class="key-content">
+            <div class="key-group">
+                <h3 class="key-heading">General Notation</h3>
+                <ul class="key-list">
+                    <li><strong>*</strong> = Re-signed (MLB Signings, MiLB Signings)</li>
+                    <li><strong>(Team)</strong> = Last team played for</li>
+                    <li><strong>(Team, Level)</strong> = Last team and highest level reached (MiLB Signings, trades, waivers)</li>
+                    <li><strong><em>Italics</em></strong> = MLB portion of Rule-5 Draft, or player subsequently outrighted (Waiver Claims)</li>
+                    <li><strong><s>Strikethrough</s></strong> = No longer in organization (except if lost off waivers then re-joined)</li>
+                </ul>
+            </div>
+            <div class="key-group">
+                <h3 class="key-heading">Free Agents & Released Players</h3>
+                <ul class="key-list">
+                    <li><strong>New Team (Contract Type)</strong> = Where player signed and contract level</li>
+                    <li>Example: "TBR (MiLB)" = Signed with Rays on Minor League contract</li>
+                    <li>Example: "Rakuten (NPB)" = Signed with team in foreign league</li>
+                </ul>
+            </div>
+            <div class="key-group">
+                <h3 class="key-heading">International Signings</h3>
+                <ul class="key-list">
+                    <li><strong>(Three-letter code)</strong> = Player's country using ISO Alpha-3 codes</li>
+                    <li>Example: "DOM" = Dominican Republic, "VEN" = Venezuela, "CUB" = Cuba</li>
+                </ul>
+            </div>
+        </div>
     </section>
 
     <footer class="footer">
@@ -734,6 +763,52 @@ body {
 .section-title {
     font-size: 1.25rem;
     font-weight: 600;
+}
+
+/* Key Section */
+.key-section {
+    padding: 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.key-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.key-group {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+}
+
+.key-heading {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent-light);
+    margin-bottom: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.key-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.key-list li {
+    font-size: 0.85rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    padding: 0.25rem 0;
+}
+
+.key-list li strong {
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
 }
 
 .teams-grid {
