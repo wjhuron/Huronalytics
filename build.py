@@ -545,7 +545,7 @@ def generate_homepage(all_transactions, css_content, search_js):
                 </ul>
             </div>
             <div class="key-group">
-                <h3 class="key-heading">International Signings</h3>
+                <h3 class="key-heading">International Amateur Signings</h3>
                 <ul class="key-list">
                     <li><strong>(Three-letter code)</strong> = Player's country using ISO Alpha-3 codes</li>
                     <li>Example: "DOM" = Dominican Republic, "VEN" = Venezuela, "CUB" = Cuba</li>
