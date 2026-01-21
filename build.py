@@ -447,30 +447,32 @@ def generate_team_grid(current_team=None):
 
 def generate_homepage(all_transactions, css_content, search_js):
     """Generate the homepage HTML"""
+    # COMMENTED OUT: Transaction feed generation - can be re-enabled later
     # Filter out "Lost off Waivers" and "Traded Away" since they duplicate info
     # (Waiver Claims shows where player came from, Traded For shows where player came from)
-    excluded_categories = ['Lost off Waivers', 'Traded Away']
-    filtered_transactions = [t for t in all_transactions if t['category'] not in excluded_categories]
-    
-    # Sort for homepage feeds: newest first (reverse chronological)
-    # Need a different sort key that puts newest first
-    def homepage_sort_key(t):
-        if t['date'] is None:
-            return (0, 0, 0)  # No date goes to end
-        try:
-            parts = t['date'].split('/')
-            month = int(parts[0])
-            day = int(parts[1])
-            year = 2025 if month >= 9 else 2026
-            return (year, month, day)
-        except:
-            return (0, 0, 0)
-    
-    filtered_sorted = sorted(filtered_transactions, key=homepage_sort_key, reverse=True)
-    mlb_transactions = [t for t in filtered_sorted if t['is_mlb']]
-    
-    mlb_feed = generate_feed_html(mlb_transactions, limit=25)
-    all_feed = generate_feed_html(filtered_sorted, limit=25)
+    # excluded_categories = ['Lost off Waivers', 'Traded Away']
+    # filtered_transactions = [t for t in all_transactions if t['category'] not in excluded_categories]
+    #
+    # # Sort for homepage feeds: newest first (reverse chronological)
+    # # Need a different sort key that puts newest first
+    # def homepage_sort_key(t):
+    #     if t['date'] is None:
+    #         return (0, 0, 0)  # No date goes to end
+    #     try:
+    #         parts = t['date'].split('/')
+    #         month = int(parts[0])
+    #         day = int(parts[1])
+    #         year = 2025 if month >= 9 else 2026
+    #         return (year, month, day)
+    #     except:
+    #         return (0, 0, 0)
+    #
+    # filtered_sorted = sorted(filtered_transactions, key=homepage_sort_key, reverse=True)
+    # mlb_transactions = [t for t in filtered_sorted if t['is_mlb']]
+    #
+    # mlb_feed = generate_feed_html(mlb_transactions, limit=25)
+    # all_feed = generate_feed_html(filtered_sorted, limit=25)
+
     team_grid = generate_team_grid()
     
     return f'''<!DOCTYPE html>
@@ -512,32 +514,6 @@ def generate_homepage(all_transactions, css_content, search_js):
         </div>
 {team_grid}
     </section>
-
-    <div class="feeds-container">
-        <div class="feed">
-            <div class="feed-header">
-                <span class="feed-title">MLB Transactions</span>
-            </div>
-            <div class="feed-body">
-{mlb_feed}
-            </div>
-            <div class="load-more">
-                <button class="load-more-btn" onclick="loadMore('mlb')">Load More</button>
-            </div>
-        </div>
-
-        <div class="feed">
-            <div class="feed-header">
-                <span class="feed-title">All Recent Transactions</span>
-            </div>
-            <div class="feed-body">
-{all_feed}
-            </div>
-            <div class="load-more">
-                <button class="load-more-btn" onclick="loadMore('all')">Load More</button>
-            </div>
-        </div>
-    </div>
 
     <footer class="footer">
         <p>Built by <a href="#">@huronalytics</a> | Data updated daily during the offseason</p>
