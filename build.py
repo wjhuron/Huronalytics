@@ -347,8 +347,7 @@ def generate_team_page(team_abbr, team_data, all_transactions, css_content):
     
     # Build accordion sections
     accordion_html = ''
-    first_section = True
-    
+
     for section in ACCORDION_SECTIONS:
         # Build dict of column -> transactions for this section
         transactions_by_col = {}
@@ -357,19 +356,18 @@ def generate_team_page(team_abbr, team_data, all_transactions, css_content):
                 transactions_by_col[col] = team_data[col]
             else:
                 transactions_by_col[col] = []
-        
+
         # Check if any transactions exist
         has_transactions = any(len(txns) > 0 for txns in transactions_by_col.values())
-        
+
         if has_transactions:
             use_subheaders = section.get('subheaders', False)
             accordion_html += generate_accordion_section(
-                section['title'], 
-                transactions_by_col, 
-                is_open=first_section,
+                section['title'],
+                transactions_by_col,
+                is_open=False,  # All sections closed by default
                 use_subheaders=use_subheaders
             )
-            first_section = False
     
     # Generate team grid for navigation
     team_grid = generate_team_grid(team_abbr)
