@@ -56,19 +56,19 @@ SKIP_COLS = ['New Team']
 
 # Accordion section ordering and grouping
 ACCORDION_SECTIONS = [
-    {'title': 'MLB Free Agents / Non-tendered', 'columns': ['Elected MLB FA/Non-tendered'], 'paired_col': 'New Team'},
     {'title': 'MLB Signings', 'columns': ['MLB Signings']},
-    {'title': 'Extensions', 'columns': ['Extensions']},
-    {'title': 'Trades', 'columns': ['Traded For', 'Traded Away'], 'subheaders': True},
-    {'title': 'Waiver Claims', 'columns': ['Waiver Claims']},
-    {'title': 'Lost off Waivers', 'columns': ['Lost off Waivers']},
-    {'title': 'MiLB Free Agents', 'columns': ['Elected MiLB FA'], 'paired_col': 'New Team'},
     {'title': 'MiLB Signings', 'columns': ['MiLB Signings']},
     {'title': 'International Signings', 'columns': ['Intl Amateur Signings']},
-    {'title': 'Released', 'columns': ['Released'], 'paired_col': 'New Team'},
+    {'title': 'Trades', 'columns': ['Traded For', 'Traded Away'], 'subheaders': True},
+    {'title': 'Extensions', 'columns': ['Extensions']},
+    {'title': 'Waiver Claims', 'columns': ['Waiver Claims']},
+    {'title': 'Lost off Waivers', 'columns': ['Lost off Waivers']},
     {'title': 'Outrighted', 'columns': ['Outrighted']},
     {'title': 'Added to 40-Man', 'columns': ['Added to 40-Man']},
     {'title': 'Rule-5 Draft', 'columns': ['Rule-5 Draft Additions', 'Rule-5 Draft Losses'], 'subheaders': True},
+    {'title': 'MLB Free Agents / Non-tendered', 'columns': ['Elected MLB FA/Non-tendered'], 'paired_col': 'New Team'},
+    {'title': 'MiLB Free Agents', 'columns': ['Elected MiLB FA'], 'paired_col': 'New Team'},
+    {'title': 'Released', 'columns': ['Released'], 'paired_col': 'New Team'},
     {'title': 'Retired', 'columns': ['Retired']},
 ]
 
