@@ -511,6 +511,16 @@ body {
     background: var(--bg-secondary);
 }
 
+.transaction-item.empty-message {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.transaction-item.empty-message:hover {
+    background: transparent;
+    cursor: default;
+}
+
 .transaction-list .subheader {
     padding: 0.5rem 1.5rem;
     background: var(--bg-tertiary);
@@ -921,6 +931,23 @@ body {
         <div class="accordion-section">
             <div class="accordion-header" onclick="toggleAccordion(this)">
                 <div class="accordion-title">
+                    Extensions
+                    <span class="accordion-count">0</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item empty-message">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">None</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
                     Waiver Claims
                     <span class="accordion-count">8</span>
                 </div>
@@ -1028,6 +1055,23 @@ body {
         <div class="accordion-section">
             <div class="accordion-header" onclick="toggleAccordion(this)">
                 <div class="accordion-title">
+                    Added to 40-Man
+                    <span class="accordion-count">0</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item empty-message">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">None</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
                     Rule-5 Draft
                     <span class="accordion-count">2</span>
                 </div>
@@ -1043,6 +1087,11 @@ body {
                     <li class="transaction-item">
                         <span class="tx-date">12/10</span>
                         <span class="tx-player">CF Carter Howell (SFG, AA)</span>
+                    </li>
+                    <li class="subheader">Losses</li>
+                    <li class="transaction-item empty-message">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">None</span>
                     </li>
                 </ul>
             </div>
@@ -1318,6 +1367,23 @@ body {
                     <li class="transaction-item">
                         <span class="tx-date">1/29</span>
                         <span class="tx-player">RHRP Albert Rivas (A)</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <div class="accordion-title">
+                    Retired
+                    <span class="accordion-count">0</span>
+                </div>
+                <span class="accordion-icon">▼</span>
+            </div>
+            <div class="accordion-content">
+                <ul class="transaction-list">
+                    <li class="transaction-item empty-message">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">None</span>
                     </li>
                 </ul>
             </div>

@@ -278,51 +278,60 @@ def generate_accordion_section(title, transactions_by_col, is_open=False, use_su
     all_transactions = []
     for col, txns in transactions_by_col.items():
         all_transactions.extend(txns)
-    
-    if not all_transactions:
-        return ''
-    
+
     open_class = ' open' if is_open else ''
     count = len(all_transactions)
-    
+
     # Build items HTML
     if use_subheaders and len(transactions_by_col) > 1:
         # Multiple columns with subheaders
         items_parts = []
         for col, txns in transactions_by_col.items():
-            if not txns:
-                continue
             subheader_label = SUBHEADER_LABELS.get(col, col)
             items_parts.append(f'                    <li class="subheader">{escape(subheader_label)}</li>')
             # Sort within each subheader group
-            txns_sorted = sorted(txns, key=date_sort_key)
-            for t in txns_sorted:
-                date_str = t['date'] if t['date'] else '—'
-                entry = format_entry(t['entry'])
-                paired = ''
-                if t.get('paired_value'):
-                    paired = f' → {escape(t["paired_value"])}'
-                items_parts.append(f'''                    <li class="transaction-item">
+            if txns:
+                txns_sorted = sorted(txns, key=date_sort_key)
+                for t in txns_sorted:
+                    date_str = t['date'] if t['date'] else '—'
+                    entry = format_entry(t['entry'])
+                    paired = ''
+                    if t.get('paired_value'):
+                        paired = f' → {escape(t["paired_value"])}'
+                    items_parts.append(f'''                    <li class="transaction-item">
                         <span class="tx-date">{date_str}</span>
                         <span class="tx-player">{entry}{paired}</span>
+                    </li>''')
+            else:
+                # Add empty message for subheader with no items
+                items_parts.append(f'''                    <li class="transaction-item empty-message">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">None</span>
                     </li>''')
         items_html = '\n'.join(items_parts)
     else:
         # Single column or no subheaders needed
         items = []
-        all_txns_sorted = sorted(all_transactions, key=date_sort_key)
-        for t in all_txns_sorted:
-            date_str = t['date'] if t['date'] else '—'
-            entry = format_entry(t['entry'])
-            paired = ''
-            if t.get('paired_value'):
-                paired = f' → {escape(t["paired_value"])}'
-            items.append(f'''                    <li class="transaction-item">
+        if all_transactions:
+            all_txns_sorted = sorted(all_transactions, key=date_sort_key)
+            for t in all_txns_sorted:
+                date_str = t['date'] if t['date'] else '—'
+                entry = format_entry(t['entry'])
+                paired = ''
+                if t.get('paired_value'):
+                    paired = f' → {escape(t["paired_value"])}'
+                items.append(f'''                    <li class="transaction-item">
                         <span class="tx-date">{date_str}</span>
                         <span class="tx-player">{entry}{paired}</span>
                     </li>''')
+        else:
+            # Add empty message when no transactions
+            items.append(f'''                    <li class="transaction-item empty-message">
+                        <span class="tx-date">—</span>
+                        <span class="tx-player">None</span>
+                    </li>''')
         items_html = '\n'.join(items)
-    
+
     return f'''        <div class="accordion-section{open_class}">
             <div class="accordion-header" onclick="toggleAccordion(this)">
                 <div class="accordion-title">
@@ -357,17 +366,14 @@ def generate_team_page(team_abbr, team_data, all_transactions, css_content):
             else:
                 transactions_by_col[col] = []
 
-        # Check if any transactions exist
-        has_transactions = any(len(txns) > 0 for txns in transactions_by_col.values())
-
-        if has_transactions:
-            use_subheaders = section.get('subheaders', False)
-            accordion_html += generate_accordion_section(
-                section['title'],
-                transactions_by_col,
-                is_open=False,  # All sections closed by default
-                use_subheaders=use_subheaders
-            )
+        # Always generate section, even if empty
+        use_subheaders = section.get('subheaders', False)
+        accordion_html += generate_accordion_section(
+            section['title'],
+            transactions_by_col,
+            is_open=False,  # All sections closed by default
+            use_subheaders=use_subheaders
+        )
     
     # Generate team grid for navigation
     team_grid = generate_team_grid(team_abbr)
@@ -1066,6 +1072,16 @@ body {
 
 .transaction-item:hover {
     background: var(--bg-secondary);
+}
+
+.transaction-item.empty-message {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.transaction-item.empty-message:hover {
+    background: transparent;
+    cursor: default;
 }
 
 .transaction-list .subheader {
