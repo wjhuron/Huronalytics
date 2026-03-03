@@ -23,7 +23,7 @@ var COLUMNS = {
     { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics', defaultHidden: true },
     // Stats
     { key: 'izPct',       label: 'IZ%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
-    { key: 'swStrPct',    label: 'SwStr%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
+    { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
@@ -36,7 +36,7 @@ var COLUMNS = {
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Count',    format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'izPct',       label: 'IZ%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
-    { key: 'swStrPct',    label: 'SwStr%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
+    { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
@@ -45,9 +45,12 @@ var COLUMNS = {
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
-    { key: 'stands',      label: 'Stands',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
+    { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',    label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    // Rates
+    { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
+    { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
     // Discipline
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
@@ -57,6 +60,7 @@ var COLUMNS = {
     // Quality
     { key: 'medEV',       label: 'Med EV',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'quality' },
     { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'quality' },
+    { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'quality' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'quality' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'quality' },
@@ -64,7 +68,12 @@ var COLUMNS = {
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'batted_ball' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
-    { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
+    { key: 'puPct',       label: 'PU%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    // Spray
+    { key: 'pullPct',    label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'spray' },
+    { key: 'centPct',    label: 'Cent%',    format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
+    { key: 'oppoPct',    label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
+    { key: 'airPullPct', label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
   ],
 };
 
@@ -295,12 +304,13 @@ var Leaderboard = {
         if (!isAvgRow) {
           var cb = document.createElement('input');
           cb.type = 'checkbox';
-          cb.checked = !!self.selectedForCompare[row.pitcher];
+          var compareKey = (row.pitcher || '') + '|' + (row.team || '');
+          cb.checked = !!self.selectedForCompare[compareKey];
           cb.addEventListener('change', function () {
             if (cb.checked) {
-              self.selectedForCompare[row.pitcher] = true;
+              self.selectedForCompare[compareKey] = true;
             } else {
-              delete self.selectedForCompare[row.pitcher];
+              delete self.selectedForCompare[compareKey];
             }
             if (typeof App !== 'undefined' && App.updateCompareButton) {
               App.updateCompareButton();

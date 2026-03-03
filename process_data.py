@@ -39,13 +39,16 @@ OUT_ZONE = {11, 12, 13, 14}
 # --- Hitter Leaderboard constants ---
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'Foul Tip', 'In Play', 'Swinging Strike (Blocked)'}
 HITTER_STAT_KEYS = [
+    'kPct', 'bbPct',
     'swingPct', 'izSwingPct', 'chasePct', 'izSwChase',
-    'whiffPct', 'medEV', 'maxEV', 'barrelPct',
+    'whiffPct', 'medEV', 'maxEV', 'medLA', 'barrelPct',
     'xBA', 'xSLG',
-    'gbPct', 'ldPct', 'fbPct', 'medLA',
+    'gbPct', 'ldPct', 'fbPct', 'puPct',
+    'pullPct', 'centPct', 'oppoPct', 'airPullPct',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
-HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
+HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
+BUNT_BB_TYPES = {'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
 
 def break_tilt_to_minutes(val):
@@ -121,13 +124,14 @@ def avg(values):
 
 
 def compute_stats(pitches):
-    """Compute IZ%, SwStr%, CSW%, Chase%, GB% from a list of pitch dicts."""
+    """Compute IZ%, Whiff%, CSW%, Chase%, GB% from a list of pitch dicts."""
     total = len(pitches)
     if total == 0:
         return {k: None for k in STAT_KEYS}
 
     iz = sum(1 for p in pitches if p['Zone'] in IN_ZONE)
-    swstr = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
+    swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
+    whiffs = sum(1 for p in pitches if p['Description'] in ('Swinging Strike', 'Swinging Strike (Blocked)'))
     csw = sum(1 for p in pitches if p['Description'] in ('Called Strike', 'Swinging Strike'))
 
     ooz = [p for p in pitches if p['Zone'] in OUT_ZONE]
@@ -138,7 +142,7 @@ def compute_stats(pitches):
 
     return {
         'izPct': iz / total,
-        'swStrPct': swstr / total,
+        'swStrPct': whiffs / swings if swings > 0 else None,
         'cswPct': csw / total,
         'chasePct': ooz_swung / len(ooz) if ooz else None,
         'gbPct': gb / len(bip) if bip else None,
@@ -179,11 +183,49 @@ def is_barrel(ev, la):
     return lower_la <= la <= upper_la
 
 
+def spray_angle(hc_x, hc_y):
+    """Compute spray angle in degrees. 0 = center, negative = left field, positive = right field."""
+    if hc_x is None or hc_y is None:
+        return None
+    hp_x, hp_y = 125.42, 198.27
+    dx = hc_x - hp_x
+    dy = hp_y - hc_y
+    if dy <= 0:
+        return None
+    return math.atan2(dx, dy) * (180 / math.pi)
+
+
+def spray_direction(angle, stands):
+    """Classify as 'pull', 'center', or 'oppo' based on spray angle and batter side."""
+    if angle is None or not stands:
+        return None
+    if stands == 'R':
+        if angle < -15:
+            return 'pull'
+        elif angle > 15:
+            return 'oppo'
+        else:
+            return 'center'
+    else:  # L
+        if angle > 15:
+            return 'pull'
+        elif angle < -15:
+            return 'oppo'
+        else:
+            return 'center'
+
+
 def compute_hitter_stats(pitches):
     """Compute hitter stats from a list of pitch dicts (already Zone-converted)."""
     total = len(pitches)
     if total == 0:
         return {k: None for k in HITTER_STAT_KEYS}
+
+    # K% and BB% — count plate appearances (pitches with an Event)
+    pa_pitches = [p for p in pitches if p.get('Event') is not None]
+    n_pa = len(pa_pitches)
+    n_k = sum(1 for p in pa_pitches if p['Event'] == 'Strikeout')
+    n_bb = sum(1 for p in pa_pitches if p['Event'] == 'Walk')
 
     # Swings
     swings = [p for p in pitches if p['Description'] in SWING_DESCRIPTIONS]
@@ -199,12 +241,13 @@ def compute_hitter_stats(pitches):
     iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
     chase_pct = ooz_swings / len(ooz_pitches) if ooz_pitches else None
 
-    # Batted balls (balls in play with BB Type)
-    bip = [p for p in pitches if p['BB Type'] is not None]
+    # Batted balls (balls in play with BB Type, excluding bunts)
+    bip = [p for p in pitches if p['BB Type'] is not None and p['BB Type'] not in BUNT_BB_TYPES]
     n_bip = len(bip)
     gb = sum(1 for p in bip if p['BB Type'] == 'ground_ball')
     ld = sum(1 for p in bip if p['BB Type'] == 'line_drive')
-    fb = sum(1 for p in bip if p['BB Type'] in ('fly_ball', 'popup'))
+    fb = sum(1 for p in bip if p['BB Type'] == 'fly_ball')
+    pu = sum(1 for p in bip if p['BB Type'] == 'popup')
 
     # Exit Velocity & Launch Angle (only LA > 0 for EV stats)
     ev_la_pos = [(safe_float(p.get('Exit Velocity')), safe_float(p.get('Launch Angle')))
@@ -228,8 +271,25 @@ def compute_hitter_stats(pitches):
     xba_vals = [safe_float(p.get('xBA')) for p in bip if safe_float(p.get('xBA')) is not None]
     xslg_vals = [safe_float(p.get('xSLG')) for p in bip if safe_float(p.get('xSLG')) is not None]
 
+    # Spray stats (Pull%, Cent%, Oppo%, AirPull%)
+    spray_data = []
+    for p in bip:
+        hc_x = safe_float(p.get('HC_X'))
+        hc_y = safe_float(p.get('HC_Y'))
+        angle = spray_angle(hc_x, hc_y)
+        direction = spray_direction(angle, p.get('Stands'))
+        if direction:
+            spray_data.append((direction, p['BB Type']))
+    n_spray = len(spray_data)
+    pull = sum(1 for d, _ in spray_data if d == 'pull')
+    center = sum(1 for d, _ in spray_data if d == 'center')
+    oppo = sum(1 for d, _ in spray_data if d == 'oppo')
+    air_pull = sum(1 for d, bb in spray_data if d == 'pull' and bb in ('line_drive', 'fly_ball'))
+
     return {
         'nSwings': n_swings,
+        'kPct': n_k / n_pa if n_pa > 0 else None,
+        'bbPct': n_bb / n_pa if n_pa > 0 else None,
         'swingPct': n_swings / total if total > 0 else None,
         'izSwingPct': iz_swing_pct,
         'chasePct': chase_pct,
@@ -243,7 +303,12 @@ def compute_hitter_stats(pitches):
         'gbPct': gb / n_bip if n_bip > 0 else None,
         'ldPct': ld / n_bip if n_bip > 0 else None,
         'fbPct': fb / n_bip if n_bip > 0 else None,
+        'puPct': pu / n_bip if n_bip > 0 else None,
         'medLA': round(median(all_la), 1) if all_la else None,
+        'pullPct': pull / n_spray if n_spray > 0 else None,
+        'centPct': center / n_spray if n_spray > 0 else None,
+        'oppoPct': oppo / n_spray if n_spray > 0 else None,
+        'airPullPct': air_pull / n_spray if n_spray > 0 else None,
     }
 
 
@@ -434,6 +499,7 @@ def main():
     pitch_details = defaultdict(list)
     for p in all_pitches:
         pitcher = p.get('Pitcher')
+        team = p.get('Team')
         pt = p.get('Pitch Type')
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
@@ -452,7 +518,7 @@ def main():
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
                 detail['rz'] = round(rel_z, 2)
-            pitch_details[pitcher].append(detail)
+            pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
     # --- League Averages per pitch type ---
@@ -518,17 +584,27 @@ def main():
     hitter_teams = sorted(set(p['Team'] for p in all_abs if p.get('Team')))
     all_teams_combined = sorted(set(all_teams + hitter_teams))
 
-    # --- Hitter Leaderboard: group by (Hitter, Team, Stands) ---
+    # --- Hitter Leaderboard: group by (Hitter, Team) ---
+    # Switch hitters (who bat from both sides) are combined with stands = "S"
     hitter_groups = defaultdict(list)
     for p in all_abs:
-        key = (p['Hitter'], p['Team'], p.get('Stands'))
+        key = (p['Hitter'], p['Team'])
         hitter_groups[key].append(p)
 
     hitter_leaderboard = []
-    for (hitter, team, stands), pitches in hitter_groups.items():
+    for (hitter, team), pitches in hitter_groups.items():
         # Convert zones to int
         for p in pitches:
             p['Zone'] = safe_int(p.get('Zone'))
+
+        # Determine bats side: if multiple sides seen, mark as Switch
+        stands_set = set(p.get('Stands') for p in pitches if p.get('Stands'))
+        if len(stands_set) > 1:
+            stands = 'S'
+        elif len(stands_set) == 1:
+            stands = stands_set.pop()
+        else:
+            stands = None
 
         row = {
             'hitter': hitter,
@@ -555,7 +631,7 @@ def main():
 
     # --- Hitter pitch details: per-hitter breakdown by pitch type faced ---
     hitter_pitch_details = {}
-    for (hitter, team, stands), pitches in hitter_groups.items():
+    for (hitter, team), pitches in hitter_groups.items():
         pt_map = defaultdict(list)
         for p in pitches:
             pt = p.get('Pitch Type')
@@ -572,7 +648,7 @@ def main():
             details.append(entry)
         # Sort by count desc
         details.sort(key=lambda x: x['count'], reverse=True)
-        hitter_pitch_details[hitter] = details
+        hitter_pitch_details[hitter + '|' + (team or '')] = details
 
     # Hitter league averages
     hitter_league_avgs = {}

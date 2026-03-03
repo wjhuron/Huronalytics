@@ -136,7 +136,7 @@
         // Update throws/stands label
         var throwsLabel = document.querySelector('#throws-filter-group label');
         if (throwsLabel) {
-          throwsLabel.textContent = currentTab === 'hitter' ? 'Stands' : 'Throws';
+          throwsLabel.textContent = currentTab === 'hitter' ? 'Bats' : 'Throws';
         }
 
         // Update search placeholder
@@ -270,7 +270,7 @@
       var info = [];
       if (team) info.push(team);
       if (currentTab === 'hitter') {
-        if (hand) info.push(hand === 'R' ? 'RHH' : hand === 'L' ? 'LHH' : hand);
+        if (hand) info.push(hand === 'R' ? 'RHH' : hand === 'L' ? 'LHH' : hand === 'S' ? 'Switch' : hand);
       } else {
         if (hand) info.push(hand === 'R' ? 'RHP' : 'LHP');
       }
@@ -286,12 +286,12 @@
         // Hide scatter chart for hitters
         if (chartContainer) chartContainer.style.display = 'none';
         ScatterChart.destroy();
-        buildHitterPanelTable(name);
+        buildHitterPanelTable(name, team);
       } else {
         // Show scatter chart for pitchers
         if (chartContainer) chartContainer.style.display = '';
-        ScatterChart.render(name);
-        buildPanelMetricsTable(name);
+        ScatterChart.render(name, team);
+        buildPanelMetricsTable(name, team);
       }
     };
 
@@ -322,7 +322,7 @@
 
   }
 
-  function buildPanelMetricsTable(pitcherName) {
+  function buildPanelMetricsTable(pitcherName, team) {
     var container = document.getElementById('panel-metrics-table');
     container.innerHTML = '';
 
@@ -330,7 +330,7 @@
     var pitchData = DataStore.pitchData;
     if (!pitchData) return;
 
-    var pitcherRows = pitchData.filter(function (r) { return r.pitcher === pitcherName; });
+    var pitcherRows = pitchData.filter(function (r) { return r.pitcher === pitcherName && r.team === team; });
     if (pitcherRows.length === 0) return;
 
     // Sort by usage descending
@@ -382,14 +382,15 @@
     container.appendChild(table);
   }
 
-  function buildHitterPanelTable(hitterName) {
+  function buildHitterPanelTable(hitterName, team) {
     var container = document.getElementById('panel-metrics-table');
     container.innerHTML = '';
 
     var details = window.HITTER_PITCH_DETAILS;
-    if (!details || !details[hitterName]) return;
+    var key = hitterName + '|' + (team || '');
+    if (!details || !details[key]) return;
 
-    var ptData = details[hitterName];
+    var ptData = details[key];
     if (ptData.length === 0) return;
 
     var statCols = [
@@ -669,7 +670,7 @@
       // Update throws/stands label
       var throwsLabel = document.querySelector('#throws-filter-group label');
       if (throwsLabel) {
-        throwsLabel.textContent = currentTab === 'hitter' ? 'Stands' : 'Throws';
+        throwsLabel.textContent = currentTab === 'hitter' ? 'Bats' : 'Throws';
       }
       // Update search placeholder
       if (searchInput) {

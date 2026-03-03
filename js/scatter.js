@@ -99,10 +99,11 @@ var ScatterChart = {
     }
   },
 
-  _buildMovementData: function (pitcherName) {
+  _buildMovementData: function (pitcherName, team) {
     var details = window.PITCH_DETAILS;
     if (!details) return null;
-    var pitches = details[pitcherName];
+    var key = pitcherName + '|' + (team || '');
+    var pitches = details[key];
     if (!pitches || pitches.length === 0) return null;
 
     var groups = {};
@@ -114,10 +115,10 @@ var ScatterChart = {
     return groups;
   },
 
-  render: function (pitcherName) {
+  render: function (pitcherName, team) {
     this.currentPitcher = pitcherName;
 
-    var groups = this._buildMovementData(pitcherName);
+    var groups = this._buildMovementData(pitcherName, team);
     if (!groups) return;
 
     var datasets = [];
@@ -200,9 +201,10 @@ var ScatterChart = {
     if (!details) return;
 
     for (var pi = 0; pi < pitcherNames.length; pi++) {
-      var name = pitcherNames[pi];
-      var pitches = details[name];
+      var key = pitcherNames[pi]; // format: "name|team"
+      var pitches = details[key];
       if (!pitches) continue;
+      var name = key.split('|')[0];
 
       var groups = {};
       for (var i = 0; i < pitches.length; i++) {
