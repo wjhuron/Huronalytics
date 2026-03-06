@@ -10,8 +10,7 @@ import time as time_module
 from datetime import datetime, time
 from collections import defaultdict
 
-PITCHING_SPREADSHEET_ID = '1nIk00hnO2VlXLoApMRK2wSmnEKslqI7ybRjHO5HOG4w'
-HITTING_SPREADSHEET_ID = '122pPITUxDJK0M_CyXJ4dkWOmGFodEBosAgcjE1PZ3RE'
+SPREADSHEET_ID = '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo'
 SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -28,13 +27,14 @@ METRIC_KEYS = {
     'VRA': 'vra', 'HRA': 'hra',
 }
 
-STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct']
+PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct']
+STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + STAT_KEYS
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + PITCH_STAT_KEYS
 
-IN_ZONE = {1, 2, 3, 4, 5, 6, 7, 8, 9}
-OUT_ZONE = {11, 12, 13, 14}
+# Pitcher stats where lower is better (invert percentile)
+PITCHER_INVERT_PCTL = {'bbPct'}
 
 # --- Hitter Leaderboard constants ---
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'Foul Tip', 'In Play', 'Swinging Strike (Blocked)'}
@@ -49,6 +49,23 @@ HITTER_STAT_KEYS = [
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
 BUNT_BB_TYPES = {'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
+
+# Strike zone: ball radius adjustment for "any part of ball touches zone"
+BALL_RADIUS_FT = 1.45 / 12  # 1.45 inches = ~0.121 ft
+ZONE_HALF_WIDTH = 0.83       # half plate (8.5") + ball radius (1.45") in feet
+
+
+def compute_in_zone(p):
+    """Compute InZone from PlateX, PlateZ, SzTop, SzBot with ball-radius adjustment."""
+    px = safe_float(p.get('PlateX'))
+    pz = safe_float(p.get('PlateZ'))
+    top = safe_float(p.get('SzTop'))
+    bot = safe_float(p.get('SzBot'))
+    if any(v is None for v in [px, pz, top, bot]):
+        return None
+    if abs(px) <= ZONE_HALF_WIDTH and (bot - BALL_RADIUS_FT) <= pz <= (top + BALL_RADIUS_FT):
+        return 'Yes'
+    return 'No'
 
 
 def break_tilt_to_minutes(val):
@@ -124,21 +141,30 @@ def avg(values):
 
 
 def compute_stats(pitches):
-    """Compute IZ%, Whiff%, CSW%, Chase%, GB% from a list of pitch dicts."""
+    """Compute IZ%, Whiff%, CSW%, Chase%, GB%, K%, BB%, K-BB% from a list of pitch dicts."""
     total = len(pitches)
     if total == 0:
         return {k: None for k in STAT_KEYS}
 
-    iz = sum(1 for p in pitches if p['Zone'] in IN_ZONE)
+    iz = sum(1 for p in pitches if p.get('InZone') == 'Yes')
     swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
     whiffs = sum(1 for p in pitches if p['Description'] in ('Swinging Strike', 'Swinging Strike (Blocked)'))
     csw = sum(1 for p in pitches if p['Description'] in ('Called Strike', 'Swinging Strike'))
 
-    ooz = [p for p in pitches if p['Zone'] in OUT_ZONE]
+    ooz = [p for p in pitches if p.get('InZone') == 'No']
     ooz_swung = sum(1 for p in ooz if p['Description'] in ('Swinging Strike', 'In Play', 'Foul'))
 
-    bip = [p for p in pitches if p['BB Type'] is not None]
-    gb = sum(1 for p in bip if p['BB Type'] == 'ground_ball')
+    bip = [p for p in pitches if p.get('BBType') is not None]
+    gb = sum(1 for p in bip if p.get('BBType') == 'ground_ball')
+
+    # K% and BB% — count plate appearances (pitches with an Event)
+    pa_pitches = [p for p in pitches if p.get('Event') is not None]
+    n_pa = len(pa_pitches)
+    n_k = sum(1 for p in pa_pitches if p['Event'] == 'Strikeout')
+    n_bb = sum(1 for p in pa_pitches if p['Event'] == 'Walk')
+    k_pct = n_k / n_pa if n_pa > 0 else None
+    bb_pct = n_bb / n_pa if n_pa > 0 else None
+    kbb_pct = round(k_pct - bb_pct, 4) if k_pct is not None and bb_pct is not None else None
 
     return {
         'izPct': iz / total,
@@ -146,6 +172,9 @@ def compute_stats(pitches):
         'cswPct': csw / total,
         'chasePct': ooz_swung / len(ooz) if ooz else None,
         'gbPct': gb / len(bip) if bip else None,
+        'kPct': k_pct,
+        'bbPct': bb_pct,
+        'kbbPct': kbb_pct,
     }
 
 
@@ -233,39 +262,39 @@ def compute_hitter_stats(pitches):
     whiffs = sum(1 for p in pitches if p['Description'] in ('Swinging Strike', 'Swinging Strike (Blocked)'))
 
     # In-zone / Out-of-zone
-    iz_pitches = [p for p in pitches if p['Zone'] in IN_ZONE]
-    ooz_pitches = [p for p in pitches if p['Zone'] in OUT_ZONE]
+    iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
+    ooz_pitches = [p for p in pitches if p.get('InZone') == 'No']
     iz_swings = sum(1 for p in iz_pitches if p['Description'] in SWING_DESCRIPTIONS)
     ooz_swings = sum(1 for p in ooz_pitches if p['Description'] in SWING_DESCRIPTIONS)
 
     iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
     chase_pct = ooz_swings / len(ooz_pitches) if ooz_pitches else None
 
-    # Batted balls (balls in play with BB Type, excluding bunts)
-    bip = [p for p in pitches if p['BB Type'] is not None and p['BB Type'] not in BUNT_BB_TYPES]
+    # Batted balls (balls in play with BBType, excluding bunts)
+    bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
     n_bip = len(bip)
-    gb = sum(1 for p in bip if p['BB Type'] == 'ground_ball')
-    ld = sum(1 for p in bip if p['BB Type'] == 'line_drive')
-    fb = sum(1 for p in bip if p['BB Type'] == 'fly_ball')
-    pu = sum(1 for p in bip if p['BB Type'] == 'popup')
+    gb = sum(1 for p in bip if p.get('BBType') == 'ground_ball')
+    ld = sum(1 for p in bip if p.get('BBType') == 'line_drive')
+    fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
+    pu = sum(1 for p in bip if p.get('BBType') == 'popup')
 
     # Exit Velocity & Launch Angle (only LA > 0 for EV stats)
-    ev_la_pos = [(safe_float(p.get('Exit Velocity')), safe_float(p.get('Launch Angle')))
+    ev_la_pos = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
                  for p in bip
-                 if safe_float(p.get('Launch Angle')) is not None and safe_float(p.get('Launch Angle')) > 0
-                 and safe_float(p.get('Exit Velocity')) is not None]
+                 if safe_float(p.get('LaunchAngle')) is not None and safe_float(p.get('LaunchAngle')) > 0
+                 and safe_float(p.get('ExitVelo')) is not None]
     evs_pos = [ev for ev, la in ev_la_pos]
 
     # Barrels: need EV and LA on all batted balls
-    ev_la_all = [(safe_float(p.get('Exit Velocity')), safe_float(p.get('Launch Angle')))
+    ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
                  for p in bip
-                 if safe_float(p.get('Exit Velocity')) is not None
-                 and safe_float(p.get('Launch Angle')) is not None]
+                 if safe_float(p.get('ExitVelo')) is not None
+                 and safe_float(p.get('LaunchAngle')) is not None]
     barrels = sum(1 for ev, la in ev_la_all if is_barrel(ev, la))
 
     # Median launch angle on ALL batted balls
-    all_la = [safe_float(p.get('Launch Angle')) for p in bip
-              if safe_float(p.get('Launch Angle')) is not None]
+    all_la = [safe_float(p.get('LaunchAngle')) for p in bip
+              if safe_float(p.get('LaunchAngle')) is not None]
 
     # xBA and xSLG on batted balls
     xba_vals = [safe_float(p.get('xBA')) for p in bip if safe_float(p.get('xBA')) is not None]
@@ -277,9 +306,9 @@ def compute_hitter_stats(pitches):
         hc_x = safe_float(p.get('HC_X'))
         hc_y = safe_float(p.get('HC_Y'))
         angle = spray_angle(hc_x, hc_y)
-        direction = spray_direction(angle, p.get('Stands'))
+        direction = spray_direction(angle, p.get('Bats'))
         if direction:
-            spray_data.append((direction, p['BB Type']))
+            spray_data.append((direction, p.get('BBType')))
     n_spray = len(spray_data)
     pull = sum(1 for d, _ in spray_data if d == 'pull')
     center = sum(1 for d, _ in spray_data if d == 'center')
@@ -360,11 +389,12 @@ def main():
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
-    sh = gc.open_by_key(PITCHING_SPREADSHEET_ID)
+    sh = gc.open_by_key(SPREADSHEET_ID)
     print(f"Spreadsheet: {sh.title} ({len(sh.worksheets())} sheets)")
 
-    # Read all pitches from all sheets
+    # Read all pitches from all sheets (WBC tab handled separately)
     all_pitches = []
+    wbc_pitches = []
     for i, ws in enumerate(sh.worksheets()):
         print(f"  Reading {ws.title}...")
         if i > 0:
@@ -374,6 +404,7 @@ def main():
             continue
         header = rows[0]
         col_idx = {name: i for i, name in enumerate(header) if name}
+        is_wbc = ws.title.upper() == 'WBC'
 
         for row in rows[1:]:
             pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
@@ -387,23 +418,55 @@ def main():
                 if val == '':
                     val = None
                 pitch[col_name] = val
-            all_pitches.append(pitch)
+
+            if is_wbc:
+                wbc_pitches.append(pitch)
+            else:
+                all_pitches.append(pitch)
 
     print(f"Read {len(all_pitches)} pitches from {len(sh.worksheets())} sheets")
+    if wbc_pitches:
+        print(f"  ({len(wbc_pitches)} WBC pitches read separately)")
+
+    # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
+    for p in all_pitches + wbc_pitches:
+        p['InZone'] = compute_in_zone(p)
+
+    # --- WBC hitter mapping: remap WBC hitters to their MLB team ---
+    # Build MLB team lookup from non-WBC data
+    mlb_hitter_teams = {}
+    for p in all_pitches:
+        batter = p.get('Batter')
+        b_team = p.get('BTeam')
+        if batter and b_team:
+            mlb_hitter_teams[batter] = b_team
+
+    # Remap WBC hitters to MLB teams (kept separate — only used for hitter grouping)
+    wbc_hitter_pitches = []
+    for p in wbc_pitches:
+        batter = p.get('Batter')
+        if batter and batter in mlb_hitter_teams:
+            p['BTeam'] = mlb_hitter_teams[batter]
+            wbc_hitter_pitches.append(p)
+    if wbc_pitches:
+        print(f"  {len(wbc_hitter_pitches)} WBC hitter pitches mapped to MLB teams")
 
     # Collect unique teams and pitch types
-    all_teams = sorted(set(p['Team'] for p in all_pitches if p.get('Team')))
+    all_teams = sorted(set(
+        [p['PTeam'] for p in all_pitches if p.get('PTeam')] +
+        [p['BTeam'] for p in all_pitches if p.get('BTeam')]
+    ))
     all_pitch_types = sorted(set(p['Pitch Type'] for p in all_pitches if p.get('Pitch Type')))
 
     # --- Count total pitches per pitcher (for usage%) ---
     pitcher_total = defaultdict(int)
     for p in all_pitches:
-        pitcher_total[(p['Pitcher'], p['Team'])] += 1
+        pitcher_total[(p['Pitcher'], p['PTeam'])] += 1
 
-    # --- Pitch Leaderboard: group by (Pitcher, Team, Pitch Type) ---
+    # --- Pitch Leaderboard: group by (Pitcher, PTeam, Pitch Type) ---
     pitch_groups = defaultdict(list)
     for p in all_pitches:
-        key = (p['Pitcher'], p['Team'], p['Pitch Type'], p.get('Throws'))
+        key = (p['Pitcher'], p['PTeam'], p['Pitch Type'], p.get('Throws'))
         pitch_groups[key].append(p)
 
     pitch_leaderboard = []
@@ -435,10 +498,6 @@ def main():
         row['breakTilt'] = minutes_to_tilt_display(avg_tilt)
         row['breakTiltMinutes'] = avg_tilt
 
-        # Stats — convert Zone to int (gspread returns strings)
-        for p in pitches:
-            p['Zone'] = safe_int(p.get('Zone'))
-
         row.update(compute_stats(pitches))
         pitch_leaderboard.append(row)
 
@@ -468,17 +527,14 @@ def main():
     pitch_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitch leaderboard: {len(pitch_leaderboard)} rows")
 
-    # --- Pitcher Leaderboard: group by (Pitcher, Team) ---
+    # --- Pitcher Leaderboard: group by (Pitcher, PTeam) ---
     pitcher_groups = defaultdict(list)
     for p in all_pitches:
-        key = (p['Pitcher'], p['Team'], p.get('Throws'))
+        key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
     pitcher_leaderboard = []
     for (pitcher, team, throws), pitches in pitcher_groups.items():
-        for p in pitches:
-            p['Zone'] = safe_int(p.get('Zone'))
-
         row = {
             'pitcher': pitcher,
             'team': team,
@@ -492,6 +548,13 @@ def main():
     for stat in STAT_KEYS:
         compute_percentile_ranks(pitcher_leaderboard, stat)
 
+    # Invert percentiles where lower is better (BB%)
+    for row in pitcher_leaderboard:
+        for stat in PITCHER_INVERT_PCTL:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
     pitcher_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitcher leaderboard: {len(pitcher_leaderboard)} rows")
 
@@ -499,7 +562,7 @@ def main():
     pitch_details = defaultdict(list)
     for p in all_pitches:
         pitcher = p.get('Pitcher')
-        team = p.get('Team')
+        team = p.get('PTeam')
         pt = p.get('Pitch Type')
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
@@ -529,7 +592,7 @@ def main():
             vals = [r[metric] for r in pt_rows if r.get(metric) is not None]
             if vals:
                 avgs[metric] = round(sum(vals) / len(vals), 2)
-        for stat in STAT_KEYS:
+        for stat in PITCH_STAT_KEYS:
             vals = [r[stat] for r in pt_rows if r.get(stat) is not None]
             if vals:
                 avgs[stat] = round(sum(vals) / len(vals), 4)
@@ -549,56 +612,23 @@ def main():
     pitcher_league_avgs['count'] = len(pitcher_leaderboard)
 
     # ======================================================================
-    #  HITTER LEADERBOARD
+    #  HITTER LEADERBOARD (derived from same unified spreadsheet)
     # ======================================================================
     print(f"\n--- Hitter Leaderboard ---")
-    hsh = gc.open_by_key(HITTING_SPREADSHEET_ID)
-    print(f"Spreadsheet: {hsh.title} ({len(hsh.worksheets())} sheets)")
 
-    all_abs = []  # each element is one pitch seen by a hitter
-    for i, ws in enumerate(hsh.worksheets()):
-        print(f"  Reading {ws.title}...")
-        if i > 0:
-            time_module.sleep(1.5)
-        rows = read_sheet_with_retry(ws)
-        if not rows:
-            continue
-        header = rows[0]
-        col_idx = {name: i for i, name in enumerate(header) if name}
-
-        for row in rows[1:]:
-            hitter = row[col_idx['Hitter']] if 'Hitter' in col_idx else None
-            if not hitter:
-                continue
-            ab = {}
-            for col_name, idx in col_idx.items():
-                val = row[idx] if idx < len(row) else None
-                if val == '':
-                    val = None
-                ab[col_name] = val
-            all_abs.append(ab)
-
-    print(f"Read {len(all_abs)} pitches from {len(hsh.worksheets())} sheets (hitters)")
-
-    # Collect unique teams from hitter data too
-    hitter_teams = sorted(set(p['Team'] for p in all_abs if p.get('Team')))
-    all_teams_combined = sorted(set(all_teams + hitter_teams))
-
-    # --- Hitter Leaderboard: group by (Hitter, Team) ---
+    # Group by (Batter, BTeam) — includes WBC hitter pitches remapped to MLB teams
     # Switch hitters (who bat from both sides) are combined with stands = "S"
     hitter_groups = defaultdict(list)
-    for p in all_abs:
-        key = (p['Hitter'], p['Team'])
-        hitter_groups[key].append(p)
+    for p in all_pitches + wbc_hitter_pitches:
+        batter = p.get('Batter')
+        b_team = p.get('BTeam')
+        if batter and b_team:
+            hitter_groups[(batter, b_team)].append(p)
 
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
-        # Convert zones to int
-        for p in pitches:
-            p['Zone'] = safe_int(p.get('Zone'))
-
         # Determine bats side: if multiple sides seen, mark as Switch
-        stands_set = set(p.get('Stands') for p in pitches if p.get('Stands'))
+        stands_set = set(p.get('Bats') for p in pitches if p.get('Bats'))
         if len(stands_set) > 1:
             stands = 'S'
         elif len(stands_set) == 1:
@@ -660,7 +690,7 @@ def main():
 
     # --- Metadata ---
     metadata = {
-        'teams': all_teams_combined,
+        'teams': all_teams,
         'pitchTypes': all_pitch_types,
         'generatedAt': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'totalPitches': len(all_pitches),
