@@ -50,6 +50,13 @@ HITTER_STAT_KEYS = [
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
 BUNT_BB_TYPES = {'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
+# 30 MLB team abbreviations (matching spreadsheet tab names)
+MLB_TEAMS = {
+    'ARI', 'ATH', 'ATL', 'BAL', 'BOS', 'CHC', 'CIN', 'CLE', 'COL', 'CWS',
+    'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY',
+    'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
+}
+
 # Strike zone: ball radius adjustment for "any part of ball touches zone"
 BALL_RADIUS_FT = 1.45 / 12  # 1.45 inches = ~0.121 ft
 ZONE_HALF_WIDTH = 0.83       # half plate (8.5") + ball radius (1.45") in feet
@@ -432,14 +439,26 @@ def main():
     for p in all_pitches + wbc_pitches:
         p['InZone'] = compute_in_zone(p)
 
-    # --- WBC hitter mapping: remap WBC hitters to their MLB team ---
-    # Build MLB team lookup from non-WBC data
+    # --- Map all hitters to MLB teams (handle WBC + non-WBC country BTeams) ---
+    # Build MLB team lookup: batter name → MLB team (only from pitches where BTeam is an MLB team)
     mlb_hitter_teams = {}
     for p in all_pitches:
         batter = p.get('Batter')
         b_team = p.get('BTeam')
-        if batter and b_team:
+        if batter and b_team and b_team in MLB_TEAMS:
             mlb_hitter_teams[batter] = b_team
+
+    # Remap non-MLB BTeams in all_pitches (e.g., when BOS plays Venezuela in ST)
+    remapped_count = 0
+    for p in all_pitches:
+        b_team = p.get('BTeam')
+        if b_team and b_team not in MLB_TEAMS:
+            batter = p.get('Batter')
+            if batter and batter in mlb_hitter_teams:
+                p['BTeam'] = mlb_hitter_teams[batter]
+                remapped_count += 1
+    if remapped_count:
+        print(f"  Remapped {remapped_count} non-MLB BTeam entries in regular data")
 
     # Remap WBC hitters to MLB teams (kept separate — only used for hitter grouping)
     wbc_hitter_pitches = []
@@ -451,10 +470,10 @@ def main():
     if wbc_pitches:
         print(f"  {len(wbc_hitter_pitches)} WBC hitter pitches mapped to MLB teams")
 
-    # Collect unique teams and pitch types
+    # Collect unique teams (MLB only) and pitch types
     all_teams = sorted(set(
-        [p['PTeam'] for p in all_pitches if p.get('PTeam')] +
-        [p['BTeam'] for p in all_pitches if p.get('BTeam')]
+        [p['PTeam'] for p in all_pitches if p.get('PTeam') and p['PTeam'] in MLB_TEAMS] +
+        [p['BTeam'] for p in all_pitches if p.get('BTeam') and p['BTeam'] in MLB_TEAMS]
     ))
     all_pitch_types = sorted(set(p['Pitch Type'] for p in all_pitches if p.get('Pitch Type')))
 
@@ -617,12 +636,13 @@ def main():
     print(f"\n--- Hitter Leaderboard ---")
 
     # Group by (Batter, BTeam) — includes WBC hitter pitches remapped to MLB teams
+    # Only include hitters with an MLB team (country-only hitters excluded)
     # Switch hitters (who bat from both sides) are combined with stands = "S"
     hitter_groups = defaultdict(list)
     for p in all_pitches + wbc_hitter_pitches:
         batter = p.get('Batter')
         b_team = p.get('BTeam')
-        if batter and b_team:
+        if batter and b_team and b_team in MLB_TEAMS:
             hitter_groups[(batter, b_team)].append(p)
 
     hitter_leaderboard = []
