@@ -1,0 +1,42 @@
+name: Update Huronalytics
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 10 AM ET (15:00 UTC during EDT, 14:00 UTC during EST)
+    - cron: '0 15 * * *'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Download latest Google Sheet
+        run: |
+          curl -L -o data/2025_26_MLB_Offseason.xlsx \
+            "https://docs.google.com/spreadsheets/d/e/2PACX-1vQX9EUtMqEgxP7tjoGibR3j6Y6CUrY9p2heOxAr6kdq3CZTq979tYSSXMdTQpuY4bNMJ3IqrswiUV5I/pub?output=xlsx"
+
+      - name: Build site
+        run: python3 build.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M') UTC"
+            git push
+          fi
