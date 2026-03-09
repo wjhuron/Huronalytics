@@ -6,6 +6,9 @@ on:
     # Run daily at 10 AM ET (15:00 UTC during EDT, 14:00 UTC during EST)
     - cron: '0 15 * * *'
 
+permissions:
+  contents: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
