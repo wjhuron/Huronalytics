@@ -43,7 +43,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-11 17:32",
+  "generatedAt": "2026-03-11 17:55",
   "totalPitches": 90743,
   "totalPitchers": 1396,
   "totalHitters": 1521,
@@ -64,7 +64,7 @@
       "swStrPct": 0.1579,
       "cswPct": 0.2566,
       "chasePct": 0.2566,
-      "gbPct": 0.5806,
+      "gbPct": 0.5831,
       "breakTiltMinutes": 251,
       "breakTilt": "4:11",
       "count": 803
@@ -85,7 +85,7 @@
       "swStrPct": 0.3289,
       "cswPct": 0.2835,
       "chasePct": 0.2473,
-      "gbPct": 0.3495,
+      "gbPct": 0.3504,
       "breakTiltMinutes": 457,
       "breakTilt": "7:37",
       "count": 595
@@ -106,7 +106,7 @@
       "swStrPct": 0.2091,
       "cswPct": 0.2432,
       "chasePct": 0.2599,
-      "gbPct": 0.3416,
+      "gbPct": 0.3444,
       "breakTiltMinutes": 221,
       "breakTilt": "3:41",
       "count": 1293
@@ -127,7 +127,7 @@
       "swStrPct": 0.3324,
       "cswPct": 0.2303,
       "chasePct": 0.2524,
-      "gbPct": 0.5013,
+      "gbPct": 0.5025,
       "breakTiltMinutes": 280,
       "breakTilt": "4:40",
       "count": 824
@@ -148,7 +148,7 @@
       "swStrPct": 0.3376,
       "cswPct": 0.3085,
       "chasePct": 0.2675,
-      "gbPct": 0.4144,
+      "gbPct": 0.4157,
       "breakTiltMinutes": 451,
       "breakTilt": "7:31",
       "count": 938
@@ -169,7 +169,7 @@
       "swStrPct": 0.2573,
       "cswPct": 0.2846,
       "chasePct": 0.2711,
-      "gbPct": 0.3871,
+      "gbPct": 0.3903,
       "breakTiltMinutes": 460,
       "breakTilt": "7:40",
       "count": 497
@@ -211,7 +211,7 @@
       "swStrPct": 0.3642,
       "cswPct": 0.2026,
       "chasePct": 0.2513,
-      "gbPct": 0.518,
+      "gbPct": 0.5191,
       "breakTiltMinutes": 214,
       "breakTilt": "3:34",
       "count": 246
@@ -264,10 +264,11 @@
     "swStrPct": 0.2697,
     "cswPct": 0.2776,
     "chasePct": 0.2608,
-    "gbPct": 0.4175,
-    "kPct": 0.2309,
-    "bbPct": 0.1139,
-    "kbbPct": 0.1171,
+    "gbPct": 0.42,
+    "kPct": 0.2317,
+    "bbPct": 0.1143,
+    "kbbPct": 0.1174,
+    "babip": 0.2914,
     "count": 1396
   },
   "hitterLeagueAverages": {
@@ -275,8 +276,10 @@
     "obp": 0.3219,
     "slg": 0.3747,
     "ops": 0.6897,
-    "xBA": 0.3186,
-    "xSLG": 0.5211,
+    "iso": 0.1431,
+    "babip": 0.2982,
+    "xBA": 0.2122,
+    "xSLG": 0.3431,
     "kPct": 0.2585,
     "bbPct": 0.104,
     "medEV": 92.0591,
@@ -296,7 +299,8 @@
     "izSwingPct": 0.6714,
     "chasePct": 0.2745,
     "izSwChase": 0.3953,
-    "izContactPct": 0.5381,
+    "contactPct": 0.7173,
+    "izContactPct": 0.8021,
     "whiffPct": 0.2827,
     "count": 1521
   }

@@ -28,25 +28,25 @@ METRIC_KEYS = {
 }
 
 PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct']
-STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct']
+STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + PITCH_STAT_KEYS
 
 # Pitcher stats where lower is better (invert percentile)
-PITCHER_INVERT_PCTL = {'bbPct'}
+PITCHER_INVERT_PCTL = {'bbPct', 'babip'}
 
 # --- Hitter Leaderboard constants ---
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
 HITTER_STAT_KEYS = [
     # Hitter Stats tab
-    'avg', 'obp', 'slg', 'ops', 'xBA', 'xSLG', 'kPct', 'bbPct',
+    'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'xBA', 'xSLG', 'kPct', 'bbPct',
     # Batted Ball tab
     'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
-    'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'izContactPct', 'whiffPct',
+    'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
@@ -166,7 +166,7 @@ def avg(values):
 
 
 def compute_stats(pitches):
-    """Compute IZ%, Whiff%, CSW%, Chase%, GB%, K%, BB%, K-BB% from a list of pitch dicts."""
+    """Compute IZ%, Whiff%, CSW%, Chase%, GB%, K%, BB%, K-BB%, BABIP from a list of pitch dicts."""
     total = len(pitches)
     if total == 0:
         return {k: None for k in STAT_KEYS}
@@ -179,17 +179,29 @@ def compute_stats(pitches):
     ooz = [p for p in pitches if p.get('InZone') == 'No']
     ooz_swung = sum(1 for p in ooz if p['Description'] in ('Swinging Strike', 'In Play', 'Foul'))
 
-    bip = [p for p in pitches if p.get('BBType') is not None]
+    # GB% — exclude bunts from denominator
+    bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
     gb = sum(1 for p in bip if p.get('BBType') == 'ground_ball')
 
-    # K% and BB% — count plate appearances (pitches with an Event)
-    pa_pitches = [p for p in pitches if p.get('Event') is not None]
+    # K%, BB%, BABIP — count true plate appearances (exclude non-PA events)
+    pa_pitches = [p for p in pitches if p.get('Event') and p['Event'] not in NON_PA_EVENTS]
     n_pa = len(pa_pitches)
+    n_h = sum(1 for p in pa_pitches if p['Event'] in HIT_EVENTS)
+    n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
     n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
     n_bb = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
+    n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
+    n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
+    n_sh = sum(1 for p in pa_pitches if p['Event'] in SH_EVENTS)
+    n_ci = sum(1 for p in pa_pitches if p['Event'] in CI_EVENTS)
+    n_ab = n_pa - n_bb - n_hbp - n_sf - n_sh - n_ci
     k_pct = n_k / n_pa if n_pa > 0 else None
     bb_pct = n_bb / n_pa if n_pa > 0 else None
     kbb_pct = round(k_pct - bb_pct, 4) if k_pct is not None and bb_pct is not None else None
+
+    # BABIP = (H - HR) / (AB - K - HR + SF)
+    babip_denom = n_ab - n_k - n_hr + n_sf
+    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
     return {
         'izPct': iz / total,
@@ -200,6 +212,7 @@ def compute_stats(pitches):
         'kPct': k_pct,
         'bbPct': bb_pct,
         'kbbPct': kbb_pct,
+        'babip': babip,
     }
 
 
@@ -312,6 +325,13 @@ def compute_hitter_stats(pitches):
     k_pct = n_k / n_pa if n_pa > 0 else None
     bb_pct = n_bb / n_pa if n_pa > 0 else None
 
+    # ISO = SLG - AVG
+    iso = round(slg - batting_avg, 3) if slg is not None and batting_avg is not None else None
+
+    # BABIP = (H - HR) / (AB - K - HR + SF)
+    babip_denom = n_ab - n_k - n_hr + n_sf
+    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
+
     # === Swing metrics ===
     n_swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
     whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
@@ -325,12 +345,18 @@ def compute_hitter_stats(pitches):
     iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
     chase_pct = ooz_swings / len(ooz_pitches) if ooz_pitches else None
 
-    # IZCT%: in-zone contact rate — (Foul + In Play, excl bunt BIP) / (IZ pitches, excl bunt BIP)
+    # Contact%: overall contact rate — (Foul + In Play) / Swings
+    contact = sum(1 for p in pitches if p['Description'] in ('Foul', 'In Play'))
+    contact_pct = contact / n_swings if n_swings > 0 else None
+
+    # IZCT%: in-zone contact rate — (IZ Foul + IZ non-bunt In Play) / IZ swings (excl bunt BIP)
+    iz_swings_non_bunt = sum(1 for p in iz_pitches
+                             if p['Description'] in SWING_DESCRIPTIONS
+                             and p.get('BBType') not in BUNT_BB_TYPES)
     iz_contact = sum(1 for p in iz_pitches
                      if p['Description'] in ('Foul', 'In Play')
                      and p.get('BBType') not in BUNT_BB_TYPES)
-    iz_non_bunt = [p for p in iz_pitches if p.get('BBType') not in BUNT_BB_TYPES]
-    iz_contact_pct = iz_contact / len(iz_non_bunt) if iz_non_bunt else None
+    iz_contact_pct = iz_contact / iz_swings_non_bunt if iz_swings_non_bunt > 0 else None
 
     # === Batted ball metrics (excluding bunts) ===
     bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
@@ -400,8 +426,10 @@ def compute_hitter_stats(pitches):
         'xbh': xbh,
         'kPct': k_pct,
         'bbPct': bb_pct,
-        'xBA': round(avg(xba_vals), 3) if xba_vals else None,
-        'xSLG': round(avg(xslg_vals), 3) if xslg_vals else None,
+        'iso': iso,
+        'babip': babip,
+        'xBA': round(sum(xba_vals) / n_ab, 3) if xba_vals and n_ab > 0 else None,
+        'xSLG': round(sum(xslg_vals) / n_ab, 3) if xslg_vals and n_ab > 0 else None,
         # Batted Ball tab
         'medEV': round(median(evs_pos), 1) if evs_pos else None,
         'ev50': ev50,
@@ -421,6 +449,7 @@ def compute_hitter_stats(pitches):
         'izSwingPct': iz_swing_pct,
         'chasePct': chase_pct,
         'izSwChase': round(iz_swing_pct - chase_pct, 4) if iz_swing_pct is not None and chase_pct is not None else None,
+        'contactPct': contact_pct,
         'izContactPct': iz_contact_pct,
         'whiffPct': whiffs / n_swings if n_swings > 0 else None,
     }
