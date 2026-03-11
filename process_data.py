@@ -169,7 +169,9 @@ def compute_stats(pitches):
     """Compute IZ%, Whiff%, CSW%, Chase%, GB%, K%, BB%, K-BB%, BABIP from a list of pitch dicts."""
     total = len(pitches)
     if total == 0:
-        return {k: None for k in STAT_KEYS}
+        empty = {k: None for k in STAT_KEYS}
+        empty['nBip'] = 0
+        return empty
 
     iz = sum(1 for p in pitches if p.get('InZone') == 'Yes')
     swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
@@ -209,6 +211,7 @@ def compute_stats(pitches):
         'cswPct': csw / total,
         'chasePct': ooz_swung / len(ooz) if ooz else None,
         'gbPct': gb / len(bip) if bip else None,
+        'nBip': len(bip),
         'kPct': k_pct,
         'bbPct': bb_pct,
         'kbbPct': kbb_pct,
