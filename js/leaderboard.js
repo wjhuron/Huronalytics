@@ -65,9 +65,6 @@ var COLUMNS = {
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'xbh',         label: 'XBH',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
-    // Rates
-    { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
-    { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
   ],
   hitterBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -101,6 +98,9 @@ var COLUMNS = {
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    // Rates
+    { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
+    { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
     // Discipline
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
