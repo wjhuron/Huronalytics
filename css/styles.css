@@ -110,6 +110,13 @@ header {
   padding: 0 32px;
 }
 
+.tab-divider {
+  width: 1px;
+  background: rgba(255,255,255,0.2);
+  margin: 8px 4px;
+  align-self: stretch;
+}
+
 .tab {
   padding: 12px 24px;
   background: none;

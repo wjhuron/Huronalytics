@@ -44,39 +44,67 @@ var COLUMNS = {
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
   ],
-  hitter: [
+  hitterStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
-    { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'nSwings',    label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    // Stats
+    { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'stats' },
+    { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'obp',         label: 'OBP',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'ops',         label: 'OPS',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    // Counting
+    { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
+    { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'xbh',         label: 'XBH',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     // Rates
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
+  ],
+  hitterBattedBall: [
+    { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
+    { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
+    { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    // Exit Velocity
+    { key: 'medEV',       label: 'Med EV',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
+    { key: 'ev50',        label: 'EV50',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
+    { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
+    // Batted Ball
+    { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'batted_ball' },
+    { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    { key: 'puPct',       label: 'PU%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    // Spray
+    { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'spray' },
+    { key: 'middlePct',   label: 'Middle%',  format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
+    { key: 'oppoPct',     label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
+    { key: 'airPullPct',  label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
+  ],
+  hitterSwingDecisions: [
+    { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
+    { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
+    { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     // Discipline
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'izSwChase',   label: 'IZSw-Ch',  format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
+    { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
-    // Quality
-    { key: 'medEV',       label: 'Med EV',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'quality' },
-    { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'quality' },
-    { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'quality' },
-    { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
-    { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'quality' },
-    { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'quality' },
-    // Batted Ball
-    { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'batted_ball' },
-    { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
-    { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
-    { key: 'puPct',       label: 'PU%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
-    // Spray
-    { key: 'pullPct',    label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'spray' },
-    { key: 'centPct',    label: 'Cent%',    format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
-    { key: 'oppoPct',    label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
-    { key: 'airPullPct', label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
   ],
 };
 
@@ -92,7 +120,7 @@ var Leaderboard = {
   keyboardFocusIndex: -1,
 
   initHiddenColumns: function () {
-    var allCols = COLUMNS.pitch.concat(COLUMNS.pitcher).concat(COLUMNS.hitter);
+    var allCols = COLUMNS.pitch.concat(COLUMNS.pitcher).concat(COLUMNS.hitterStats).concat(COLUMNS.hitterBattedBall).concat(COLUMNS.hitterSwingDecisions);
     for (var i = 0; i < allCols.length; i++) {
       if (allCols[i].defaultHidden) {
         this.hiddenColumns[allCols[i].key] = true;
@@ -157,6 +185,7 @@ var Leaderboard = {
       avg[key] = count > 0 ? sum / count : null;
     });
     avg.pitcher = 'League Avg';
+    avg.hitter = 'League Avg';
     avg._isLeagueAvg = true;
     avg._rank = '';
     return avg;

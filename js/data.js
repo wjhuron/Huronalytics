@@ -59,7 +59,12 @@ var DataStore = {
       if (tab === 'pitch' && selectedPitchTypes !== 'all') {
         if (selectedPitchTypes.indexOf(row.pitchType) === -1) return false;
       }
-      if (row.count < filters.minCount) return false;
+      // Min count: use PA for hitters, pitch count for pitchers
+      if (tab === 'hitter') {
+        if ((row.pa || 0) < filters.minCount) return false;
+      } else {
+        if (row.count < filters.minCount) return false;
+      }
       if (tab === 'hitter' && filters.minSwings && row.nSwings < filters.minSwings) return false;
       if (filters.search) {
         var name = (row.pitcher || row.hitter || '').toLowerCase();
