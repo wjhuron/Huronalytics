@@ -185,8 +185,8 @@ def compute_stats(pitches):
     # K% and BB% — count plate appearances (pitches with an Event)
     pa_pitches = [p for p in pitches if p.get('Event') is not None]
     n_pa = len(pa_pitches)
-    n_k = sum(1 for p in pa_pitches if p['Event'] == 'Strikeout')
-    n_bb = sum(1 for p in pa_pitches if p['Event'] == 'Walk')
+    n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
+    n_bb = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
     k_pct = n_k / n_pa if n_pa > 0 else None
     bb_pct = n_bb / n_pa if n_pa > 0 else None
     kbb_pct = round(k_pct - bb_pct, 4) if k_pct is not None and bb_pct is not None else None
