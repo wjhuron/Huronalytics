@@ -1112,10 +1112,12 @@ def main():
         for metric in PITCH_PCTL_KEYS:
             compute_percentile_ranks(pt_rows, metric)
 
-    # --- Invert VAA and nVAA percentiles for FF and FC (lower = better for fastballs) ---
-    VAA_INVERT_TYPES = {'FF', 'FC'}
+    # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
+    # FF/FC: closer to 0 (e.g. -3) = red (default: higher value = higher pctl = red) — no inversion
+    # All others: further from 0 (e.g. -10) = red (lower value = red) — invert
+    VAA_NO_INVERT_TYPES = {'FF', 'FC'}
     for pt, pt_rows in pt_groups.items():
-        if pt in VAA_INVERT_TYPES:
+        if pt not in VAA_NO_INVERT_TYPES:
             for row in pt_rows:
                 if row.get('vaa_pctl') is not None:
                     row['vaa_pctl'] = 100 - row['vaa_pctl']

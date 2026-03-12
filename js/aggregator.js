@@ -387,11 +387,12 @@ var Aggregator = {
       });
     }
 
-    // Invert VAA and nVAA percentiles for FF and FC (lower/more negative = better for fastballs)
-    // For all other pitch types, higher VAA = better (more drop evasion)
-    var VAA_INVERT_TYPES = { FF: true, FC: true };
+    // Invert VAA and nVAA percentiles for non-fastball pitch types
+    // FF/FC: closer to 0 (e.g. -3) = red (default: higher value = higher pctl) — no inversion
+    // All others: further from 0 (e.g. -10) = red (lower value = red) — invert
+    var VAA_NO_INVERT = { FF: true, FC: true };
     for (var ptV in ptGroups) {
-      if (VAA_INVERT_TYPES[ptV]) {
+      if (!VAA_NO_INVERT[ptV]) {
         ptGroups[ptV].forEach(function (r) {
           if (r.vaa_pctl !== null && r.vaa_pctl !== undefined) {
             r.vaa_pctl = 100 - r.vaa_pctl;
