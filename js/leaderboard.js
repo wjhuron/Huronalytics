@@ -177,7 +177,7 @@ var Leaderboard = {
   computeLeagueAvgRow: function (data, columns) {
     var avg = {};
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
-    var ABS_AVG_KEYS = { horzBrk: true, haa: true, hra: true };
+    var ABS_AVG_KEYS = { horzBrk: true, haa: true, hra: true, relPosX: true };
     var numericKeys = [];
     for (var i = 0; i < columns.length; i++) {
       if (columns[i].sortType === 'numeric' && !columns[i].noPercentile && columns[i].key !== '_rank') {
