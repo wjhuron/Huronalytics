@@ -46,8 +46,6 @@ var COLUMNS = {
     { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
     { key: 'relPosX',     label: 'RelX',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
     { key: 'extension',   label: 'Ext',      format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
-    { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
-    { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'vra',         label: 'VRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'izPct',       label: 'IZ%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
