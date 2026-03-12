@@ -74,6 +74,10 @@
     // Set generated date
     var genDate = document.getElementById('generated-date');
     if (genDate) genDate.textContent = DataStore.metadata.generatedAt;
+    var freshness = document.getElementById('data-freshness');
+    if (freshness && DataStore.metadata.generatedAt) {
+      freshness.textContent = '| Updated ' + DataStore.metadata.generatedAt;
+    }
 
     // Set date range min/max from micro data dates
     if (Aggregator.loaded && Aggregator.data && Aggregator.data.lookups.dates.length > 0) {
@@ -158,7 +162,7 @@
         document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
         tab.classList.add('active');
         currentTab = tab.getAttribute('data-tab');
-        Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'pa' : 'count', dir: 'desc' };
+        Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
         Leaderboard.currentPage = 1;
         Leaderboard.keyboardFocusIndex = -1;
 
@@ -229,7 +233,7 @@
 
     // Apply sort
     if (!Leaderboard.currentSort.key) {
-      Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'pa' : 'count', dir: 'desc' };
+      Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
     }
 
     var sortKey = Leaderboard.currentSort.key;
@@ -276,6 +280,22 @@
         refresh();
       });
     }
+
+    // Compact mode toggle
+    (function () {
+      var compactBtn = document.getElementById('compact-toggle');
+      if (!compactBtn) return;
+      if (localStorage.getItem('compactMode') === '1') {
+        document.body.classList.add('compact');
+        compactBtn.classList.add('active');
+      }
+      compactBtn.addEventListener('click', function () {
+        document.body.classList.toggle('compact');
+        var on = document.body.classList.contains('compact');
+        compactBtn.classList.toggle('active', on);
+        localStorage.setItem('compactMode', on ? '1' : '0');
+      });
+    })();
 
     // Export CSV
     document.getElementById('export-csv-btn').addEventListener('click', function () {

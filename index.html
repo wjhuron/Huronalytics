@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ST 2026 Leaderboard</title>
-  <link rel="stylesheet" href="css/styles.css?v=15">
+  <link rel="stylesheet" href="css/styles.css?v=16">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -89,6 +89,7 @@
   <section class="toolbar">
     <div class="toolbar-left">
       <span class="result-count"><span id="row-count">0</span> results</span>
+      <span class="data-freshness" id="data-freshness"></span>
     </div>
     <div class="toolbar-right">
       <button id="compare-btn" class="toolbar-btn" title="Compare selected pitchers" disabled>Compare (0)</button>
@@ -96,6 +97,7 @@
         <button id="col-settings-btn" class="toolbar-btn" title="Show/hide columns">Columns</button>
         <div id="col-settings-panel" class="col-settings-panel"></div>
       </div>
+      <button id="compact-toggle" class="toolbar-btn" title="Toggle compact mode">Compact</button>
       <button id="export-csv-btn" class="toolbar-btn" title="Export to CSV">CSV</button>
       <button id="copy-clipboard-btn" class="toolbar-btn" title="Copy to clipboard">Copy</button>
     </div>
@@ -167,6 +169,6 @@
   <script src="js/data.js?v=15"></script>
   <script src="js/leaderboard.js?v=16"></script>
   <script src="js/scatter.js?v=15"></script>
-  <script src="js/app.js?v=15"></script>
+  <script src="js/app.js?v=16"></script>
 </body>
 </html>

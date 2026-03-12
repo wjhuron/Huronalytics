@@ -3,7 +3,7 @@ var COLUMNS = {
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: '_compare',    label: '',         format: function(){ return ''; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, isCompare: true, group: 'info', width: '32px' },
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
-    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isPitchType: true },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
@@ -33,7 +33,7 @@ var COLUMNS = {
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: '_compare',    label: '',         format: function(){ return ''; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, isCompare: true, group: 'info', width: '32px' },
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
-    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
@@ -51,7 +51,7 @@ var COLUMNS = {
   hitterStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
-    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     // Stats
@@ -70,7 +70,7 @@ var COLUMNS = {
   hitterBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
-    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
@@ -95,7 +95,7 @@ var COLUMNS = {
   hitterSwingDecisions: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
-    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
+    { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
@@ -227,8 +227,46 @@ var Leaderboard = {
     if (pagePrev) pagePrev.disabled = this.currentPage <= 1;
     if (pageNext) pageNext.disabled = this.currentPage >= totalPages;
 
-    // Build header
-    headerRow.innerHTML = '';
+    // Build header - group row + column row
+    var thead = document.querySelector('#leaderboard-table thead');
+    thead.innerHTML = '';
+
+    // Group header row
+    var groupRow = document.createElement('tr');
+    groupRow.id = 'table-group-header';
+    var groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline' };
+    var prevGroup = null;
+    var groupSpans = [];
+    visCols.forEach(function (col) {
+      var g = col.group || 'info';
+      if (g === prevGroup) {
+        groupSpans[groupSpans.length - 1].span++;
+      } else {
+        groupSpans.push({ group: g, span: 1, sticky: col.sticky });
+        prevGroup = g;
+      }
+    });
+    var hasGroups = groupSpans.some(function (gs) { return groupLabels[gs.group]; });
+    if (hasGroups) {
+      var colIdx = 0;
+      groupSpans.forEach(function (gs) {
+        var th = document.createElement('th');
+        th.setAttribute('colspan', gs.span);
+        th.textContent = groupLabels[gs.group] || '';
+        th.classList.add('group-header-cell');
+        if (gs.sticky) { th.classList.add('sticky-col'); }
+        if (gs.group !== 'info' && groupLabels[gs.group]) th.classList.add('group-header-labeled');
+        // Check if first col in this span is sectionStart
+        if (visCols[colIdx] && visCols[colIdx].sectionStart) th.classList.add('section-start');
+        colIdx += gs.span;
+        groupRow.appendChild(th);
+      });
+      thead.appendChild(groupRow);
+    }
+
+    // Column header row
+    headerRow = document.createElement('tr');
+    headerRow.id = 'table-header';
     visCols.forEach(function (col) {
       var th = document.createElement('th');
       if (col.isCompare) {
@@ -258,6 +296,38 @@ var Leaderboard = {
 
       headerRow.appendChild(th);
     });
+    thead.appendChild(headerRow);
+
+    // Set column header sticky top below group header
+    if (hasGroups) {
+      var groupRowHeight = groupRow.offsetHeight || 25;
+      for (var hi = 0; hi < headerRow.cells.length; hi++) {
+        headerRow.cells[hi].style.top = groupRowHeight + 'px';
+      }
+    }
+
+    // Calculate sticky column offsets (for frozen Team column)
+    this._stickyLeftOffsets = {};
+    var firstStickyTh = null;
+    for (var si = 0; si < visCols.length; si++) {
+      if (visCols[si].sticky && !visCols[si].stickyIdx) {
+        firstStickyTh = headerRow.cells[si];
+        break;
+      }
+    }
+    if (firstStickyTh) {
+      var firstStickyWidth = firstStickyTh.offsetWidth;
+      for (var si2 = 0; si2 < visCols.length; si2++) {
+        if (visCols[si2].stickyIdx === 1) {
+          headerRow.cells[si2].style.left = firstStickyWidth + 'px';
+          this._stickyLeftOffsets[visCols[si2].key] = firstStickyWidth;
+          // Also set on group header if present
+          if (hasGroups) {
+            // Find which group cell contains this column
+          }
+        }
+      }
+    }
 
     // Build body
     tbody.innerHTML = '';
@@ -416,7 +486,12 @@ var Leaderboard = {
       var val = row[col.key];
       td.textContent = col.format(val);
       if (col.align) td.classList.add('align-' + col.align);
-      if (col.sticky) td.classList.add('sticky-col');
+      if (col.sticky) {
+        td.classList.add('sticky-col');
+        if (col.stickyIdx === 1 && self._stickyLeftOffsets[col.key]) {
+          td.style.left = self._stickyLeftOffsets[col.key] + 'px';
+        }
+      }
       if (col.cls) td.classList.add(col.cls);
       if (col.sectionStart) td.classList.add('section-start');
       if (val === null || val === undefined) td.classList.add('col-null');

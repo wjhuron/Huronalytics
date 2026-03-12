@@ -275,6 +275,12 @@ header {
   color: var(--text-primary);
 }
 
+.data-freshness {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
 .toolbar-btn {
   padding: 5px 12px;
   border: 1px solid var(--border);
@@ -409,6 +415,29 @@ thead th:hover { background: var(--bg-th-hover); color: white; }
 thead th.align-left { text-align: left; }
 thead th.align-center { text-align: center; }
 thead th.sorted { color: white; background: var(--bg-th-hover); }
+
+/* Group header row */
+#table-group-header th {
+  background: var(--bg-th);
+  color: var(--text-muted);
+  padding: 4px 14px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-right: 1px solid var(--border-th);
+  border-bottom: 1px solid var(--border-th);
+  cursor: default;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+#table-group-header th:hover { background: var(--bg-th); color: var(--text-muted); }
+#table-group-header th.group-header-labeled { color: var(--text-th); }
+#table-group-header th.sticky-col { position: sticky; left: 0; z-index: 4; }
+#table-group-header th:last-child { border-right: none; }
+/* #table-header th top is set dynamically in JS */
 
 thead th.sorted::after {
   font-size: 9px;
@@ -803,6 +832,13 @@ tbody tr.keyboard-focus {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+/* === Compact Mode === */
+body.compact #leaderboard-table thead th { padding: 3px 8px; font-size: 11px; }
+body.compact #table-group-header th { padding: 2px 8px; font-size: 9px; }
+body.compact #leaderboard-table tbody td { padding: 4px 8px; font-size: 12px; }
+body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
+#compact-toggle.active { background: var(--accent); color: #fff; }
 
 /* === Responsive === */
 @media (max-width: 768px) {
