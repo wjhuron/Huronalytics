@@ -378,7 +378,7 @@ var Aggregator = {
 
     // Invert VAA percentiles for FF and FC (lower/more negative VAA = better for fastballs)
     // For all other pitch types, higher VAA = better (more drop evasion)
-    var VAA_INVERT_TYPES = { FF: true, FC: true, SI: true };
+    var VAA_INVERT_TYPES = { FF: true, FC: true };
     for (var ptV in ptGroups) {
       if (VAA_INVERT_TYPES[ptV]) {
         ptGroups[ptV].forEach(function (r) {
