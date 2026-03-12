@@ -712,7 +712,7 @@ tbody td.col-compare input[type="checkbox"] {
   background: var(--bg-th);
   color: var(--text-th);
   padding: 6px 8px;
-  text-align: right;
+  text-align: center;
   font-weight: 600;
   font-size: 11px;
   position: static;
@@ -720,19 +720,17 @@ tbody td.col-compare input[type="checkbox"] {
   border-right: 1px solid var(--border-th);
 }
 
-.panel-metrics-table th:first-child { text-align: left; }
 .panel-metrics-table th:last-child { border-right: none; }
 
 .panel-metrics-table td {
   padding: 5px 8px;
-  text-align: right;
+  text-align: center;
   border-bottom: 1px solid var(--border-light);
   font-family: "SF Mono", "Menlo", monospace;
   font-size: 11px;
 }
 
 .panel-metrics-table td:first-child {
-  text-align: left;
   font-family: inherit;
   font-weight: 600;
 }
