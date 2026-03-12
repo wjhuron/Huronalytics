@@ -43,7 +43,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-12 11:16",
+  "generatedAt": "2026-03-12 17:01",
   "totalPitches": 93462,
   "totalPitchers": 1400,
   "totalHitters": 1536,
@@ -278,8 +278,6 @@
     "ops": 0.6903,
     "iso": 0.1438,
     "babip": 0.2986,
-    "xBA": 0.2155,
-    "xSLG": 0.3468,
     "kPct": 0.2616,
     "bbPct": 0.1039,
     "medEV": 92.0558,
