@@ -56,10 +56,8 @@ var COLUMNS = {
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     // Stats
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'stats' },
-    { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'obp',         label: 'OBP',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
-    { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'ops',         label: 'OPS',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'iso',         label: 'ISO',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },

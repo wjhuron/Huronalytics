@@ -130,8 +130,6 @@ var Utils = {
     'Med EV': 'Median Exit Velocity (mph, LA > 0 only)',
     'Max EV': 'Max Exit Velocity (mph, LA > 0 only)',
     'Barrel%': 'Barrel Rate (Statcast definition)',
-    'xBA': 'Expected Batting Average (on batted balls)',
-    'xSLG': 'Expected Slugging (on batted balls)',
     'LD%': 'Line Drive Rate',
     'FB%': 'Fly Ball Rate',
     'PU%': 'Popup Rate',

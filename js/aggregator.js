@@ -452,7 +452,7 @@ var Aggregator = {
     }
 
     var HITTER_STAT_KEYS = [
-      'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'xBA', 'xSLG', 'kPct', 'bbPct',
+      'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
       'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct',
       'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
@@ -477,7 +477,6 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
-      var sumXBA = c[32], nXBA = c[33], sumXSLG = c[34], nXSLG = c[35];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -543,8 +542,6 @@ var Aggregator = {
         bbPct: bbPct,
         iso: iso_val,
         babip: babip_val,
-        xBA: (nXBA > 0 && ab > 0) ? Math.round(sumXBA / ab * 1000) / 1000 : null,
-        xSLG: (nXSLG > 0 && ab > 0) ? Math.round(sumXSLG / ab * 1000) / 1000 : null,
         medEV: medEV,
         ev50: ev50,
         maxEV: maxEV,

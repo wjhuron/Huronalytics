@@ -470,8 +470,6 @@
       { key: 'swingPct', label: 'Swing%', format: Utils.formatPct },
       { key: 'whiffPct', label: 'Whiff%', format: Utils.formatPct },
       { key: 'medEV', label: 'Med EV', format: Utils.formatDecimal(1) },
-      { key: 'xBA', label: 'xBA', format: Utils.formatDecimal(3) },
-      { key: 'xSLG', label: 'xSLG', format: Utils.formatDecimal(3) },
     ];
 
     var table = document.createElement('table');

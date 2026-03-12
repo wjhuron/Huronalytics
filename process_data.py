@@ -40,7 +40,7 @@ PITCHER_INVERT_PCTL = {'bbPct', 'babip'}
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
 HITTER_STAT_KEYS = [
     # Hitter Stats tab
-    'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'xBA', 'xSLG', 'kPct', 'bbPct',
+    'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
     # Batted Ball tab
     'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct',
@@ -417,10 +417,6 @@ def compute_hitter_stats(pitches):
     all_la = [safe_float(p.get('LaunchAngle')) for p in bip
               if safe_float(p.get('LaunchAngle')) is not None]
 
-    # xBA and xSLG on batted balls
-    xba_vals = [safe_float(p.get('xBA')) for p in bip if safe_float(p.get('xBA')) is not None]
-    xslg_vals = [safe_float(p.get('xSLG')) for p in bip if safe_float(p.get('xSLG')) is not None]
-
     # Spray stats (Pull%, Middle%, Oppo%, AirPull%)
     spray_data = []
     for p in bip:
@@ -454,8 +450,6 @@ def compute_hitter_stats(pitches):
         'bbPct': bb_pct,
         'iso': iso,
         'babip': babip,
-        'xBA': round(sum(xba_vals) / n_ab, 3) if xba_vals and n_ab > 0 else None,
-        'xSLG': round(sum(xslg_vals) / n_ab, 3) if xslg_vals and n_ab > 0 else None,
         # Batted Ball tab
         'medEV': round(median(evs_pos), 1) if evs_pos else None,
         'ev50': ev50,
@@ -700,7 +694,7 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
     #  26:barrels  27:nSpray  28:pull  29:center  30:oppo  31:airPull
     #  32:sumXBA  33:nXBA  34:sumXSLG  35:nXSLG
     # ==========================================================
-    hitter_micro = defaultdict(lambda: [0.0] * 36)
+    hitter_micro = defaultdict(lambda: [0.0] * 32)
 
     for p in all_hitter_pitches:
         batter = p.get('Batter')
@@ -790,15 +784,6 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
                 if sd == 'pull' and bb_type in ('line_drive', 'fly_ball'):
                     c[31] += 1  # airPull
 
-            # xBA / xSLG sums
-            xba = safe_float(p.get('xBA'))
-            if xba is not None:
-                c[32] += xba   # sumXBA
-                c[33] += 1     # nXBA
-            xslg = safe_float(p.get('xSLG'))
-            if xslg is not None:
-                c[34] += xslg  # sumXSLG
-                c[35] += 1     # nXSLG
 
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
