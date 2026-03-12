@@ -1034,6 +1034,11 @@ def main():
             key_name = METRIC_KEYS[col]
             row[key_name] = round_metric(col, avg(values))
 
+        # Max velocity
+        velos = [safe_float(p.get('Velocity')) for p in pitches]
+        velos = [v for v in velos if v is not None]
+        row['maxVelo'] = round(max(velos), 1) if velos else None
+
         # Break Tilt (circular mean)
         tilt_minutes = [break_tilt_to_minutes(p.get('Break Tilt')) for p in pitches]
         tilt_minutes = [m for m in tilt_minutes if m is not None]

@@ -431,10 +431,11 @@
       { key: 'pitchType', label: 'Pitch', format: function (v) { return v; } },
       { key: 'usagePct', label: 'Usage', format: Utils.formatPct },
       { key: 'velocity', label: 'Velo', format: Utils.formatDecimal(1) },
+      { key: 'maxVelo', label: 'Max Velo', format: Utils.formatDecimal(1) },
       { key: 'spinRate', label: 'Spin', format: Utils.formatInt },
+      { key: 'breakTilt', label: 'Tilt', format: function (v) { return v || '--'; } },
       { key: 'indVertBrk', label: 'IVB', format: Utils.formatDecimal(1) },
       { key: 'horzBrk', label: 'HB', format: Utils.formatDecimal(1) },
-      { key: 'extension', label: 'Ext', format: Utils.formatDecimal(1) },
     ];
 
     var table = document.createElement('table');
