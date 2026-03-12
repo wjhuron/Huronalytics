@@ -32,6 +32,17 @@ var DataStore = {
   },
 
   /**
+   * Smart filter: uses Aggregator when date/hand filters are active,
+   * otherwise falls back to pre-aggregated data.
+   */
+  getFilteredDataV2: function (tab, filters) {
+    if (Aggregator.needsReaggregation(filters)) {
+      return Aggregator.aggregate(tab, filters);
+    }
+    return this.getFilteredData(tab, filters);
+  },
+
+  /**
    * Filter data based on current filters.
    * pitchTypes can be an array for multi-select: ['FF', 'SI'] or 'all'
    */

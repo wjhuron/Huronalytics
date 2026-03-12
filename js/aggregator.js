@@ -1,0 +1,598 @@
+/**
+ * Client-side aggregator for micro-aggregate data.
+ * Enables filtering by opponent hand and date range by
+ * summing pre-computed counts and recomputing final stats + percentiles.
+ */
+var Aggregator = {
+  data: null,
+  loaded: false,
+  _colIdx: {},
+
+  load: function () {
+    // Try embedded data first (for file:// usage)
+    if (window.MICRO_DATA) {
+      this.data = window.MICRO_DATA;
+      this._buildIndexes();
+      this.loaded = true;
+      return Promise.resolve();
+    }
+    // Fallback: fetch JSON
+    var self = this;
+    return fetch('data/micro_data.json')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        self.data = d;
+        self._buildIndexes();
+        self.loaded = true;
+      })
+      .catch(function (e) {
+        console.warn('Micro data not available (advanced filters disabled):', e);
+        self.loaded = false;
+      });
+  },
+
+  _buildIndexes: function () {
+    var d = this.data;
+    var tables = ['pitcherCols', 'pitchCols', 'hitterCols', 'hitterBipCols'];
+    for (var t = 0; t < tables.length; t++) {
+      var key = tables[t];
+      this._colIdx[key] = {};
+      for (var i = 0; i < d[key].length; i++) {
+        this._colIdx[key][d[key][i]] = i;
+      }
+    }
+  },
+
+  /**
+   * Returns true if advanced filters are active and re-aggregation is needed.
+   */
+  needsReaggregation: function (filters) {
+    if (!this.loaded) return false;
+    return (filters.vsHand && filters.vsHand !== 'all') ||
+           !!filters.dateStart || !!filters.dateEnd;
+  },
+
+  /**
+   * Main entry: aggregate micro data for the given tab and filters.
+   * Returns an array of row objects matching the pre-aggregated format.
+   */
+  aggregate: function (tab, filters) {
+    if (tab === 'pitcher') return this._aggregatePitcher(filters);
+    if (tab === 'pitch') return this._aggregatePitch(filters);
+    if (tab === 'hitter') return this._aggregateHitter(filters);
+    return [];
+  },
+
+  // ---- Date filtering helper ----
+  _getValidDateSet: function (filters) {
+    var dates = this.data.lookups.dates;
+    var minDate = filters.dateStart || '';
+    var maxDate = filters.dateEnd || '\uffff';
+    var valid = {};
+    for (var i = 0; i < dates.length; i++) {
+      if (dates[i] >= minDate && dates[i] <= maxDate) {
+        valid[i] = true;
+      }
+    }
+    return valid;
+  },
+
+  // ---- Percentile computation (replicates Python's compute_percentile_ranks) ----
+  _computePercentiles: function (rows, metricKey) {
+    var pctlKey = metricKey + '_pctl';
+    var valid = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined) {
+        valid.push({ idx: i, val: rows[i][metricKey] });
+      }
+    }
+
+    if (valid.length < 2) {
+      for (var j = 0; j < rows.length; j++) {
+        rows[j][pctlKey] = (rows[j][metricKey] !== null && rows[j][metricKey] !== undefined) ? 50 : null;
+      }
+      return;
+    }
+
+    var values = valid.map(function (v) { return v.val; });
+    var n = values.length;
+
+    for (var k = 0; k < valid.length; k++) {
+      var val = valid[k].val;
+      var below = 0, equal = 0;
+      for (var m = 0; m < n; m++) {
+        if (values[m] < val) below++;
+        if (values[m] === val) equal++;
+      }
+      var pctl = (below + 0.5 * (equal - 1)) / Math.max(1, n - 1) * 100;
+      rows[valid[k].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(pctl)));
+    }
+
+    for (var j2 = 0; j2 < rows.length; j2++) {
+      if (!(pctlKey in rows[j2])) {
+        rows[j2][pctlKey] = null;
+      }
+    }
+  },
+
+  // ==================================================================
+  //  Pitcher aggregation
+  // ==================================================================
+  _aggregatePitcher: function (filters) {
+    var d = this.data;
+    var ci = this._colIdx.pitcherCols;
+    var micro = d.pitcherMicro;
+    var lookups = d.lookups;
+    var validDates = this._getValidDateSet(filters);
+    var vsHand = filters.vsHand || 'all';
+
+    // Group by (pitcherIdx, teamIdx)
+    var groups = {};
+    for (var i = 0; i < micro.length; i++) {
+      var row = micro[i];
+      if (!validDates[row[ci.dateIdx]]) continue;
+      if (vsHand !== 'all' && row[ci.batterHand] !== vsHand) continue;
+
+      var gk = row[ci.pitcherIdx] + '|' + row[ci.teamIdx];
+      if (!groups[gk]) {
+        groups[gk] = {
+          pitcherIdx: row[ci.pitcherIdx],
+          teamIdx: row[ci.teamIdx],
+          throws: row[ci.throws],
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        };
+      }
+      var c = groups[gk].counts;
+      for (var f = 0; f < 18; f++) {
+        c[f] += row[ci.n + f];
+      }
+    }
+
+    // Convert to row objects
+    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip'];
+    var INVERT = { bbPct: true, babip: true };
+    var rows = [];
+
+    for (var gk2 in groups) {
+      var g = groups[gk2];
+      var c = g.counts;
+      var n = c[0], iz = c[1], sw = c[2], wh = c[3], csw = c[4];
+      var ooz = c[5], oozSw = c[6], bip = c[7], gb = c[8];
+      var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
+      var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
+      var ab = pa - bb - hbp - sf - sh - ci_val;
+
+      var kPct = pa > 0 ? k / pa : null;
+      var bbPct = pa > 0 ? bb / pa : null;
+      var kbbPct = (kPct !== null && bbPct !== null) ? Math.round((kPct - bbPct) * 10000) / 10000 : null;
+      var babip_denom = ab - k - hr + sf;
+      var babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
+
+      var obj = {
+        pitcher: lookups.pitchers[g.pitcherIdx],
+        team: lookups.teams[g.teamIdx],
+        throws: g.throws,
+        count: n,
+        pa: pa,
+        nBip: bip,
+        izPct: n > 0 ? iz / n : null,
+        swStrPct: sw > 0 ? wh / sw : null,
+        cswPct: n > 0 ? csw / n : null,
+        chasePct: ooz > 0 ? oozSw / ooz : null,
+        gbPct: bip > 0 ? gb / bip : null,
+        kPct: kPct,
+        bbPct: bbPct,
+        kbbPct: kbbPct,
+        babip: babip,
+      };
+
+      // Apply non-aggregator filters
+      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
+      if (obj.count < (filters.minCount || 1)) continue;
+      if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
+
+      rows.push(obj);
+    }
+
+    // Compute percentiles
+    for (var si = 0; si < STAT_KEYS.length; si++) {
+      this._computePercentiles(rows, STAT_KEYS[si]);
+    }
+    // Invert where lower is better
+    for (var ri = 0; ri < rows.length; ri++) {
+      for (var inv in INVERT) {
+        var pk = inv + '_pctl';
+        if (rows[ri][pk] !== null && rows[ri][pk] !== undefined) {
+          rows[ri][pk] = 100 - rows[ri][pk];
+        }
+      }
+    }
+
+    return rows;
+  },
+
+  // ==================================================================
+  //  Pitch aggregation
+  // ==================================================================
+  _aggregatePitch: function (filters) {
+    var d = this.data;
+    var ci = this._colIdx.pitchCols;
+    var micro = d.pitchMicro;
+    var lookups = d.lookups;
+    var validDates = this._getValidDateSet(filters);
+    var vsHand = filters.vsHand || 'all';
+
+    var METRIC_MAP = [
+      { key: 'velocity', sum: 'sumVelo', cnt: 'nVelo', round: 1 },
+      { key: 'spinRate', sum: 'sumSpin', cnt: 'nSpin', round: 0 },
+      { key: 'indVertBrk', sum: 'sumIVB', cnt: 'nIVB', round: 1 },
+      { key: 'horzBrk', sum: 'sumHB', cnt: 'nHB', round: 1 },
+      { key: 'relPosZ', sum: 'sumRelZ', cnt: 'nRelZ', round: 1 },
+      { key: 'relPosX', sum: 'sumRelX', cnt: 'nRelX', round: 1 },
+      { key: 'extension', sum: 'sumExt', cnt: 'nExt', round: 1 },
+      { key: 'vaa', sum: 'sumVAA', cnt: 'nVAA', round: 2 },
+      { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
+      { key: 'vra', sum: 'sumVRA', cnt: 'nVRA', round: 2 },
+      { key: 'hra', sum: 'sumHRA', cnt: 'nHRA', round: 2 },
+    ];
+    var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; });
+    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct'];
+    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(PITCH_STAT_KEYS);
+
+    // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
+    var groups = {};
+    var pitcherTotals = {};
+
+    for (var i = 0; i < micro.length; i++) {
+      var row = micro[i];
+      if (!validDates[row[ci.dateIdx]]) continue;
+      if (vsHand !== 'all' && row[ci.batterHand] !== vsHand) continue;
+
+      var pitcherKey = row[ci.pitcherIdx] + '|' + row[ci.teamIdx];
+      var gk = pitcherKey + '|' + row[ci.pitchTypeIdx];
+
+      pitcherTotals[pitcherKey] = (pitcherTotals[pitcherKey] || 0) + row[ci.n];
+
+      if (!groups[gk]) {
+        groups[gk] = {
+          pitcherIdx: row[ci.pitcherIdx],
+          teamIdx: row[ci.teamIdx],
+          throws: row[ci.throws],
+          pitchTypeIdx: row[ci.pitchTypeIdx],
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          metricSums: {}
+        };
+        METRIC_MAP.forEach(function (m) {
+          groups[gk].metricSums[m.sum] = 0;
+          groups[gk].metricSums[m.cnt] = 0;
+        });
+        groups[gk].metricSums.sumTiltSin = 0;
+        groups[gk].metricSums.sumTiltCos = 0;
+        groups[gk].metricSums.nTilt = 0;
+      }
+
+      var g = groups[gk];
+      for (var f = 0; f < 18; f++) {
+        g.counts[f] += row[ci.n + f];
+      }
+      METRIC_MAP.forEach(function (m) {
+        g.metricSums[m.sum] += row[ci[m.sum]];
+        g.metricSums[m.cnt] += row[ci[m.cnt]];
+      });
+      g.metricSums.sumTiltSin += row[ci.sumTiltSin];
+      g.metricSums.sumTiltCos += row[ci.sumTiltCos];
+      g.metricSums.nTilt += row[ci.nTilt];
+    }
+
+    // Convert to row objects
+    var rows = [];
+    for (var gk2 in groups) {
+      var g = groups[gk2];
+      var c = g.counts;
+      var ms = g.metricSums;
+      var n = c[0], iz = c[1], sw = c[2], wh = c[3], csw = c[4];
+      var ooz = c[5], oozSw = c[6], bip = c[7], gb = c[8];
+      var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
+      var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
+      var ab = pa - bb - hbp - sf - sh - ci_val;
+      var pitcherKey = g.pitcherIdx + '|' + g.teamIdx;
+      var pitcherTotal = pitcherTotals[pitcherKey] || 0;
+
+      var kPct = pa > 0 ? k / pa : null;
+      var bbPct = pa > 0 ? bb / pa : null;
+      var kbbPct = (kPct !== null && bbPct !== null) ? Math.round((kPct - bbPct) * 10000) / 10000 : null;
+      var babip_denom = ab - k - hr + sf;
+      var babip_val = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
+
+      var obj = {
+        pitcher: lookups.pitchers[g.pitcherIdx],
+        team: lookups.teams[g.teamIdx],
+        throws: g.throws,
+        pitchType: lookups.pitchTypes[g.pitchTypeIdx],
+        count: n,
+        nBip: bip,
+        usagePct: pitcherTotal > 0 ? Math.round(n / pitcherTotal * 10000) / 10000 : null,
+        pa: pa,
+        izPct: n > 0 ? iz / n : null,
+        swStrPct: sw > 0 ? wh / sw : null,
+        cswPct: n > 0 ? csw / n : null,
+        chasePct: ooz > 0 ? oozSw / ooz : null,
+        gbPct: bip > 0 ? gb / bip : null,
+        kPct: kPct,
+        bbPct: bbPct,
+        kbbPct: kbbPct,
+        babip: babip_val,
+      };
+
+      // Metric averages
+      METRIC_MAP.forEach(function (m) {
+        var cnt = ms[m.cnt];
+        if (cnt > 0) {
+          obj[m.key] = Number((ms[m.sum] / cnt).toFixed(m.round));
+        } else {
+          obj[m.key] = null;
+        }
+      });
+
+      // Break Tilt (circular mean)
+      if (ms.nTilt > 0) {
+        var sinAvg = ms.sumTiltSin / ms.nTilt;
+        var cosAvg = ms.sumTiltCos / ms.nTilt;
+        var avgAngle = Math.atan2(sinAvg, cosAvg);
+        if (avgAngle < 0) avgAngle += 2 * Math.PI;
+        var avgMinutes = Math.round(avgAngle / (2 * Math.PI) * 720);
+        var thh = Math.floor(avgMinutes / 60);
+        var tmm = avgMinutes % 60;
+        if (thh === 0) thh = 12;
+        obj.breakTilt = thh + ':' + (tmm < 10 ? '0' : '') + tmm;
+        obj.breakTiltMinutes = avgMinutes;
+      } else {
+        obj.breakTilt = null;
+        obj.breakTiltMinutes = null;
+      }
+
+      // Apply non-aggregator filters
+      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
+      if (filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
+      if (obj.count < (filters.minCount || 1)) continue;
+      if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
+
+      rows.push(obj);
+    }
+
+    // Percentiles per pitch type
+    var ptGroups = {};
+    rows.forEach(function (r) {
+      if (!ptGroups[r.pitchType]) ptGroups[r.pitchType] = [];
+      ptGroups[r.pitchType].push(r);
+    });
+
+    var self = this;
+    for (var pt in ptGroups) {
+      PITCH_PCTL_KEYS.forEach(function (key) {
+        self._computePercentiles(ptGroups[pt], key);
+      });
+    }
+
+    // Stuff Score
+    rows.forEach(function (r) {
+      var vp = r.velocity_pctl;
+      var sp = r.spinRate_pctl;
+      if (vp != null && sp != null) {
+        r.stuffScore = Math.round((vp + sp) / 2);
+      } else {
+        r.stuffScore = null;
+      }
+    });
+    for (var pt2 in ptGroups) {
+      self._computePercentiles(ptGroups[pt2], 'stuffScore');
+    }
+
+    return rows;
+  },
+
+  // ==================================================================
+  //  Hitter aggregation
+  // ==================================================================
+  _aggregateHitter: function (filters) {
+    var d = this.data;
+    var ci = this._colIdx.hitterCols;
+    var bci = this._colIdx.hitterBipCols;
+    var micro = d.hitterMicro;
+    var bipData = d.hitterBip;
+    var lookups = d.lookups;
+    var validDates = this._getValidDateSet(filters);
+    var vsHand = filters.vsHand || 'all';
+
+    // Group by (hitterIdx, teamIdx)
+    var groups = {};
+    for (var i = 0; i < micro.length; i++) {
+      var row = micro[i];
+      if (!validDates[row[ci.dateIdx]]) continue;
+      if (vsHand !== 'all' && row[ci.pitcherHand] !== vsHand) continue;
+
+      var gk = row[ci.hitterIdx] + '|' + row[ci.teamIdx];
+      if (!groups[gk]) {
+        groups[gk] = {
+          hitterIdx: row[ci.hitterIdx],
+          teamIdx: row[ci.teamIdx],
+          batsSet: {},
+          counts: new Array(36)
+        };
+        for (var z = 0; z < 36; z++) groups[gk].counts[z] = 0;
+      }
+
+      var g = groups[gk];
+      g.batsSet[row[ci.bats]] = true;
+
+      for (var f = 0; f < 36; f++) {
+        g.counts[f] += row[5 + f];
+      }
+    }
+
+    // Filter BIP records for medians
+    var bipByHitter = {};
+    for (var bi = 0; bi < bipData.length; bi++) {
+      var brow = bipData[bi];
+      if (!validDates[brow[bci.dateIdx]]) continue;
+      if (vsHand !== 'all' && brow[bci.pitcherHand] !== vsHand) continue;
+
+      var hIdx = brow[bci.hitterIdx];
+      if (!bipByHitter[hIdx]) bipByHitter[hIdx] = [];
+      bipByHitter[hIdx].push(brow);
+    }
+
+    function median(arr) {
+      if (arr.length === 0) return null;
+      arr.sort(function (a, b) { return a - b; });
+      var mid = Math.floor(arr.length / 2);
+      return arr.length % 2 === 1 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+    }
+
+    var HITTER_STAT_KEYS = [
+      'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'xBA', 'xSLG', 'kPct', 'bbPct',
+      'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
+      'gbPct', 'ldPct', 'fbPct', 'puPct',
+      'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
+      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
+    ];
+    var HITTER_INVERT = {
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true
+    };
+
+    var rows = [];
+    for (var gk2 in groups) {
+      var g = groups[gk2];
+      var c = g.counts;
+      var batsKeys = Object.keys(g.batsSet);
+      var stands = batsKeys.length > 1 ? 'S' : (batsKeys[0] || null);
+
+      var n_total = c[0], pa = c[1], h = c[2], db = c[3], tp = c[4], hr = c[5];
+      var bb = c[6], hbp = c[7], sf = c[8], sh = c[9], ci_v = c[10], k = c[11];
+      var swings = c[12], whiffs = c[13];
+      var izPitches = c[14], oozPitches = c[15];
+      var izSwings = c[16], oozSwings = c[17], contact = c[18];
+      var izSwNonBunt = c[19], izContact = c[20];
+      var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
+      var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
+      var sumXBA = c[32], nXBA = c[33], sumXSLG = c[34], nXSLG = c[35];
+
+      var ab = pa - bb - hbp - sf - sh - ci_v;
+      var singles = h - db - tp - hr;
+      var tb_val = singles + 2 * db + 3 * tp + 4 * hr;
+      var xbh = db + tp + hr;
+
+      var batting_avg = ab > 0 ? Math.round(h / ab * 1000) / 1000 : null;
+      var obp_denom = ab + bb + hbp + sf;
+      var obp_val = obp_denom > 0 ? Math.round((h + bb + hbp) / obp_denom * 1000) / 1000 : null;
+      var slg_val = ab > 0 ? Math.round(tb_val / ab * 1000) / 1000 : null;
+      var ops_val = (obp_val !== null && slg_val !== null) ? Math.round((obp_val + slg_val) * 1000) / 1000 : null;
+      var iso_val = (slg_val !== null && batting_avg !== null) ? Math.round((slg_val - batting_avg) * 1000) / 1000 : null;
+      var babip_denom = ab - k - hr + sf;
+      var babip_val = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
+
+      var kPct = pa > 0 ? k / pa : null;
+      var bbPct = pa > 0 ? bb / pa : null;
+      var izSwingPct = izPitches > 0 ? izSwings / izPitches : null;
+      var chasePct_val = oozPitches > 0 ? oozSwings / oozPitches : null;
+      var izSwChase = (izSwingPct !== null && chasePct_val !== null)
+        ? Math.round((izSwingPct - chasePct_val) * 10000) / 10000 : null;
+      var contactPct = swings > 0 ? contact / swings : null;
+      var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
+
+      // BIP medians
+      var bipRecords = bipByHitter[g.hitterIdx] || [];
+      var evsPos = [], allLA = [];
+      for (var bri = 0; bri < bipRecords.length; bri++) {
+        var bev = bipRecords[bri][bci.exitVelo];
+        var bla = bipRecords[bri][bci.launchAngle];
+        if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
+        if (bla !== null) allLA.push(bla);
+      }
+
+      var medEV = evsPos.length > 0 ? Math.round(median(evsPos.slice()) * 10) / 10 : null;
+      var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
+      var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
+
+      var ev50 = null;
+      if (evsPos.length > 0) {
+        var sorted = evsPos.slice().sort(function (a, b) { return b - a; });
+        var topHalf = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 2)));
+        ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
+      }
+
+      var obj = {
+        hitter: lookups.hitters[g.hitterIdx],
+        team: lookups.teams[g.teamIdx],
+        stands: stands,
+        count: n_total,
+        pa: pa,
+        nSwings: swings,
+        nBip: bip,
+        avg: batting_avg,
+        obp: obp_val,
+        slg: slg_val,
+        ops: ops_val,
+        doubles: db,
+        triples: tp,
+        hr: hr,
+        xbh: xbh,
+        kPct: kPct,
+        bbPct: bbPct,
+        iso: iso_val,
+        babip: babip_val,
+        xBA: (nXBA > 0 && ab > 0) ? Math.round(sumXBA / ab * 1000) / 1000 : null,
+        xSLG: (nXSLG > 0 && ab > 0) ? Math.round(sumXSLG / ab * 1000) / 1000 : null,
+        medEV: medEV,
+        ev50: ev50,
+        maxEV: maxEV,
+        medLA: medLA,
+        barrelPct: bip > 0 ? barrels / bip : null,
+        gbPct: bip > 0 ? gb_c / bip : null,
+        ldPct: bip > 0 ? ld / bip : null,
+        fbPct: bip > 0 ? fb / bip : null,
+        puPct: bip > 0 ? pu / bip : null,
+        pullPct: nSpray > 0 ? pull / nSpray : null,
+        middlePct: nSpray > 0 ? center / nSpray : null,
+        oppoPct: nSpray > 0 ? oppo / nSpray : null,
+        airPullPct: nSpray > 0 ? airPull / nSpray : null,
+        swingPct: n_total > 0 ? swings / n_total : null,
+        izSwingPct: izSwingPct,
+        chasePct: chasePct_val,
+        izSwChase: izSwChase,
+        contactPct: contactPct,
+        izContactPct: izContactPct,
+        whiffPct: swings > 0 ? whiffs / swings : null,
+      };
+
+      // Apply non-aggregator filters
+      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
+      if ((obj.pa || 0) < (filters.minCount || 1)) continue;
+      if (filters.minSwings && obj.nSwings < filters.minSwings) continue;
+      if (filters.search && obj.hitter.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
+
+      rows.push(obj);
+    }
+
+    // Compute percentiles
+    var self = this;
+    HITTER_STAT_KEYS.forEach(function (key) {
+      self._computePercentiles(rows, key);
+    });
+
+    // Invert where lower is better
+    for (var ri2 = 0; ri2 < rows.length; ri2++) {
+      for (var inv2 in HITTER_INVERT) {
+        var pk2 = inv2 + '_pctl';
+        if (rows[ri2][pk2] !== null && rows[ri2][pk2] !== undefined) {
+          rows[ri2][pk2] = 100 - rows[ri2][pk2];
+        }
+      }
+    }
+
+    return rows;
+  },
+};

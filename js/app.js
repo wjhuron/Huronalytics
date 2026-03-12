@@ -1,6 +1,6 @@
 (function () {
   // ---- State ----
-  var currentTab = 'pitch';
+  var currentTab = 'pitcher';
   var selectedPitchTypes = []; // empty = all; or array of selected types
   var allData = []; // current filtered + sorted data (full, before pagination)
 
@@ -9,12 +9,13 @@
   }
 
   // ---- DOM refs ----
-  var teamSelect, throwsSelect, minCountInput, minSwingsInput, searchInput;
+  var teamSelect, throwsSelect, vsHandSelect, minCountInput, minSwingsInput, searchInput;
+  var dateStartInput, dateEndInput;
   var sidePanel, panelOverlay, panelClose;
 
   // ---- Init ----
   function init() {
-    DataStore.load().then(function () {
+    Promise.all([DataStore.load(), Aggregator.load()]).then(function () {
       if (!DataStore.metadata) {
         document.getElementById('no-results').textContent = 'Failed to load data.';
         document.getElementById('no-results').style.display = '';
@@ -32,6 +33,13 @@
       setupColumnSettings();
       setupDarkMode();
       applyURLState();
+      // Set initial filter visibility based on default tab
+      document.getElementById('pitch-type-filter-group').style.display =
+        currentTab === 'pitch' ? '' : 'none';
+      document.getElementById('min-swings-filter-group').style.display =
+        isHitterTab(currentTab) ? '' : 'none';
+      // Set initial vs-hand labels
+      updateVsHandLabels();
       refresh();
     });
   }
@@ -39,9 +47,12 @@
   function setupDOM() {
     teamSelect = document.getElementById('team-filter');
     throwsSelect = document.getElementById('throws-filter');
+    vsHandSelect = document.getElementById('vs-hand-filter');
     minCountInput = document.getElementById('min-count');
     minSwingsInput = document.getElementById('min-swings');
     searchInput = document.getElementById('search-input');
+    dateStartInput = document.getElementById('date-start');
+    dateEndInput = document.getElementById('date-end');
     sidePanel = document.getElementById('side-panel');
     panelOverlay = document.getElementById('panel-overlay');
     panelClose = document.getElementById('panel-close');
@@ -64,11 +75,33 @@
     var genDate = document.getElementById('generated-date');
     if (genDate) genDate.textContent = DataStore.metadata.generatedAt;
 
+    // Set date range min/max from micro data dates
+    if (Aggregator.loaded && Aggregator.data && Aggregator.data.lookups.dates.length > 0) {
+      var dates = Aggregator.data.lookups.dates;
+      dateStartInput.min = dates[0];
+      dateStartInput.max = dates[dates.length - 1];
+      dateEndInput.min = dates[0];
+      dateEndInput.max = dates[dates.length - 1];
+    }
+
+    // Disable vs-hand and date filters if micro data not available
+    if (!Aggregator.loaded) {
+      vsHandSelect.disabled = true;
+      vsHandSelect.title = 'Requires micro data (run process_data.py)';
+      dateStartInput.disabled = true;
+      dateEndInput.disabled = true;
+      dateStartInput.title = 'Requires micro data';
+      dateEndInput.title = 'Requires micro data';
+    }
+
     // Filter listeners
     teamSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     throwsSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
+    vsHandSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     minCountInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
+    dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
 
     var searchTimer = null;
     searchInput.addEventListener('input', function () {
@@ -147,6 +180,9 @@
           minCountLabel.textContent = isHitterTab(currentTab) ? 'Min PA' : 'Min Pitches';
         }
 
+        // Update vs-hand option labels (RHH/LHH for pitcher tabs, RHP/LHP for hitter tabs)
+        updateVsHandLabels();
+
         // Update search placeholder
         searchInput.placeholder = isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...';
 
@@ -159,22 +195,36 @@
     });
   }
 
+  // ---- vs-Hand label helper ----
+  function updateVsHandLabels() {
+    if (!vsHandSelect) return;
+    var opts = vsHandSelect.options;
+    var isHitter = isHitterTab(currentTab);
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].value === 'R') opts[i].textContent = isHitter ? 'RHP' : 'RHH';
+      if (opts[i].value === 'L') opts[i].textContent = isHitter ? 'LHP' : 'LHH';
+    }
+  }
+
   // ---- Core refresh ----
   function getFilters() {
     return {
       team: teamSelect.value,
       pitchTypes: selectedPitchTypes.length > 0 ? selectedPitchTypes : 'all',
       throws: throwsSelect.value,
+      vsHand: vsHandSelect.value,
       minCount: parseInt(minCountInput.value) || 1,
       minSwings: parseInt(minSwingsInput.value) || 1,
       search: searchInput.value.trim(),
+      dateStart: dateStartInput.value || '',
+      dateEnd: dateEndInput.value || '',
     };
   }
 
   function refresh() {
     var filters = getFilters();
     var dataTab = isHitterTab(currentTab) ? 'hitter' : currentTab;
-    var data = DataStore.getFilteredData(dataTab, filters);
+    var data = DataStore.getFilteredDataV2(dataTab, filters);
     var columns = COLUMNS[currentTab];
 
     // Apply sort
@@ -201,19 +251,31 @@
     }
 
     allData = data;
-    Leaderboard.render(data, columns);
+
+    // Compute league-wide data (all teams) for league avg row
+    var leagueFilters = {};
+    for (var fk in filters) leagueFilters[fk] = filters[fk];
+    leagueFilters.team = 'all';
+    var leagueData = DataStore.getFilteredDataV2(dataTab, leagueFilters);
+
+    Leaderboard.render(data, columns, {
+      teamFilter: filters.team,
+      leagueData: leagueData
+    });
     saveURLState();
   }
 
   // ---- Toolbar ----
   function setupToolbar() {
-    // League average toggle
+    // League average toggle (button removed — always on)
     var avgBtn = document.getElementById('league-avg-toggle');
-    avgBtn.addEventListener('click', function () {
-      Leaderboard.showLeagueAvg = !Leaderboard.showLeagueAvg;
-      avgBtn.classList.toggle('active', Leaderboard.showLeagueAvg);
-      refresh();
-    });
+    if (avgBtn) {
+      avgBtn.addEventListener('click', function () {
+        Leaderboard.showLeagueAvg = !Leaderboard.showLeagueAvg;
+        avgBtn.classList.toggle('active', Leaderboard.showLeagueAvg);
+        refresh();
+      });
+    }
 
     // Export CSV
     document.getElementById('export-csv-btn').addEventListener('click', function () {
@@ -651,11 +713,14 @@
       tab: currentTab,
       team: teamSelect.value,
       throws: throwsSelect.value,
+      vsHand: vsHandSelect.value,
       min: minCountInput.value,
       search: searchInput.value,
       sort: Leaderboard.currentSort.key || '',
       dir: Leaderboard.currentSort.dir || '',
       page: Leaderboard.currentPage.toString(),
+      dateStart: dateStartInput.value || '',
+      dateEnd: dateEndInput.value || '',
     };
     if (selectedPitchTypes.length > 0) {
       params.pitch = selectedPitchTypes.join(',');
@@ -695,8 +760,11 @@
     }
     if (params.team) teamSelect.value = params.team;
     if (params.throws) throwsSelect.value = params.throws;
+    if (params.vsHand) vsHandSelect.value = params.vsHand;
     if (params.min) minCountInput.value = params.min;
     if (params.search) searchInput.value = params.search;
+    if (params.dateStart) dateStartInput.value = params.dateStart;
+    if (params.dateEnd) dateEndInput.value = params.dateEnd;
     if (params.sort) Leaderboard.currentSort.key = params.sort;
     if (params.dir) Leaderboard.currentSort.dir = params.dir;
     if (params.page) Leaderboard.currentPage = parseInt(params.page) || 1;

@@ -35,6 +35,7 @@ var COLUMNS = {
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
+    { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
@@ -117,7 +118,7 @@ var COLUMNS = {
 var Leaderboard = {
   currentSort: { key: null, dir: 'desc' },
   hiddenColumns: {},  // key -> true if hidden
-  showLeagueAvg: false,
+  showLeagueAvg: true,
   currentPage: 1,
   pageSize: 50,
   lastRenderedData: null,
@@ -197,16 +198,19 @@ var Leaderboard = {
     return avg;
   },
 
-  render: function (data, columns) {
+  render: function (data, columns, opts) {
+    opts = opts || {};
     var self = this;
     var visCols = this.getVisibleColumns(columns);
     var headerRow = document.getElementById('table-header');
     var tbody = document.getElementById('table-body');
+    var pinnedBody = document.getElementById('table-pinned-body');
     var noResults = document.getElementById('no-results');
     var isDark = document.body.classList.contains('dark');
 
     this.lastRenderedData = data;
     this.lastRenderedColumns = columns;
+    this._lastRenderOpts = opts;
 
     // Pagination
     var totalRows = data.length;
@@ -250,7 +254,7 @@ var Leaderboard = {
         th.addEventListener('click', function () {
           self.sortData(data, col.key, columns);
           self.currentPage = 1;
-          self.render(data, columns);
+          self.render(data, columns, self._lastRenderOpts);
         });
       }
 
@@ -259,6 +263,7 @@ var Leaderboard = {
 
     // Build body
     tbody.innerHTML = '';
+    if (pinnedBody) pinnedBody.innerHTML = '';
 
     if (data.length === 0) {
       noResults.style.display = '';
@@ -269,15 +274,47 @@ var Leaderboard = {
     noResults.style.display = 'none';
     document.getElementById('pagination').style.display = '';
 
-    var fragment = document.createDocumentFragment();
+    // Pinned average rows
+    if (pinnedBody && this.showLeagueAvg && data.length > 0) {
+      var thead = document.querySelector('#leaderboard-table thead');
+      var thHeight = thead ? thead.offsetHeight : 36;
 
-    // League average row
-    if (this.showLeagueAvg && pageData.length > 0) {
-      var avgRow = this.computeLeagueAvgRow(data, visCols);
-      var avgTr = this._createRow(avgRow, visCols, -1, isDark, true);
-      avgTr.classList.add('league-avg-row');
-      fragment.appendChild(avgTr);
+      // League Average: computed from all-teams data (ignores team filter)
+      var leagueAvgData = opts.leagueData || data;
+      var leagueAvgRow = this.computeLeagueAvgRow(leagueAvgData, visCols);
+      leagueAvgRow.pitcher = 'League Avg';
+      leagueAvgRow.hitter = 'League Avg';
+      var leagueTr = this._createRow(leagueAvgRow, visCols, -1, isDark, true);
+      leagueTr.classList.add('league-avg-row');
+      pinnedBody.appendChild(leagueTr);
+
+      // Make league avg row cells sticky
+      for (var ci = 0; ci < leagueTr.cells.length; ci++) {
+        leagueTr.cells[ci].style.position = 'sticky';
+        leagueTr.cells[ci].style.top = thHeight + 'px';
+        leagueTr.cells[ci].style.zIndex = '1';
+      }
+
+      // Team Average: only when a single team is selected
+      if (opts.teamFilter && opts.teamFilter !== 'all' && data.length > 0) {
+        var teamAvgRow = this.computeLeagueAvgRow(data, visCols);
+        teamAvgRow.pitcher = opts.teamFilter + ' Avg';
+        teamAvgRow.hitter = opts.teamFilter + ' Avg';
+        teamAvgRow._isTeamAvg = true;
+        var teamTr = this._createRow(teamAvgRow, visCols, -1, isDark, true);
+        teamTr.classList.add('league-avg-row', 'team-avg-row');
+        pinnedBody.appendChild(teamTr);
+
+        var leagueRowHeight = leagueTr.offsetHeight || 30;
+        for (var ti = 0; ti < teamTr.cells.length; ti++) {
+          teamTr.cells[ti].style.position = 'sticky';
+          teamTr.cells[ti].style.top = (thHeight + leagueRowHeight) + 'px';
+          teamTr.cells[ti].style.zIndex = '1';
+        }
+      }
     }
+
+    var fragment = document.createDocumentFragment();
 
     // Data rows
     for (var ri = 0; ri < pageData.length; ri++) {

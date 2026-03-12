@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ST 2026 Leaderboard</title>
-  <link rel="stylesheet" href="css/styles.css?v=13">
+  <link rel="stylesheet" href="css/styles.css?v=15">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -21,8 +21,8 @@
   </header>
 
   <nav class="tab-bar">
-    <button class="tab active" data-tab="pitch">Pitch Leaderboard</button>
-    <button class="tab" data-tab="pitcher">Pitcher Leaderboard</button>
+    <button class="tab active" data-tab="pitcher">Pitcher Leaderboard</button>
+    <button class="tab" data-tab="pitch">Pitch Leaderboard</button>
     <span class="tab-divider"></span>
     <button class="tab" data-tab="hitterStats">Hitter Stats</button>
     <button class="tab" data-tab="hitterBattedBall">Batted Ball Metrics</button>
@@ -52,6 +52,15 @@
       </select>
     </div>
 
+    <div class="filter-group" id="vs-hand-filter-group">
+      <label for="vs-hand-filter">vs Hand</label>
+      <select id="vs-hand-filter">
+        <option value="all">All</option>
+        <option value="R">RHH</option>
+        <option value="L">LHH</option>
+      </select>
+    </div>
+
     <div class="filter-group">
       <label for="min-count">Min Pitches</label>
       <input type="number" id="min-count" value="10" min="1" max="500" step="1">
@@ -60,6 +69,15 @@
     <div class="filter-group" id="min-swings-filter-group" style="display:none;">
       <label for="min-swings">Min Swings</label>
       <input type="number" id="min-swings" value="1" min="1" max="500" step="1">
+    </div>
+
+    <div class="filter-group" id="date-filter-group">
+      <label>Date Range</label>
+      <div class="date-range-inputs">
+        <input type="date" id="date-start">
+        <span class="date-sep">to</span>
+        <input type="date" id="date-end">
+      </div>
     </div>
 
     <div class="filter-group search-group">
@@ -71,7 +89,6 @@
   <section class="toolbar">
     <div class="toolbar-left">
       <span class="result-count"><span id="row-count">0</span> results</span>
-      <button id="league-avg-toggle" class="toolbar-btn" title="Toggle league average row">Avg</button>
     </div>
     <div class="toolbar-right">
       <button id="compare-btn" class="toolbar-btn" title="Compare selected pitchers" disabled>Compare (0)</button>
@@ -88,6 +105,7 @@
     <div class="table-container" id="table-container">
       <table id="leaderboard-table">
         <thead><tr id="table-header"></tr></thead>
+        <tbody id="table-pinned-body"></tbody>
         <tbody id="table-body"></tbody>
       </table>
     </div>
@@ -143,11 +161,12 @@
     <p>Data: Spring Training 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=13"></script>
-  <script src="js/utils.js?v=13"></script>
-  <script src="js/data.js?v=13"></script>
-  <script src="js/leaderboard.js?v=13"></script>
-  <script src="js/scatter.js?v=13"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="data/data_embedded.js?v=15"></script>
+  <script src="js/utils.js?v=15"></script>
+  <script src="js/aggregator.js?v=15"></script>
+  <script src="js/data.js?v=15"></script>
+  <script src="js/leaderboard.js?v=15"></script>
+  <script src="js/scatter.js?v=15"></script>
+  <script src="js/app.js?v=15"></script>
 </body>
 </html>

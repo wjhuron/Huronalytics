@@ -157,6 +157,27 @@ def safe_int(val):
         return None
 
 
+def normalize_date(val):
+    """Normalize a date value to YYYY-MM-DD string."""
+    if val is None or val == '':
+        return None
+    if isinstance(val, datetime):
+        return val.strftime('%Y-%m-%d')
+    s = str(val).strip()
+    # ISO format: 2026-03-05 or 2026-03-05T...
+    if len(s) >= 10 and s[4] == '-' and s[7] == '-':
+        return s[:10]
+    # US format: M/D/YYYY or MM/DD/YYYY
+    parts = s.split('/')
+    if len(parts) == 3:
+        try:
+            m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
+            return f"{y:04d}-{m:02d}-{d:02d}"
+        except ValueError:
+            pass
+    return None
+
+
 def avg(values):
     """Average a list of numbers, ignoring None."""
     nums = [v for v in values if v is not None]
@@ -171,6 +192,7 @@ def compute_stats(pitches):
     if total == 0:
         empty = {k: None for k in STAT_KEYS}
         empty['nBip'] = 0
+        empty['pa'] = 0
         return empty
 
     iz = sum(1 for p in pitches if p.get('InZone') == 'Yes')
@@ -206,6 +228,7 @@ def compute_stats(pitches):
     babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
     return {
+        'pa': n_pa,
         'izPct': iz / total,
         'swStrPct': whiffs / swings if swings > 0 else None,
         'cswPct': csw / total,
@@ -455,6 +478,408 @@ def compute_hitter_stats(pitches):
         'contactPct': contact_pct,
         'izContactPct': iz_contact_pct,
         'whiffPct': whiffs / n_swings if n_swings > 0 else None,
+    }
+
+
+def generate_micro_data(all_pitches, wbc_hitter_pitches):
+    """Generate micro-aggregate data for client-side date and opponent-hand filtering.
+
+    Groups pitches by (person, date, opponent_hand) with summable counts.
+    Returns a dict with compact arrays-of-arrays format for JSON serialization.
+    """
+    all_hitter_pitches = all_pitches + wbc_hitter_pitches
+
+    # --- Build lookup tables ---
+    pitcher_set = set()
+    hitter_set = set()
+    team_set = set()
+    date_set = set()
+    pitch_type_set = set()
+
+    for p in all_pitches:
+        if p.get('Pitcher'):
+            pitcher_set.add(p['Pitcher'])
+        if p.get('PTeam') and p['PTeam'] in MLB_TEAMS:
+            team_set.add(p['PTeam'])
+        d = normalize_date(p.get('Game Date'))
+        if d:
+            date_set.add(d)
+        if p.get('Pitch Type'):
+            pitch_type_set.add(p['Pitch Type'])
+
+    for p in all_hitter_pitches:
+        if p.get('Batter'):
+            hitter_set.add(p['Batter'])
+        if p.get('BTeam') and p['BTeam'] in MLB_TEAMS:
+            team_set.add(p['BTeam'])
+        d = normalize_date(p.get('Game Date'))
+        if d:
+            date_set.add(d)
+
+    pitchers = sorted(pitcher_set)
+    hitters = sorted(hitter_set)
+    teams = sorted(team_set)
+    dates = sorted(date_set)
+    pitch_types = sorted(pitch_type_set)
+
+    pi_idx = {name: i for i, name in enumerate(pitchers)}
+    hi_idx = {name: i for i, name in enumerate(hitters)}
+    tm_idx = {name: i for i, name in enumerate(teams)}
+    dt_idx = {d: i for i, d in enumerate(dates)}
+    pt_idx = {pt: i for i, pt in enumerate(pitch_types)}
+
+    # ==========================================================
+    #  Pitcher micro-aggs
+    #  Key: (pitcherIdx, teamIdx, throws, dateIdx, batterHand)
+    #  Values: 18 count fields
+    #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
+    #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
+    # ==========================================================
+    pitcher_micro = defaultdict(lambda: [0] * 18)
+
+    for p in all_pitches:
+        pitcher = p.get('Pitcher')
+        team = p.get('PTeam')
+        throws = p.get('Throws')
+        date = normalize_date(p.get('Game Date'))
+        batter_hand = p.get('Bats')
+
+        if not pitcher or not team or team not in MLB_TEAMS:
+            continue
+        if not date or not batter_hand:
+            continue
+
+        key = (pi_idx[pitcher], tm_idx[team], throws or '', dt_idx[date], batter_hand)
+        c = pitcher_micro[key]
+
+        c[0] += 1  # n
+        if p.get('InZone') == 'Yes':
+            c[1] += 1  # iz
+        desc = p.get('Description', '')
+        if desc in SWING_DESCRIPTIONS:
+            c[2] += 1  # sw
+        if desc == 'Swinging Strike':
+            c[3] += 1  # wh
+        if desc in ('Called Strike', 'Swinging Strike'):
+            c[4] += 1  # csw
+        if p.get('InZone') == 'No':
+            c[5] += 1  # ooz
+            if desc in ('Swinging Strike', 'In Play', 'Foul'):
+                c[6] += 1  # oozSw
+        bb_type = p.get('BBType')
+        if bb_type and bb_type not in BUNT_BB_TYPES:
+            c[7] += 1  # bip
+            if bb_type == 'ground_ball':
+                c[8] += 1  # gb
+        event = p.get('Event')
+        if event and event not in NON_PA_EVENTS:
+            c[9] += 1   # pa
+            if event in HIT_EVENTS:      c[10] += 1  # h
+            if event == 'Home Run':      c[11] += 1  # hr
+            if event in K_EVENTS:        c[12] += 1  # k
+            if event in BB_EVENTS:       c[13] += 1  # bb
+            if event in HBP_EVENTS:      c[14] += 1  # hbp
+            if event in SF_EVENTS:       c[15] += 1  # sf
+            if event in SH_EVENTS:       c[16] += 1  # sh
+            if event in CI_EVENTS:       c[17] += 1  # ci
+
+    pitcher_rows = []
+    for (pi, ti, throws, di, bh), c in pitcher_micro.items():
+        pitcher_rows.append([pi, ti, throws, di, bh] + c)
+
+    # ==========================================================
+    #  Pitch micro-aggs
+    #  Key: (pitcherIdx, teamIdx, throws, pitchTypeIdx, dateIdx, batterHand)
+    #  Values: 18 count fields + 25 metric fields = 43 fields
+    #  Metric fields (offset from 18):
+    #  18:sumVelo 19:nVelo  20:sumSpin 21:nSpin  22:sumIVB 23:nIVB
+    #  24:sumHB 25:nHB  26:sumRelZ 27:nRelZ  28:sumRelX 29:nRelX
+    #  30:sumExt 31:nExt  32:sumVAA 33:nVAA  34:sumHAA 35:nHAA
+    #  36:sumVRA 37:nVRA  38:sumHRA 39:nHRA
+    #  40:sumTiltSin 41:sumTiltCos 42:nTilt
+    # ==========================================================
+    METRIC_OFFSETS = [
+        ('Velocity', 18), ('Spin Rate', 20), ('IndVertBrk', 22),
+        ('HorzBrk', 24), ('RelPosZ', 26), ('RelPosX', 28),
+        ('Extension', 30), ('VAA', 32), ('HAA', 34),
+        ('VRA', 36), ('HRA', 38),
+    ]
+
+    pitch_micro = defaultdict(lambda: [0.0] * 43)
+
+    for p in all_pitches:
+        pitcher = p.get('Pitcher')
+        team = p.get('PTeam')
+        throws = p.get('Throws')
+        pitch_type = p.get('Pitch Type')
+        date = normalize_date(p.get('Game Date'))
+        batter_hand = p.get('Bats')
+
+        if not pitcher or not team or team not in MLB_TEAMS or not pitch_type:
+            continue
+        if not date or not batter_hand:
+            continue
+
+        key = (pi_idx[pitcher], tm_idx[team], throws or '',
+               pt_idx[pitch_type], dt_idx[date], batter_hand)
+        c = pitch_micro[key]
+
+        # Same 18 count fields as pitcher
+        c[0] += 1
+        if p.get('InZone') == 'Yes':
+            c[1] += 1
+        desc = p.get('Description', '')
+        if desc in SWING_DESCRIPTIONS:
+            c[2] += 1
+        if desc == 'Swinging Strike':
+            c[3] += 1
+        if desc in ('Called Strike', 'Swinging Strike'):
+            c[4] += 1
+        if p.get('InZone') == 'No':
+            c[5] += 1
+            if desc in ('Swinging Strike', 'In Play', 'Foul'):
+                c[6] += 1
+        bb_type = p.get('BBType')
+        if bb_type and bb_type not in BUNT_BB_TYPES:
+            c[7] += 1
+            if bb_type == 'ground_ball':
+                c[8] += 1
+        event = p.get('Event')
+        if event and event not in NON_PA_EVENTS:
+            c[9] += 1
+            if event in HIT_EVENTS:      c[10] += 1
+            if event == 'Home Run':      c[11] += 1
+            if event in K_EVENTS:        c[12] += 1
+            if event in BB_EVENTS:       c[13] += 1
+            if event in HBP_EVENTS:      c[14] += 1
+            if event in SF_EVENTS:       c[15] += 1
+            if event in SH_EVENTS:       c[16] += 1
+            if event in CI_EVENTS:       c[17] += 1
+
+        # Metric sums
+        for col_name, offset in METRIC_OFFSETS:
+            val = safe_float(p.get(col_name))
+            if val is not None:
+                c[offset] += val
+                c[offset + 1] += 1
+
+        # Break Tilt (circular sin/cos components)
+        tilt_min = break_tilt_to_minutes(p.get('Break Tilt'))
+        if tilt_min is not None:
+            angle = tilt_min / 720.0 * 2 * math.pi
+            c[40] += math.sin(angle)
+            c[41] += math.cos(angle)
+            c[42] += 1
+
+    pitch_rows = []
+    for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
+        row = [pi, ti, throws, pti, di, bh]
+        # 18 integer counts
+        for i in range(18):
+            row.append(int(c[i]))
+        # 11 metric sum/count pairs
+        for col_name, offset in METRIC_OFFSETS:
+            row.append(round(c[offset], 2))       # metric sum
+            row.append(int(c[offset + 1]))         # metric count
+        # Tilt sin/cos
+        row.append(round(c[40], 6))  # sumTiltSin
+        row.append(round(c[41], 6))  # sumTiltCos
+        row.append(int(c[42]))       # nTilt
+        pitch_rows.append(row)
+
+    # ==========================================================
+    #  Hitter micro-aggs
+    #  Key: (hitterIdx, teamIdx, bats, dateIdx, pitcherHand)
+    #  bats = actual batting side for these pitches (R/L)
+    #  Values: 36 count fields
+    #  0:n  1:pa  2:h  3:db  4:tp  5:hr  6:bb  7:hbp  8:sf  9:sh  10:ci  11:k
+    #  12:swings  13:whiffs  14:izPitches  15:oozPitches
+    #  16:izSwings  17:oozSwings  18:contact
+    #  19:izSwNonBunt  20:izContact
+    #  21:bip  22:gb  23:ld  24:fb  25:pu
+    #  26:barrels  27:nSpray  28:pull  29:center  30:oppo  31:airPull
+    #  32:sumXBA  33:nXBA  34:sumXSLG  35:nXSLG
+    # ==========================================================
+    hitter_micro = defaultdict(lambda: [0.0] * 36)
+
+    for p in all_hitter_pitches:
+        batter = p.get('Batter')
+        team = p.get('BTeam')
+        bats = p.get('Bats')
+        date = normalize_date(p.get('Game Date'))
+        pitcher_hand = p.get('Throws')
+
+        if not batter or not team or team not in MLB_TEAMS:
+            continue
+        if not date or not pitcher_hand or not bats:
+            continue
+
+        key = (hi_idx[batter], tm_idx[team], bats, dt_idx[date], pitcher_hand)
+        c = hitter_micro[key]
+
+        c[0] += 1  # n (total pitches)
+        desc = p.get('Description', '')
+        bb_type = p.get('BBType')
+        in_zone = p.get('InZone')
+
+        # PA and event counts
+        event = p.get('Event')
+        if event and event not in NON_PA_EVENTS:
+            c[1] += 1   # pa
+            if event in HIT_EVENTS:      c[2] += 1   # h
+            if event == 'Double':        c[3] += 1   # db
+            if event == 'Triple':        c[4] += 1   # tp
+            if event == 'Home Run':      c[5] += 1   # hr
+            if event in BB_EVENTS:       c[6] += 1   # bb
+            if event in HBP_EVENTS:      c[7] += 1   # hbp
+            if event in SF_EVENTS:       c[8] += 1   # sf
+            if event in SH_EVENTS:       c[9] += 1   # sh
+            if event in CI_EVENTS:       c[10] += 1  # ci
+            if event in K_EVENTS:        c[11] += 1  # k
+
+        # Swing counts
+        if desc in SWING_DESCRIPTIONS:
+            c[12] += 1  # swings
+        if desc == 'Swinging Strike':
+            c[13] += 1  # whiffs
+
+        # Zone-based counts
+        if in_zone == 'Yes':
+            c[14] += 1  # izPitches
+            if desc in SWING_DESCRIPTIONS:
+                c[16] += 1  # izSwings
+                # izSwNonBunt: exclude bunt BIPs from IZ swing count
+                if bb_type not in BUNT_BB_TYPES:  # None not in set → True
+                    c[19] += 1
+            if desc in ('Foul', 'In Play'):
+                if bb_type not in BUNT_BB_TYPES:
+                    c[20] += 1  # izContact
+        elif in_zone == 'No':
+            c[15] += 1  # oozPitches
+            if desc in SWING_DESCRIPTIONS:
+                c[17] += 1  # oozSwings
+
+        # Contact (overall)
+        if desc in ('Foul', 'In Play'):
+            c[18] += 1
+
+        # Batted ball data (non-bunt BIPs)
+        if bb_type and bb_type not in BUNT_BB_TYPES:
+            c[21] += 1  # bip
+            if bb_type == 'ground_ball':  c[22] += 1  # gb
+            if bb_type == 'line_drive':   c[23] += 1  # ld
+            if bb_type == 'fly_ball':     c[24] += 1  # fb
+            if bb_type == 'popup':        c[25] += 1  # pu
+
+            # Barrel
+            ev = safe_float(p.get('ExitVelo'))
+            la = safe_float(p.get('LaunchAngle'))
+            if is_barrel(ev, la):
+                c[26] += 1
+
+            # Spray direction
+            hc_x = safe_float(p.get('HC_X'))
+            hc_y = safe_float(p.get('HC_Y'))
+            sa = spray_angle(hc_x, hc_y)
+            sd = spray_direction(sa, bats)
+            if sd:
+                c[27] += 1  # nSpray
+                if sd == 'pull':    c[28] += 1
+                if sd == 'center':  c[29] += 1
+                if sd == 'oppo':    c[30] += 1
+                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball'):
+                    c[31] += 1  # airPull
+
+            # xBA / xSLG sums
+            xba = safe_float(p.get('xBA'))
+            if xba is not None:
+                c[32] += xba   # sumXBA
+                c[33] += 1     # nXBA
+            xslg = safe_float(p.get('xSLG'))
+            if xslg is not None:
+                c[34] += xslg  # sumXSLG
+                c[35] += 1     # nXSLG
+
+    hitter_rows = []
+    for (hi, ti, bats, di, ph), c in hitter_micro.items():
+        row = [hi, ti, bats, di, ph]
+        for i in range(36):
+            val = c[i]
+            row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
+        hitter_rows.append(row)
+
+    # ==========================================================
+    #  Hitter BIP records (for median EV, EV50, maxEV, medLA)
+    #  [hitterIdx, dateIdx, pitcherHand, exitVelo, launchAngle]
+    # ==========================================================
+    hitter_bip_rows = []
+    for p in all_hitter_pitches:
+        batter = p.get('Batter')
+        team = p.get('BTeam')
+        date = normalize_date(p.get('Game Date'))
+        pitcher_hand = p.get('Throws')
+        bb_type = p.get('BBType')
+
+        if not batter or not team or team not in MLB_TEAMS:
+            continue
+        if not date or not pitcher_hand:
+            continue
+        if not bb_type or bb_type in BUNT_BB_TYPES:
+            continue
+
+        ev = safe_float(p.get('ExitVelo'))
+        la = safe_float(p.get('LaunchAngle'))
+        if ev is None and la is None:
+            continue
+
+        hitter_bip_rows.append([
+            hi_idx[batter],
+            dt_idx[date],
+            pitcher_hand,
+            round(ev, 1) if ev is not None else None,
+            round(la, 1) if la is not None else None,
+        ])
+
+    # ==========================================================
+    #  Build output
+    # ==========================================================
+    return {
+        'lookups': {
+            'pitchers': pitchers,
+            'hitters': hitters,
+            'teams': teams,
+            'dates': dates,
+            'pitchTypes': pitch_types,
+        },
+        'pitcherCols': [
+            'pitcherIdx', 'teamIdx', 'throws', 'dateIdx', 'batterHand',
+            'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
+            'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
+        ],
+        'pitcherMicro': pitcher_rows,
+        'pitchCols': [
+            'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',
+            'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
+            'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
+            'sumVelo', 'nVelo', 'sumSpin', 'nSpin', 'sumIVB', 'nIVB',
+            'sumHB', 'nHB', 'sumRelZ', 'nRelZ', 'sumRelX', 'nRelX',
+            'sumExt', 'nExt', 'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
+            'sumVRA', 'nVRA', 'sumHRA', 'nHRA',
+            'sumTiltSin', 'sumTiltCos', 'nTilt',
+        ],
+        'pitchMicro': pitch_rows,
+        'hitterCols': [
+            'hitterIdx', 'teamIdx', 'bats', 'dateIdx', 'pitcherHand',
+            'n', 'pa', 'h', 'db', 'tp', 'hr', 'bb', 'hbp', 'sf', 'sh', 'ci', 'k',
+            'swings', 'whiffs', 'izPitches', 'oozPitches', 'izSwings', 'oozSwings',
+            'contact', 'izSwNonBunt', 'izContact',
+            'bip', 'gb', 'ld', 'fb', 'pu',
+            'barrels', 'nSpray', 'pull', 'center', 'oppo', 'airPull',
+            'sumXBA', 'nXBA', 'sumXSLG', 'nXSLG',
+        ],
+        'hitterMicro': hitter_rows,
+        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
+        'hitterBip': hitter_bip_rows,
     }
 
 
@@ -862,6 +1287,25 @@ def main():
         f.write('window.HITTER_PITCH_DETAILS = ')
         json.dump(hitter_pitch_details, f)
         f.write(';\n')
+
+    # --- Generate micro-aggregate data for date/hand filtering ---
+    print(f"\n--- Generating micro-aggregate data ---")
+    micro_data = generate_micro_data(all_pitches, wbc_hitter_pitches)
+
+    micro_path = os.path.join(DATA_DIR, 'micro_data.json')
+    with open(micro_path, 'w') as f:
+        json.dump(micro_data, f, separators=(',', ':'))
+
+    # Also append to embedded JS for file:// usage
+    with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'a') as f:
+        f.write('window.MICRO_DATA = ')
+        json.dump(micro_data, f, separators=(',', ':'))
+        f.write(';\n')
+
+    print(f"  micro_data.json ({len(micro_data['pitcherMicro'])} pitcher, "
+          f"{len(micro_data['pitchMicro'])} pitch, "
+          f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "
+          f"{len(micro_data['hitterBip'])} hitter BIP records)")
 
     print(f"\nOutput written to {DATA_DIR}/")
     print(f"  pitch_leaderboard.json  ({len(pitch_leaderboard)} rows)")
