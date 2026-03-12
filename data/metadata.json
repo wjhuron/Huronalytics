@@ -43,7 +43,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-12 21:53",
+  "generatedAt": "2026-03-12 22:11",
   "totalPitches": 94569,
   "totalPitchers": 1402,
   "totalHitters": 1542,
@@ -70,8 +70,8 @@
       "count": 1299
     },
     "SL": {
-      "velocity": 85.62,
-      "spinRate": 2374.33,
+      "velocity": 85.61,
+      "spinRate": 2374.55,
       "indVertBrk": 1.63,
       "horzBrk": -1.68,
       "relPosZ": 5.75,
@@ -81,35 +81,35 @@
       "haa": 1.18,
       "vra": -1.26,
       "hra": 0.89,
-      "izPct": 0.4658,
+      "izPct": 0.4659,
       "swStrPct": 0.3436,
       "cswPct": 0.3106,
-      "chasePct": 0.2692,
-      "gbPct": 0.4166,
+      "chasePct": 0.2694,
+      "gbPct": 0.4174,
       "breakTiltMinutes": 451,
       "breakTilt": "7:31",
-      "count": 930
+      "count": 931
     },
     "ST": {
-      "velocity": 81.59,
-      "spinRate": 2524.27,
+      "velocity": 81.58,
+      "spinRate": 2524.17,
       "indVertBrk": 1.55,
       "horzBrk": -6.78,
-      "relPosZ": 5.44,
+      "relPosZ": 5.43,
       "relPosX": -0.96,
       "extension": 6.29,
       "vaa": -7.5,
-      "haa": 1.94,
+      "haa": 1.93,
       "vra": -0.48,
       "hra": 0.74,
-      "izPct": 0.4361,
+      "izPct": 0.436,
       "swStrPct": 0.329,
-      "cswPct": 0.2881,
-      "chasePct": 0.2508,
-      "gbPct": 0.3401,
+      "cswPct": 0.2882,
+      "chasePct": 0.2503,
+      "gbPct": 0.3386,
       "breakTiltMinutes": 460,
       "breakTilt": "7:40",
-      "count": 553
+      "count": 552
     },
     "CH": {
       "velocity": 86.07,
@@ -308,5 +308,9 @@
     "izContactPct": 0.8006,
     "whiffPct": 0.2848,
     "count": 1542
+  },
+  "vaaRegression": {
+    "slope": 1.42135,
+    "intercept": -9.762202
   }
 }
