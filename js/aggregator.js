@@ -336,11 +336,12 @@ var Aggregator = {
         }
       });
 
-      // Normalized VAA (location-independent): nVAA = avgVAA - (slope * avgPlateZ + intercept)
+      // Normalized VAA (location-independent):
+      // nVAA = VAA - slope * (pitcher_avgPlateZ - league_avgPlateZ)
+      // Adjusts VAA to what it would be at league-average pitch height
       var vaaReg = DataStore.metadata && DataStore.metadata.vaaRegression;
-      if (obj.vaa !== null && obj._plateZ !== null && vaaReg) {
-        var expectedVAA = vaaReg.slope * obj._plateZ + vaaReg.intercept;
-        obj.nVAA = Number((obj.vaa - expectedVAA).toFixed(2));
+      if (obj.vaa !== null && obj._plateZ !== null && vaaReg && vaaReg.leagueAvgPlateZ != null) {
+        obj.nVAA = Number((obj.vaa - vaaReg.slope * (obj._plateZ - vaaReg.leagueAvgPlateZ)).toFixed(2));
       } else {
         obj.nVAA = null;
       }

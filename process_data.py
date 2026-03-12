@@ -1080,24 +1080,27 @@ def main():
         ss_res = sum((pair[1] - (vaa_slope * pair[0] + vaa_intercept)) ** 2 for pair in vaa_plateZ_pairs)
         ss_tot = sum((pair[1] - mean_y) ** 2 for pair in vaa_plateZ_pairs)
         r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-        print(f"\nVAA ~ PlateZ regression: slope={vaa_slope:.4f}, intercept={vaa_intercept:.4f}, R²={r_squared:.4f} (n={n_reg})")
+        league_avg_plateZ = mean_x  # average PlateZ across all pitches
+        print(f"\nVAA ~ PlateZ regression: slope={vaa_slope:.4f}, intercept={vaa_intercept:.4f}, "
+              f"R²={r_squared:.4f}, league avg PlateZ={league_avg_plateZ:.4f} (n={n_reg})")
     else:
         vaa_slope = 0.0
         vaa_intercept = 0.0
+        league_avg_plateZ = 0.0
         print("\nWARNING: Not enough data for VAA ~ PlateZ regression")
 
     # Compute nVAA for each pitch leaderboard row
+    # nVAA = VAA - slope * (pitcher_avgPlateZ - league_avgPlateZ)
+    # This adjusts VAA to what it would be at league-average pitch height
     for row in pitch_leaderboard:
         if row.get('vaa') is not None:
-            # Compute average PlateZ for this pitcher/team/pitchType combo
             key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
             pitches_for_row = pitch_groups[key]
             pz_vals = [safe_float(p.get('PlateZ')) for p in pitches_for_row]
             pz_vals = [v for v in pz_vals if v is not None]
             if pz_vals:
                 avg_pz = sum(pz_vals) / len(pz_vals)
-                expected_vaa = vaa_slope * avg_pz + vaa_intercept
-                row['nVAA'] = round(row['vaa'] - expected_vaa, 2)
+                row['nVAA'] = round(row['vaa'] - vaa_slope * (avg_pz - league_avg_plateZ), 2)
             else:
                 row['nVAA'] = None
         else:
@@ -1324,6 +1327,7 @@ def main():
         'vaaRegression': {
             'slope': round(vaa_slope, 6),
             'intercept': round(vaa_intercept, 6),
+            'leagueAvgPlateZ': round(league_avg_plateZ, 6),
         },
     }
 
