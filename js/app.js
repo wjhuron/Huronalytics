@@ -3,6 +3,7 @@
   var currentTab = 'pitcher';
   var selectedPitchTypes = []; // empty = all; or array of selected types
   var allData = []; // current filtered + sorted data (full, before pagination)
+  var columnRangeFilters = {}; // { colKey: { min: number|null, max: number|null } }
 
   function isHitterTab(tab) {
     return tab === 'hitterStats' || tab === 'hitterBattedBall' || tab === 'hitterSwingDecisions';
@@ -31,6 +32,7 @@
       setupPercentileTooltips();
       setupKeyboardNav();
       setupColumnSettings();
+      setupRangeFilters();
       setupDarkMode();
       applyURLState();
       // Set initial filter visibility based on default tab
@@ -194,6 +196,10 @@
         document.getElementById('compare-btn').style.display =
           isHitterTab(currentTab) ? 'none' : '';
 
+        // Reset range filters on tab switch
+        columnRangeFilters = {};
+        updateRangeFilterBadge();
+
         refresh();
       });
     });
@@ -231,6 +237,9 @@
     var data = DataStore.getFilteredDataV2(dataTab, filters);
     var columns = COLUMNS[currentTab];
 
+    // Apply column range filters
+    data = applyRangeFilters(data, columns);
+
     // Apply sort
     if (!Leaderboard.currentSort.key) {
       Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
@@ -261,6 +270,7 @@
     for (var fk in filters) leagueFilters[fk] = filters[fk];
     leagueFilters.team = 'all';
     var leagueData = DataStore.getFilteredDataV2(dataTab, leagueFilters);
+    leagueData = applyRangeFilters(leagueData, columns);
 
     Leaderboard.render(data, columns, {
       teamFilter: filters.team,
@@ -628,6 +638,165 @@
     }
     if (Leaderboard.keyboardFocusIndex >= 0 && rows[Leaderboard.keyboardFocusIndex]) {
       rows[Leaderboard.keyboardFocusIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  // ---- Range Filters ----
+  function setupRangeFilters() {
+    var btn = document.getElementById('range-filter-btn');
+    var panel = document.getElementById('range-filter-panel');
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) {
+        buildRangeFilterPanel();
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', function (e) {
+      if (!panel.contains(e.target) && e.target !== btn) {
+        panel.classList.remove('open');
+      }
+    });
+  }
+
+  function isPercentageColumn(col) {
+    return col.format === Utils.formatPct;
+  }
+
+  function buildRangeFilterPanel() {
+    var panel = document.getElementById('range-filter-panel');
+    panel.innerHTML = '';
+
+    var columns = COLUMNS[currentTab];
+    var currentGroup = '';
+
+    columns.forEach(function (col) {
+      if (col.sortType !== 'numeric') return;
+      if (col.key === '_rank' || col.isCompare) return;
+
+      // Group header
+      if (col.group && col.group !== currentGroup) {
+        currentGroup = col.group;
+        var groupLabel = document.createElement('div');
+        groupLabel.className = 'range-filter-group-label';
+        groupLabel.textContent = currentGroup.charAt(0).toUpperCase() + currentGroup.slice(1);
+        panel.appendChild(groupLabel);
+      }
+
+      var row = document.createElement('div');
+      row.className = 'range-filter-row';
+
+      var label = document.createElement('span');
+      label.className = 'rf-label';
+      label.textContent = col.label;
+      row.appendChild(label);
+
+      var existing = columnRangeFilters[col.key] || {};
+      var isPct = isPercentageColumn(col);
+
+      var minInput = document.createElement('input');
+      minInput.type = 'number';
+      minInput.placeholder = 'Min';
+      minInput.step = 'any';
+      if (existing.min !== null && existing.min !== undefined) {
+        minInput.value = isPct ? (existing.min * 100) : existing.min;
+      }
+
+      var sep = document.createElement('span');
+      sep.className = 'rf-sep';
+      sep.textContent = '–';
+
+      var maxInput = document.createElement('input');
+      maxInput.type = 'number';
+      maxInput.placeholder = 'Max';
+      maxInput.step = 'any';
+      if (existing.max !== null && existing.max !== undefined) {
+        maxInput.value = isPct ? (existing.max * 100) : existing.max;
+      }
+
+      row.appendChild(minInput);
+      row.appendChild(sep);
+      row.appendChild(maxInput);
+      panel.appendChild(row);
+
+      // Debounced input handlers
+      var debounceTimer = null;
+      function onInput() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+          var minVal = minInput.value !== '' ? parseFloat(minInput.value) : null;
+          var maxVal = maxInput.value !== '' ? parseFloat(maxInput.value) : null;
+
+          // Scale percentage inputs
+          if (isPct) {
+            if (minVal !== null) minVal = minVal / 100;
+            if (maxVal !== null) maxVal = maxVal / 100;
+          }
+
+          if (minVal === null && maxVal === null) {
+            delete columnRangeFilters[col.key];
+          } else {
+            columnRangeFilters[col.key] = { min: minVal, max: maxVal };
+          }
+
+          updateRangeFilterBadge();
+          Leaderboard.currentPage = 1;
+          refresh();
+        }, 200);
+      }
+
+      minInput.addEventListener('input', onInput);
+      maxInput.addEventListener('input', onInput);
+    });
+
+    // Clear All button
+    var actions = document.createElement('div');
+    actions.className = 'range-filter-actions';
+    var clearBtn = document.createElement('button');
+    clearBtn.className = 'rf-clear-btn';
+    clearBtn.textContent = 'Clear All';
+    clearBtn.addEventListener('click', function () {
+      columnRangeFilters = {};
+      updateRangeFilterBadge();
+      buildRangeFilterPanel(); // rebuild to clear inputs
+      Leaderboard.currentPage = 1;
+      refresh();
+    });
+    actions.appendChild(clearBtn);
+    panel.appendChild(actions);
+  }
+
+  function applyRangeFilters(data, columns) {
+    var keys = Object.keys(columnRangeFilters);
+    if (keys.length === 0) return data;
+
+    return data.filter(function (row) {
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var filter = columnRangeFilters[key];
+        var val = row[key];
+
+        // Exclude rows with null values for filtered columns
+        if (val === null || val === undefined) return false;
+
+        if (filter.min !== null && val < filter.min) return false;
+        if (filter.max !== null && val > filter.max) return false;
+      }
+      return true;
+    });
+  }
+
+  function updateRangeFilterBadge() {
+    var badge = document.getElementById('range-filter-badge');
+    var count = Object.keys(columnRangeFilters).length;
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
     }
   }
 
