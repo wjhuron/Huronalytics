@@ -519,7 +519,6 @@ tbody tr.active-row { background: var(--row-active) !important; }
 #table-pinned-body tr.league-avg-row {
   background: var(--bg-primary) !important;
   font-weight: 700;
-  border-bottom: 2px solid var(--border);
 }
 
 #table-pinned-body tr.league-avg-row td {
@@ -527,16 +526,19 @@ tbody tr.active-row { background: var(--row-active) !important; }
   color: var(--text-secondary);
   font-size: 11px;
   background: var(--bg-primary);
+  border-bottom: none;
+  box-shadow: 0 1px 0 var(--border), 0 2px 0 var(--bg-primary);
 }
 
 #table-pinned-body tr.team-avg-row {
-  border-bottom: 2px solid var(--accent);
 }
 
 #table-pinned-body tr.team-avg-row td {
   font-style: italic;
   color: var(--accent);
   background: var(--bg-primary);
+  border-bottom: none;
+  box-shadow: 0 2px 0 var(--accent), 0 3px 0 var(--bg-primary);
 }
 
 /* Compare checkbox column */
