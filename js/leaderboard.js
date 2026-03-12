@@ -35,7 +35,7 @@ var COLUMNS = {
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info', isTeam: true },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', noPercentile: true, group: 'info' },
-    { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'pa',          label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
@@ -292,7 +292,7 @@ var Leaderboard = {
       for (var ci = 0; ci < leagueTr.cells.length; ci++) {
         leagueTr.cells[ci].style.position = 'sticky';
         leagueTr.cells[ci].style.top = thHeight + 'px';
-        leagueTr.cells[ci].style.zIndex = '1';
+        leagueTr.cells[ci].style.zIndex = leagueTr.cells[ci].classList.contains('sticky-col') ? '5' : '3';
       }
 
       // Team Average: only when a single team is selected
@@ -309,7 +309,7 @@ var Leaderboard = {
         for (var ti = 0; ti < teamTr.cells.length; ti++) {
           teamTr.cells[ti].style.position = 'sticky';
           teamTr.cells[ti].style.top = (thHeight + leagueRowHeight) + 'px';
-          teamTr.cells[ti].style.zIndex = '1';
+          teamTr.cells[ti].style.zIndex = teamTr.cells[ti].classList.contains('sticky-col') ? '5' : '3';
         }
       }
     }
