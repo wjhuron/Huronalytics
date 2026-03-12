@@ -922,7 +922,11 @@ def main():
     # Read all pitches from all sheets (WBC tab handled separately)
     all_pitches = []
     wbc_pitches = []
+    VALID_SHEETS = MLB_TEAMS | {'WBC'}
     for i, ws in enumerate(sh.worksheets()):
+        if ws.title not in VALID_SHEETS:
+            print(f"  Skipping {ws.title} (not a team/WBC sheet)")
+            continue
         print(f"  Reading {ws.title}...")
         if i > 0:
             time_module.sleep(1.5)
@@ -1072,6 +1076,7 @@ def main():
         key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
+    PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'VAA', 'HAA', 'VRA', 'HRA']
     pitcher_leaderboard = []
     for (pitcher, team, throws), pitches in pitcher_groups.items():
         row = {
@@ -1080,11 +1085,17 @@ def main():
             'throws': throws,
             'count': len(pitches),
         }
+        # Average release/approach metrics across all pitches for this pitcher
+        for col in PITCHER_METRIC_COLS:
+            values = [safe_float(p.get(col)) for p in pitches]
+            key_name = METRIC_KEYS[col]
+            row[key_name] = round_metric(col, avg(values))
         row.update(compute_stats(pitches))
         pitcher_leaderboard.append(row)
 
     # Compute percentiles for pitcher leaderboard (across all pitchers)
-    for stat in STAT_KEYS:
+    PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
         compute_percentile_ranks(pitcher_leaderboard, stat)
 
     # Invert percentiles where lower is better (BB%)
@@ -1144,7 +1155,7 @@ def main():
 
     # League averages for pitcher leaderboard (across all pitchers)
     pitcher_league_avgs = {}
-    for stat in STAT_KEYS:
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
         vals = [r[stat] for r in pitcher_leaderboard if r.get(stat) is not None]
         if vals:
             pitcher_league_avgs[stat] = round(sum(vals) / len(vals), 4)
