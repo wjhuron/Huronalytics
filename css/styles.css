@@ -397,7 +397,7 @@ thead th {
   background: var(--bg-th);
   color: var(--text-th);
   padding: 10px 14px;
-  text-align: right;
+  text-align: center;
   cursor: pointer;
   user-select: none;
   position: sticky;
@@ -473,7 +473,7 @@ tbody tr:hover { background: var(--row-hover); }
 
 tbody td {
   padding: 7px 14px;
-  text-align: right;
+  text-align: center;
   border-bottom: 1px solid var(--border-light);
   font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
   font-size: 12px;
