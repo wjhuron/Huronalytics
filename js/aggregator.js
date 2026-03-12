@@ -376,6 +376,19 @@ var Aggregator = {
       });
     }
 
+    // Invert VAA percentiles for FF and FC (lower/more negative VAA = better for fastballs)
+    // For all other pitch types, higher VAA = better (more drop evasion)
+    var VAA_INVERT_TYPES = { FF: true, FC: true, SI: true };
+    for (var ptV in ptGroups) {
+      if (VAA_INVERT_TYPES[ptV]) {
+        ptGroups[ptV].forEach(function (r) {
+          if (r.vaa_pctl !== null && r.vaa_pctl !== undefined) {
+            r.vaa_pctl = 100 - r.vaa_pctl;
+          }
+        });
+      }
+    }
+
     // Stuff Score
     rows.forEach(function (r) {
       var vp = r.velocity_pctl;

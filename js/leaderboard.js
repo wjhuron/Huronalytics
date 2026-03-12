@@ -15,13 +15,13 @@ var COLUMNS = {
     { key: 'breakTilt',   label: 'Tilt',     format: Utils.formatTilt, sortType: 'numeric', sortKey: 'breakTiltMinutes', noPercentile: true, group: 'metrics' },
     { key: 'indVertBrk',  label: 'IVB',      format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
     { key: 'horzBrk',     label: 'HB',       format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
-    { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics', defaultHidden: true },
-    { key: 'relPosX',     label: 'RelX',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics', defaultHidden: true },
+    { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
+    { key: 'relPosX',     label: 'RelX',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
     { key: 'extension',   label: 'Ext',      format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
-    { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics', defaultHidden: true },
-    { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics', defaultHidden: true },
-    { key: 'vra',         label: 'VRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics', defaultHidden: true },
-    { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics', defaultHidden: true },
+    { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
+    { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
+    { key: 'vra',         label: 'VRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
+    { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     // Stats
     { key: 'izPct',       label: 'IZ%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
@@ -132,12 +132,7 @@ var Leaderboard = {
   keyboardFocusIndex: -1,
 
   initHiddenColumns: function () {
-    var allCols = COLUMNS.pitch.concat(COLUMNS.pitcher).concat(COLUMNS.hitterStats).concat(COLUMNS.hitterBattedBall).concat(COLUMNS.hitterSwingDecisions);
-    for (var i = 0; i < allCols.length; i++) {
-      if (allCols[i].defaultHidden) {
-        this.hiddenColumns[allCols[i].key] = true;
-      }
-    }
+    // No columns are hidden by default
   },
 
   getVisibleColumns: function (columns) {
@@ -182,6 +177,8 @@ var Leaderboard = {
 
   computeLeagueAvgRow: function (data, columns) {
     var avg = {};
+    // Keys where average should use absolute values (RHP/LHP have opposite signs)
+    var ABS_AVG_KEYS = { horzBrk: true, haa: true, hra: true };
     var numericKeys = [];
     for (var i = 0; i < columns.length; i++) {
       if (columns[i].sortType === 'numeric' && !columns[i].noPercentile && columns[i].key !== '_rank') {
@@ -190,9 +187,13 @@ var Leaderboard = {
     }
     numericKeys.forEach(function (key) {
       var sum = 0, count = 0;
+      var useAbs = ABS_AVG_KEYS[key] || false;
       for (var j = 0; j < data.length; j++) {
         var v = data[j][key];
-        if (v !== null && v !== undefined) { sum += v; count++; }
+        if (v !== null && v !== undefined) {
+          sum += useAbs ? Math.abs(v) : v;
+          count++;
+        }
       }
       avg[key] = count > 0 ? sum / count : null;
     });
