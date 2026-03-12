@@ -788,7 +788,7 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
         row = [hi, ti, bats, di, ph]
-        for i in range(36):
+        for i in range(32):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_rows.append(row)
