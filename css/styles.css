@@ -387,7 +387,8 @@ header {
 
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   white-space: nowrap;
   font-size: 13px;
 }
@@ -526,8 +527,12 @@ tbody tr.active-row { background: var(--row-active) !important; }
   color: var(--text-secondary);
   font-size: 11px;
   background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+/* When team avg follows, remove league bottom border so rows sit flush */
+#table-pinned-body tr.league-avg-row:not(:last-child) td {
   border-bottom: none;
-  box-shadow: 0 1px 0 var(--border), 0 2px 0 var(--bg-primary);
 }
 
 #table-pinned-body tr.team-avg-row {
@@ -538,7 +543,11 @@ tbody tr.active-row { background: var(--row-active) !important; }
   color: var(--accent);
   background: var(--bg-primary);
   border-bottom: none;
-  box-shadow: 0 2px 0 var(--accent), 0 3px 0 var(--bg-primary);
+}
+
+/* Bottom edge of last pinned row: accent line via box-shadow to cover any gap */
+#table-pinned-body tr:last-child td {
+  box-shadow: 0 2px 0 var(--accent);
 }
 
 /* Compare checkbox column */

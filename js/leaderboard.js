@@ -376,7 +376,7 @@ var Leaderboard = {
         var leagueRowHeight = leagueTr.offsetHeight || 30;
         for (var ti = 0; ti < teamTr.cells.length; ti++) {
           teamTr.cells[ti].style.position = 'sticky';
-          teamTr.cells[ti].style.top = (thHeight + leagueRowHeight) + 'px';
+          teamTr.cells[ti].style.top = (thHeight + leagueRowHeight - 1) + 'px';
           teamTr.cells[ti].style.zIndex = teamTr.cells[ti].classList.contains('sticky-col') ? '5' : '3';
         }
       }
