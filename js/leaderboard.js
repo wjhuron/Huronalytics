@@ -359,7 +359,7 @@ var Leaderboard = {
       // Make league avg row cells sticky
       for (var ci = 0; ci < leagueTr.cells.length; ci++) {
         leagueTr.cells[ci].style.position = 'sticky';
-        leagueTr.cells[ci].style.top = thHeight + 'px';
+        leagueTr.cells[ci].style.top = (thHeight - 1) + 'px';
         leagueTr.cells[ci].style.zIndex = leagueTr.cells[ci].classList.contains('sticky-col') ? '5' : '3';
       }
 
