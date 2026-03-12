@@ -235,10 +235,11 @@ var Aggregator = {
       { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
       { key: 'vra', sum: 'sumVRA', cnt: 'nVRA', round: 2 },
       { key: 'hra', sum: 'sumHRA', cnt: 'nHRA', round: 2 },
+      { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
     ];
-    var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; });
+    var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ'; });
     var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct'];
-    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(PITCH_STAT_KEYS);
+    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA']).concat(PITCH_STAT_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -335,6 +336,16 @@ var Aggregator = {
         }
       });
 
+      // Normalized VAA (location-independent): nVAA = avgVAA - (slope * avgPlateZ + intercept)
+      var vaaReg = DataStore.metadata && DataStore.metadata.vaaRegression;
+      if (obj.vaa !== null && obj._plateZ !== null && vaaReg) {
+        var expectedVAA = vaaReg.slope * obj._plateZ + vaaReg.intercept;
+        obj.nVAA = Number((obj.vaa - expectedVAA).toFixed(2));
+      } else {
+        obj.nVAA = null;
+      }
+      delete obj._plateZ;  // internal, not displayed
+
       // Break Tilt (circular mean)
       if (ms.nTilt > 0) {
         var sinAvg = ms.sumTiltSin / ms.nTilt;
@@ -376,7 +387,7 @@ var Aggregator = {
       });
     }
 
-    // Invert VAA percentiles for FF and FC (lower/more negative VAA = better for fastballs)
+    // Invert VAA and nVAA percentiles for FF and FC (lower/more negative = better for fastballs)
     // For all other pitch types, higher VAA = better (more drop evasion)
     var VAA_INVERT_TYPES = { FF: true, FC: true };
     for (var ptV in ptGroups) {
@@ -384,6 +395,9 @@ var Aggregator = {
         ptGroups[ptV].forEach(function (r) {
           if (r.vaa_pctl !== null && r.vaa_pctl !== undefined) {
             r.vaa_pctl = 100 - r.vaa_pctl;
+          }
+          if (r.nVAA_pctl !== null && r.nVAA_pctl !== undefined) {
+            r.nVAA_pctl = 100 - r.nVAA_pctl;
           }
         });
       }

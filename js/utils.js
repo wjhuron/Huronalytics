@@ -108,6 +108,7 @@ var Utils = {
     'RelX': 'Horizontal Release Position (feet)',
     'Ext': 'Extension (feet)',
     'VAA': 'Vertical Approach Angle (degrees)',
+    'nVAA': 'Normalized VAA — location-independent (VAA minus expected VAA at that plate height)',
     'HAA': 'Horizontal Approach Angle (degrees)',
     'VRA': 'Vertical Release Angle (degrees)',
     'HRA': 'Horizontal Release Angle (degrees)',

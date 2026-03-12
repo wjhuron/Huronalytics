@@ -31,7 +31,7 @@ PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct']
 STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + PITCH_STAT_KEYS
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA'] + PITCH_STAT_KEYS
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip'}
@@ -584,22 +584,23 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
     # ==========================================================
     #  Pitch micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, pitchTypeIdx, dateIdx, batterHand)
-    #  Values: 18 count fields + 25 metric fields = 43 fields
+    #  Values: 18 count fields + 27 metric fields = 45 fields
     #  Metric fields (offset from 18):
     #  18:sumVelo 19:nVelo  20:sumSpin 21:nSpin  22:sumIVB 23:nIVB
     #  24:sumHB 25:nHB  26:sumRelZ 27:nRelZ  28:sumRelX 29:nRelX
     #  30:sumExt 31:nExt  32:sumVAA 33:nVAA  34:sumHAA 35:nHAA
     #  36:sumVRA 37:nVRA  38:sumHRA 39:nHRA
-    #  40:sumTiltSin 41:sumTiltCos 42:nTilt
+    #  40:sumPlateZ 41:nPlateZ
+    #  42:sumTiltSin 43:sumTiltCos 44:nTilt
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 18), ('Spin Rate', 20), ('IndVertBrk', 22),
         ('HorzBrk', 24), ('RelPosZ', 26), ('RelPosX', 28),
         ('Extension', 30), ('VAA', 32), ('HAA', 34),
-        ('VRA', 36), ('HRA', 38),
+        ('VRA', 36), ('HRA', 38), ('PlateZ', 40),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 43)
+    pitch_micro = defaultdict(lambda: [0.0] * 45)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -661,9 +662,9 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
         tilt_min = break_tilt_to_minutes(p.get('Break Tilt'))
         if tilt_min is not None:
             angle = tilt_min / 720.0 * 2 * math.pi
-            c[40] += math.sin(angle)
-            c[41] += math.cos(angle)
-            c[42] += 1
+            c[42] += math.sin(angle)
+            c[43] += math.cos(angle)
+            c[44] += 1
 
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
@@ -671,14 +672,14 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
         # 18 integer counts
         for i in range(18):
             row.append(int(c[i]))
-        # 11 metric sum/count pairs
+        # 12 metric sum/count pairs (including PlateZ)
         for col_name, offset in METRIC_OFFSETS:
             row.append(round(c[offset], 2))       # metric sum
             row.append(int(c[offset + 1]))         # metric count
         # Tilt sin/cos
-        row.append(round(c[40], 6))  # sumTiltSin
-        row.append(round(c[41], 6))  # sumTiltCos
-        row.append(int(c[42]))       # nTilt
+        row.append(round(c[42], 6))  # sumTiltSin
+        row.append(round(c[43], 6))  # sumTiltCos
+        row.append(int(c[44]))       # nTilt
         pitch_rows.append(row)
 
     # ==========================================================
@@ -850,6 +851,7 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
             'sumHB', 'nHB', 'sumRelZ', 'nRelZ', 'sumRelX', 'nRelX',
             'sumExt', 'nExt', 'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
             'sumVRA', 'nVRA', 'sumHRA', 'nHRA',
+            'sumPlateZ', 'nPlateZ',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
         ],
         'pitchMicro': pitch_rows,
@@ -1049,6 +1051,58 @@ def main():
         row.update(compute_stats(pitches))
         pitch_leaderboard.append(row)
 
+    # --- Fit VAA ~ PlateZ regression for normalized VAA ---
+    # Collect all pitches with both VAA and PlateZ
+    vaa_plateZ_pairs = []
+    for p in all_pitches:
+        vaa_val = safe_float(p.get('VAA'))
+        pz_val = safe_float(p.get('PlateZ'))
+        if vaa_val is not None and pz_val is not None:
+            vaa_plateZ_pairs.append((pz_val, vaa_val))
+
+    # Simple linear regression: VAA = slope * PlateZ + intercept
+    if len(vaa_plateZ_pairs) > 10:
+        n_reg = len(vaa_plateZ_pairs)
+        sum_x = sum(pair[0] for pair in vaa_plateZ_pairs)
+        sum_y = sum(pair[1] for pair in vaa_plateZ_pairs)
+        sum_xy = sum(pair[0] * pair[1] for pair in vaa_plateZ_pairs)
+        sum_x2 = sum(pair[0] ** 2 for pair in vaa_plateZ_pairs)
+        mean_x = sum_x / n_reg
+        mean_y = sum_y / n_reg
+        denom = sum_x2 - n_reg * mean_x ** 2
+        if abs(denom) > 1e-10:
+            vaa_slope = (sum_xy - n_reg * mean_x * mean_y) / denom
+            vaa_intercept = mean_y - vaa_slope * mean_x
+        else:
+            vaa_slope = 0.0
+            vaa_intercept = mean_y
+        # R-squared
+        ss_res = sum((pair[1] - (vaa_slope * pair[0] + vaa_intercept)) ** 2 for pair in vaa_plateZ_pairs)
+        ss_tot = sum((pair[1] - mean_y) ** 2 for pair in vaa_plateZ_pairs)
+        r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
+        print(f"\nVAA ~ PlateZ regression: slope={vaa_slope:.4f}, intercept={vaa_intercept:.4f}, R²={r_squared:.4f} (n={n_reg})")
+    else:
+        vaa_slope = 0.0
+        vaa_intercept = 0.0
+        print("\nWARNING: Not enough data for VAA ~ PlateZ regression")
+
+    # Compute nVAA for each pitch leaderboard row
+    for row in pitch_leaderboard:
+        if row.get('vaa') is not None:
+            # Compute average PlateZ for this pitcher/team/pitchType combo
+            key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
+            pitches_for_row = pitch_groups[key]
+            pz_vals = [safe_float(p.get('PlateZ')) for p in pitches_for_row]
+            pz_vals = [v for v in pz_vals if v is not None]
+            if pz_vals:
+                avg_pz = sum(pz_vals) / len(pz_vals)
+                expected_vaa = vaa_slope * avg_pz + vaa_intercept
+                row['nVAA'] = round(row['vaa'] - expected_vaa, 2)
+            else:
+                row['nVAA'] = None
+        else:
+            row['nVAA'] = None
+
     # --- Compute percentiles per pitch type ---
     pt_groups = defaultdict(list)
     for row in pitch_leaderboard:
@@ -1057,6 +1111,16 @@ def main():
     for pt, pt_rows in pt_groups.items():
         for metric in PITCH_PCTL_KEYS:
             compute_percentile_ranks(pt_rows, metric)
+
+    # --- Invert VAA and nVAA percentiles for FF and FC (lower = better for fastballs) ---
+    VAA_INVERT_TYPES = {'FF', 'FC'}
+    for pt, pt_rows in pt_groups.items():
+        if pt in VAA_INVERT_TYPES:
+            for row in pt_rows:
+                if row.get('vaa_pctl') is not None:
+                    row['vaa_pctl'] = 100 - row['vaa_pctl']
+                if row.get('nVAA_pctl') is not None:
+                    row['nVAA_pctl'] = 100 - row['nVAA_pctl']
 
     # --- Compute Stuff Score ---
     # Average of velocity and spin rate percentiles within pitch type
@@ -1255,6 +1319,10 @@ def main():
         'leagueAverages': league_avgs,
         'pitcherLeagueAverages': pitcher_league_avgs,
         'hitterLeagueAverages': hitter_league_avgs,
+        'vaaRegression': {
+            'slope': round(vaa_slope, 6),
+            'intercept': round(vaa_intercept, 6),
+        },
     }
 
     # Write JSON files
