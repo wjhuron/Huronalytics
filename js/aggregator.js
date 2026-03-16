@@ -140,17 +140,17 @@ var Aggregator = {
           pitcherIdx: row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         };
       }
       var c = groups[gk].counts;
-      for (var f = 0; f < 18; f++) {
+      for (var f = 0; f < 20; f++) {
         c[f] += row[ci.n + f];
       }
     }
 
     // Convert to row objects
-    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip'];
+    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip'];
     var INVERT = { bbPct: true, babip: true };
     var rows = [];
 
@@ -161,6 +161,7 @@ var Aggregator = {
       var ooz = c[5], oozSw = c[6], bip = c[7], gb = c[8];
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
+      var izSw = c[18], izWh = c[19];
       var ab = pa - bb - hbp - sf - sh - ci_val;
 
       var kPct = pa > 0 ? k / pa : null;
@@ -179,6 +180,7 @@ var Aggregator = {
         izPct: n > 0 ? iz / n : null,
         swStrPct: sw > 0 ? wh / sw : null,
         cswPct: n > 0 ? csw / n : null,
+        izWhiffPct: izSw > 0 ? izWh / izSw : null,
         chasePct: ooz > 0 ? oozSw / ooz : null,
         gbPct: bip > 0 ? gb / bip : null,
         kPct: kPct,
@@ -239,7 +241,7 @@ var Aggregator = {
       { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
     ];
     var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ'; });
-    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct'];
+    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct'];
     var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA']).concat(PITCH_STAT_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
@@ -262,7 +264,7 @@ var Aggregator = {
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
           metricSums: {}
         };
         METRIC_MAP.forEach(function (m) {
@@ -275,7 +277,7 @@ var Aggregator = {
       }
 
       var g = groups[gk];
-      for (var f = 0; f < 18; f++) {
+      for (var f = 0; f < 20; f++) {
         g.counts[f] += row[ci.n + f];
       }
       METRIC_MAP.forEach(function (m) {
@@ -297,6 +299,7 @@ var Aggregator = {
       var ooz = c[5], oozSw = c[6], bip = c[7], gb = c[8];
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
+      var izSw = c[18], izWh = c[19];
       var ab = pa - bb - hbp - sf - sh - ci_val;
       var pitcherKey = g.pitcherIdx + '|' + g.teamIdx;
       var pitcherTotal = pitcherTotals[pitcherKey] || 0;
@@ -319,6 +322,7 @@ var Aggregator = {
         izPct: n > 0 ? iz / n : null,
         swStrPct: sw > 0 ? wh / sw : null,
         cswPct: n > 0 ? csw / n : null,
+        izWhiffPct: izSw > 0 ? izWh / izSw : null,
         chasePct: ooz > 0 ? oozSw / ooz : null,
         gbPct: bip > 0 ? gb / bip : null,
         kPct: kPct,

@@ -27,8 +27,8 @@ METRIC_KEYS = {
     'VRA': 'vra', 'HRA': 'hra',
 }
 
-PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct']
-STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip']
+PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct']
+STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA'] + PITCH_STAT_KEYS
@@ -201,6 +201,9 @@ def compute_stats(pitches):
     whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
     csw = sum(1 for p in pitches if p['Description'] in ('Called Strike', 'Swinging Strike'))
 
+    iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
+    iz_swings = sum(1 for p in iz_pitches if p['Description'] in SWING_DESCRIPTIONS)
+    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] == 'Swinging Strike')
     ooz = [p for p in pitches if p.get('InZone') == 'No']
     ooz_swung = sum(1 for p in ooz if p['Description'] in ('Swinging Strike', 'In Play', 'Foul'))
 
@@ -233,6 +236,7 @@ def compute_stats(pitches):
         'izPct': iz / total,
         'swStrPct': whiffs / swings if swings > 0 else None,
         'cswPct': csw / total,
+        'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
         'chasePct': ooz_swung / len(ooz) if ooz else None,
         'gbPct': gb / len(bip) if bip else None,
         'nBip': len(bip),
@@ -367,6 +371,7 @@ def compute_hitter_stats(pitches):
     iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
     ooz_pitches = [p for p in pitches if p.get('InZone') == 'No']
     iz_swings = sum(1 for p in iz_pitches if p['Description'] in SWING_DESCRIPTIONS)
+    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] == 'Swinging Strike')
     ooz_swings = sum(1 for p in ooz_pitches if p['Description'] in SWING_DESCRIPTIONS)
 
     iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
@@ -473,6 +478,7 @@ def compute_hitter_stats(pitches):
         'contactPct': contact_pct,
         'izContactPct': iz_contact_pct,
         'whiffPct': whiffs / n_swings if n_swings > 0 else None,
+        'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
     }
 
 
@@ -524,11 +530,12 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitcher micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, dateIdx, batterHand)
-    #  Values: 18 count fields
+    #  Values: 20 count fields
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
+    #  18:izSw  19:izWh
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 18)
+    pitcher_micro = defaultdict(lambda: [0] * 20)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -546,13 +553,18 @@ def generate_micro_data(all_pitches):
         c = pitcher_micro[key]
 
         c[0] += 1  # n
-        if p.get('InZone') == 'Yes':
+        in_zone = p.get('InZone') == 'Yes'
+        if in_zone:
             c[1] += 1  # iz
         desc = p.get('Description', '')
         if desc in SWING_DESCRIPTIONS:
             c[2] += 1  # sw
+            if in_zone:
+                c[18] += 1  # izSw
         if desc == 'Swinging Strike':
             c[3] += 1  # wh
+            if in_zone:
+                c[19] += 1  # izWh
         if desc in ('Called Strike', 'Swinging Strike'):
             c[4] += 1  # csw
         if p.get('InZone') == 'No':
@@ -583,23 +595,26 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitch micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, pitchTypeIdx, dateIdx, batterHand)
-    #  Values: 18 count fields + 27 metric fields = 45 fields
-    #  Metric fields (offset from 18):
-    #  18:sumVelo 19:nVelo  20:sumSpin 21:nSpin  22:sumIVB 23:nIVB
-    #  24:sumHB 25:nHB  26:sumRelZ 27:nRelZ  28:sumRelX 29:nRelX
-    #  30:sumExt 31:nExt  32:sumVAA 33:nVAA  34:sumHAA 35:nHAA
-    #  36:sumVRA 37:nVRA  38:sumHRA 39:nHRA
-    #  40:sumPlateZ 41:nPlateZ
-    #  42:sumTiltSin 43:sumTiltCos 44:nTilt
+    #  Values: 20 count fields + 27 metric fields = 47 fields
+    #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
+    #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
+    #  18:izSw  19:izWh
+    #  Metric fields (offset from 20):
+    #  20:sumVelo 21:nVelo  22:sumSpin 23:nSpin  24:sumIVB 25:nIVB
+    #  26:sumHB 27:nHB  28:sumRelZ 29:nRelZ  30:sumRelX 31:nRelX
+    #  32:sumExt 33:nExt  34:sumVAA 35:nVAA  36:sumHAA 37:nHAA
+    #  38:sumVRA 39:nVRA  40:sumHRA 41:nHRA
+    #  42:sumPlateZ 43:nPlateZ
+    #  44:sumTiltSin 45:sumTiltCos 46:nTilt
     # ==========================================================
     METRIC_OFFSETS = [
-        ('Velocity', 18), ('Spin Rate', 20), ('IndVertBrk', 22),
-        ('HorzBrk', 24), ('RelPosZ', 26), ('RelPosX', 28),
-        ('Extension', 30), ('VAA', 32), ('HAA', 34),
-        ('VRA', 36), ('HRA', 38), ('PlateZ', 40),
+        ('Velocity', 20), ('Spin Rate', 22), ('IndVertBrk', 24),
+        ('HorzBrk', 26), ('RelPosZ', 28), ('RelPosX', 30),
+        ('Extension', 32), ('VAA', 34), ('HAA', 36),
+        ('VRA', 38), ('HRA', 40), ('PlateZ', 42),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 45)
+    pitch_micro = defaultdict(lambda: [0.0] * 47)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -618,15 +633,20 @@ def generate_micro_data(all_pitches):
                pt_idx[pitch_type], dt_idx[date], batter_hand)
         c = pitch_micro[key]
 
-        # Same 18 count fields as pitcher
+        # Same 20 count fields as pitcher
         c[0] += 1
-        if p.get('InZone') == 'Yes':
+        in_zone = p.get('InZone') == 'Yes'
+        if in_zone:
             c[1] += 1
         desc = p.get('Description', '')
         if desc in SWING_DESCRIPTIONS:
             c[2] += 1
+            if in_zone:
+                c[18] += 1  # izSw
         if desc == 'Swinging Strike':
             c[3] += 1
+            if in_zone:
+                c[19] += 1  # izWh
         if desc in ('Called Strike', 'Swinging Strike'):
             c[4] += 1
         if p.get('InZone') == 'No':
@@ -661,9 +681,9 @@ def generate_micro_data(all_pitches):
         tilt_min = break_tilt_to_minutes(p.get('Break Tilt'))
         if tilt_min is not None:
             angle = tilt_min / 720.0 * 2 * math.pi
-            c[42] += math.sin(angle)
-            c[43] += math.cos(angle)
-            c[44] += 1
+            c[44] += math.sin(angle)
+            c[45] += math.cos(angle)
+            c[46] += 1
 
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
@@ -968,12 +988,14 @@ def generate_micro_data(all_pitches):
             'pitcherIdx', 'teamIdx', 'throws', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
+            'izSw', 'izWh',
         ],
         'pitcherMicro': pitcher_rows,
         'pitchCols': [
             'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
+            'izSw', 'izWh',
             'sumVelo', 'nVelo', 'sumSpin', 'nSpin', 'sumIVB', 'nIVB',
             'sumHB', 'nHB', 'sumRelZ', 'nRelZ', 'sumRelX', 'nRelX',
             'sumExt', 'nExt', 'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
