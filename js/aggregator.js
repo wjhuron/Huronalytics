@@ -627,6 +627,13 @@ var Aggregator = {
     return rows;
   },
 
+  // Category definitions for hitter pitch type grouping
+  PITCH_CATEGORIES: {
+    'Hard': ['FF', 'SI'],
+    'Breaking': ['FC', 'SL', 'ST', 'CU', 'SV'],
+    'Offspeed': ['CH', 'FS', 'KN']
+  },
+
   _aggregateHitterPitch: function (filters) {
     var d = this.data;
     var ci = this._colIdx.hitterPitchCols;
@@ -639,9 +646,47 @@ var Aggregator = {
 
     if (!micro || !ci) return [];
 
-    // Group by (hitterIdx, teamIdx, pitchTypeIdx)
-    var groups = {};
-    // Also track total pitches per hitter for seenPct
+    var selectedPitchTypes = filters.pitchTypes; // array or 'all'
+    var CATS = this.PITCH_CATEGORIES;
+
+    // Build reverse lookup: pitch type name -> set of pitchTypeIdx values
+    var ptNameToIdx = {};
+    for (var pi = 0; pi < lookups.pitchTypes.length; pi++) {
+      ptNameToIdx[lookups.pitchTypes[pi]] = pi;
+    }
+
+    // Build category -> set of pitchTypeIdx
+    var catIdxSets = {};
+    for (var catName in CATS) {
+      catIdxSets[catName] = {};
+      for (var ci2 = 0; ci2 < CATS[catName].length; ci2++) {
+        var idx = ptNameToIdx[CATS[catName][ci2]];
+        if (idx !== undefined) catIdxSets[catName][idx] = true;
+      }
+    }
+
+    // Determine which output groups we need
+    // Each selected chip becomes an output group with its own grouping logic
+    var outputGroups = []; // { name, type: 'all'|'category'|'individual', idxSet }
+    if (selectedPitchTypes === 'all') {
+      // Default: show all individual pitch types
+      outputGroups.push({ name: 'all_individual', type: 'all_individual' });
+    } else {
+      for (var si = 0; si < selectedPitchTypes.length; si++) {
+        var sel = selectedPitchTypes[si];
+        if (sel === 'All') {
+          outputGroups.push({ name: 'All', type: 'all' });
+        } else if (CATS[sel]) {
+          outputGroups.push({ name: sel, type: 'category', idxSet: catIdxSets[sel] });
+        } else {
+          outputGroups.push({ name: sel, type: 'individual', idx: ptNameToIdx[sel] });
+        }
+      }
+    }
+
+    // First pass: accumulate per-hitter-team-pitchType micro rows
+    // and track hitter totals
+    var perPT = {}; // hitterIdx|teamIdx|pitchTypeIdx -> { counts, batsSet }
     var hitterTotals = {};
 
     for (var i = 0; i < micro.length; i++) {
@@ -650,30 +695,26 @@ var Aggregator = {
       if (vsHand !== 'all' && row[ci.pitcherHand] !== vsHand) continue;
 
       var hk = row[ci.hitterIdx] + '|' + row[ci.teamIdx];
-      if (!hitterTotals[hk]) hitterTotals[hk] = 0;
-      hitterTotals[hk] += row[6]; // n is at offset 6
+      if (!hitterTotals[hk]) hitterTotals[hk] = { total: 0, batsSet: {} };
+      hitterTotals[hk].total += row[6];
+      hitterTotals[hk].batsSet[row[ci.bats]] = true;
 
       var gk = row[ci.hitterIdx] + '|' + row[ci.teamIdx] + '|' + row[ci.pitchTypeIdx];
-      if (!groups[gk]) {
-        groups[gk] = {
+      if (!perPT[gk]) {
+        perPT[gk] = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          batsSet: {},
           counts: new Array(32)
         };
-        for (var z = 0; z < 32; z++) groups[gk].counts[z] = 0;
+        for (var z = 0; z < 32; z++) perPT[gk].counts[z] = 0;
       }
-
-      var g = groups[gk];
-      g.batsSet[row[ci.bats]] = true;
-
       for (var f = 0; f < 32; f++) {
-        g.counts[f] += row[6 + f];
+        perPT[gk].counts[f] += row[6 + f];
       }
     }
 
-    // Filter BIP records for medians
+    // BIP records by hitter+pitchTypeIdx
     var bipByKey = {};
     if (bipData && bci) {
       for (var bi = 0; bi < bipData.length; bi++) {
@@ -694,6 +735,70 @@ var Aggregator = {
       return arr.length % 2 === 1 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
     }
 
+    // Second pass: build output rows per output group
+    // For 'all' and 'category', we combine multiple perPT entries per hitter
+    var groups = {}; // outputGroupName|hitterIdx|teamIdx -> combined counts + bipRecords
+
+    for (var gk2 in perPT) {
+      var entry = perPT[gk2];
+      var ptIdx = entry.pitchTypeIdx;
+      var ptName = lookups.pitchTypes[ptIdx];
+
+      for (var oi = 0; oi < outputGroups.length; oi++) {
+        var og = outputGroups[oi];
+        var match = false;
+
+        if (og.type === 'all') {
+          match = true;
+        } else if (og.type === 'category') {
+          match = !!og.idxSet[ptIdx];
+        } else if (og.type === 'individual') {
+          match = (ptIdx === og.idx);
+        } else if (og.type === 'all_individual') {
+          // For 'all_individual', each pitch type becomes its own output row
+          // handled differently below
+          match = false;
+        }
+
+        if (match) {
+          var outKey = og.name + '|' + entry.hitterIdx + '|' + entry.teamIdx;
+          if (!groups[outKey]) {
+            groups[outKey] = {
+              hitterIdx: entry.hitterIdx,
+              teamIdx: entry.teamIdx,
+              outputName: og.name,
+              counts: new Array(32),
+              bipPtIdxs: []
+            };
+            for (var z2 = 0; z2 < 32; z2++) groups[outKey].counts[z2] = 0;
+          }
+          var gg = groups[outKey];
+          for (var f2 = 0; f2 < 32; f2++) {
+            gg.counts[f2] += entry.counts[f2];
+          }
+          if (gg.bipPtIdxs.indexOf(ptIdx) === -1) gg.bipPtIdxs.push(ptIdx);
+        }
+      }
+
+      // Handle all_individual: each perPT entry is its own output row
+      if (outputGroups.length === 1 && outputGroups[0].type === 'all_individual') {
+        var outKey2 = ptName + '|' + entry.hitterIdx + '|' + entry.teamIdx;
+        if (!groups[outKey2]) {
+          groups[outKey2] = {
+            hitterIdx: entry.hitterIdx,
+            teamIdx: entry.teamIdx,
+            outputName: ptName,
+            counts: new Array(32),
+            bipPtIdxs: [ptIdx]
+          };
+          for (var z3 = 0; z3 < 32; z3++) groups[outKey2].counts[z3] = 0;
+        }
+        for (var f3 = 0; f3 < 32; f3++) {
+          groups[outKey2].counts[f3] += entry.counts[f3];
+        }
+      }
+    }
+
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso',
       'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
@@ -705,18 +810,16 @@ var Aggregator = {
       swingPct: true, chasePct: true, whiffPct: true, gbPct: true
     };
 
-    var selectedPitchTypes = filters.pitchTypes;
     var rows = [];
 
-    for (var gk2 in groups) {
-      var g = groups[gk2];
-      var c = g.counts;
-      var batsKeys = Object.keys(g.batsSet);
+    for (var gk3 in groups) {
+      var gg2 = groups[gk3];
+      var c = gg2.counts;
+      var hk2 = gg2.hitterIdx + '|' + gg2.teamIdx;
+      var ht = hitterTotals[hk2];
+      var hTotal = ht ? ht.total : 1;
+      var batsKeys = ht ? Object.keys(ht.batsSet) : [];
       var stands = batsKeys.length > 1 ? 'S' : (batsKeys[0] || null);
-      var pitchType = lookups.pitchTypes[g.pitchTypeIdx];
-
-      var hk2 = g.hitterIdx + '|' + g.teamIdx;
-      var hTotal = hitterTotals[hk2] || 1;
 
       var n_total = c[0], pa = c[1], h = c[2], db = c[3], tp = c[4], hr = c[5];
       var bb = c[6], hbp = c[7], sf = c[8], sh = c[9], ci_v = c[10], k = c[11];
@@ -740,15 +843,17 @@ var Aggregator = {
       var contactPct = swings > 0 ? contact / swings : null;
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
 
-      // BIP medians
-      var bipKey2 = g.hitterIdx + '|' + g.pitchTypeIdx;
-      var bipRecords = bipByKey[bipKey2] || [];
+      // BIP medians — combine BIP records from all pitch types in this group
       var evsPos = [], allLA = [];
-      for (var bri = 0; bri < bipRecords.length; bri++) {
-        var bev = bipRecords[bri][bci.exitVelo];
-        var bla = bipRecords[bri][bci.launchAngle];
-        if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
-        if (bla !== null) allLA.push(bla);
+      for (var bpi = 0; bpi < gg2.bipPtIdxs.length; bpi++) {
+        var bpKey = gg2.hitterIdx + '|' + gg2.bipPtIdxs[bpi];
+        var bipRecords = bipByKey[bpKey] || [];
+        for (var bri = 0; bri < bipRecords.length; bri++) {
+          var bev = bipRecords[bri][bci.exitVelo];
+          var bla = bipRecords[bri][bci.launchAngle];
+          if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
+          if (bla !== null) allLA.push(bla);
+        }
       }
 
       var medEV = evsPos.length > 0 ? Math.round(median(evsPos.slice()) * 10) / 10 : null;
@@ -763,10 +868,10 @@ var Aggregator = {
       }
 
       var obj = {
-        hitter: lookups.hitters[g.hitterIdx],
-        team: lookups.teams[g.teamIdx],
+        hitter: lookups.hitters[gg2.hitterIdx],
+        team: lookups.teams[gg2.teamIdx],
         stands: stands,
-        pitchType: pitchType,
+        pitchType: gg2.outputName,
         count: n_total,
         seenPct: Math.round(n_total / hTotal * 10000) / 10000,
         pa: pa,
@@ -796,14 +901,13 @@ var Aggregator = {
       // Apply non-aggregator filters
       if (filters.team !== 'all' && obj.team !== filters.team) continue;
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
-      if (selectedPitchTypes !== 'all' && selectedPitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
       if (filters.search && obj.hitter.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
     }
 
-    // Compute percentiles per pitch type
+    // Compute percentiles per pitch type (output group name)
     var ptGroups = {};
     for (var ri = 0; ri < rows.length; ri++) {
       var pt = rows[ri].pitchType;

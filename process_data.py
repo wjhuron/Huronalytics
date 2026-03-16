@@ -1457,6 +1457,12 @@ def main():
     ]
     HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
 
+    PITCH_CATEGORIES = {
+        'Hard': ['FF', 'SI'],
+        'Breaking': ['FC', 'SL', 'ST', 'CU', 'SV'],
+        'Offspeed': ['CH', 'FS', 'KN'],
+    }
+
     hitter_pitch_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
         total_count = len(pitches)
@@ -1469,6 +1475,7 @@ def main():
             if pt:
                 pt_map[pt].append(p)
 
+        # Per-pitch-type rows
         for pt, pt_pitches in pt_map.items():
             row = {
                 'hitter': hitter,
@@ -1480,6 +1487,38 @@ def main():
             }
             row.update(compute_hitter_stats(pt_pitches))
             hitter_pitch_leaderboard.append(row)
+
+        # "All" combined row
+        row_all = {
+            'hitter': hitter,
+            'team': team,
+            'stands': stands,
+            'pitchType': 'All',
+            'count': total_count,
+            'seenPct': 1.0,
+        }
+        row_all.update(compute_hitter_stats(pitches))
+        hitter_pitch_leaderboard.append(row_all)
+
+        # Category combined rows (Hard, Breaking, Offspeed)
+        for cat_name, cat_types in PITCH_CATEGORIES.items():
+            cat_pitches = []
+            cat_seen = 0.0
+            for ct in cat_types:
+                if ct in pt_map:
+                    cat_pitches.extend(pt_map[ct])
+                    cat_seen += len(pt_map[ct]) / total_count if total_count else 0
+            if len(cat_pitches) > 0:
+                row_cat = {
+                    'hitter': hitter,
+                    'team': team,
+                    'stands': stands,
+                    'pitchType': cat_name,
+                    'count': len(cat_pitches),
+                    'seenPct': round(cat_seen, 4),
+                }
+                row_cat.update(compute_hitter_stats(cat_pitches))
+                hitter_pitch_leaderboard.append(row_cat)
 
     # Compute percentiles per pitch type
     pt_groups = defaultdict(list)

@@ -70,7 +70,7 @@
       teamSelect.appendChild(opt);
     });
 
-    // Populate pitch type chips
+    // Populate pitch type chips (will be rebuilt on tab switch if needed)
     buildPitchChips();
 
     // Set generated date
@@ -116,6 +116,23 @@
     });
   }
 
+  // Ordered chip list for hitterPitch tab
+  var HITTER_PITCH_CHIP_ORDER = [
+    'All', '|',
+    'Hard', 'Breaking', 'Offspeed', '|',
+    'FF', 'SI', '|',
+    'FC', 'SL', 'ST', 'CU', 'SV', '|',
+    'CH', 'FS', 'KN'
+  ];
+
+  // Category chip colors
+  var CATEGORY_CHIP_COLORS = {
+    'All': '#888',
+    'Hard': '#d62728',
+    'Breaking': '#2ca02c',
+    'Offspeed': '#ff7f0e'
+  };
+
   function buildPitchChips() {
     var container = document.getElementById('pitch-type-chips');
     container.innerHTML = '';
@@ -139,6 +156,112 @@
       });
 
       container.appendChild(btn);
+    });
+  }
+
+  function buildHitterPitchChips(preserveSelection) {
+    var container = document.getElementById('pitch-type-chips');
+    container.innerHTML = '';
+
+    // Default to "All" selected if no preserved selection
+    if (!preserveSelection) {
+      selectedPitchTypes = ['All'];
+    }
+
+    HITTER_PITCH_CHIP_ORDER.forEach(function (item) {
+      if (item === '|') {
+        var divider = document.createElement('span');
+        divider.className = 'chip-divider';
+        container.appendChild(divider);
+        return;
+      }
+
+      var btn = document.createElement('button');
+      btn.className = 'pitch-chip';
+      btn.textContent = item;
+      btn.setAttribute('data-pitch', item);
+
+      var color;
+      if (CATEGORY_CHIP_COLORS[item]) {
+        color = CATEGORY_CHIP_COLORS[item];
+      } else {
+        color = Utils.getPitchColor(item);
+      }
+      btn.style.setProperty('--chip-bg', color);
+      btn.style.borderColor = color;
+      if (item === 'SI' || item === 'SV') btn.style.color = '';
+
+      // Set initial selected state
+      if (selectedPitchTypes.indexOf(item) !== -1) {
+        btn.classList.add('selected');
+        btn.style.backgroundColor = color;
+        btn.style.borderColor = 'transparent';
+      }
+
+      btn.addEventListener('click', function () {
+        toggleHitterPitchChip(item);
+        Leaderboard.currentPage = 1;
+        refresh();
+      });
+
+      container.appendChild(btn);
+    });
+  }
+
+  function toggleHitterPitchChip(pt) {
+    var isAll = (pt === 'All');
+    var idx = selectedPitchTypes.indexOf(pt);
+
+    if (isAll) {
+      // Clicking "All": if not selected, select it and deselect everything else
+      if (idx === -1) {
+        selectedPitchTypes = ['All'];
+      }
+      // If already selected, do nothing (can't deselect All by clicking it again — always need something)
+    } else {
+      // Clicking a non-All chip
+      // First remove "All" if it's selected
+      var allIdx = selectedPitchTypes.indexOf('All');
+      if (allIdx !== -1) {
+        selectedPitchTypes.splice(allIdx, 1);
+      }
+
+      if (idx === -1) {
+        // Not accounting for possible shift from removing All
+        selectedPitchTypes.push(pt);
+      } else {
+        // Recalculate idx since All removal may have shifted it
+        var newIdx = selectedPitchTypes.indexOf(pt);
+        if (newIdx !== -1) {
+          selectedPitchTypes.splice(newIdx, 1);
+        }
+      }
+
+      // If nothing selected after toggle, revert to "All"
+      if (selectedPitchTypes.length === 0) {
+        selectedPitchTypes = ['All'];
+      }
+    }
+
+    // Re-render chips to update visual state
+    updateHitterPitchChipVisuals();
+  }
+
+  function updateHitterPitchChipVisuals() {
+    var container = document.getElementById('pitch-type-chips');
+    var chips = container.querySelectorAll('.pitch-chip');
+    chips.forEach(function (btn) {
+      var pt = btn.getAttribute('data-pitch');
+      var color = btn.style.getPropertyValue('--chip-bg');
+      if (selectedPitchTypes.indexOf(pt) !== -1) {
+        btn.classList.add('selected');
+        btn.style.backgroundColor = color;
+        btn.style.borderColor = 'transparent';
+      } else {
+        btn.classList.remove('selected');
+        btn.style.backgroundColor = '';
+        btn.style.borderColor = '';
+      }
     });
   }
 
@@ -175,6 +298,14 @@
         // Show/hide min swings filter (hitter tabs except hitterPitch)
         document.getElementById('min-swings-filter-group').style.display =
           (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
+
+        // Rebuild pitch chips for hitterPitch tab (custom) vs standard
+        selectedPitchTypes = [];
+        if (currentTab === 'hitterPitch') {
+          buildHitterPitchChips(false);
+        } else {
+          buildPitchChips();
+        }
 
         // Update throws/stands label and min count label
         var throwsLabel = document.querySelector('#throws-filter-group label');
@@ -957,8 +1088,15 @@
     if (params.dir) Leaderboard.currentSort.dir = params.dir;
     if (params.page) Leaderboard.currentPage = parseInt(params.page) || 1;
 
-    // Restore pitch type chips
-    if (params.pitch) {
+    // Rebuild chips if hitterPitch tab and restore selection
+    if (currentTab === 'hitterPitch') {
+      if (params.pitch) {
+        selectedPitchTypes = params.pitch.split(',');
+      } else {
+        selectedPitchTypes = ['All'];
+      }
+      buildHitterPitchChips(true);
+    } else if (params.pitch) {
       var types = params.pitch.split(',');
       var chips = document.querySelectorAll('.pitch-chip');
       types.forEach(function (pt) {

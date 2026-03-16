@@ -248,6 +248,15 @@ header {
   /* background set inline via JS */
 }
 
+.chip-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
 /* === Toolbar === */
 .toolbar {
   display: flex;
