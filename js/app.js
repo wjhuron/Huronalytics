@@ -6,7 +6,7 @@
   var columnRangeFilters = {}; // { colKey: { min: number|null, max: number|null } }
 
   function isHitterTab(tab) {
-    return tab === 'hitterStats' || tab === 'hitterBattedBall' || tab === 'hitterSwingDecisions';
+    return tab === 'hitterStats' || tab === 'hitterBattedBall' || tab === 'hitterSwingDecisions' || tab === 'hitterPitch';
   }
 
   // ---- DOM refs ----
@@ -37,9 +37,9 @@
       applyURLState();
       // Set initial filter visibility based on default tab
       document.getElementById('pitch-type-filter-group').style.display =
-        currentTab === 'pitch' ? '' : 'none';
+        (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
       document.getElementById('min-swings-filter-group').style.display =
-        isHitterTab(currentTab) ? '' : 'none';
+        (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
       // Set initial vs-hand labels
       updateVsHandLabels();
       refresh();
@@ -168,13 +168,13 @@
         Leaderboard.currentPage = 1;
         Leaderboard.keyboardFocusIndex = -1;
 
-        // Show/hide pitch type filter
+        // Show/hide pitch type filter (pitch tab and hitter pitch type tab)
         document.getElementById('pitch-type-filter-group').style.display =
-          currentTab === 'pitch' ? '' : 'none';
+          (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
 
-        // Show/hide min swings filter (hitter tabs only)
+        // Show/hide min swings filter (hitter tabs except hitterPitch)
         document.getElementById('min-swings-filter-group').style.display =
-          isHitterTab(currentTab) ? '' : 'none';
+          (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
 
         // Update throws/stands label and min count label
         var throwsLabel = document.querySelector('#throws-filter-group label');
@@ -183,7 +183,7 @@
         }
         var minCountLabel = document.querySelector('[for="min-count"]');
         if (minCountLabel) {
-          minCountLabel.textContent = isHitterTab(currentTab) ? 'Min PA' : 'Min Pitches';
+          minCountLabel.textContent = (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? 'Min PA' : 'Min Pitches';
         }
 
         // Update vs-hand option labels (RHH/LHH for pitcher tabs, RHP/LHP for hitter tabs)
@@ -233,7 +233,7 @@
 
   function refresh() {
     var filters = getFilters();
-    var dataTab = isHitterTab(currentTab) ? 'hitter' : currentTab;
+    var dataTab = currentTab === 'hitterPitch' ? 'hitterPitch' : (isHitterTab(currentTab) ? 'hitter' : currentTab);
     var data = DataStore.getFilteredDataV2(dataTab, filters);
     var columns = COLUMNS[currentTab];
 
@@ -926,9 +926,9 @@
         t.classList.toggle('active', t.getAttribute('data-tab') === currentTab);
       });
       document.getElementById('pitch-type-filter-group').style.display =
-        currentTab === 'pitch' ? '' : 'none';
+        (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
       document.getElementById('min-swings-filter-group').style.display =
-        isHitterTab(currentTab) ? '' : 'none';
+        (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
       // Update throws/stands label and min count label
       var throwsLabel = document.querySelector('#throws-filter-group label');
       if (throwsLabel) {
@@ -936,7 +936,7 @@
       }
       var minCountLabel = document.querySelector('[for="min-count"]');
       if (minCountLabel) {
-        minCountLabel.textContent = isHitterTab(currentTab) ? 'Min PA' : 'Min Pitches';
+        minCountLabel.textContent = (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? 'Min PA' : 'Min Pitches';
       }
       // Update search placeholder
       if (searchInput) {

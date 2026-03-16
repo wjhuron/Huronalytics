@@ -73,6 +73,7 @@ MLB_TEAMS = {
     'ARI', 'ATH', 'ATL', 'BAL', 'BOS', 'CHC', 'CIN', 'CLE', 'COL', 'CWS',
     'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY',
     'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
+    'WBC',
 }
 
 # Strike zone: ball radius adjustment for "any part of ball touches zone"
@@ -475,14 +476,12 @@ def compute_hitter_stats(pitches):
     }
 
 
-def generate_micro_data(all_pitches, wbc_hitter_pitches):
+def generate_micro_data(all_pitches):
     """Generate micro-aggregate data for client-side date and opponent-hand filtering.
 
     Groups pitches by (person, date, opponent_hand) with summable counts.
     Returns a dict with compact arrays-of-arrays format for JSON serialization.
     """
-    all_hitter_pitches = all_pitches + wbc_hitter_pitches
-
     # --- Build lookup tables ---
     pitcher_set = set()
     hitter_set = set()
@@ -501,7 +500,7 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
         if p.get('Pitch Type'):
             pitch_type_set.add(p['Pitch Type'])
 
-    for p in all_hitter_pitches:
+    for p in all_pitches:
         if p.get('Batter'):
             hitter_set.add(p['Batter'])
         if p.get('BTeam') and p['BTeam'] in MLB_TEAMS:
@@ -697,7 +696,7 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
     # ==========================================================
     hitter_micro = defaultdict(lambda: [0.0] * 32)
 
-    for p in all_hitter_pitches:
+    for p in all_pitches:
         batter = p.get('Batter')
         team = p.get('BTeam')
         bats = p.get('Bats')
@@ -799,7 +798,7 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
     #  [hitterIdx, dateIdx, pitcherHand, exitVelo, launchAngle]
     # ==========================================================
     hitter_bip_rows = []
-    for p in all_hitter_pitches:
+    for p in all_pitches:
         batter = p.get('Batter')
         team = p.get('BTeam')
         date = normalize_date(p.get('Game Date'))
@@ -820,6 +819,134 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
 
         hitter_bip_rows.append([
             hi_idx[batter],
+            dt_idx[date],
+            pitcher_hand,
+            round(ev, 1) if ev is not None else None,
+            round(la, 1) if la is not None else None,
+        ])
+
+    # ==========================================================
+    #  Hitter-Pitch micro-aggs (same counts as hitter micro, but keyed with pitch type)
+    #  Key: (hitterIdx, teamIdx, bats, pitchTypeIdx, dateIdx, pitcherHand)
+    #  Same 32 count fields as hitter micro
+    # ==========================================================
+    hitter_pitch_micro = defaultdict(lambda: [0.0] * 32)
+
+    for p in all_pitches:
+        batter = p.get('Batter')
+        team = p.get('BTeam')
+        bats = p.get('Bats')
+        pitch_type = p.get('Pitch Type')
+        date = normalize_date(p.get('Game Date'))
+        pitcher_hand = p.get('Throws')
+
+        if not batter or not team or team not in MLB_TEAMS:
+            continue
+        if not date or not pitcher_hand or not bats or not pitch_type:
+            continue
+
+        key = (hi_idx[batter], tm_idx[team], bats, pt_idx[pitch_type], dt_idx[date], pitcher_hand)
+        c = hitter_pitch_micro[key]
+
+        c[0] += 1  # n
+        desc = p.get('Description', '')
+        bb_type = p.get('BBType')
+        in_zone = p.get('InZone')
+
+        event = p.get('Event')
+        if event and event not in NON_PA_EVENTS:
+            c[1] += 1   # pa
+            if event in HIT_EVENTS:      c[2] += 1
+            if event == 'Double':        c[3] += 1
+            if event == 'Triple':        c[4] += 1
+            if event == 'Home Run':      c[5] += 1
+            if event in BB_EVENTS:       c[6] += 1
+            if event in HBP_EVENTS:      c[7] += 1
+            if event in SF_EVENTS:       c[8] += 1
+            if event in SH_EVENTS:       c[9] += 1
+            if event in CI_EVENTS:       c[10] += 1
+            if event in K_EVENTS:        c[11] += 1
+
+        if desc in SWING_DESCRIPTIONS:
+            c[12] += 1  # swings
+        if desc == 'Swinging Strike':
+            c[13] += 1  # whiffs
+
+        if in_zone == 'Yes':
+            c[14] += 1  # izPitches
+            if desc in SWING_DESCRIPTIONS:
+                c[16] += 1  # izSwings
+                if bb_type not in BUNT_BB_TYPES:
+                    c[19] += 1  # izSwNonBunt
+            if desc in ('Foul', 'In Play'):
+                if bb_type not in BUNT_BB_TYPES:
+                    c[20] += 1  # izContact
+        elif in_zone == 'No':
+            c[15] += 1  # oozPitches
+            if desc in SWING_DESCRIPTIONS:
+                c[17] += 1  # oozSwings
+
+        if desc in ('Foul', 'In Play'):
+            c[18] += 1  # contact
+
+        if bb_type and bb_type not in BUNT_BB_TYPES:
+            c[21] += 1  # bip
+            if bb_type == 'ground_ball':  c[22] += 1
+            if bb_type == 'line_drive':   c[23] += 1
+            if bb_type == 'fly_ball':     c[24] += 1
+            if bb_type == 'popup':        c[25] += 1
+
+            ev = safe_float(p.get('ExitVelo'))
+            la = safe_float(p.get('LaunchAngle'))
+            if is_barrel(ev, la):
+                c[26] += 1
+
+            hc_x = safe_float(p.get('HC_X'))
+            hc_y = safe_float(p.get('HC_Y'))
+            sa = spray_angle(hc_x, hc_y)
+            sd = spray_direction(sa, bats)
+            if sd:
+                c[27] += 1
+                if sd == 'pull':    c[28] += 1
+                if sd == 'center':  c[29] += 1
+                if sd == 'oppo':    c[30] += 1
+                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball'):
+                    c[31] += 1
+
+    hitter_pitch_rows = []
+    for (hi, ti, bats, pti, di, ph), c in hitter_pitch_micro.items():
+        row = [hi, ti, bats, pti, di, ph]
+        for i in range(32):
+            val = c[i]
+            row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
+        hitter_pitch_rows.append(row)
+
+    # Hitter-Pitch BIP records (with pitch type)
+    # [hitterIdx, pitchTypeIdx, dateIdx, pitcherHand, exitVelo, launchAngle]
+    hitter_pitch_bip_rows = []
+    for p in all_pitches:
+        batter = p.get('Batter')
+        team = p.get('BTeam')
+        pitch_type = p.get('Pitch Type')
+        date = normalize_date(p.get('Game Date'))
+        pitcher_hand = p.get('Throws')
+        bb_type = p.get('BBType')
+
+        if not batter or not team or team not in MLB_TEAMS:
+            continue
+        if not date or not pitcher_hand or not pitch_type:
+            continue
+        if not bb_type or bb_type in BUNT_BB_TYPES:
+            continue
+
+        ev = safe_float(p.get('ExitVelo'))
+        la = safe_float(p.get('LaunchAngle'))
+        if ev is None and la is None:
+            continue
+
+        hitter_pitch_bip_rows.append([
+            hi_idx[batter],
+            pt_idx[pitch_type],
             dt_idx[date],
             pitcher_hand,
             round(ev, 1) if ev is not None else None,
@@ -867,6 +994,17 @@ def generate_micro_data(all_pitches, wbc_hitter_pitches):
         'hitterMicro': hitter_rows,
         'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
         'hitterBip': hitter_bip_rows,
+        'hitterPitchCols': [
+            'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',
+            'n', 'pa', 'h', 'db', 'tp', 'hr', 'bb', 'hbp', 'sf', 'sh', 'ci', 'k',
+            'swings', 'whiffs', 'izPitches', 'oozPitches', 'izSwings', 'oozSwings',
+            'contact', 'izSwNonBunt', 'izContact',
+            'bip', 'gb', 'ld', 'fb', 'pu',
+            'barrels', 'nSpray', 'pull', 'center', 'oppo', 'airPull',
+        ],
+        'hitterPitchMicro': hitter_pitch_rows,
+        'hitterPitchBipCols': ['hitterIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
+        'hitterPitchBip': hitter_pitch_bip_rows,
     }
 
 
@@ -921,13 +1059,11 @@ def main():
     sh = gc.open_by_key(SPREADSHEET_ID)
     print(f"Spreadsheet: {sh.title} ({len(sh.worksheets())} sheets)")
 
-    # Read all pitches from all sheets (WBC tab handled separately)
+    # Read all pitches from all sheets (including WBC as 31st team)
     all_pitches = []
-    wbc_pitches = []
-    VALID_SHEETS = MLB_TEAMS | {'WBC'}
     for i, ws in enumerate(sh.worksheets()):
-        if ws.title not in VALID_SHEETS:
-            print(f"  Skipping {ws.title} (not a team/WBC sheet)")
+        if ws.title not in MLB_TEAMS:
+            print(f"  Skipping {ws.title} (not a team sheet)")
             continue
         print(f"  Reading {ws.title}...")
         if i > 0:
@@ -937,7 +1073,6 @@ def main():
             continue
         header = rows[0]
         col_idx = {name: i for i, name in enumerate(header) if name}
-        is_wbc = ws.title.upper() == 'WBC'
 
         for row in rows[1:]:
             pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
@@ -952,20 +1087,15 @@ def main():
                     val = None
                 pitch[col_name] = val
 
-            if is_wbc:
-                wbc_pitches.append(pitch)
-            else:
-                all_pitches.append(pitch)
+            all_pitches.append(pitch)
 
     print(f"Read {len(all_pitches)} pitches from {len(sh.worksheets())} sheets")
-    if wbc_pitches:
-        print(f"  ({len(wbc_pitches)} WBC pitches read separately)")
 
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
-    for p in all_pitches + wbc_pitches:
+    for p in all_pitches:
         p['InZone'] = compute_in_zone(p)
 
-    # --- Map all hitters to MLB teams (handle WBC + non-WBC country BTeams) ---
+    # --- Map non-MLB BTeams to MLB teams where possible ---
     # Build MLB team lookup: batter name → MLB team (only from pitches where BTeam is an MLB team)
     mlb_hitter_teams = {}
     for p in all_pitches:
@@ -985,16 +1115,6 @@ def main():
                 remapped_count += 1
     if remapped_count:
         print(f"  Remapped {remapped_count} non-MLB BTeam entries in regular data")
-
-    # Remap WBC hitters to MLB teams (kept separate — only used for hitter grouping)
-    wbc_hitter_pitches = []
-    for p in wbc_pitches:
-        batter = p.get('Batter')
-        if batter and batter in mlb_hitter_teams:
-            p['BTeam'] = mlb_hitter_teams[batter]
-            wbc_hitter_pitches.append(p)
-    if wbc_pitches:
-        print(f"  {len(wbc_hitter_pitches)} WBC hitter pitches mapped to MLB teams")
 
     # Collect unique teams (MLB only) and pitch types
     all_teams = sorted(set(
@@ -1244,7 +1364,7 @@ def main():
     # Only include hitters with an MLB team (country-only hitters excluded)
     # Switch hitters (who bat from both sides) are combined with stands = "S"
     hitter_groups = defaultdict(list)
-    for p in all_pitches + wbc_hitter_pitches:
+    for p in all_pitches:
         batter = p.get('Batter')
         b_team = p.get('BTeam')
         if batter and b_team and b_team in MLB_TEAMS:
@@ -1305,6 +1425,59 @@ def main():
         details.sort(key=lambda x: x['count'], reverse=True)
         hitter_pitch_details[hitter + '|' + (team or '')] = details
 
+    # --- Hitter pitch-type leaderboard: flatten into one row per hitter-pitch-type ---
+    HITTER_PITCH_PCTL_KEYS = [
+        'avg', 'slg', 'iso',
+        'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
+        'gbPct', 'ldPct', 'fbPct',
+        'pullPct', 'oppoPct',
+        'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
+    ]
+    HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
+
+    hitter_pitch_leaderboard = []
+    for (hitter, team), pitches in hitter_groups.items():
+        total_count = len(pitches)
+        stands_set = set(p.get('Bats') for p in pitches if p.get('Bats'))
+        stands = 'S' if len(stands_set) > 1 else (stands_set.pop() if stands_set else None)
+
+        pt_map = defaultdict(list)
+        for p in pitches:
+            pt = p.get('Pitch Type')
+            if pt:
+                pt_map[pt].append(p)
+
+        for pt, pt_pitches in pt_map.items():
+            row = {
+                'hitter': hitter,
+                'team': team,
+                'stands': stands,
+                'pitchType': pt,
+                'count': len(pt_pitches),
+                'seenPct': round(len(pt_pitches) / total_count, 4) if total_count else 0,
+            }
+            row.update(compute_hitter_stats(pt_pitches))
+            hitter_pitch_leaderboard.append(row)
+
+    # Compute percentiles per pitch type
+    pt_groups = defaultdict(list)
+    for row in hitter_pitch_leaderboard:
+        pt_groups[row['pitchType']].append(row)
+
+    for pt, pt_rows in pt_groups.items():
+        for stat in HITTER_PITCH_PCTL_KEYS:
+            compute_percentile_ranks(pt_rows, stat)
+
+    # Invert percentiles where lower is better
+    for row in hitter_pitch_leaderboard:
+        for stat in HITTER_PITCH_INVERT_PCTL:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
+    hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
+    print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
+
     # Hitter league averages
     hitter_league_avgs = {}
     for stat in HITTER_STAT_KEYS:
@@ -1338,6 +1511,8 @@ def main():
         json.dump(pitcher_leaderboard, f)
     with open(os.path.join(DATA_DIR, 'hitter_leaderboard.json'), 'w') as f:
         json.dump(hitter_leaderboard, f)
+    with open(os.path.join(DATA_DIR, 'hitter_pitch_leaderboard.json'), 'w') as f:
+        json.dump(hitter_pitch_leaderboard, f)
     with open(os.path.join(DATA_DIR, 'metadata.json'), 'w') as f:
         json.dump(metadata, f, indent=2)
 
@@ -1362,10 +1537,13 @@ def main():
         f.write('window.HITTER_PITCH_DETAILS = ')
         json.dump(hitter_pitch_details, f)
         f.write(';\n')
+        f.write('window.HITTER_PITCH_LB = ')
+        json.dump(hitter_pitch_leaderboard, f)
+        f.write(';\n')
 
     # --- Generate micro-aggregate data for date/hand filtering ---
     print(f"\n--- Generating micro-aggregate data ---")
-    micro_data = generate_micro_data(all_pitches, wbc_hitter_pitches)
+    micro_data = generate_micro_data(all_pitches)
 
     micro_path = os.path.join(DATA_DIR, 'micro_data.json')
     with open(micro_path, 'w') as f:

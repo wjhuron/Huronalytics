@@ -2,6 +2,7 @@ var DataStore = {
   pitchData: null,
   pitcherData: null,
   hitterData: null,
+  hitterPitchData: null,
   metadata: null,
 
   load: function () {
@@ -10,6 +11,7 @@ var DataStore = {
       this.pitchData = window.PITCH_DATA;
       this.pitcherData = window.PITCHER_DATA;
       this.hitterData = window.HITTER_DATA || [];
+      this.hitterPitchData = window.HITTER_PITCH_LB || [];
       this.metadata = window.METADATA;
       return Promise.resolve();
     }
@@ -20,12 +22,14 @@ var DataStore = {
       fetch('data/pitch_leaderboard.json').then(function (r) { return r.json(); }),
       fetch('data/pitcher_leaderboard.json').then(function (r) { return r.json(); }),
       fetch('data/hitter_leaderboard.json').then(function (r) { return r.json(); }).catch(function () { return []; }),
+      fetch('data/hitter_pitch_leaderboard.json').then(function (r) { return r.json(); }).catch(function () { return []; }),
       fetch('data/metadata.json').then(function (r) { return r.json(); }),
     ]).then(function (results) {
       self.pitchData = results[0];
       self.pitcherData = results[1];
       self.hitterData = results[2];
-      self.metadata = results[3];
+      self.hitterPitchData = results[3];
+      self.metadata = results[4];
     }).catch(function (e) {
       console.error('Failed to load data:', e);
     });
@@ -51,6 +55,7 @@ var DataStore = {
     if (tab === 'pitch') source = this.pitchData;
     else if (tab === 'pitcher') source = this.pitcherData;
     else if (tab === 'hitter') source = this.hitterData;
+    else if (tab === 'hitterPitch') source = this.hitterPitchData;
     if (!source) return [];
 
     var selectedPitchTypes = filters.pitchTypes; // array or 'all'
@@ -60,17 +65,17 @@ var DataStore = {
 
       // Throws filter applies to pitchers; stands filter applies to hitters (same dropdown)
       if (filters.throws !== 'all') {
-        if (tab === 'hitter') {
+        if (tab === 'hitter' || tab === 'hitterPitch') {
           if (row.stands !== filters.throws) return false;
         } else {
           if (row.throws !== filters.throws) return false;
         }
       }
 
-      if (tab === 'pitch' && selectedPitchTypes !== 'all') {
+      if ((tab === 'pitch' || tab === 'hitterPitch') && selectedPitchTypes !== 'all') {
         if (selectedPitchTypes.indexOf(row.pitchType) === -1) return false;
       }
-      // Min count: use PA for hitters, pitch count for pitchers
+      // Min count: use PA for hitters, pitch count for pitchers and hitterPitch
       if (tab === 'hitter') {
         if ((row.pa || 0) < filters.minCount) return false;
       } else {
