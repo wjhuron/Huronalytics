@@ -591,6 +591,7 @@
       { key: 'breakTilt', label: 'Tilt', format: function (v) { return v || '--'; } },
       { key: 'indVertBrk', label: 'IVB', format: Utils.formatDecimal(1) },
       { key: 'horzBrk', label: 'HB', format: Utils.formatDecimal(1) },
+      { key: 'swStrPct', label: 'Whiff%', format: Utils.formatPct },
     ];
 
     var table = document.createElement('table');
