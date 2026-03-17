@@ -116,14 +116,18 @@
     });
   }
 
-  // Ordered chip list for hitterPitch tab
-  var HITTER_PITCH_CHIP_ORDER = [
-    'All', '|',
-    'Hard', 'Breaking', 'Offspeed', '|',
+  // Standard pitch type ordering used across all tabs
+  var PITCH_TYPE_ORDER = [
     'FF', 'SI', 'CF', '|',
     'FC', 'SL', 'ST', 'CU', 'SV', '|',
     'CH', 'FS', 'KN'
   ];
+
+  // Ordered chip list for hitterPitch tab (adds All + categories before the standard order)
+  var HITTER_PITCH_CHIP_ORDER = [
+    'All', '|',
+    'Hard', 'Breaking', 'Offspeed', '|'
+  ].concat(PITCH_TYPE_ORDER);
 
   // Category chip colors
   var CATEGORY_CHIP_COLORS = {
@@ -136,21 +140,31 @@
   function buildPitchChips() {
     var container = document.getElementById('pitch-type-chips');
     container.innerHTML = '';
+    var available = DataStore.metadata.pitchTypes;
 
-    DataStore.metadata.pitchTypes.forEach(function (pt) {
+    PITCH_TYPE_ORDER.forEach(function (item) {
+      if (item === '|') {
+        var divider = document.createElement('span');
+        divider.className = 'chip-divider';
+        container.appendChild(divider);
+        return;
+      }
+      // Only show chip if this pitch type exists in the data
+      if (available.indexOf(item) === -1) return;
+
       var btn = document.createElement('button');
       btn.className = 'pitch-chip';
-      btn.textContent = pt;
-      btn.setAttribute('data-pitch', pt);
-      var color = Utils.getPitchColor(pt);
+      btn.textContent = item;
+      btn.setAttribute('data-pitch', item);
+      var color = Utils.getPitchColor(item);
       btn.style.setProperty('--chip-bg', color);
       btn.style.borderColor = color;
       // For light-colored pitches, adjust text
-      if (pt === 'SI' || pt === 'SV') btn.style.color = '';
-      btn.title = Utils.pitchTypeLabel(pt);
+      if (item === 'SI' || item === 'SV') btn.style.color = '';
+      btn.title = Utils.pitchTypeLabel(item);
 
       btn.addEventListener('click', function () {
-        togglePitchChip(pt, btn);
+        togglePitchChip(item, btn);
         Leaderboard.currentPage = 1;
         refresh();
       });
