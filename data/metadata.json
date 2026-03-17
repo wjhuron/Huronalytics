@@ -44,14 +44,14 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-17 12:45",
-  "totalPitches": 124920,
+  "generatedAt": "2026-03-17 14:22",
+  "totalPitches": 124919,
   "totalPitchers": 1626,
   "totalHitters": 1780,
   "leagueAverages": {
     "FF": {
       "velocity": 93.58,
-      "spinRate": 2243.56,
+      "spinRate": 2243.63,
       "indVertBrk": 15.02,
       "horzBrk": 3.78,
       "relPosZ": 5.67,
@@ -61,15 +61,15 @@
       "haa": 0.51,
       "vra": -1.99,
       "hra": 1.18,
-      "izPct": 0.4862,
+      "izPct": 0.4859,
       "swStrPct": 0.2051,
-      "cswPct": 0.243,
+      "cswPct": 0.2429,
       "izWhiffPct": 0.1677,
-      "chasePct": 0.2511,
+      "chasePct": 0.251,
       "gbPct": 0.3426,
       "breakTiltMinutes": 220,
       "breakTilt": "3:40",
-      "count": 1505
+      "count": 1506
     },
     "SL": {
       "velocity": 85.21,
@@ -139,7 +139,7 @@
     },
     "CU": {
       "velocity": 79.46,
-      "spinRate": 2489.73,
+      "spinRate": 2489.65,
       "indVertBrk": -10.41,
       "horzBrk": -3.42,
       "relPosZ": 5.99,
@@ -149,9 +149,9 @@
       "haa": 1.13,
       "vra": 0.04,
       "hra": 0.52,
-      "izPct": 0.406,
+      "izPct": 0.4061,
       "swStrPct": 0.2852,
-      "cswPct": 0.2769,
+      "cswPct": 0.277,
       "izWhiffPct": 0.1688,
       "chasePct": 0.1919,
       "gbPct": 0.4337,
@@ -161,25 +161,25 @@
     },
     "SI": {
       "velocity": 93.12,
-      "spinRate": 2166.18,
-      "indVertBrk": 8.19,
+      "spinRate": 2165.98,
+      "indVertBrk": 8.18,
       "horzBrk": 6.74,
       "relPosZ": 5.54,
-      "relPosX": -0.74,
+      "relPosX": -0.73,
       "extension": 6.34,
       "vaa": -5.86,
       "haa": 0.11,
       "vra": -1.73,
       "hra": 1.3,
-      "izPct": 0.5143,
+      "izPct": 0.5148,
       "swStrPct": 0.1546,
-      "cswPct": 0.2505,
+      "cswPct": 0.2507,
       "izWhiffPct": 0.1171,
-      "chasePct": 0.2474,
+      "chasePct": 0.2476,
       "gbPct": 0.5724,
       "breakTiltMinutes": 252,
       "breakTilt": "4:12",
-      "count": 918
+      "count": 917
     },
     "FC": {
       "velocity": 88.77,
@@ -285,7 +285,7 @@
     "relPosX": -0.7442,
     "extension": 6.3278,
     "vaa": -6.3492,
-    "haa": 0.7591,
+    "haa": 0.759,
     "vra": -1.4916,
     "hra": 1.0572,
     "count": 1626
@@ -322,8 +322,8 @@
     "count": 1780
   },
   "vaaRegression": {
-    "slope": 1.418273,
-    "intercept": -9.770644,
-    "leagueAvgPlateZ": 2.384966
+    "slope": 1.418239,
+    "intercept": -9.770543,
+    "leagueAvgPlateZ": 2.38498
   }
 }
