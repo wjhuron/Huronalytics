@@ -6,7 +6,7 @@ var ScatterChart = {
   COLORS: {
     FF: { bg: '#0000FF', border: '#0000CC' },
     SI: { bg: '#FFD700', border: '#CCB000' },
-    CF: { bg: '#D2691E', border: '#A85216' },
+    CF: { bg: '#8B4513', border: '#6B340F' },
     FC: { bg: '#FFA500', border: '#CC8400' },
     SL: { bg: '#006400', border: '#004D00' },
     ST: { bg: '#FF1493', border: '#CC1076' },
