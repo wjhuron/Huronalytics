@@ -120,7 +120,7 @@
   var HITTER_PITCH_CHIP_ORDER = [
     'All', '|',
     'Hard', 'Breaking', 'Offspeed', '|',
-    'FF', 'SI', '|',
+    'FF', 'SI', 'CF', '|',
     'FC', 'SL', 'ST', 'CU', 'SV', '|',
     'CH', 'FS', 'KN'
   ];

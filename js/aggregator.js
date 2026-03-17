@@ -629,7 +629,7 @@ var Aggregator = {
 
   // Category definitions for hitter pitch type grouping
   PITCH_CATEGORIES: {
-    'Hard': ['FF', 'SI'],
+    'Hard': ['FF', 'SI', 'CF'],
     'Breaking': ['FC', 'SL', 'ST', 'CU', 'SV'],
     'Offspeed': ['CH', 'FS', 'KN']
   },

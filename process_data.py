@@ -1458,7 +1458,7 @@ def main():
     HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
 
     PITCH_CATEGORIES = {
-        'Hard': ['FF', 'SI'],
+        'Hard': ['FF', 'SI', 'CF'],
         'Breaking': ['FC', 'SL', 'ST', 'CU', 'SV'],
         'Offspeed': ['CH', 'FS', 'KN'],
     }
