@@ -138,7 +138,7 @@ var Utils = {
     'Pull%': 'Pull Rate (batted balls to pull side)',
     'Cent%': 'Center Rate (batted balls to center)',
     'Oppo%': 'Oppo Rate (batted balls to opposite field)',
-    'AirPull%': 'Air Pull Rate (LD + FB to pull side / total BIP)',
+    'AirPull%': 'Air Pull Rate (LD + FB + PU to pull side / total BIP)',
   },
 
   // URL state helpers
