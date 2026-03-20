@@ -47,7 +47,7 @@
   // Tabs that show pitch type filter
   var PITCH_TYPE_TABS = {
     pitchMetrics: true, hitterPitch: true,
-    pitcherBattedBall: true, pitcherSwingDecisions: true,
+    pitcherSwingDecisions: true,
     hitterBattedBall: true, hitterSwingDecisions: true,
     hitterBatTracking: true
   };
@@ -250,6 +250,8 @@
     selectedPitchTypes = [];
     if (currentTab === 'hitterPitch') {
       buildHitterPitchChips(false);
+    } else if (PITCH_TYPE_TABS[currentTab]) {
+      buildPitchChipsWithAll();
     } else {
       buildPitchChips();
     }
@@ -406,6 +408,63 @@
 
       btn.addEventListener('click', function () {
         togglePitchChip(item, btn);
+        Leaderboard.currentPage = 1;
+        refresh();
+      });
+
+      container.appendChild(btn);
+    });
+  }
+
+  function buildPitchChipsWithAll() {
+    var container = document.getElementById('pitch-type-chips');
+    container.innerHTML = '';
+    var available = DataStore.metadata.pitchTypes;
+
+    selectedPitchTypes = ['All'];
+
+    // Add "All" chip first
+    var allBtn = document.createElement('button');
+    allBtn.className = 'pitch-chip selected';
+    allBtn.textContent = 'All';
+    allBtn.setAttribute('data-pitch', 'All');
+    allBtn.style.setProperty('--chip-bg', '#888');
+    allBtn.style.borderColor = 'transparent';
+    allBtn.style.backgroundColor = '#888';
+    allBtn.addEventListener('click', function () {
+      toggleHitterPitchChip('All');
+      Leaderboard.currentPage = 1;
+      refresh();
+    });
+    container.appendChild(allBtn);
+
+    // Add divider
+    var divider = document.createElement('span');
+    divider.className = 'chip-divider';
+    container.appendChild(divider);
+
+    // Add individual pitch type chips
+    PITCH_TYPE_ORDER.forEach(function (item) {
+      if (item === '|') {
+        var div = document.createElement('span');
+        div.className = 'chip-divider';
+        container.appendChild(div);
+        return;
+      }
+      if (available.indexOf(item) === -1) return;
+
+      var btn = document.createElement('button');
+      btn.className = 'pitch-chip';
+      btn.textContent = item;
+      btn.setAttribute('data-pitch', item);
+      var color = Utils.getPitchColor(item);
+      btn.style.setProperty('--chip-bg', color);
+      btn.style.borderColor = color;
+      if (item === 'SI' || item === 'SV') btn.style.color = '';
+      btn.title = Utils.pitchTypeLabel(item);
+
+      btn.addEventListener('click', function () {
+        toggleHitterPitchChip(item);
         Leaderboard.currentPage = 1;
         refresh();
       });
@@ -575,7 +634,7 @@
   function getFilters() {
     return {
       team: teamSelect.value,
-      pitchTypes: selectedPitchTypes.length > 0 ? selectedPitchTypes : 'all',
+      pitchTypes: (selectedPitchTypes.length === 0 || (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All')) ? 'all' : selectedPitchTypes,
       throws: throwsSelect.value,
       vsHand: vsHandSelect.value,
       minCount: parseInt(minCountInput.value) || 1,
@@ -589,6 +648,17 @@
   function refresh() {
     var filters = getFilters();
     var dataTab = TAB_DATA[currentTab] || 'pitcher';
+
+    // When pitch types are selected, switch to pitch-level data sources
+    var hasPitchTypeFilter = selectedPitchTypes.length > 0 && !(selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All');
+
+    if (currentTab === 'pitcherSwingDecisions' && hasPitchTypeFilter) {
+      dataTab = 'pitch';
+    }
+    if ((currentTab === 'hitterBattedBall' || currentTab === 'hitterSwingDecisions') && hasPitchTypeFilter) {
+      dataTab = 'hitterPitch';
+    }
+
     var data = DataStore.getFilteredDataV2(dataTab, filters);
     var columns = COLUMNS[currentTab];
 

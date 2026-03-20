@@ -45,7 +45,6 @@ var COLUMNS = {
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
-    { key: 'fpsPct',      label: 'FPS%',     format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
   ],
   pitcherBattedBall: [
@@ -75,6 +74,7 @@ var COLUMNS = {
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchBadge: true },
     // Swing Decision Stats
     { key: 'izPct',       label: 'Zone%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
@@ -113,6 +113,7 @@ var COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchBadge: true },
     // Exit Velocity
     { key: 'medEV',       label: 'Med EV',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
     { key: 'ev75',        label: 'EV75',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
@@ -141,6 +142,7 @@ var COLUMNS = {
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchBadge: true },
     // Rates
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'rates' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
