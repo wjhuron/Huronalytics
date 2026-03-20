@@ -5,8 +5,8 @@ var PlayerPage = {
 
   // Percentile stat definitions for the pitching section
   PITCHING_STATS: [
-    { key: 'fbVelo',            label: 'Fastball Velo',    format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
-    { key: 'avgEVAgainst',      label: 'Avg Exit Velo',    format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'fbVelo',            label: 'Fastball Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'avgEVAgainst',      label: 'Avg Exit Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'chasePct',          label: 'Chase %',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct',          label: 'Whiff %',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct',              label: 'K %',              format: function(v) { return Utils.formatPct(v); } },
@@ -14,7 +14,7 @@ var PlayerPage = {
     { key: 'barrelPctAgainst',  label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
     { key: 'hardHitPct',        label: 'Hard-Hit %',       format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB %',             format: function(v) { return Utils.formatPct(v); } },
-    { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
   ],
 
   // Pitch usage table columns
