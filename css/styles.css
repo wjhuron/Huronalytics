@@ -1235,43 +1235,47 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+  background: #fff;
 }
 
-.player-pitch-stats-table th {
+.player-pitch-stats-table thead th {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   padding: 6px 8px;
-  border-bottom: 2px solid var(--border, #ddd);
+  border-bottom: 2px solid #ddd;
+  border-right: none;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: #888;
+  background: #fff;
+  cursor: default;
+  position: static;
+  letter-spacing: 0;
+}
+
+.player-pitch-stats-table thead th:hover {
+  background: #fff;
+  color: #888;
+}
+
+.player-pitch-stats-table tbody tr,
+.player-pitch-stats-table tbody tr:nth-child(even) {
+  background: #fff;
+}
+
+.player-pitch-stats-table tbody tr:hover {
+  background: #f8f9fa;
 }
 
 .player-pitch-stats-table td {
   padding: 5px 8px;
   text-align: center;
-  border-bottom: 1px solid var(--border, #eee);
-  color: var(--text, #333);
+  border-bottom: 1px solid #eee;
+  color: #333;
 }
 
 .player-pitch-stats-table tbody tr:last-child td {
   border-bottom: none;
-}
-
-.dark-mode .player-pitch-table {
-  background: #fff;
-  border-radius: 8px;
-  padding: 8px;
-}
-
-.dark-mode .player-pitch-stats-table th {
-  color: #555;
-  border-bottom-color: #ddd;
-}
-
-.dark-mode .player-pitch-stats-table td {
-  color: #333;
-  border-bottom-color: #eee;
 }
 
 /* --- Responsive --- */
