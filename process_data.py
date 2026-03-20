@@ -7,6 +7,8 @@ import json
 import math
 import os
 import time as time_module
+import urllib.request
+import urllib.parse
 from datetime import datetime, time
 from collections import defaultdict
 
@@ -281,6 +283,55 @@ def is_barrel(ev, la):
     return lower_la <= la <= upper_la
 
 
+def compute_pitcher_batted_ball(pitches):
+    """Compute batted-ball-against stats for a pitcher: Avg EV, Hard-Hit%, Barrel%, LD%, FB%, PU%."""
+    bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
+    n_bip = len(bip)
+    if n_bip == 0:
+        return {
+            'avgEVAgainst': None, 'maxEVAgainst': None,
+            'hardHitPct': None, 'barrelPctAgainst': None,
+            'ldPct': None, 'fbPct': None, 'puPct': None,
+        }
+
+    # Exit velo stats (all BIP, not just positive LA)
+    ev_vals = [safe_float(p.get('ExitVelo')) for p in bip]
+    ev_valid = [v for v in ev_vals if v is not None]
+    avg_ev = round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None
+    max_ev = round(max(ev_valid), 1) if ev_valid else None
+
+    # Hard-hit: EV >= 95 mph
+    hard_hit = sum(1 for v in ev_valid if v >= 95)
+    hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
+
+    # Barrel rate
+    ev_la_pairs = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
+                   for p in bip
+                   if safe_float(p.get('ExitVelo')) is not None
+                   and safe_float(p.get('LaunchAngle')) is not None]
+    barrels = sum(1 for ev, la in ev_la_pairs if is_barrel(ev, la))
+    barrel_pct = barrels / n_bip if n_bip > 0 else None
+
+    # Batted ball type breakdown
+    ld = sum(1 for p in bip if p.get('BBType') == 'line_drive')
+    fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
+    pu = sum(1 for p in bip if p.get('BBType') == 'popup')
+
+    return {
+        'avgEVAgainst': avg_ev,
+        'maxEVAgainst': max_ev,
+        'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
+        'barrelPctAgainst': round(barrel_pct, 4) if barrel_pct is not None else None,
+        'ldPct': round(ld / n_bip, 4) if n_bip > 0 else None,
+        'fbPct': round(fb / n_bip, 4) if n_bip > 0 else None,
+        'puPct': round(pu / n_bip, 4) if n_bip > 0 else None,
+    }
+
+
+PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct']
+PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst'}
+
+
 def spray_angle(hc_x, hc_y):
     """Compute spray angle in degrees. 0 = center, negative = left field, positive = right field."""
     if hc_x is None or hc_y is None:
@@ -436,7 +487,7 @@ def compute_hitter_stats(pitches):
     pull = sum(1 for d, _ in spray_data if d == 'pull')
     center = sum(1 for d, _ in spray_data if d == 'center')
     oppo = sum(1 for d, _ in spray_data if d == 'oppo')
-    air_pull = sum(1 for d, bb in spray_data if d == 'pull' and bb in ('line_drive', 'fly_ball'))
+    air_pull = sum(1 for d, bb in spray_data if d == 'pull' and bb in ('line_drive', 'fly_ball', 'popup'))
 
     return {
         # Info / counts
@@ -801,7 +852,7 @@ def generate_micro_data(all_pitches):
                 if sd == 'pull':    c[28] += 1
                 if sd == 'center':  c[29] += 1
                 if sd == 'oppo':    c[30] += 1
-                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball'):
+                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1  # airPull
 
 
@@ -930,7 +981,7 @@ def generate_micro_data(all_pitches):
                 if sd == 'pull':    c[28] += 1
                 if sd == 'center':  c[29] += 1
                 if sd == 'oppo':    c[30] += 1
-                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball'):
+                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1
 
     hitter_pitch_rows = []
@@ -1044,16 +1095,20 @@ def read_sheet_with_retry(ws, max_retries=3):
                 raise
 
 
-def compute_percentile_ranks(rows, metric_key):
+def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
     """Compute percentile rank (0-100) for each row's metric value.
-    Uses the 'mean rank' method for ties."""
+    Uses the 'mean rank' method for ties.
+    If min_count > 0, only rows with row[count_key] >= min_count participate
+    in the percentile pool. Rows below the threshold get pctl = None."""
     pctl_key = metric_key + '_pctl'
     valid = [(i, rows[i][metric_key]) for i in range(len(rows))
-             if rows[i].get(metric_key) is not None]
+             if rows[i].get(metric_key) is not None
+             and (min_count == 0 or (rows[i].get(count_key) or 0) >= min_count)]
 
     if len(valid) < 2:
         for row in rows:
-            row[pctl_key] = 50 if row.get(metric_key) is not None else None
+            row[pctl_key] = 50 if (row.get(metric_key) is not None
+                                   and (min_count == 0 or (row.get(count_key) or 0) >= min_count)) else None
         return
 
     values = [v for _, v in valid]
@@ -1065,7 +1120,7 @@ def compute_percentile_ranks(rows, metric_key):
         pctl = (below + 0.5 * (equal - 1)) / max(1, n - 1) * 100
         rows[idx][pctl_key] = max(0, min(100, round(pctl)))
 
-    # Set None for rows that don't have the metric
+    # Set None for rows that don't have the metric or don't qualify
     for row in rows:
         if pctl_key not in row:
             row[pctl_key] = None
@@ -1145,6 +1200,110 @@ def main():
     ))
     all_pitch_types = sorted(set(p['Pitch Type'] for p in all_pitches if p.get('Pitch Type')))
 
+    # --- Lookup MLB IDs for all pitchers and hitters ---
+    print("\n--- Looking up MLB player IDs ---")
+    mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')
+    if os.path.exists(mlb_id_cache_path):
+        with open(mlb_id_cache_path, 'r') as f:
+            mlb_id_cache = json.load(f)
+    else:
+        mlb_id_cache = {}
+
+    # Team abbreviation → MLB API team ID mapping
+    TEAM_ABBREV_TO_ID = {
+        'ARI': 109, 'ATL': 144, 'BAL': 110, 'BOS': 111, 'CHC': 112,
+        'CWS': 145, 'CIN': 113, 'CLE': 114, 'COL': 115, 'DET': 116,
+        'HOU': 117, 'KCR': 118, 'LAA': 108, 'LAD': 119, 'MIA': 146,
+        'MIL': 158, 'MIN': 142, 'NYM': 121, 'NYY': 147, 'ATH': 133,
+        'PHI': 143, 'PIT': 134, 'SDP': 135, 'SFG': 137, 'SEA': 136,
+        'STL': 138, 'TBR': 139, 'TEX': 140, 'TOR': 141, 'WSH': 120,
+    }
+
+    def lookup_mlb_id(player_name, team_abbrev):
+        """Look up MLB player ID using the MLB Stats API, matching by name and team."""
+        cache_key = f"{player_name}|{team_abbrev}"
+        if cache_key in mlb_id_cache:
+            return mlb_id_cache[cache_key]
+
+        # Parse "Last, First" format
+        parts = player_name.split(', ')
+        if len(parts) == 2:
+            search_name = f"{parts[1]} {parts[0]}"
+        else:
+            search_name = player_name
+
+        try:
+            url = f"https://statsapi.mlb.com/api/v1/people/search?names={urllib.parse.quote(search_name)}&sportIds=1,11,12,13,14&hydrate=currentTeam&limit=25"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+
+            team_id = TEAM_ABBREV_TO_ID.get(team_abbrev)
+            people = data.get('people', [])
+
+            # Try to match by team first
+            if team_id and people:
+                for person in people:
+                    ct = person.get('currentTeam', {})
+                    parent = ct.get('parentOrgId') or ct.get('id')
+                    if parent == team_id or ct.get('id') == team_id:
+                        mlb_id = person['id']
+                        mlb_id_cache[cache_key] = mlb_id
+                        return mlb_id
+
+            # Fallback: first result with matching last name
+            if people:
+                last_name = parts[0] if len(parts) == 2 else player_name.split()[-1]
+                for person in people:
+                    if person.get('lastName', '').lower() == last_name.lower():
+                        mlb_id = person['id']
+                        mlb_id_cache[cache_key] = mlb_id
+                        return mlb_id
+                # Last resort: first result
+                mlb_id = people[0]['id']
+                mlb_id_cache[cache_key] = mlb_id
+                return mlb_id
+
+        except Exception as e:
+            print(f"  Warning: MLB ID lookup failed for {player_name} ({team_abbrev}): {e}")
+
+        mlb_id_cache[cache_key] = None
+        return None
+
+    # Build unique pitcher/hitter lists
+    unique_pitchers = set()
+    unique_hitters = set()
+    for p in all_pitches:
+        pitcher = p.get('Pitcher')
+        pteam = p.get('PTeam')
+        if pitcher and pteam:
+            unique_pitchers.add((pitcher, pteam))
+        batter = p.get('Batter')
+        bteam = p.get('BTeam')
+        if batter and bteam:
+            unique_hitters.add((batter, bteam))
+
+    # Look up all unique players
+    all_unique = unique_pitchers | unique_hitters
+    new_lookups = 0
+    for name, team in sorted(all_unique):
+        cache_key = f"{name}|{team}"
+        if cache_key not in mlb_id_cache:
+            lookup_mlb_id(name, team)
+            new_lookups += 1
+            if new_lookups % 20 == 0:
+                time_module.sleep(0.5)  # Rate limit
+                print(f"  Looked up {new_lookups} players...")
+
+    # Save cache
+    with open(mlb_id_cache_path, 'w') as f:
+        json.dump(mlb_id_cache, f, indent=2)
+    print(f"  MLB ID cache: {len(mlb_id_cache)} entries ({new_lookups} new lookups)")
+
+    # Helper to get cached MLB ID
+    def get_mlb_id(name, team):
+        return mlb_id_cache.get(f"{name}|{team}")
+
     # --- Count total pitches per pitcher (for usage%) ---
     pitcher_total = defaultdict(int)
     for p in all_pitches:
@@ -1170,6 +1329,7 @@ def main():
             'pitchType': pitch_type,
             'count': len(pitches),
             'usagePct': round(len(pitches) / total_for_pitcher, 4) if total_for_pitcher > 0 else None,
+            'mlbId': get_mlb_id(pitcher, team),
         }
 
         # Average metrics
@@ -1300,6 +1460,7 @@ def main():
             'team': team,
             'throws': throws,
             'count': len(pitches),
+            'mlbId': get_mlb_id(pitcher, team),
         }
         # Average release/approach metrics across all pitches for this pitcher
         for col in PITCHER_METRIC_COLS:
@@ -1307,16 +1468,42 @@ def main():
             key_name = METRIC_KEYS[col]
             row[key_name] = round_metric(col, avg(values))
         row.update(compute_stats(pitches))
+        # Batted-ball-against stats
+        row.update(compute_pitcher_batted_ball(pitches))
+
+        # Fastball velo: average velo of most-used fastball (FF/SI/CF)
+        fb_types = {'FF', 'SI', 'CF'}
+        fb_pitches_by_type = defaultdict(list)
+        for p in pitches:
+            pt = p.get('Pitch Type')
+            if pt in fb_types:
+                v = safe_float(p.get('Velocity'))
+                if v is not None:
+                    fb_pitches_by_type[pt].append(v)
+        if fb_pitches_by_type:
+            # Pick the fastball type with most pitches
+            primary_fb_type = max(fb_pitches_by_type, key=lambda t: len(fb_pitches_by_type[t]))
+            fb_velos = fb_pitches_by_type[primary_fb_type]
+            row['fbVelo'] = round(sum(fb_velos) / len(fb_velos), 1) if fb_velos else None
+            row['primaryFbType'] = primary_fb_type
+        else:
+            row['fbVelo'] = None
+            row['primaryFbType'] = None
+
         pitcher_leaderboard.append(row)
 
     # Compute percentiles for pitcher leaderboard (across all pitchers)
+    # 75-pitch qualifying threshold for rate stats; fbVelo and extension are exempt
+    MIN_PITCHES_PCTL = 75
+    PITCHER_PCTL_EXEMPT = {'fbVelo', 'extension'}
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
-        compute_percentile_ranks(pitcher_leaderboard, stat)
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo']:
+        mc = 0 if stat in PITCHER_PCTL_EXEMPT else MIN_PITCHES_PCTL
+        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=mc)
 
-    # Invert percentiles where lower is better (BB%)
+    # Invert percentiles where lower is better
     for row in pitcher_leaderboard:
-        for stat in PITCHER_INVERT_PCTL:
+        for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT:
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]

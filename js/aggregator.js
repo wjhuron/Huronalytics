@@ -79,18 +79,23 @@ var Aggregator = {
   },
 
   // ---- Percentile computation (replicates Python's compute_percentile_ranks) ----
-  _computePercentiles: function (rows, metricKey) {
+  // minCount: minimum value of row[countKey] to qualify for percentile pool (0 = no threshold)
+  _computePercentiles: function (rows, metricKey, minCount, countKey) {
+    minCount = minCount || 0;
+    countKey = countKey || 'count';
     var pctlKey = metricKey + '_pctl';
     var valid = [];
     for (var i = 0; i < rows.length; i++) {
-      if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined) {
+      if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined
+          && (minCount === 0 || (rows[i][countKey] || 0) >= minCount)) {
         valid.push({ idx: i, val: rows[i][metricKey] });
       }
     }
 
     if (valid.length < 2) {
       for (var j = 0; j < rows.length; j++) {
-        rows[j][pctlKey] = (rows[j][metricKey] !== null && rows[j][metricKey] !== undefined) ? 50 : null;
+        rows[j][pctlKey] = (rows[j][metricKey] !== null && rows[j][metricKey] !== undefined
+                            && (minCount === 0 || (rows[j][countKey] || 0) >= minCount)) ? 50 : null;
       }
       return;
     }
@@ -198,9 +203,10 @@ var Aggregator = {
       rows.push(obj);
     }
 
-    // Compute percentiles
+    // Compute percentiles (75-pitch qualifying threshold for rate stats)
+    var MIN_PITCHES_PCTL = 75;
     for (var si = 0; si < STAT_KEYS.length; si++) {
-      this._computePercentiles(rows, STAT_KEYS[si]);
+      this._computePercentiles(rows, STAT_KEYS[si], MIN_PITCHES_PCTL);
     }
     // Invert where lower is better
     for (var ri = 0; ri < rows.length; ri++) {
