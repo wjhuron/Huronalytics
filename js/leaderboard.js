@@ -44,6 +44,8 @@ var COLUMNS = {
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'rates' },
+    { key: 'barrelPctAgainst', label: 'Barrel%', format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
+    { key: 'hardHitPct',      label: 'HardHit%', format: Utils.formatPct, sortType: 'numeric', group: 'rates' },
     { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
     { key: 'relPosX',     label: 'RelX',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
     { key: 'extension',   label: 'Ext',      format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
