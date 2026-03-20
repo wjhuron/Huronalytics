@@ -1,7 +1,8 @@
-/* Player Page — full-page pitcher profile view */
+/* Player Page — full-page pitcher/hitter profile view */
 var PlayerPage = {
   chart: null,
   isOpen: false,
+  _playerType: null, // 'pitcher' or 'hitter'
 
   // Percentile stat definitions for the pitching section
   PITCHING_STATS: [
@@ -17,6 +18,20 @@ var PlayerPage = {
     { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
   ],
 
+  // Percentile stat definitions for the hitting section
+  HITTING_STATS: [
+    { key: 'medEV',        label: 'Avg Exit Velo',  format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'ev75',         label: 'EV75',            format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'maxEV',        label: 'Max Exit Velo',   format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'hardHitPct',   label: 'Hard-Hit %',      format: function(v) { return Utils.formatPct(v); } },
+    { key: 'barrelPct',    label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kPct',         label: 'K %',              format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct',        label: 'BB %',             format: function(v) { return Utils.formatPct(v); } },
+    { key: 'chasePct',     label: 'Chase %',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'whiffPct',     label: 'Whiff %',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'contactPct',   label: 'Contact %',        format: function(v) { return Utils.formatPct(v); } },
+  ],
+
   // Pitch usage table columns
   PITCH_TABLE_COLS: [
     { key: 'pitchType', label: 'Pitch' },
@@ -28,35 +43,83 @@ var PlayerPage = {
   ],
 
   open: function (mlbId) {
-    // Find pitcher data by MLB ID
+    // Try pitcher first, then hitter
     var pitcherData = this._findPitcherByMlbId(mlbId);
-    if (!pitcherData) {
+    var hitterData = !pitcherData ? this._findHitterByMlbId(mlbId) : null;
+
+    if (!pitcherData && !hitterData) {
       console.warn('Player not found for mlbId:', mlbId);
       return;
     }
 
+    // Save current route for back navigation
+    var curHash = window.location.hash.replace(/^#/, '');
+    if (curHash.indexOf('player=') === -1) {
+      this._lastRoute = curHash;
+    }
+
     this.isOpen = true;
+    this._playerType = pitcherData ? 'pitcher' : 'hitter';
 
     // Hide leaderboard, show player page
-    var hideEls = ['tab-bar', 'controls', 'toolbar', 'table-wrapper', 'pagination', 'side-panel', 'panel-overlay'];
+    var hideEls = ['tab-bar', 'controls', 'toolbar', 'table-wrapper', 'pagination', 'side-panel', 'panel-overlay', 'home-page'];
     hideEls.forEach(function (cls) {
       var els = document.querySelectorAll('.' + cls + ', #' + cls + ', nav.' + cls + ', section.' + cls);
       els.forEach(function (el) { el.style.display = 'none'; });
     });
     document.getElementById('player-page').style.display = 'block';
 
-    // Render all sections
-    this._renderIdentity(pitcherData);
-    this._renderUsage(pitcherData);
-    this._renderPercentiles(pitcherData);
-    this._renderMovementChart(pitcherData);
-    this._renderPitchTable(pitcherData);
+    if (pitcherData) {
+      this._renderPitcherPage(pitcherData);
+    } else {
+      this._renderHitterPage(hitterData);
+    }
 
     // Update URL
     window.location.hash = 'player=' + mlbId;
 
     // Scroll to top
     window.scrollTo(0, 0);
+  },
+
+  _renderPitcherPage: function (data) {
+    // Show pitcher-specific sections, hide hitter-specific
+    this._showPitcherLayout();
+    this._renderIdentity(data);
+    this._renderUsage(data);
+    this._renderPercentiles(data, this.PITCHING_STATS);
+    this._renderMovementChart(data);
+    this._renderPitchTable(data);
+  },
+
+  _renderHitterPage: function (data) {
+    // Show hitter-specific sections, hide pitcher-specific
+    this._showHitterLayout();
+    this._renderHitterIdentity(data);
+    this._renderPercentiles(data, this.HITTING_STATS);
+    this._renderBattedBallChart(data);
+    this._renderHitterStatsTable(data);
+  },
+
+  _showPitcherLayout: function () {
+    var usageSection = document.querySelector('.player-usage-section');
+    var movementCol = document.querySelector('.player-col-movement');
+    if (usageSection) usageSection.style.display = '';
+    if (movementCol) movementCol.style.display = '';
+    // Reset section title
+    var title = document.querySelector('.player-col-movement .section-title');
+    if (title) title.textContent = 'Movement Profile';
+  },
+
+  _showHitterLayout: function () {
+    // Hide pitcher-only usage section
+    var usageSection = document.querySelector('.player-usage-section');
+    if (usageSection) usageSection.style.display = 'none';
+    // Show movement column (reused for batted ball chart)
+    var movementCol = document.querySelector('.player-col-movement');
+    if (movementCol) movementCol.style.display = '';
+    var title = document.querySelector('.player-col-movement .section-title');
+    if (title) title.textContent = 'Batted Ball Profile';
   },
 
   close: function () {
@@ -72,10 +135,15 @@ var PlayerPage = {
     document.querySelector('section.table-wrapper').style.display = '';
     document.querySelector('section.pagination').style.display = '';
 
-    // Remove player hash, restore leaderboard state
+    // Navigate back — use history if available, otherwise go home
     var hash = window.location.hash.replace(/^#/, '');
     if (hash.indexOf('player=') !== -1) {
-      window.location.hash = '';
+      // Go back to whatever leaderboard makes sense
+      if (this._lastRoute) {
+        window.location.hash = this._lastRoute;
+      } else {
+        window.location.hash = 'pitchers/stats';
+      }
     }
   },
 
@@ -134,6 +202,34 @@ var PlayerPage = {
     // Position (RHP/LHP) | Team
     var pos = (data.throws === 'L' ? 'LHP' : 'RHP');
     document.getElementById('player-position').textContent = pos + ' | ' + (data.team || '');
+    document.getElementById('player-age').textContent = '';
+  },
+
+  _renderHitterIdentity: function (data) {
+    // Headshot
+    var img = document.getElementById('player-headshot');
+    if (data.mlbId) {
+      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
+      img.alt = data.hitter;
+    } else {
+      img.src = '';
+      img.alt = '';
+    }
+    img.onerror = function () {
+      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect fill="%23333" width="120" height="120"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
+    };
+
+    // Name
+    var nameParts = data.hitter.split(', ');
+    var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : data.hitter;
+    document.getElementById('player-name').textContent = displayName;
+
+    // Bats | Team
+    var batsLabel = data.stands === 'S' ? 'Switch' : (data.stands === 'L' ? 'Bats Left' : 'Bats Right');
+    document.getElementById('player-position').textContent = batsLabel + ' | ' + (data.team || '');
+
+    // Show PA count
+    document.getElementById('player-age').textContent = (data.pa || 0) + ' PA | ' + (data.count || 0) + ' pitches seen';
   },
 
   // --- Render: Pitch Usage (vs LHH / vs RHH) ---
@@ -234,14 +330,14 @@ var PlayerPage = {
 
   // --- Render: Percentile Bars ---
 
-  _renderPercentiles: function (data) {
+  _renderPercentiles: function (data, statsDef) {
     var container = document.getElementById('player-percentiles');
     container.innerHTML = '';
 
     var isDark = document.body.classList.contains('dark-mode');
 
-    for (var i = 0; i < this.PITCHING_STATS.length; i++) {
-      var stat = this.PITCHING_STATS[i];
+    for (var i = 0; i < statsDef.length; i++) {
+      var stat = statsDef[i];
       var val = data[stat.key];
       var pctl = data[stat.key + '_pctl'];
 
@@ -464,6 +560,115 @@ var PlayerPage = {
     }
     table.appendChild(tbody);
     container.appendChild(table);
+  },
+
+  // --- Hitter: Batted Ball Chart (donut) ---
+
+  _renderBattedBallChart: function (data) {
+    this.destroyChart();
+
+    var canvas = document.getElementById('player-pitch-chart');
+    var ctx = canvas.getContext('2d');
+
+    var gb = data.gbPct || 0;
+    var ld = data.ldPct || 0;
+    var fb = data.fbPct || 0;
+    var pu = data.puPct || 0;
+
+    var isDark = document.body.classList.contains('dark-mode');
+    var labelColor = isDark ? '#ccc' : '#333';
+
+    this.chart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['GB', 'LD', 'FB', 'PU'],
+        datasets: [{
+          data: [
+            Math.round(gb * 1000) / 10,
+            Math.round(ld * 1000) / 10,
+            Math.round(fb * 1000) / 10,
+            Math.round(pu * 1000) / 10
+          ],
+          backgroundColor: ['#4e79a7', '#59a14f', '#f28e2b', '#e15759'],
+          borderWidth: 2,
+          borderColor: isDark ? '#1a1a2e' : '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '55%',
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: { color: labelColor, usePointStyle: true, padding: 12, font: { size: 12 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return ctx.label + ': ' + ctx.parsed.toFixed(1) + '%';
+              }
+            }
+          }
+        }
+      }
+    });
+  },
+
+  // --- Hitter: Stats Table (below chart) ---
+
+  _renderHitterStatsTable: function (data) {
+    var container = document.getElementById('player-pitch-usage-table');
+    container.innerHTML = '';
+
+    var statRows = [
+      { label: 'AVG', value: data.avg != null ? data.avg.toFixed(3).replace(/^0/, '') : '—' },
+      { label: 'OBP', value: data.obp != null ? data.obp.toFixed(3).replace(/^0/, '') : '—' },
+      { label: 'SLG', value: data.slg != null ? data.slg.toFixed(3).replace(/^0/, '') : '—' },
+      { label: 'OPS', value: data.ops != null ? data.ops.toFixed(3).replace(/^0/, '') : '—' },
+      { label: 'ISO', value: data.iso != null ? data.iso.toFixed(3).replace(/^0/, '') : '—' },
+      { label: 'BABIP', value: data.babip != null ? data.babip.toFixed(3).replace(/^0/, '') : '—' },
+      { label: 'HR', value: data.hr != null ? data.hr : '—' },
+      { label: 'XBH', value: data.xbh != null ? data.xbh : '—' },
+      { label: 'Pull%', value: data.pullPct != null ? (data.pullPct * 100).toFixed(1) + '%' : '—' },
+      { label: 'Oppo%', value: data.oppoPct != null ? (data.oppoPct * 100).toFixed(1) + '%' : '—' },
+    ];
+
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table';
+    var thead = document.createElement('thead');
+    var hrow = document.createElement('tr');
+    var th1 = document.createElement('th'); th1.textContent = 'Stat'; hrow.appendChild(th1);
+    var th2 = document.createElement('th'); th2.textContent = 'Value'; hrow.appendChild(th2);
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    for (var i = 0; i < statRows.length; i++) {
+      var tr = document.createElement('tr');
+      var tdLabel = document.createElement('td');
+      tdLabel.textContent = statRows[i].label;
+      tdLabel.style.fontWeight = '600';
+      var tdVal = document.createElement('td');
+      tdVal.textContent = statRows[i].value;
+      tr.appendChild(tdLabel);
+      tr.appendChild(tdVal);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  },
+
+  // --- Hitter lookup ---
+
+  _findHitterByMlbId: function (mlbId) {
+    mlbId = parseInt(mlbId, 10);
+    var hitterData = window.HITTER_DATA || [];
+    for (var i = 0; i < hitterData.length; i++) {
+      if (hitterData[i].mlbId === mlbId) return hitterData[i];
+    }
+    return null;
   },
 
   // --- URL Routing ---

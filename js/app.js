@@ -1,12 +1,63 @@
 (function () {
   // ---- State ----
-  var currentTab = 'pitcher';
+  var currentTab = 'pitcherStats';
+  var currentSection = 'pitchers';  // 'home', 'pitchers', 'hitters'
   var selectedPitchTypes = []; // empty = all; or array of selected types
   var allData = []; // current filtered + sorted data (full, before pagination)
   var columnRangeFilters = {}; // { colKey: { min: number|null, max: number|null } }
 
+  // Tab → section mapping
+  var TAB_SECTION = {
+    pitcherStats: 'pitchers', pitchMetrics: 'pitchers',
+    pitcherBattedBall: 'pitchers', pitcherSwingDecisions: 'pitchers',
+    hitterStats: 'hitters', hitterBattedBall: 'hitters',
+    hitterSwingDecisions: 'hitters', hitterBatTracking: 'hitters',
+    hitterPitch: 'hitters'
+  };
+
+  // Tab → data source mapping
+  var TAB_DATA = {
+    pitcherStats: 'pitcher', pitchMetrics: 'pitch',
+    pitcherBattedBall: 'pitcher', pitcherSwingDecisions: 'pitcher',
+    hitterStats: 'hitter', hitterBattedBall: 'hitter',
+    hitterSwingDecisions: 'hitter', hitterBatTracking: 'hitter',
+    hitterPitch: 'hitterPitch'
+  };
+
+  // Tab → hash route mapping
+  var TAB_ROUTE = {
+    pitcherStats: 'pitchers/stats', pitchMetrics: 'pitchers/pitch-metrics',
+    pitcherBattedBall: 'pitchers/batted-ball', pitcherSwingDecisions: 'pitchers/swing-decisions',
+    hitterStats: 'hitters/stats', hitterBattedBall: 'hitters/batted-ball',
+    hitterSwingDecisions: 'hitters/swing-decisions', hitterBatTracking: 'hitters/bat-tracking',
+    hitterPitch: 'hitters/pitch-type'
+  };
+
+  // Hash route → tab mapping (reverse of TAB_ROUTE)
+  var ROUTE_TAB = {};
+  Object.keys(TAB_ROUTE).forEach(function (t) { ROUTE_TAB[TAB_ROUTE[t]] = t; });
+
+  // Old tab names → new tab names (backward compat)
+  var OLD_TAB_MAP = {
+    pitcher: 'pitcherStats', pitch: 'pitchMetrics',
+    hitterStats: 'hitterStats', hitterBattedBall: 'hitterBattedBall',
+    hitterSwingDecisions: 'hitterSwingDecisions', hitterPitch: 'hitterPitch'
+  };
+
+  // Tabs that show pitch type filter
+  var PITCH_TYPE_TABS = {
+    pitchMetrics: true, hitterPitch: true,
+    pitcherBattedBall: true, pitcherSwingDecisions: true,
+    hitterBattedBall: true, hitterSwingDecisions: true,
+    hitterBatTracking: true
+  };
+
   function isHitterTab(tab) {
-    return tab === 'hitterStats' || tab === 'hitterBattedBall' || tab === 'hitterSwingDecisions' || tab === 'hitterPitch';
+    return TAB_SECTION[tab] === 'hitters';
+  }
+
+  function isPitcherTab(tab) {
+    return TAB_SECTION[tab] === 'pitchers';
   }
 
   // ---- DOM refs ----
@@ -34,31 +85,206 @@
       setupColumnSettings();
       setupRangeFilters();
       setupDarkMode();
-      applyURLState();
+
+      // Populate home page counts
+      var pitcherCount = document.getElementById('home-pitcher-count');
+      var hitterCount = document.getElementById('home-hitter-count');
+      if (pitcherCount && DataStore.pitcherData) pitcherCount.textContent = DataStore.pitcherData.length + ' pitchers';
+      if (hitterCount && DataStore.hitterData) hitterCount.textContent = DataStore.hitterData.length + ' hitters';
+
       // Player page back button
       document.getElementById('player-back').addEventListener('click', function () {
         PlayerPage.close();
       });
-      // Handle browser back/forward for player page
+
+      // Handle browser navigation (back/forward, hash changes)
       window.addEventListener('hashchange', function () {
-        var params = Utils.readHash();
-        if (params.player && !PlayerPage.isOpen) {
-          PlayerPage.open(params.player);
-        } else if (!params.player && PlayerPage.isOpen) {
-          PlayerPage.close();
-        }
+        handleRoute();
       });
-      // Set initial filter visibility based on default tab
-      document.getElementById('pitch-type-filter-group').style.display =
-        (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
-      document.getElementById('min-swings-filter-group').style.display =
-        (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
-      // Set initial vs-hand labels
-      updateVsHandLabels();
-      if (!PlayerPage.isOpen) {
-        refresh();
-      }
+
+      // Initial routing
+      handleRoute();
     });
+  }
+
+  function handleRoute() {
+    var hash = window.location.hash.replace(/^#/, '');
+
+    // Player page route
+    if (hash.indexOf('player=') === 0) {
+      var mlbId = hash.split('=')[1];
+      if (mlbId && !PlayerPage.isOpen) {
+        PlayerPage.open(mlbId);
+      }
+      return;
+    }
+
+    // Close player page if open
+    if (PlayerPage.isOpen) {
+      PlayerPage.close();
+    }
+
+    // Home page
+    if (!hash || hash === 'home') {
+      showHome();
+      return;
+    }
+
+    // Backward compat: old format like "tab=pitcher&team=NYY"
+    if (hash.indexOf('tab=') !== -1) {
+      var oldParams = Utils.readHash();
+      var newTab = OLD_TAB_MAP[oldParams.tab] || oldParams.tab || 'pitcherStats';
+      // Restore filter state from old params
+      if (oldParams.team) teamSelect.value = oldParams.team;
+      if (oldParams.throws) throwsSelect.value = oldParams.throws;
+      if (oldParams.vsHand) vsHandSelect.value = oldParams.vsHand;
+      if (oldParams.min) minCountInput.value = oldParams.min;
+      if (oldParams.search) searchInput.value = oldParams.search;
+      if (oldParams.sort) Leaderboard.currentSort.key = oldParams.sort;
+      if (oldParams.dir) Leaderboard.currentSort.dir = oldParams.dir;
+      if (oldParams.page) Leaderboard.currentPage = parseInt(oldParams.page, 10) || 1;
+      navigateToTab(newTab);
+      return;
+    }
+
+    // New route format: "pitchers/stats?team=NYY&throws=R"
+    var parts = hash.split('?');
+    var routePart = parts[0];
+    var tab = ROUTE_TAB[routePart];
+    if (tab) {
+      // Parse query params and apply filters before navigating
+      if (parts[1]) {
+        var qp = {};
+        parts[1].split('&').forEach(function (p) {
+          var kv = p.split('=');
+          qp[kv[0]] = decodeURIComponent(kv[1] || '');
+        });
+        if (qp.team) teamSelect.value = qp.team;
+        if (qp.throws) throwsSelect.value = qp.throws;
+        if (qp.vsHand) vsHandSelect.value = qp.vsHand;
+        if (qp.min) minCountInput.value = qp.min;
+        if (qp.search) searchInput.value = qp.search;
+        if (qp.sort) Leaderboard.currentSort.key = qp.sort;
+        if (qp.dir) Leaderboard.currentSort.dir = qp.dir;
+        if (qp.page) Leaderboard.currentPage = parseInt(qp.page, 10) || 1;
+        if (qp.dateStart) dateStartInput.value = qp.dateStart;
+        if (qp.dateEnd) dateEndInput.value = qp.dateEnd;
+        if (qp.pitch) {
+          selectedPitchTypes = qp.pitch.split(',');
+        }
+      }
+      navigateToTab(tab, true);  // true = don't push hash (already there)
+    } else {
+      // Unknown route — go home
+      showHome();
+    }
+  }
+
+  function showHome() {
+    currentSection = 'home';
+    document.getElementById('home-page').style.display = '';
+    document.querySelector('.controls').style.display = 'none';
+    document.querySelector('.toolbar').style.display = 'none';
+    document.querySelector('.table-wrapper').style.display = 'none';
+    document.getElementById('pagination').style.display = 'none';
+    var banner = document.getElementById('tab-banner');
+    if (banner) banner.style.display = 'none';
+
+    // Update section tabs
+    document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); });
+    var homeBtn = document.querySelector('.section-tab[data-section="home"]');
+    if (homeBtn) homeBtn.classList.add('active');
+
+    // Hide subtabs
+    document.getElementById('pitcher-subtabs').style.display = 'none';
+    document.getElementById('hitter-subtabs').style.display = 'none';
+  }
+
+  function showLeaderboard() {
+    document.getElementById('home-page').style.display = 'none';
+    document.querySelector('.controls').style.display = '';
+    document.querySelector('.toolbar').style.display = '';
+    document.querySelector('.table-wrapper').style.display = '';
+    document.getElementById('pagination').style.display = '';
+  }
+
+  function navigateToTab(tab, skipHash) {
+    currentTab = tab;
+    currentSection = TAB_SECTION[tab];
+
+    // Update URL hash
+    if (!skipHash) {
+      window.location.hash = TAB_ROUTE[tab];
+    }
+
+    showLeaderboard();
+
+    // Update section tabs
+    document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); });
+    var sectionBtn = document.querySelector('.section-tab[data-section="' + currentSection + '"]');
+    if (sectionBtn) sectionBtn.classList.add('active');
+
+    // Show/hide subtab bars
+    document.getElementById('pitcher-subtabs').style.display = currentSection === 'pitchers' ? '' : 'none';
+    document.getElementById('hitter-subtabs').style.display = currentSection === 'hitters' ? '' : 'none';
+
+    // Update active subtab
+    document.querySelectorAll('.nav-subtabs .tab').forEach(function (t) { t.classList.remove('active'); });
+    var activeTab = document.querySelector('.tab[data-tab="' + tab + '"]');
+    if (activeTab) activeTab.classList.add('active');
+
+    // Reset state for new tab
+    Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
+    Leaderboard.currentPage = 1;
+    Leaderboard.keyboardFocusIndex = -1;
+
+    // Show/hide pitch type filter
+    document.getElementById('pitch-type-filter-group').style.display =
+      PITCH_TYPE_TABS[currentTab] ? '' : 'none';
+
+    // Show/hide min swings filter (hitter tabs except hitterPitch)
+    document.getElementById('min-swings-filter-group').style.display =
+      (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
+
+    // Rebuild pitch chips
+    selectedPitchTypes = [];
+    if (currentTab === 'hitterPitch') {
+      buildHitterPitchChips(false);
+    } else {
+      buildPitchChips();
+    }
+
+    // Update labels
+    var throwsLabel = document.querySelector('#throws-filter-group label');
+    if (throwsLabel) {
+      throwsLabel.textContent = isHitterTab(currentTab) ? 'Bats' : 'Throws';
+    }
+    var minCountLabel = document.querySelector('[for="min-count"]');
+    if (minCountLabel) {
+      minCountLabel.textContent = (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? 'Min PA' : 'Min Pitches';
+    }
+    updateVsHandLabels();
+    searchInput.placeholder = isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...';
+
+    // Hide compare button on hitter tabs
+    document.getElementById('compare-btn').style.display = isHitterTab(currentTab) ? 'none' : '';
+
+    // Tab banner (e.g., bat tracking placeholder)
+    var banner = document.getElementById('tab-banner');
+    if (banner) {
+      if (currentTab === 'hitterBatTracking') {
+        banner.textContent = 'Bat tracking data will be available starting in the regular season.';
+        banner.style.display = '';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    // Reset range filters
+    columnRangeFilters = {};
+    updateRangeFilterBadge();
+
+    refresh();
   }
 
   function setupDOM() {
@@ -311,56 +537,25 @@
 
   // ---- Tabs ----
   function setupTabs() {
-    document.querySelectorAll('.tab').forEach(function (tab) {
+    // Section tab clicks (Home / Pitchers / Hitters)
+    document.querySelectorAll('.section-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var section = btn.getAttribute('data-section');
+        if (section === 'home') {
+          window.location.hash = 'home';
+        } else if (section === 'pitchers') {
+          navigateToTab('pitcherStats');
+        } else if (section === 'hitters') {
+          navigateToTab('hitterStats');
+        }
+      });
+    });
+
+    // Subtab clicks
+    document.querySelectorAll('.nav-subtabs .tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
-        document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
-        tab.classList.add('active');
-        currentTab = tab.getAttribute('data-tab');
-        Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
-        Leaderboard.currentPage = 1;
-        Leaderboard.keyboardFocusIndex = -1;
-
-        // Show/hide pitch type filter (pitch tab and hitter pitch type tab)
-        document.getElementById('pitch-type-filter-group').style.display =
-          (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
-
-        // Show/hide min swings filter (hitter tabs except hitterPitch)
-        document.getElementById('min-swings-filter-group').style.display =
-          (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
-
-        // Rebuild pitch chips for hitterPitch tab (custom) vs standard
-        selectedPitchTypes = [];
-        if (currentTab === 'hitterPitch') {
-          buildHitterPitchChips(false);
-        } else {
-          buildPitchChips();
-        }
-
-        // Update throws/stands label and min count label
-        var throwsLabel = document.querySelector('#throws-filter-group label');
-        if (throwsLabel) {
-          throwsLabel.textContent = isHitterTab(currentTab) ? 'Bats' : 'Throws';
-        }
-        var minCountLabel = document.querySelector('[for="min-count"]');
-        if (minCountLabel) {
-          minCountLabel.textContent = (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? 'Min PA' : 'Min Pitches';
-        }
-
-        // Update vs-hand option labels (RHH/LHH for pitcher tabs, RHP/LHP for hitter tabs)
-        updateVsHandLabels();
-
-        // Update search placeholder
-        searchInput.placeholder = isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...';
-
-        // Hide compare button on hitter tabs (no scatter compare for hitters)
-        document.getElementById('compare-btn').style.display =
-          isHitterTab(currentTab) ? 'none' : '';
-
-        // Reset range filters on tab switch
-        columnRangeFilters = {};
-        updateRangeFilterBadge();
-
-        refresh();
+        var tabKey = tab.getAttribute('data-tab');
+        navigateToTab(tabKey);
       });
     });
   }
@@ -393,7 +588,7 @@
 
   function refresh() {
     var filters = getFilters();
-    var dataTab = currentTab === 'hitterPitch' ? 'hitterPitch' : (isHitterTab(currentTab) ? 'hitter' : currentTab);
+    var dataTab = TAB_DATA[currentTab] || 'pitcher';
     var data = DataStore.getFilteredDataV2(dataTab, filters);
     var columns = COLUMNS[currentTab];
 
@@ -1060,92 +1255,27 @@
   function saveURLState() {
     // Don't overwrite player page URL
     if (PlayerPage.isOpen) return;
-    var params = {
-      tab: currentTab,
-      team: teamSelect.value,
-      throws: throwsSelect.value,
-      vsHand: vsHandSelect.value,
-      min: minCountInput.value,
-      search: searchInput.value,
-      sort: Leaderboard.currentSort.key || '',
-      dir: Leaderboard.currentSort.dir || '',
-      page: Leaderboard.currentPage.toString(),
-      dateStart: dateStartInput.value || '',
-      dateEnd: dateEndInput.value || '',
-    };
-    if (selectedPitchTypes.length > 0) {
-      params.pitch = selectedPitchTypes.join(',');
-    }
-    Utils.writeHash(params);
-  }
-
-  function applyURLState() {
-    var params = Utils.readHash();
-    if (!params || Object.keys(params).length === 0) return;
-
-    // Player page route
-    if (params.player) {
-      PlayerPage.open(params.player);
-      return;
-    }
-
-    if (params.tab) {
-      currentTab = params.tab;
-      document.querySelectorAll('.tab').forEach(function (t) {
-        t.classList.toggle('active', t.getAttribute('data-tab') === currentTab);
-      });
-      document.getElementById('pitch-type-filter-group').style.display =
-        (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
-      document.getElementById('min-swings-filter-group').style.display =
-        (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
-      // Update throws/stands label and min count label
-      var throwsLabel = document.querySelector('#throws-filter-group label');
-      if (throwsLabel) {
-        throwsLabel.textContent = isHitterTab(currentTab) ? 'Bats' : 'Throws';
-      }
-      var minCountLabel = document.querySelector('[for="min-count"]');
-      if (minCountLabel) {
-        minCountLabel.textContent = (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? 'Min PA' : 'Min Pitches';
-      }
-      // Update search placeholder
-      if (searchInput) {
-        searchInput.placeholder = isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...';
-      }
-      // Hide compare on hitter tabs
-      document.getElementById('compare-btn').style.display =
-        isHitterTab(currentTab) ? 'none' : '';
-    }
-    if (params.team) teamSelect.value = params.team;
-    if (params.throws) throwsSelect.value = params.throws;
-    if (params.vsHand) vsHandSelect.value = params.vsHand;
-    if (params.min) minCountInput.value = params.min;
-    if (params.search) searchInput.value = params.search;
-    if (params.dateStart) dateStartInput.value = params.dateStart;
-    if (params.dateEnd) dateEndInput.value = params.dateEnd;
-    if (params.sort) Leaderboard.currentSort.key = params.sort;
-    if (params.dir) Leaderboard.currentSort.dir = params.dir;
-    if (params.page) Leaderboard.currentPage = parseInt(params.page) || 1;
-
-    // Rebuild chips if hitterPitch tab and restore selection
-    if (currentTab === 'hitterPitch') {
-      if (params.pitch) {
-        selectedPitchTypes = params.pitch.split(',');
-      } else {
-        selectedPitchTypes = ['All'];
-      }
-      buildHitterPitchChips(true);
-    } else if (params.pitch) {
-      var types = params.pitch.split(',');
-      var chips = document.querySelectorAll('.pitch-chip');
-      types.forEach(function (pt) {
-        chips.forEach(function (chip) {
-          if (chip.getAttribute('data-pitch') === pt) {
-            togglePitchChip(pt, chip);
-          }
-        });
-      });
+    // Use new route format: #pitchers/stats?team=NYY&throws=R
+    var route = TAB_ROUTE[currentTab] || 'pitchers/stats';
+    var parts = [];
+    if (teamSelect.value !== 'all') parts.push('team=' + teamSelect.value);
+    if (throwsSelect.value !== 'all') parts.push('throws=' + throwsSelect.value);
+    if (vsHandSelect.value !== 'all') parts.push('vsHand=' + vsHandSelect.value);
+    if (minCountInput.value !== '10') parts.push('min=' + minCountInput.value);
+    if (searchInput.value) parts.push('search=' + encodeURIComponent(searchInput.value));
+    if (Leaderboard.currentSort.key) parts.push('sort=' + Leaderboard.currentSort.key);
+    if (Leaderboard.currentSort.dir) parts.push('dir=' + Leaderboard.currentSort.dir);
+    if (Leaderboard.currentPage > 1) parts.push('page=' + Leaderboard.currentPage);
+    if (dateStartInput.value) parts.push('dateStart=' + dateStartInput.value);
+    if (dateEndInput.value) parts.push('dateEnd=' + dateEndInput.value);
+    if (selectedPitchTypes.length > 0) parts.push('pitch=' + selectedPitchTypes.join(','));
+    var hash = route + (parts.length > 0 ? '?' + parts.join('&') : '');
+    if (window.location.hash !== '#' + hash) {
+      history.replaceState(null, '', '#' + hash);
     }
   }
+
+  // applyURLState is now handled by handleRoute()
 
   // Start the app
   init();

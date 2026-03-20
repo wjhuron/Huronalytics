@@ -104,9 +104,100 @@ header {
 }
 
 /* === Tab Bar === */
+/* === Home Page === */
+.home-page {
+  max-width: 900px;
+  margin: 80px auto;
+  padding: 0 24px;
+  text-align: center;
+}
+.home-hero h2 {
+  font-size: 2.4rem;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+  font-weight: 800;
+}
+.home-hero p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin: 0 0 48px;
+}
+.home-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.home-card {
+  display: block;
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 40px 32px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.home-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+.home-card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+}
+.home-card h3 {
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+.home-card p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 12px;
+}
+.home-card-count {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: var(--row-alt);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+@media (max-width: 600px) {
+  .home-cards { grid-template-columns: 1fr; }
+  .home-page { margin: 40px auto; }
+}
+
+/* === Tab Bar (two-level nav) === */
 .tab-bar {
   display: flex;
+  flex-direction: column;
   background: var(--bg-tab-bar);
+}
+.nav-sections {
+  display: flex;
+  padding: 0 32px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.section-tab {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  color: #8d99ae;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.section-tab:hover { color: #ccc; }
+.section-tab.active { color: white; border-bottom-color: var(--accent); }
+.nav-subtabs {
+  display: flex;
   padding: 0 32px;
 }
 
@@ -118,11 +209,11 @@ header {
 }
 
 .tab {
-  padding: 12px 24px;
+  padding: 10px 20px;
   background: none;
   border: none;
   color: #8d99ae;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border-bottom: 3px solid transparent;
@@ -621,6 +712,19 @@ tbody td.col-rank {
 /* Section divider styling */
 thead th.section-start { border-left: 2px solid var(--accent); }
 tbody td.section-start { border-left: 2px solid var(--border); }
+
+/* Tab banner (e.g., bat tracking placeholder note) */
+.tab-banner {
+  max-width: 1400px;
+  margin: 0 auto 8px auto;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: center;
+}
 
 /* No results */
 .no-results {
@@ -1235,7 +1339,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  background: #fff;
+  background: var(--bg-card);
 }
 
 .player-pitch-stats-table thead th {
@@ -1243,7 +1347,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   font-weight: 700;
   text-transform: uppercase;
   padding: 6px 8px;
-  border-bottom: 2px solid #ddd;
+  border-bottom: 2px solid var(--border);
   border-right: none;
   text-align: center;
   color: #888;
@@ -1254,24 +1358,24 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 }
 
 .player-pitch-stats-table thead th:hover {
-  background: #fff;
-  color: #888;
+  background: var(--bg-card);
+  color: var(--text-muted);
 }
 
 .player-pitch-stats-table tbody tr,
 .player-pitch-stats-table tbody tr:nth-child(even) {
-  background: #fff;
+  background: var(--bg-card);
 }
 
 .player-pitch-stats-table tbody tr:hover {
-  background: #f8f9fa;
+  background: var(--row-hover);
 }
 
 .player-pitch-stats-table td {
   padding: 5px 8px;
   text-align: center;
-  border-bottom: 1px solid #eee;
-  color: #333;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
 .player-pitch-stats-table tbody tr:last-child td {

@@ -18,19 +18,20 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
 METRIC_COLS = [
     'Velocity', 'Spin Rate', 'IndVertBrk', 'HorzBrk',
-    'RelPosZ', 'RelPosX', 'Extension', 'VAA', 'HAA', 'VRA', 'HRA'
+    'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA', 'VRA', 'HRA'
 ]
 
 METRIC_KEYS = {
     'Velocity': 'velocity', 'Spin Rate': 'spinRate',
     'IndVertBrk': 'indVertBrk', 'HorzBrk': 'horzBrk',
     'RelPosZ': 'relPosZ', 'RelPosX': 'relPosX',
-    'Extension': 'extension', 'VAA': 'vaa', 'HAA': 'haa',
+    'Extension': 'extension', 'ArmAngle': 'armAngle',
+    'VAA': 'vaa', 'HAA': 'haa',
     'VRA': 'vra', 'HRA': 'hra',
 }
 
-PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct']
-STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip']
+PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
+STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA'] + PITCH_STAT_KEYS
@@ -44,8 +45,8 @@ HITTER_STAT_KEYS = [
     # Hitter Stats tab
     'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
     # Batted Ball tab
-    'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
-    'gbPct', 'ldPct', 'fbPct', 'puPct',
+    'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+    'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
     'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
@@ -233,6 +234,13 @@ def compute_stats(pitches):
     babip_denom = n_ab - n_k - n_hr + n_sf
     babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
+    # FPS% — first pitch strike rate (count == "0-0")
+    # A strike = called strike, swinging strike, foul, or in play
+    first_pitches = [p for p in pitches if p.get('Count') == '0-0']
+    fps_strikes = sum(1 for p in first_pitches
+                      if p.get('Description') in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'))
+    fps_pct = fps_strikes / len(first_pitches) if first_pitches else None
+
     return {
         'pa': n_pa,
         'izPct': iz / total,
@@ -246,6 +254,7 @@ def compute_stats(pitches):
         'bbPct': bb_pct,
         'kbbPct': kbb_pct,
         'babip': babip,
+        'fpsPct': fps_pct,
     }
 
 
@@ -292,6 +301,7 @@ def compute_pitcher_batted_ball(pitches):
             'avgEVAgainst': None, 'maxEVAgainst': None,
             'hardHitPct': None, 'barrelPctAgainst': None,
             'ldPct': None, 'fbPct': None, 'puPct': None,
+            'hrFbPct': None,
         }
 
     # Exit velo stats (all BIP, not just positive LA)
@@ -317,6 +327,10 @@ def compute_pitcher_batted_ball(pitches):
     fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
     pu = sum(1 for p in bip if p.get('BBType') == 'popup')
 
+    # HR/FB ratio
+    n_hr_bb = sum(1 for p in bip if p.get('Event') == 'Home Run')
+    hr_fb_pct = round(n_hr_bb / fb, 4) if fb > 0 else None
+
     return {
         'avgEVAgainst': avg_ev,
         'maxEVAgainst': max_ev,
@@ -325,11 +339,12 @@ def compute_pitcher_batted_ball(pitches):
         'ldPct': round(ld / n_bip, 4) if n_bip > 0 else None,
         'fbPct': round(fb / n_bip, 4) if n_bip > 0 else None,
         'puPct': round(pu / n_bip, 4) if n_bip > 0 else None,
+        'hrFbPct': hr_fb_pct,
     }
 
 
-PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct']
-PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst'}
+PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct']
+PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct'}
 
 
 def spray_angle(hc_x, hc_y):
@@ -456,12 +471,12 @@ def compute_hitter_stats(pitches):
                  and safe_float(p.get('ExitVelo')) is not None]
     evs_pos = [ev for ev, la in ev_la_pos]
 
-    # EV50: average of top 50% hardest hit balls (LA > 0)
-    ev50 = None
+    # EV75: average of top 25% hardest hit balls (75th percentile and above, LA > 0)
+    ev75 = None
     if evs_pos:
         sorted_evs = sorted(evs_pos, reverse=True)
-        top_half = sorted_evs[:max(1, len(sorted_evs) // 2)]
-        ev50 = round(sum(top_half) / len(top_half), 1)
+        top_quarter = sorted_evs[:max(1, len(sorted_evs) // 4)]
+        ev75 = round(sum(top_quarter) / len(top_quarter), 1)
 
     # Barrels: need EV and LA on all batted balls
     ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
@@ -489,9 +504,24 @@ def compute_hitter_stats(pitches):
     oppo = sum(1 for d, _ in spray_data if d == 'oppo')
     air_pull = sum(1 for d, bb in spray_data if d == 'pull' and bb in ('line_drive', 'fly_ball', 'popup'))
 
+    # Hard-hit: EV >= 95 mph
+    ev_valid = [safe_float(p.get('ExitVelo')) for p in bip]
+    ev_valid = [v for v in ev_valid if v is not None]
+    hard_hit = sum(1 for v in ev_valid if v >= 95)
+    hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
+
+    # LA Sweet-Spot%: launch angle between 8° and 32°
+    sweet_spot = sum(1 for la in all_la if 8 <= la <= 32)
+    la_sweet_spot_pct = sweet_spot / len(all_la) if all_la else None
+
+    # HR/FB ratio for hitters
+    n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
+    hr_fb_pct = round(n_hr_fb / fb, 4) if fb > 0 else None
+
     return {
         # Info / counts
         'pa': n_pa,
+        'ab': n_ab,
         'nSwings': n_swings,
         'nBip': n_bip,
         # Hitter Stats tab
@@ -509,14 +539,17 @@ def compute_hitter_stats(pitches):
         'babip': babip,
         # Batted Ball tab
         'medEV': round(median(evs_pos), 1) if evs_pos else None,
-        'ev50': ev50,
+        'ev75': ev75,
         'maxEV': round(max(evs_pos), 1) if evs_pos else None,
         'medLA': round(median(all_la), 1) if all_la else None,
+        'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
         'barrelPct': barrels / n_bip if n_bip > 0 else None,
+        'laSweetSpotPct': round(la_sweet_spot_pct, 4) if la_sweet_spot_pct is not None else None,
         'gbPct': gb / n_bip if n_bip > 0 else None,
         'ldPct': ld / n_bip if n_bip > 0 else None,
         'fbPct': fb / n_bip if n_bip > 0 else None,
         'puPct': pu / n_bip if n_bip > 0 else None,
+        'hrFbPct': hr_fb_pct,
         'pullPct': pull / n_spray if n_spray > 0 else None,
         'middlePct': center / n_spray if n_spray > 0 else None,
         'oppoPct': oppo / n_spray if n_spray > 0 else None,
@@ -581,12 +614,13 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitcher micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, dateIdx, batterHand)
-    #  Values: 20 count fields
+    #  Values: 24 count fields
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
-    #  18:izSw  19:izWh
+    #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
+    #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 20)
+    pitcher_micro = defaultdict(lambda: [0] * 24)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -627,6 +661,10 @@ def generate_micro_data(all_pitches):
             c[7] += 1  # bip
             if bb_type == 'ground_ball':
                 c[8] += 1  # gb
+            if bb_type == 'fly_ball':
+                c[22] += 1  # fb (fly balls for HR/FB)
+            if p.get('Event') == 'Home Run':
+                c[23] += 1  # nHrBip (HR on BIP)
         event = p.get('Event')
         if event and event not in NON_PA_EVENTS:
             c[9] += 1   # pa
@@ -638,6 +676,11 @@ def generate_micro_data(all_pitches):
             if event in SF_EVENTS:       c[15] += 1  # sf
             if event in SH_EVENTS:       c[16] += 1  # sh
             if event in CI_EVENTS:       c[17] += 1  # ci
+        # FPS counts (first pitch of PA: count == "0-0")
+        if p.get('Count') == '0-0':
+            c[20] += 1  # firstPitches
+            if desc in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'):
+                c[21] += 1  # firstPitchStrikes
 
     pitcher_rows = []
     for (pi, ti, throws, di, bh), c in pitcher_micro.items():
@@ -646,26 +689,27 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitch micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, pitchTypeIdx, dateIdx, batterHand)
-    #  Values: 20 count fields + 27 metric fields = 47 fields
+    #  Values: 22 count fields + 29 metric fields = 51 fields
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
-    #  18:izSw  19:izWh
-    #  Metric fields (offset from 20):
-    #  20:sumVelo 21:nVelo  22:sumSpin 23:nSpin  24:sumIVB 25:nIVB
-    #  26:sumHB 27:nHB  28:sumRelZ 29:nRelZ  30:sumRelX 31:nRelX
-    #  32:sumExt 33:nExt  34:sumVAA 35:nVAA  36:sumHAA 37:nHAA
-    #  38:sumVRA 39:nVRA  40:sumHRA 41:nHRA
-    #  42:sumPlateZ 43:nPlateZ
-    #  44:sumTiltSin 45:sumTiltCos 46:nTilt
+    #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
+    #  Metric fields (offset from 22):
+    #  22:sumVelo 23:nVelo  24:sumSpin 25:nSpin  26:sumIVB 27:nIVB
+    #  28:sumHB 29:nHB  30:sumRelZ 31:nRelZ  32:sumRelX 33:nRelX
+    #  34:sumExt 35:nExt  36:sumArmAngle 37:nArmAngle
+    #  38:sumVAA 39:nVAA  40:sumHAA 41:nHAA
+    #  42:sumVRA 43:nVRA  44:sumHRA 45:nHRA
+    #  46:sumPlateZ 47:nPlateZ
+    #  48:sumTiltSin 49:sumTiltCos 50:nTilt
     # ==========================================================
     METRIC_OFFSETS = [
-        ('Velocity', 20), ('Spin Rate', 22), ('IndVertBrk', 24),
-        ('HorzBrk', 26), ('RelPosZ', 28), ('RelPosX', 30),
-        ('Extension', 32), ('VAA', 34), ('HAA', 36),
-        ('VRA', 38), ('HRA', 40), ('PlateZ', 42),
+        ('Velocity', 22), ('Spin Rate', 24), ('IndVertBrk', 26),
+        ('HorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
+        ('Extension', 34), ('ArmAngle', 36), ('VAA', 38), ('HAA', 40),
+        ('VRA', 42), ('HRA', 44), ('PlateZ', 46),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 47)
+    pitch_micro = defaultdict(lambda: [0.0] * 51)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -684,7 +728,7 @@ def generate_micro_data(all_pitches):
                pt_idx[pitch_type], dt_idx[date], batter_hand)
         c = pitch_micro[key]
 
-        # Same 20 count fields as pitcher
+        # Same 22 count fields as pitcher (0-21), plus fly ball/HR counts don't apply at pitch level
         c[0] += 1
         in_zone = p.get('InZone') == 'Yes'
         if in_zone:
@@ -721,6 +765,12 @@ def generate_micro_data(all_pitches):
             if event in SH_EVENTS:       c[16] += 1
             if event in CI_EVENTS:       c[17] += 1
 
+        # FPS counts (first pitch of PA: count == "0-0")
+        if p.get('Count') == '0-0':
+            c[20] += 1  # firstPitches
+            if desc in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'):
+                c[21] += 1  # firstPitchStrikes
+
         # Metric sums
         for col_name, offset in METRIC_OFFSETS:
             val = safe_float(p.get(col_name))
@@ -732,24 +782,24 @@ def generate_micro_data(all_pitches):
         tilt_min = break_tilt_to_minutes(p.get('Break Tilt'))
         if tilt_min is not None:
             angle = tilt_min / 720.0 * 2 * math.pi
-            c[44] += math.sin(angle)
-            c[45] += math.cos(angle)
-            c[46] += 1
+            c[48] += math.sin(angle)
+            c[49] += math.cos(angle)
+            c[50] += 1
 
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
         row = [pi, ti, throws, pti, di, bh]
-        # 18 integer counts
-        for i in range(18):
+        # 22 integer/float counts (0-21)
+        for i in range(22):
             row.append(int(c[i]))
-        # 12 metric sum/count pairs (including PlateZ)
+        # 13 metric sum/count pairs (including PlateZ and ArmAngle)
         for col_name, offset in METRIC_OFFSETS:
             row.append(round(c[offset], 2))       # metric sum
             row.append(int(c[offset + 1]))         # metric count
         # Tilt sin/cos
-        row.append(round(c[42], 6))  # sumTiltSin
-        row.append(round(c[43], 6))  # sumTiltCos
-        row.append(int(c[44]))       # nTilt
+        row.append(round(c[48], 6))  # sumTiltSin
+        row.append(round(c[49], 6))  # sumTiltCos
+        row.append(int(c[50]))       # nTilt
         pitch_rows.append(row)
 
     # ==========================================================
@@ -763,9 +813,9 @@ def generate_micro_data(all_pitches):
     #  19:izSwNonBunt  20:izContact
     #  21:bip  22:gb  23:ld  24:fb  25:pu
     #  26:barrels  27:nSpray  28:pull  29:center  30:oppo  31:airPull
-    #  32:sumXBA  33:nXBA  34:sumXSLG  35:nXSLG
+    #  32:hardHit  33:laSweetSpot  34:nLaValid  35:nHrBip
     # ==========================================================
-    hitter_micro = defaultdict(lambda: [0.0] * 32)
+    hitter_micro = defaultdict(lambda: [0.0] * 36)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -836,11 +886,19 @@ def generate_micro_data(all_pitches):
             if bb_type == 'fly_ball':     c[24] += 1  # fb
             if bb_type == 'popup':        c[25] += 1  # pu
 
-            # Barrel
+            # Barrel, hard-hit, LA sweet-spot, HR on BIP
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
             if is_barrel(ev, la):
                 c[26] += 1
+            if ev is not None and ev >= 95:
+                c[32] += 1  # hardHit
+            if la is not None:
+                c[34] += 1  # nLaValid
+                if 8 <= la <= 32:
+                    c[33] += 1  # laSweetSpot
+            if event == 'Home Run':
+                c[35] += 1  # nHrBip
 
             # Spray direction
             hc_x = safe_float(p.get('HC_X'))
@@ -859,7 +917,7 @@ def generate_micro_data(all_pitches):
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
         row = [hi, ti, bats, di, ph]
-        for i in range(32):
+        for i in range(36):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_rows.append(row)
@@ -899,9 +957,9 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Hitter-Pitch micro-aggs (same counts as hitter micro, but keyed with pitch type)
     #  Key: (hitterIdx, teamIdx, bats, pitchTypeIdx, dateIdx, pitcherHand)
-    #  Same 32 count fields as hitter micro
+    #  Same 36 count fields as hitter micro
     # ==========================================================
-    hitter_pitch_micro = defaultdict(lambda: [0.0] * 32)
+    hitter_pitch_micro = defaultdict(lambda: [0.0] * 36)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -971,6 +1029,14 @@ def generate_micro_data(all_pitches):
             la = safe_float(p.get('LaunchAngle'))
             if is_barrel(ev, la):
                 c[26] += 1
+            if ev is not None and ev >= 95:
+                c[32] += 1  # hardHit
+            if la is not None:
+                c[34] += 1  # nLaValid
+                if 8 <= la <= 32:
+                    c[33] += 1  # laSweetSpot
+            if event == 'Home Run':
+                c[35] += 1  # nHrBip
 
             hc_x = safe_float(p.get('HC_X'))
             hc_y = safe_float(p.get('HC_Y'))
@@ -987,7 +1053,7 @@ def generate_micro_data(all_pitches):
     hitter_pitch_rows = []
     for (hi, ti, bats, pti, di, ph), c in hitter_pitch_micro.items():
         row = [hi, ti, bats, pti, di, ph]
-        for i in range(32):
+        for i in range(36):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_pitch_rows.append(row)
@@ -1039,17 +1105,18 @@ def generate_micro_data(all_pitches):
             'pitcherIdx', 'teamIdx', 'throws', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
-            'izSw', 'izWh',
+            'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip',
         ],
         'pitcherMicro': pitcher_rows,
         'pitchCols': [
             'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
-            'izSw', 'izWh',
+            'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes',
             'sumVelo', 'nVelo', 'sumSpin', 'nSpin', 'sumIVB', 'nIVB',
             'sumHB', 'nHB', 'sumRelZ', 'nRelZ', 'sumRelX', 'nRelX',
-            'sumExt', 'nExt', 'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
+            'sumExt', 'nExt', 'sumArmAngle', 'nArmAngle',
+            'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
             'sumVRA', 'nVRA', 'sumHRA', 'nHRA',
             'sumPlateZ', 'nPlateZ',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
@@ -1062,7 +1129,7 @@ def generate_micro_data(all_pitches):
             'contact', 'izSwNonBunt', 'izContact',
             'bip', 'gb', 'ld', 'fb', 'pu',
             'barrels', 'nSpray', 'pull', 'center', 'oppo', 'airPull',
-            'sumXBA', 'nXBA', 'sumXSLG', 'nXSLG',
+            'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip',
         ],
         'hitterMicro': hitter_rows,
         'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
@@ -1074,6 +1141,7 @@ def generate_micro_data(all_pitches):
             'contact', 'izSwNonBunt', 'izContact',
             'bip', 'gb', 'ld', 'fb', 'pu',
             'barrels', 'nSpray', 'pull', 'center', 'oppo', 'airPull',
+            'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip',
         ],
         'hitterPitchMicro': hitter_pitch_rows,
         'hitterPitchBipCols': ['hitterIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
@@ -1595,6 +1663,7 @@ def main():
             'team': team,
             'stands': stands,
             'count': len(pitches),
+            'mlbId': get_mlb_id(hitter, team),
         }
         row.update(compute_hitter_stats(pitches))
         hitter_leaderboard.append(row)
@@ -1637,7 +1706,7 @@ def main():
     # --- Hitter pitch-type leaderboard: flatten into one row per hitter-pitch-type ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
-        'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
+        'medEV', 'ev75', 'maxEV', 'medLA', 'barrelPct',
         'gbPct', 'ldPct', 'fbPct',
         'pullPct', 'oppoPct',
         'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
@@ -1671,6 +1740,7 @@ def main():
                 'pitchType': pt,
                 'count': len(pt_pitches),
                 'seenPct': round(len(pt_pitches) / total_count, 4) if total_count else 0,
+                'mlbId': get_mlb_id(hitter, team),
             }
             row.update(compute_hitter_stats(pt_pitches))
             hitter_pitch_leaderboard.append(row)
@@ -1683,6 +1753,7 @@ def main():
             'pitchType': 'All',
             'count': total_count,
             'seenPct': 1.0,
+            'mlbId': get_mlb_id(hitter, team),
         }
         row_all.update(compute_hitter_stats(pitches))
         hitter_pitch_leaderboard.append(row_all)
@@ -1703,6 +1774,7 @@ def main():
                     'pitchType': cat_name,
                     'count': len(cat_pitches),
                     'seenPct': round(cat_seen, 4),
+                    'mlbId': get_mlb_id(hitter, team),
                 }
                 row_cat.update(compute_hitter_stats(cat_pitches))
                 hitter_pitch_leaderboard.append(row_cat)

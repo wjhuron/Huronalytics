@@ -145,18 +145,18 @@ var Aggregator = {
           pitcherIdx: row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         };
       }
       var c = groups[gk].counts;
-      for (var f = 0; f < 20; f++) {
+      for (var f = 0; f < 24; f++) {
         c[f] += row[ci.n + f];
       }
     }
 
     // Convert to row objects
-    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip'];
-    var INVERT = { bbPct: true, babip: true };
+    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct'];
+    var INVERT = { bbPct: true, babip: true, hrFbPct: true };
     var rows = [];
 
     for (var gk2 in groups) {
@@ -167,6 +167,7 @@ var Aggregator = {
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
       var izSw = c[18], izWh = c[19];
+      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23];
       var ab = pa - bb - hbp - sf - sh - ci_val;
 
       var kPct = pa > 0 ? k / pa : null;
@@ -174,6 +175,8 @@ var Aggregator = {
       var kbbPct = (kPct !== null && bbPct !== null) ? Math.round((kPct - bbPct) * 10000) / 10000 : null;
       var babip_denom = ab - k - hr + sf;
       var babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
+      var fpsPct = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
+      var hrFbPct = fb_cnt > 0 ? nHrBip / fb_cnt : null;
 
       var obj = {
         pitcher: lookups.pitchers[g.pitcherIdx],
@@ -192,6 +195,8 @@ var Aggregator = {
         bbPct: bbPct,
         kbbPct: kbbPct,
         babip: babip,
+        fpsPct: fpsPct,
+        hrFbPct: hrFbPct,
       };
 
       // Apply non-aggregator filters
@@ -240,6 +245,7 @@ var Aggregator = {
       { key: 'relPosZ', sum: 'sumRelZ', cnt: 'nRelZ', round: 1 },
       { key: 'relPosX', sum: 'sumRelX', cnt: 'nRelX', round: 1 },
       { key: 'extension', sum: 'sumExt', cnt: 'nExt', round: 1 },
+      { key: 'armAngle', sum: 'sumArmAngle', cnt: 'nArmAngle', round: 1 },
       { key: 'vaa', sum: 'sumVAA', cnt: 'nVAA', round: 2 },
       { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
       { key: 'vra', sum: 'sumVRA', cnt: 'nVRA', round: 2 },
@@ -247,7 +253,7 @@ var Aggregator = {
       { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
     ];
     var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ'; });
-    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct'];
+    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
     var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA']).concat(PITCH_STAT_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
@@ -270,7 +276,7 @@ var Aggregator = {
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
           metricSums: {}
         };
         METRIC_MAP.forEach(function (m) {
@@ -283,7 +289,7 @@ var Aggregator = {
       }
 
       var g = groups[gk];
-      for (var f = 0; f < 20; f++) {
+      for (var f = 0; f < 22; f++) {
         g.counts[f] += row[ci.n + f];
       }
       METRIC_MAP.forEach(function (m) {
@@ -306,6 +312,7 @@ var Aggregator = {
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
       var izSw = c[18], izWh = c[19];
+      var firstPitches = c[20], firstPitchStrikes = c[21];
       var ab = pa - bb - hbp - sf - sh - ci_val;
       var pitcherKey = g.pitcherIdx + '|' + g.teamIdx;
       var pitcherTotal = pitcherTotals[pitcherKey] || 0;
@@ -315,6 +322,7 @@ var Aggregator = {
       var kbbPct = (kPct !== null && bbPct !== null) ? Math.round((kPct - bbPct) * 10000) / 10000 : null;
       var babip_denom = ab - k - hr + sf;
       var babip_val = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
+      var fpsPct_val = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
 
       var obj = {
         pitcher: lookups.pitchers[g.pitcherIdx],
@@ -335,6 +343,7 @@ var Aggregator = {
         bbPct: bbPct,
         kbbPct: kbbPct,
         babip: babip_val,
+        fpsPct: fpsPct_val,
       };
 
       // Metric averages
@@ -493,8 +502,8 @@ var Aggregator = {
 
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
-      'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
-      'gbPct', 'ldPct', 'fbPct', 'puPct',
+      'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
     ];
@@ -517,6 +526,7 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
+      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -540,6 +550,9 @@ var Aggregator = {
         ? Math.round((izSwingPct - chasePct_val) * 10000) / 10000 : null;
       var contactPct = swings > 0 ? contact / swings : null;
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
+      var hardHitPct = bip > 0 ? hardHit / bip : null;
+      var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
+      var hrFbPct_val = fb > 0 ? nHrBip / fb : null;
 
       // BIP medians
       var bipRecords = bipByHitter[g.hitterIdx] || [];
@@ -555,11 +568,12 @@ var Aggregator = {
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
-      var ev50 = null;
+      // EV75: average of top 25% hardest-hit balls
+      var ev75 = null;
       if (evsPos.length > 0) {
         var sorted = evsPos.slice().sort(function (a, b) { return b - a; });
-        var topHalf = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 2)));
-        ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
+        var topQuarter = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 4)));
+        ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
       }
 
       var obj = {
@@ -583,14 +597,17 @@ var Aggregator = {
         iso: iso_val,
         babip: babip_val,
         medEV: medEV,
-        ev50: ev50,
+        ev75: ev75,
         maxEV: maxEV,
         medLA: medLA,
+        hardHitPct: hardHitPct,
         barrelPct: bip > 0 ? barrels / bip : null,
+        laSweetSpotPct: laSweetSpotPct,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,
         puPct: bip > 0 ? pu / bip : null,
+        hrFbPct: hrFbPct_val,
         pullPct: nSpray > 0 ? pull / nSpray : null,
         middlePct: nSpray > 0 ? center / nSpray : null,
         oppoPct: nSpray > 0 ? oppo / nSpray : null,
@@ -711,11 +728,11 @@ var Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          counts: new Array(32)
+          counts: new Array(36)
         };
-        for (var z = 0; z < 32; z++) perPT[gk].counts[z] = 0;
+        for (var z = 0; z < 36; z++) perPT[gk].counts[z] = 0;
       }
-      for (var f = 0; f < 32; f++) {
+      for (var f = 0; f < 36; f++) {
         perPT[gk].counts[f] += row[6 + f];
       }
     }
@@ -773,13 +790,13 @@ var Aggregator = {
               hitterIdx: entry.hitterIdx,
               teamIdx: entry.teamIdx,
               outputName: og.name,
-              counts: new Array(32),
+              counts: new Array(36),
               bipPtIdxs: []
             };
-            for (var z2 = 0; z2 < 32; z2++) groups[outKey].counts[z2] = 0;
+            for (var z2 = 0; z2 < 36; z2++) groups[outKey].counts[z2] = 0;
           }
           var gg = groups[outKey];
-          for (var f2 = 0; f2 < 32; f2++) {
+          for (var f2 = 0; f2 < 36; f2++) {
             gg.counts[f2] += entry.counts[f2];
           }
           if (gg.bipPtIdxs.indexOf(ptIdx) === -1) gg.bipPtIdxs.push(ptIdx);
@@ -794,12 +811,12 @@ var Aggregator = {
             hitterIdx: entry.hitterIdx,
             teamIdx: entry.teamIdx,
             outputName: ptName,
-            counts: new Array(32),
+            counts: new Array(36),
             bipPtIdxs: [ptIdx]
           };
-          for (var z3 = 0; z3 < 32; z3++) groups[outKey2].counts[z3] = 0;
+          for (var z3 = 0; z3 < 36; z3++) groups[outKey2].counts[z3] = 0;
         }
-        for (var f3 = 0; f3 < 32; f3++) {
+        for (var f3 = 0; f3 < 36; f3++) {
           groups[outKey2].counts[f3] += entry.counts[f3];
         }
       }
@@ -807,8 +824,8 @@ var Aggregator = {
 
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso',
-      'medEV', 'ev50', 'maxEV', 'medLA', 'barrelPct',
-      'gbPct', 'ldPct', 'fbPct',
+      'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
       'pullPct', 'oppoPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
     ];
@@ -835,6 +852,7 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
+      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -848,6 +866,9 @@ var Aggregator = {
       var chasePct_val = oozPitches > 0 ? oozSwings / oozPitches : null;
       var contactPct = swings > 0 ? contact / swings : null;
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
+      var hardHitPct = bip > 0 ? hardHit / bip : null;
+      var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
+      var hrFbPct_val = fb > 0 ? nHrBip / fb : null;
 
       // BIP medians — combine BIP records from all pitch types in this group
       var evsPos = [], allLA = [];
@@ -866,11 +887,12 @@ var Aggregator = {
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
-      var ev50 = null;
+      // EV75: average of top 25% hardest-hit balls
+      var ev75 = null;
       if (evsPos.length > 0) {
         var sorted = evsPos.slice().sort(function (a, b) { return b - a; });
-        var topHalf = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 2)));
-        ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
+        var topQuarter = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 4)));
+        ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
       }
 
       var obj = {
@@ -887,13 +909,16 @@ var Aggregator = {
         slg: slg_val,
         iso: iso_val,
         medEV: medEV,
-        ev50: ev50,
+        ev75: ev75,
         maxEV: maxEV,
         medLA: medLA,
+        hardHitPct: hardHitPct,
         barrelPct: bip > 0 ? barrels / bip : null,
+        laSweetSpotPct: laSweetSpotPct,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,
+        hrFbPct: hrFbPct_val,
         pullPct: nSpray > 0 ? pull / nSpray : null,
         oppoPct: nSpray > 0 ? oppo / nSpray : null,
         swingPct: n_total > 0 ? swings / n_total : null,

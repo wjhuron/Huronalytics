@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ST 2026 Leaderboard</title>
-  <link rel="stylesheet" href="css/styles.css?v=34">
+  <link rel="stylesheet" href="css/styles.css?v=36">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -20,15 +20,48 @@
     </div>
   </header>
 
-  <nav class="tab-bar">
-    <button class="tab active" data-tab="pitcher">Pitcher Leaderboard</button>
-    <button class="tab" data-tab="pitch">Pitch Leaderboard</button>
-    <span class="tab-divider"></span>
-    <button class="tab" data-tab="hitterStats">Hitter Stats</button>
-    <button class="tab" data-tab="hitterBattedBall">Batted Ball Metrics</button>
-    <button class="tab" data-tab="hitterSwingDecisions">Swing Decisions</button>
-    <span class="tab-divider"></span>
-    <button class="tab" data-tab="hitterPitch">Hitter Pitch Type</button>
+  <!-- Home Page -->
+  <section id="home-page" class="home-page" style="display:none;">
+    <div class="home-hero">
+      <h2>Spring Training 2026</h2>
+      <p>Pitch-Level Analytics &amp; Leaderboards</p>
+    </div>
+    <div class="home-cards">
+      <a class="home-card home-card-pitchers" href="#pitchers/stats">
+        <div class="home-card-icon">&#9918;</div>
+        <h3>Pitcher Leaderboards</h3>
+        <p>Stats, pitch metrics, batted ball, and swing decisions</p>
+        <span class="home-card-count" id="home-pitcher-count"></span>
+      </a>
+      <a class="home-card home-card-hitters" href="#hitters/stats">
+        <div class="home-card-icon">&#9776;</div>
+        <h3>Hitter Leaderboards</h3>
+        <p>Stats, batted ball, swing decisions, and bat tracking</p>
+        <span class="home-card-count" id="home-hitter-count"></span>
+      </a>
+    </div>
+  </section>
+
+  <nav class="tab-bar" id="main-nav">
+    <div class="nav-sections">
+      <button class="section-tab" data-section="home" title="Home">&#8962;</button>
+      <button class="section-tab active" data-section="pitchers">Pitchers</button>
+      <button class="section-tab" data-section="hitters">Hitters</button>
+    </div>
+    <div class="nav-subtabs" id="pitcher-subtabs">
+      <button class="tab active" data-tab="pitcherStats">Stats</button>
+      <button class="tab" data-tab="pitchMetrics">Pitch Metrics</button>
+      <button class="tab" data-tab="pitcherBattedBall">Batted Ball</button>
+      <button class="tab" data-tab="pitcherSwingDecisions">Swing Decisions</button>
+    </div>
+    <div class="nav-subtabs" id="hitter-subtabs" style="display:none;">
+      <button class="tab" data-tab="hitterStats">Stats</button>
+      <button class="tab" data-tab="hitterBattedBall">Batted Ball</button>
+      <button class="tab" data-tab="hitterSwingDecisions">Swing Decisions</button>
+      <button class="tab" data-tab="hitterBatTracking">Bat Tracking</button>
+      <span class="tab-divider"></span>
+      <button class="tab" data-tab="hitterPitch">Pitch Type</button>
+    </div>
   </nav>
 
   <section class="controls">
@@ -109,6 +142,7 @@
     </div>
   </section>
 
+  <div id="tab-banner" class="tab-banner" style="display:none;"></div>
   <section class="table-wrapper">
     <div class="table-container" id="table-container">
       <table id="leaderboard-table">
@@ -215,13 +249,13 @@
     <p>Data: Spring Training 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=34"></script>
-  <script src="js/utils.js?v=34"></script>
-  <script src="js/aggregator.js?v=34"></script>
-  <script src="js/data.js?v=34"></script>
-  <script src="js/leaderboard.js?v=34"></script>
-  <script src="js/scatter.js?v=34"></script>
-  <script src="js/player-page.js?v=34"></script>
-  <script src="js/app.js?v=34"></script>
+  <script src="data/data_embedded.js?v=36"></script>
+  <script src="js/utils.js?v=36"></script>
+  <script src="js/aggregator.js?v=36"></script>
+  <script src="js/data.js?v=36"></script>
+  <script src="js/leaderboard.js?v=36"></script>
+  <script src="js/scatter.js?v=36"></script>
+  <script src="js/player-page.js?v=36"></script>
+  <script src="js/app.js?v=36"></script>
 </body>
 </html>

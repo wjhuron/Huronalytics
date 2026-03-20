@@ -58,6 +58,8 @@ var DataStore = {
     else if (tab === 'hitterPitch') source = this.hitterPitchData;
     if (!source) return [];
 
+    var isHitter = (tab === 'hitter' || tab === 'hitterPitch');
+    var hasPitchType = (tab === 'pitch' || tab === 'hitterPitch');
     var selectedPitchTypes = filters.pitchTypes; // array or 'all'
 
     return source.filter(function (row) {
@@ -65,14 +67,14 @@ var DataStore = {
 
       // Throws filter applies to pitchers; stands filter applies to hitters (same dropdown)
       if (filters.throws !== 'all') {
-        if (tab === 'hitter' || tab === 'hitterPitch') {
+        if (isHitter) {
           if (row.stands !== filters.throws) return false;
         } else {
           if (row.throws !== filters.throws) return false;
         }
       }
 
-      if ((tab === 'pitch' || tab === 'hitterPitch') && selectedPitchTypes !== 'all') {
+      if (hasPitchType && selectedPitchTypes !== 'all') {
         if (selectedPitchTypes.indexOf(row.pitchType) === -1) return false;
       }
       // Min count: use PA for hitters, pitch count for pitchers and hitterPitch
