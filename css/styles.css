@@ -1258,14 +1258,20 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   border-bottom: none;
 }
 
+.dark-mode .player-pitch-table {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+}
+
 .dark-mode .player-pitch-stats-table th {
-  color: #aaa;
-  border-bottom-color: rgba(255,255,255,0.15);
+  color: #555;
+  border-bottom-color: #ddd;
 }
 
 .dark-mode .player-pitch-stats-table td {
-  color: #e0e0e0;
-  border-bottom-color: rgba(255,255,255,0.08);
+  color: #333;
+  border-bottom-color: #eee;
 }
 
 /* --- Responsive --- */
