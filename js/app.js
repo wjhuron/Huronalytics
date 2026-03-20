@@ -35,6 +35,19 @@
       setupRangeFilters();
       setupDarkMode();
       applyURLState();
+      // Player page back button
+      document.getElementById('player-back').addEventListener('click', function () {
+        PlayerPage.close();
+      });
+      // Handle browser back/forward for player page
+      window.addEventListener('hashchange', function () {
+        var params = Utils.readHash();
+        if (params.player && !PlayerPage.isOpen) {
+          PlayerPage.open(params.player);
+        } else if (!params.player && PlayerPage.isOpen) {
+          PlayerPage.close();
+        }
+      });
       // Set initial filter visibility based on default tab
       document.getElementById('pitch-type-filter-group').style.display =
         (currentTab === 'pitch' || currentTab === 'hitterPitch') ? '' : 'none';
@@ -1065,6 +1078,13 @@
   function applyURLState() {
     var params = Utils.readHash();
     if (!params || Object.keys(params).length === 0) return;
+
+    // Player page route
+    if (params.player) {
+      // Defer to after data loads
+      setTimeout(function () { PlayerPage.open(params.player); }, 0);
+      return;
+    }
 
     if (params.tab) {
       currentTab = params.tab;

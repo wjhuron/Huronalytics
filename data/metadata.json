@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-20 15:05",
+  "generatedAt": "2026-03-20 15:01",
   "totalPitches": 138609,
   "totalPitchers": 1699,
   "totalHitters": 1854,
@@ -334,7 +334,7 @@
     "pullPct": 0.4346,
     "middlePct": 0.2907,
     "oppoPct": 0.2747,
-    "airPullPct": 0.1627,
+    "airPullPct": 0.1767,
     "swingPct": 0.4725,
     "izSwingPct": 0.6694,
     "chasePct": 0.278,

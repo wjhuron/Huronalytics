@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ST 2026 Leaderboard</title>
-  <link rel="stylesheet" href="css/styles.css?v=27">
+  <link rel="stylesheet" href="css/styles.css?v=29">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -149,6 +149,52 @@
   </aside>
   <div id="panel-overlay" class="panel-overlay"></div>
 
+  <!-- Player Page -->
+  <section id="player-page" class="player-page" style="display:none;">
+    <div class="player-page-nav">
+      <button id="player-back" class="toolbar-btn">&larr; Back to Leaderboard</button>
+    </div>
+    <div class="player-page-content">
+      <!-- Column 1: Player Info -->
+      <div class="player-col player-col-info">
+        <div class="player-card">
+          <img id="player-headshot" class="player-headshot" src="" alt="">
+          <h2 id="player-name" class="player-name"></h2>
+          <p id="player-position" class="player-position"></p>
+          <p id="player-age" class="player-age"></p>
+        </div>
+        <div class="player-usage-section">
+          <h3>Pitch Usage</h3>
+          <div class="usage-split-container">
+            <div class="usage-split">
+              <h4>vs LHH</h4>
+              <div id="player-usage-lhh" class="usage-bars"></div>
+            </div>
+            <div class="usage-split">
+              <h4>vs RHH</h4>
+              <div id="player-usage-rhh" class="usage-bars"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Percentile Rankings -->
+      <div class="player-col player-col-pctls">
+        <h3 class="section-title">Percentile Rankings</h3>
+        <div id="player-percentiles" class="percentile-bars-container"></div>
+      </div>
+
+      <!-- Column 3: Movement Profile -->
+      <div class="player-col player-col-movement">
+        <h3 class="section-title">Movement Profile</h3>
+        <div class="player-chart-container">
+          <canvas id="player-pitch-chart"></canvas>
+        </div>
+        <div id="player-pitch-usage-table" class="player-pitch-table"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- Compare Modal -->
   <div id="compare-modal" class="compare-modal" style="display:none;">
     <div class="compare-modal-content">
@@ -169,12 +215,13 @@
     <p>Data: Spring Training 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=27"></script>
+  <script src="data/data_embedded.js?v=29"></script>
   <script src="js/utils.js?v=29"></script>
-  <script src="js/aggregator.js?v=27"></script>
-  <script src="js/data.js?v=27"></script>
-  <script src="js/leaderboard.js?v=27"></script>
-  <script src="js/scatter.js?v=27"></script>
-  <script src="js/app.js?v=28"></script>
+  <script src="js/aggregator.js?v=29"></script>
+  <script src="js/data.js?v=29"></script>
+  <script src="js/leaderboard.js?v=29"></script>
+  <script src="js/scatter.js?v=29"></script>
+  <script src="js/player-page.js?v=29"></script>
+  <script src="js/app.js?v=29"></script>
 </body>
 </html>

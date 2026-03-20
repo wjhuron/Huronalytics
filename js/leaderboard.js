@@ -523,6 +523,30 @@ var Leaderboard = {
         return;
       }
 
+      // Pitcher name as clickable link to player page
+      if (col.key === 'pitcher' && !isAvgRow && row.mlbId) {
+        var link = document.createElement('a');
+        link.href = '#player=' + row.mlbId;
+        link.className = 'pitcher-name-link';
+        link.textContent = col.format(row[col.key]);
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          PlayerPage.open(row.mlbId);
+        });
+        td.appendChild(link);
+        if (col.align) td.classList.add('align-' + col.align);
+        if (col.sticky) {
+          td.classList.add('sticky-col');
+          if (col.stickyIdx === 1 && self._stickyLeftOffsets[col.key]) {
+            td.style.left = self._stickyLeftOffsets[col.key] + 'px';
+          }
+        }
+        if (col.cls) td.classList.add(col.cls);
+        tr.appendChild(td);
+        return;
+      }
+
       // Regular cell
       var val = row[col.key];
       td.textContent = col.format(val);
