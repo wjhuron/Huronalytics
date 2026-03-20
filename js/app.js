@@ -55,7 +55,9 @@
         (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
       // Set initial vs-hand labels
       updateVsHandLabels();
-      refresh();
+      if (!PlayerPage.isOpen) {
+        refresh();
+      }
     });
   }
 
@@ -1056,6 +1058,8 @@
 
   // ---- URL State ----
   function saveURLState() {
+    // Don't overwrite player page URL
+    if (PlayerPage.isOpen) return;
     var params = {
       tab: currentTab,
       team: teamSelect.value,
@@ -1081,8 +1085,7 @@
 
     // Player page route
     if (params.player) {
-      // Defer to after data loads
-      setTimeout(function () { PlayerPage.open(params.player); }, 0);
+      PlayerPage.open(params.player);
       return;
     }
 
