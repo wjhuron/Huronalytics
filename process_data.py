@@ -195,6 +195,7 @@ def compute_stats(pitches):
     total = len(pitches)
     if total == 0:
         empty = {k: None for k in STAT_KEYS}
+        empty['nSwings'] = 0
         empty['nBip'] = 0
         empty['pa'] = 0
         return empty
@@ -249,6 +250,7 @@ def compute_stats(pitches):
         'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
         'chasePct': ooz_swung / len(ooz) if ooz else None,
         'gbPct': gb / len(bip) if bip else None,
+        'nSwings': swings,
         'nBip': len(bip),
         'kPct': k_pct,
         'bbPct': bb_pct,
