@@ -39,13 +39,25 @@ var COLUMNS = {
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
-    { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'pa',          label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    // Stats
+    // Counting stats (FanGraphs — not yet populated)
+    { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'counting' },
+    { key: 'gs',          label: 'GS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'ip',          label: 'IP',       format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'pa',          label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    // Rate stats
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
+    { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
+    // Advanced pitching (FanGraphs — not yet populated)
+    { key: 'era',         label: 'ERA',      format: Utils.formatDecimal(2), sortType: 'numeric', sectionStart: true, group: 'advanced' },
+    { key: 'xERA',        label: 'xERA',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
+    { key: 'eraMinusXera', label: 'ERA-xERA', format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
+    { key: 'fip',         label: 'FIP',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
+    { key: 'xFIP',        label: 'xFIP',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
+    { key: 'siera',       label: 'SIERA',    format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
   ],
   pitcherBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
