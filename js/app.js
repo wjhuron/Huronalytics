@@ -27,9 +27,9 @@
   // Tab → hash route mapping
   var TAB_ROUTE = {
     pitcherStats: 'pitchers/stats', pitchMetrics: 'pitchers/pitch-metrics',
-    pitcherBattedBall: 'pitchers/batted-ball', pitcherSwingDecisions: 'pitchers/swing-decisions',
+    pitcherBattedBall: 'pitchers/batted-ball', pitcherSwingDecisions: 'pitchers/plate-discipline',
     hitterStats: 'hitters/stats', hitterBattedBall: 'hitters/batted-ball',
-    hitterSwingDecisions: 'hitters/swing-decisions', hitterBatTracking: 'hitters/bat-tracking',
+    hitterSwingDecisions: 'hitters/plate-discipline', hitterBatTracking: 'hitters/bat-tracking',
     hitterPitch: 'hitters/pitch-type'
   };
 
@@ -62,6 +62,7 @@
 
   // ---- DOM refs ----
   var teamSelect, throwsSelect, vsHandSelect, minCountInput, minSwingsInput, searchInput;
+  var minIpInput, minTbfInput, minBipInput, minPitcherSwingsInput;
   var dateStartInput, dateEndInput;
   var sidePanel, panelOverlay, panelClose;
 
@@ -150,6 +151,9 @@
     // New route format: "pitchers/stats?team=NYY&throws=R"
     var parts = hash.split('?');
     var routePart = parts[0];
+    // Backward compat: old swing-decisions → plate-discipline
+    if (routePart === 'pitchers/swing-decisions') routePart = 'pitchers/plate-discipline';
+    if (routePart === 'hitters/swing-decisions') routePart = 'hitters/plate-discipline';
     var tab = ROUTE_TAB[routePart];
     if (tab) {
       // Parse query params and apply filters before navigating
@@ -246,6 +250,20 @@
     document.getElementById('min-swings-filter-group').style.display =
       (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
 
+    // Show/hide pitcher-specific filters
+    document.getElementById('min-ip-filter-group').style.display =
+      currentTab === 'pitcherStats' ? '' : 'none';
+    document.getElementById('min-tbf-filter-group').style.display =
+      currentTab === 'pitcherStats' ? '' : 'none';
+    document.getElementById('min-bip-filter-group').style.display =
+      currentTab === 'pitcherBattedBall' ? '' : 'none';
+    document.getElementById('min-pitcher-swings-filter-group').style.display =
+      currentTab === 'pitcherSwingDecisions' ? '' : 'none';
+
+    // Hide Min Pitches on pitcherStats (uses Min IP / Min TBF instead)
+    document.getElementById('min-count').parentElement.style.display =
+      currentTab === 'pitcherStats' ? 'none' : '';
+
     // Rebuild pitch chips
     selectedPitchTypes = [];
     if (currentTab === 'hitterPitch') {
@@ -295,6 +313,10 @@
     vsHandSelect = document.getElementById('vs-hand-filter');
     minCountInput = document.getElementById('min-count');
     minSwingsInput = document.getElementById('min-swings');
+    minIpInput = document.getElementById('min-ip');
+    minTbfInput = document.getElementById('min-tbf');
+    minBipInput = document.getElementById('min-bip');
+    minPitcherSwingsInput = document.getElementById('min-pitcher-swings');
     searchInput = document.getElementById('search-input');
     dateStartInput = document.getElementById('date-start');
     dateEndInput = document.getElementById('date-end');
@@ -349,6 +371,10 @@
     vsHandSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     minCountInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    minIpInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    minTbfInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    minBipInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    minPitcherSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
 
@@ -639,6 +665,10 @@
       vsHand: vsHandSelect.value,
       minCount: parseInt(minCountInput.value) || 1,
       minSwings: parseInt(minSwingsInput.value) || 1,
+      minIp: parseFloat(minIpInput.value) || 0,
+      minTbf: parseInt(minTbfInput.value) || 1,
+      minBip: parseInt(minBipInput.value) || 1,
+      minPitcherSwings: parseInt(minPitcherSwingsInput.value) || 1,
       search: searchInput.value.trim(),
       dateStart: dateStartInput.value || '',
       dateEnd: dateEndInput.value || '',

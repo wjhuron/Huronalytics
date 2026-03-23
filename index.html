@@ -52,12 +52,12 @@
       <button class="tab active" data-tab="pitcherStats">Stats</button>
       <button class="tab" data-tab="pitchMetrics">Pitch Metrics</button>
       <button class="tab" data-tab="pitcherBattedBall">Batted Ball</button>
-      <button class="tab" data-tab="pitcherSwingDecisions">Swing Decisions</button>
+      <button class="tab" data-tab="pitcherSwingDecisions">Plate Discipline</button>
     </div>
     <div class="nav-subtabs" id="hitter-subtabs" style="display:none;">
       <button class="tab" data-tab="hitterStats">Stats</button>
       <button class="tab" data-tab="hitterBattedBall">Batted Ball</button>
-      <button class="tab" data-tab="hitterSwingDecisions">Swing Decisions</button>
+      <button class="tab" data-tab="hitterSwingDecisions">Plate Discipline</button>
       <button class="tab" data-tab="hitterBatTracking">Bat Tracking</button>
       <span class="tab-divider"></span>
       <button class="tab" data-tab="hitterPitch">Pitch Type</button>
@@ -104,6 +104,26 @@
     <div class="filter-group" id="min-swings-filter-group" style="display:none;">
       <label for="min-swings">Min Swings</label>
       <input type="number" id="min-swings" value="1" min="1" max="500" step="1">
+    </div>
+
+    <div class="filter-group" id="min-ip-filter-group" style="display:none;">
+      <label for="min-ip">Min IP</label>
+      <input type="number" id="min-ip" value="0" min="0" max="300" step="0.1">
+    </div>
+
+    <div class="filter-group" id="min-tbf-filter-group" style="display:none;">
+      <label for="min-tbf">Min TBF</label>
+      <input type="number" id="min-tbf" value="1" min="1" max="1000" step="1">
+    </div>
+
+    <div class="filter-group" id="min-bip-filter-group" style="display:none;">
+      <label for="min-bip">Min BIP</label>
+      <input type="number" id="min-bip" value="1" min="1" max="500" step="1">
+    </div>
+
+    <div class="filter-group" id="min-pitcher-swings-filter-group" style="display:none;">
+      <label for="min-pitcher-swings">Min Swings</label>
+      <input type="number" id="min-pitcher-swings" value="1" min="1" max="500" step="1">
     </div>
 
     <div class="filter-group" id="date-filter-group">

@@ -184,6 +184,7 @@ var Aggregator = {
         throws: g.throws,
         count: n,
         pa: pa,
+        nSwings: sw,
         nBip: bip,
         izPct: n > 0 ? iz / n : null,
         swStrPct: sw > 0 ? wh / sw : null,
@@ -203,6 +204,10 @@ var Aggregator = {
       if (filters.team !== 'all' && obj.team !== filters.team) continue;
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
       if (obj.count < (filters.minCount || 1)) continue;
+      if (filters.minTbf && (obj.pa || 0) < filters.minTbf) continue;
+      if (filters.minIp && (obj.ip || 0) < filters.minIp) continue;
+      if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
+      if (filters.minPitcherSwings && (obj.nSwings || 0) < filters.minPitcherSwings) continue;
       if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
