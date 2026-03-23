@@ -596,19 +596,13 @@ header {
 }
 
 table {
-  width: 100%;
+  width: auto;
   border-collapse: separate;
   border-spacing: 0;
   white-space: nowrap;
   font-size: 13px;
 }
 
-/* All columns fit to content, don't stretch */
-thead th,
-tbody td {
-  width: 1%;
-  white-space: nowrap;
-}
 
 /* Table Header */
 thead th {
