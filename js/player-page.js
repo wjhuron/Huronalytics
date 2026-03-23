@@ -88,8 +88,9 @@ var PlayerPage = {
     this._showPitcherLayout();
     this._renderIdentity(data);
     this._renderUsage(data);
-    this._renderPercentiles(data, this.PITCHING_STATS);
+    document.getElementById('player-percentiles').innerHTML = '';
     this._renderPitchRunValues(data);
+    this._renderPercentiles(data, this.PITCHING_STATS, true);
     this._renderMovementChart(data);
     this._renderPitchTable(data);
   },
@@ -346,9 +347,9 @@ var PlayerPage = {
 
   // --- Render: Percentile Bars ---
 
-  _renderPercentiles: function (data, statsDef) {
+  _renderPercentiles: function (data, statsDef, append) {
     var container = document.getElementById('player-percentiles');
-    container.innerHTML = '';
+    if (!append) container.innerHTML = '';
 
     var isDark = document.body.classList.contains('dark-mode');
 
@@ -415,36 +416,36 @@ var PlayerPage = {
     var pitchRows = this._getPitchRows(data.pitcher, data.team);
     if (pitchRows.length === 0) return;
 
-    // Add divider
-    var divider = document.createElement('div');
-    divider.style.cssText = 'border-top: 1px solid var(--border, #ddd); margin: 12px 0 8px 0;';
-    container.appendChild(divider);
-
     // Section label
     var sectionLabel = document.createElement('div');
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
     sectionLabel.textContent = 'Pitch Run Value';
     container.appendChild(sectionLabel);
 
-    // Render a percentile bar for each pitch type
-    for (var i = 0; i < pitchRows.length; i++) {
-      var pitch = pitchRows[i];
-      // runValue = negated RunExpP (lower RV = better for pitcher = shows as positive)
-      var rawRV = pitch.runValue;
-      var displayVal = (rawRV != null) ? -rawRV : null;
-      var pctl = pitch.runValue_pctl;  // will be null until data flows in
+    // Compute overall RV (sum of all pitch run values)
+    var overallRV = null;
+    var overallPctl = null;  // will need its own percentile eventually
+    var hasAnyRV = false;
+    for (var j = 0; j < pitchRows.length; j++) {
+      if (pitchRows[j].runValue != null) {
+        overallRV = (overallRV || 0) + pitchRows[j].runValue;
+        hasAnyRV = true;
+      }
+    }
 
+    // Helper to build a single percentile row
+    function buildPctlRow(labelContent, displayVal, pctl) {
       var row = document.createElement('div');
       row.className = 'pctl-row';
 
-      // Label: pitch type badge
+      // Label
       var labelEl = document.createElement('span');
       labelEl.className = 'pctl-label';
-      var badge = document.createElement('span');
-      badge.className = 'pitch-badge-sm';
-      badge.style.backgroundColor = Utils.getPitchColor(pitch.pitchType);
-      badge.textContent = pitch.pitchType;
-      labelEl.appendChild(badge);
+      if (typeof labelContent === 'string') {
+        labelEl.textContent = labelContent;
+      } else {
+        labelEl.appendChild(labelContent);
+      }
 
       // Value
       var valEl = document.createElement('span');
@@ -454,7 +455,6 @@ var PlayerPage = {
       // Percentile circle
       var circleWrap = document.createElement('div');
       circleWrap.className = 'pctl-circle-wrap';
-
       if (pctl != null) {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
@@ -482,8 +482,32 @@ var PlayerPage = {
       row.appendChild(barTrack);
       row.appendChild(circleWrap);
       row.appendChild(valEl);
-      container.appendChild(row);
+      return row;
     }
+
+    // Overall row (sum of all pitch RVs, negated for display)
+    var overallDisplay = hasAnyRV ? -overallRV : null;
+    container.appendChild(buildPctlRow('Overall', overallDisplay, overallPctl));
+
+    // Per-pitch-type rows
+    for (var i = 0; i < pitchRows.length; i++) {
+      var pitch = pitchRows[i];
+      var rawRV = pitch.runValue;
+      var displayVal = (rawRV != null) ? -rawRV : null;
+      var pctl = pitch.runValue_pctl;
+
+      var badge = document.createElement('span');
+      badge.className = 'pitch-badge-sm';
+      badge.style.backgroundColor = Utils.getPitchColor(pitch.pitchType);
+      badge.textContent = pitch.pitchType;
+
+      container.appendChild(buildPctlRow(badge, displayVal, pctl));
+    }
+
+    // Divider before the stat percentiles that follow
+    var divider = document.createElement('div');
+    divider.style.cssText = 'border-top: 1px solid var(--border, #ddd); margin: 12px 0 8px 0;';
+    container.appendChild(divider);
   },
 
   // --- Render: Movement Chart ---
