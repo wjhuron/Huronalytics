@@ -38,6 +38,7 @@ var PlayerPage = {
     { key: 'usagePct', label: 'Usage', format: function(v) { return Utils.formatPct(v); } },
     { key: 'velocity', label: 'MPH',   format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'spinRate', label: 'Spin',   format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'breakTilt', label: 'Tilt',  format: function(v) { return v || '—'; } },
     { key: 'indVertBrk', label: 'IVB',  format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
@@ -88,6 +89,7 @@ var PlayerPage = {
     this._renderIdentity(data);
     this._renderUsage(data);
     this._renderPercentiles(data, this.PITCHING_STATS);
+    this._renderPitchRunValues(data);
     this._renderMovementChart(data);
     this._renderPitchTable(data);
   },
@@ -181,17 +183,17 @@ var PlayerPage = {
   // --- Render: Identity ---
 
   _renderIdentity: function (data) {
-    // Headshot
+    // Headshot — request larger image for zoomed-out display
     var img = document.getElementById('player-headshot');
     if (data.mlbId) {
-      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
+      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
       img.alt = data.pitcher;
     } else {
       img.src = '';
       img.alt = '';
     }
     img.onerror = function () {
-      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect fill="%23333" width="120" height="120"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
+      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect fill="%23333" width="160" height="160"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
     };
 
     // Name
@@ -199,10 +201,24 @@ var PlayerPage = {
     var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : data.pitcher;
     document.getElementById('player-name').textContent = displayName;
 
-    // Position (RHP/LHP) | Team
+    // Position (RHP/LHP) | Team | Age (fetched from MLB API)
     var pos = (data.throws === 'L' ? 'LHP' : 'RHP');
-    document.getElementById('player-position').textContent = pos + ' | ' + (data.team || '');
-    document.getElementById('player-age').textContent = '';
+    var posEl = document.getElementById('player-position');
+    var ageEl = document.getElementById('player-age');
+    posEl.textContent = pos + ' | ' + (data.team || '');
+    ageEl.textContent = '';
+
+    if (data.mlbId) {
+      fetch('https://statsapi.mlb.com/api/v1/people/' + data.mlbId)
+        .then(function (res) { return res.json(); })
+        .then(function (json) {
+          var person = json.people && json.people[0];
+          if (person && person.currentAge != null) {
+            posEl.textContent = pos + ' | ' + (data.team || '') + ' | Age: ' + person.currentAge;
+          }
+        })
+        .catch(function () { /* silently ignore */ });
+    }
   },
 
   _renderHitterIdentity: function (data) {
@@ -353,6 +369,87 @@ var PlayerPage = {
       var valEl = document.createElement('span');
       valEl.className = 'pctl-value';
       valEl.textContent = stat.format(val);
+
+      // Percentile circle
+      var circleWrap = document.createElement('div');
+      circleWrap.className = 'pctl-circle-wrap';
+
+      if (pctl != null) {
+        var circle = document.createElement('div');
+        circle.className = 'pctl-circle';
+        var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+        var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+        circle.style.backgroundColor = bgColor;
+        circle.style.color = textColor;
+        circle.textContent = Math.round(pctl);
+        circleWrap.appendChild(circle);
+      }
+
+      // Bar
+      var barTrack = document.createElement('div');
+      barTrack.className = 'pctl-bar-track';
+      var barFill = document.createElement('div');
+      barFill.className = 'pctl-bar-fill';
+      if (pctl != null) {
+        barFill.style.width = Math.round(pctl) + '%';
+        var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+        barFill.style.backgroundColor = barColor;
+      }
+      barTrack.appendChild(barFill);
+
+      row.appendChild(labelEl);
+      row.appendChild(barTrack);
+      row.appendChild(circleWrap);
+      row.appendChild(valEl);
+      container.appendChild(row);
+    }
+  },
+
+  // --- Render: Pitch Run Values (per-pitch-type percentile bars) ---
+
+  _renderPitchRunValues: function (data) {
+    var container = document.getElementById('player-percentiles');
+    var isDark = document.body.classList.contains('dark-mode');
+
+    // Get this pitcher's pitch rows
+    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    if (pitchRows.length === 0) return;
+
+    // Add divider
+    var divider = document.createElement('div');
+    divider.style.cssText = 'border-top: 1px solid var(--border, #ddd); margin: 12px 0 8px 0;';
+    container.appendChild(divider);
+
+    // Section label
+    var sectionLabel = document.createElement('div');
+    sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
+    sectionLabel.textContent = 'Pitch Run Value';
+    container.appendChild(sectionLabel);
+
+    // Render a percentile bar for each pitch type
+    for (var i = 0; i < pitchRows.length; i++) {
+      var pitch = pitchRows[i];
+      // runValue = negated RunExpP (lower RV = better for pitcher = shows as positive)
+      var rawRV = pitch.runValue;
+      var displayVal = (rawRV != null) ? -rawRV : null;
+      var pctl = pitch.runValue_pctl;  // will be null until data flows in
+
+      var row = document.createElement('div');
+      row.className = 'pctl-row';
+
+      // Label: pitch type badge
+      var labelEl = document.createElement('span');
+      labelEl.className = 'pctl-label';
+      var badge = document.createElement('span');
+      badge.className = 'pitch-badge-sm';
+      badge.style.backgroundColor = Utils.getPitchColor(pitch.pitchType);
+      badge.textContent = pitch.pitchType;
+      labelEl.appendChild(badge);
+
+      // Value
+      var valEl = document.createElement('span');
+      valEl.className = 'pctl-value';
+      valEl.textContent = (displayVal != null) ? displayVal.toFixed(1) : '—';
 
       // Percentile circle
       var circleWrap = document.createElement('div');

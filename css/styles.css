@@ -1156,10 +1156,11 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 }
 
 .player-headshot {
-  width: 120px;
-  height: 120px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
   object-fit: cover;
+  object-position: top;
   margin-bottom: 12px;
   border: 3px solid var(--border, #ddd);
   background: #333;
@@ -1270,7 +1271,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 
 .pctl-row {
   display: grid;
-  grid-template-columns: 110px 1fr 44px 60px;
+  grid-template-columns: 110px 1fr 44px 80px;
   align-items: center;
   gap: 8px;
   height: 32px;
@@ -1323,6 +1324,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   font-weight: 600;
   text-align: right;
   color: var(--text, #333);
+  white-space: nowrap;
 }
 
 /* --- Column 3: Movement Profile --- */
@@ -1339,7 +1341,8 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  background: var(--bg-card);
+  background: #fff !important;
+  color: #1a1a2e !important;
 }
 
 .player-pitch-stats-table thead th {
@@ -1347,35 +1350,35 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   font-weight: 700;
   text-transform: uppercase;
   padding: 6px 8px;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid #ddd;
   border-right: none;
   text-align: center;
-  color: #888;
-  background: #fff;
+  color: #666 !important;
+  background: #fff !important;
   cursor: default;
   position: static;
   letter-spacing: 0;
 }
 
 .player-pitch-stats-table thead th:hover {
-  background: var(--bg-card);
-  color: var(--text-muted);
+  background: #fff !important;
+  color: #666 !important;
 }
 
 .player-pitch-stats-table tbody tr,
 .player-pitch-stats-table tbody tr:nth-child(even) {
-  background: var(--bg-card);
+  background: #fff !important;
 }
 
 .player-pitch-stats-table tbody tr:hover {
-  background: var(--row-hover);
+  background: #f5f5f5 !important;
 }
 
 .player-pitch-stats-table td {
   padding: 5px 8px;
   text-align: center;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-primary);
+  border-bottom: 1px solid #ddd;
+  color: #1a1a2e !important;
 }
 
 .player-pitch-stats-table tbody tr:last-child td {
@@ -1401,7 +1404,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
     padding: 12px;
   }
   .pctl-row {
-    grid-template-columns: 90px 1fr 36px 50px;
+    grid-template-columns: 90px 1fr 36px 70px;
   }
 }
 

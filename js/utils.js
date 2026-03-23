@@ -47,20 +47,22 @@ var Utils = {
     return this.PITCH_COLORS[pt] || '#999';
   },
 
-  // Percentile color: blue (0) -> white (50) -> red (100)
+  // Percentile color: vivid blue (0) -> near-white (50) -> vivid red (100)
   percentileColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      r = Math.round(60 + t * 195);
-      g = Math.round(100 + t * 155);
-      b = Math.round(240 + t * 15);
+      // 0th = rgb(20,60,220), 50th = rgb(235,235,240)
+      r = Math.round(20 + t * 215);
+      g = Math.round(60 + t * 175);
+      b = Math.round(220 + t * 20);
     } else {
       var t = (pctl - 50) / 50;
-      r = 255;
-      g = Math.round(255 - t * 180);
-      b = Math.round(255 - t * 200);
+      // 50th = rgb(235,235,240), 100th = rgb(220,30,30)
+      r = Math.round(235 - t * 15);
+      g = Math.round(235 - t * 205);
+      b = Math.round(240 - t * 210);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
@@ -68,21 +70,21 @@ var Utils = {
   // Text color for percentile backgrounds
   percentileTextColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
-    if (pctl < 15 || pctl > 85) return '#fff';
+    if (pctl < 20 || pctl > 80) return '#fff';
     return '#1a1a2e';
   },
 
-  // Dark mode: semi-transparent overlays so text stays readable
+  // Dark mode: semi-transparent overlays, more vivid
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     if (pctl <= 50) {
       // Blue tint, stronger at low percentiles
-      var opacity = ((50 - pctl) / 50 * 0.45).toFixed(2);
-      return 'rgba(60, 120, 255, ' + opacity + ')';
+      var opacity = ((50 - pctl) / 50 * 0.65).toFixed(2);
+      return 'rgba(50, 110, 255, ' + opacity + ')';
     } else {
       // Red tint, stronger at high percentiles
-      var opacity = ((pctl - 50) / 50 * 0.45).toFixed(2);
-      return 'rgba(255, 70, 50, ' + opacity + ')';
+      var opacity = ((pctl - 50) / 50 * 0.65).toFixed(2);
+      return 'rgba(255, 50, 40, ' + opacity + ')';
     }
   },
 
