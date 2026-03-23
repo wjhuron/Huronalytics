@@ -614,7 +614,7 @@ tbody td {
 thead th {
   background: var(--bg-th);
   color: var(--text-th);
-  padding: 10px 14px;
+  padding: 6px 6px;
   text-align: center;
   cursor: pointer;
   user-select: none;
@@ -638,7 +638,7 @@ thead th.sorted { color: white; background: var(--bg-th-hover); }
 #table-group-header th {
   background: var(--bg-th);
   color: var(--text-muted);
-  padding: 4px 14px;
+  padding: 3px 6px;
   text-align: center;
   font-size: 10px;
   font-weight: 700;
@@ -690,7 +690,7 @@ tbody tr:nth-child(even) { background: var(--row-alt); }
 tbody tr:hover { background: var(--row-hover); }
 
 tbody td {
-  padding: 7px 14px;
+  padding: 5px 6px;
   text-align: center;
   border-bottom: 1px solid var(--border-light);
   font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
@@ -708,7 +708,7 @@ tbody td.align-center {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-tbody td.col-pitcher { font-weight: 600; font-size: 13px; }
+tbody td.col-pitcher { font-weight: 600; font-size: 13px; padding-left: 10px; padding-right: 10px; }
 tbody td.col-null { color: var(--text-muted); }
 tbody td.col-rank {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
