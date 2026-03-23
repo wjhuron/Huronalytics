@@ -603,6 +603,12 @@ table {
   font-size: 13px;
 }
 
+/* Name/pitcher column: fit to content, don't stretch */
+.col-pitcher {
+  width: 1%;
+  white-space: nowrap;
+}
+
 /* Table Header */
 thead th {
   background: var(--bg-th);
