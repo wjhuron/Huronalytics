@@ -34,7 +34,7 @@ PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbP
 STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA'] + PITCH_STAT_KEYS
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip'}
@@ -1475,6 +1475,59 @@ def main():
                 row['nVAA'] = None
         else:
             row['nVAA'] = None
+
+    # --- Fit HAA ~ PlateX regression for normalized HAA ---
+    # Same approach as nVAA but for horizontal approach angle vs horizontal location
+    haa_plateX_pairs = []
+    for p in all_pitches:
+        haa_val = safe_float(p.get('HAA'))
+        px_val = safe_float(p.get('PlateX'))
+        if haa_val is not None and px_val is not None:
+            haa_plateX_pairs.append((px_val, haa_val))
+
+    if len(haa_plateX_pairs) > 10:
+        n_reg_h = len(haa_plateX_pairs)
+        sum_x_h = sum(pair[0] for pair in haa_plateX_pairs)
+        sum_y_h = sum(pair[1] for pair in haa_plateX_pairs)
+        sum_xy_h = sum(pair[0] * pair[1] for pair in haa_plateX_pairs)
+        sum_x2_h = sum(pair[0] ** 2 for pair in haa_plateX_pairs)
+        mean_x_h = sum_x_h / n_reg_h
+        mean_y_h = sum_y_h / n_reg_h
+        denom_h = sum_x2_h - n_reg_h * mean_x_h ** 2
+        if abs(denom_h) > 1e-10:
+            haa_slope = (sum_xy_h - n_reg_h * mean_x_h * mean_y_h) / denom_h
+            haa_intercept = mean_y_h - haa_slope * mean_x_h
+        else:
+            haa_slope = 0.0
+            haa_intercept = mean_y_h
+        ss_res_h = sum((pair[1] - (haa_slope * pair[0] + haa_intercept)) ** 2 for pair in haa_plateX_pairs)
+        ss_tot_h = sum((pair[1] - mean_y_h) ** 2 for pair in haa_plateX_pairs)
+        r_squared_h = 1 - ss_res_h / ss_tot_h if ss_tot_h > 0 else 0
+        league_avg_plateX = mean_x_h
+        print(f"HAA ~ PlateX regression: slope={haa_slope:.4f}, intercept={haa_intercept:.4f}, "
+              f"R²={r_squared_h:.4f}, league avg PlateX={league_avg_plateX:.4f} (n={n_reg_h})")
+    else:
+        haa_slope = 0.0
+        haa_intercept = 0.0
+        league_avg_plateX = 0.0
+        print("\nWARNING: Not enough data for HAA ~ PlateX regression")
+
+    # Compute nHAA for each pitch leaderboard row
+    # nHAA = HAA - slope * (pitcher_avgPlateX - league_avgPlateX)
+    # This adjusts HAA to what it would be at league-average horizontal location
+    for row in pitch_leaderboard:
+        if row.get('haa') is not None:
+            key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
+            pitches_for_row = pitch_groups[key]
+            px_vals = [safe_float(p.get('PlateX')) for p in pitches_for_row]
+            px_vals = [v for v in px_vals if v is not None]
+            if px_vals:
+                avg_px = sum(px_vals) / len(px_vals)
+                row['nHAA'] = round(row['haa'] - haa_slope * (avg_px - league_avg_plateX), 2)
+            else:
+                row['nHAA'] = None
+        else:
+            row['nHAA'] = None
 
     # --- Compute percentiles per pitch type ---
     pt_groups = defaultdict(list)
