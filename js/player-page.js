@@ -147,6 +147,9 @@ var PlayerPage = {
     document.querySelector('section.table-wrapper').style.display = '';
     document.querySelector('section.pagination').style.display = '';
 
+    // Set pending scroll restore — handleRoute will pick this up after re-rendering
+    this._pendingScrollRestore = this._savedScrollY;
+
     // Navigate back — use history if available, otherwise go home
     var hash = window.location.hash.replace(/^#/, '');
     if (hash.indexOf('player=') !== -1) {
@@ -156,12 +159,16 @@ var PlayerPage = {
         window.location.hash = 'pitchers/stats';
       }
     }
+  },
 
-    // Restore scroll position to where user was in the leaderboard
-    var savedY = this._savedScrollY;
-    requestAnimationFrame(function () {
-      window.scrollTo(0, savedY);
-    });
+  // Called after handleRoute finishes rendering the leaderboard
+  restoreScrollIfPending: function () {
+    if (this._pendingScrollRestore != null) {
+      var y = this._pendingScrollRestore;
+      this._pendingScrollRestore = null;
+      // Use setTimeout to ensure DOM has finished layout after re-render
+      setTimeout(function () { window.scrollTo(0, y); }, 0);
+    }
   },
 
   // Click outside player-page-inner to close
