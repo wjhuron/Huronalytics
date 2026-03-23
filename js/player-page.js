@@ -43,6 +43,8 @@ var PlayerPage = {
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
 
+  _savedScrollY: 0,
+
   open: function (mlbId) {
     // Try pitcher first, then hitter
     var pitcherData = this._findPitcherByMlbId(mlbId);
@@ -58,6 +60,9 @@ var PlayerPage = {
     if (curHash.indexOf('player=') === -1) {
       this._lastRoute = curHash;
     }
+
+    // Save scroll position so we can restore it when closing
+    this._savedScrollY = window.scrollY;
 
     this.isOpen = true;
     this._playerType = pitcherData ? 'pitcher' : 'hitter';
@@ -79,8 +84,11 @@ var PlayerPage = {
     // Update URL
     window.location.hash = 'player=' + mlbId;
 
-    // Scroll to top
+    // Scroll to top of player page
     window.scrollTo(0, 0);
+
+    // Click-outside-to-close: listen on the player-page backdrop
+    this._bindClickOutside();
   },
 
   _renderPitcherPage: function (data) {
@@ -128,6 +136,7 @@ var PlayerPage = {
   close: function () {
     this.isOpen = false;
     this.destroyChart();
+    this._unbindClickOutside();
 
     document.getElementById('player-page').style.display = 'none';
 
@@ -141,12 +150,38 @@ var PlayerPage = {
     // Navigate back — use history if available, otherwise go home
     var hash = window.location.hash.replace(/^#/, '');
     if (hash.indexOf('player=') !== -1) {
-      // Go back to whatever leaderboard makes sense
       if (this._lastRoute) {
         window.location.hash = this._lastRoute;
       } else {
         window.location.hash = 'pitchers/stats';
       }
+    }
+
+    // Restore scroll position to where user was in the leaderboard
+    var savedY = this._savedScrollY;
+    requestAnimationFrame(function () {
+      window.scrollTo(0, savedY);
+    });
+  },
+
+  // Click outside player-page-content to close
+  _bindClickOutside: function () {
+    var self = this;
+    this._clickOutsideHandler = function (e) {
+      var content = document.querySelector('.player-page-content');
+      var nav = document.querySelector('.player-page-nav');
+      // If click is on the player-page backdrop but NOT inside the content or nav
+      if (!content.contains(e.target) && !nav.contains(e.target)) {
+        self.close();
+      }
+    };
+    document.getElementById('player-page').addEventListener('click', this._clickOutsideHandler);
+  },
+
+  _unbindClickOutside: function () {
+    if (this._clickOutsideHandler) {
+      document.getElementById('player-page').removeEventListener('click', this._clickOutsideHandler);
+      this._clickOutsideHandler = null;
     }
   },
 
