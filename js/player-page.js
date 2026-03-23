@@ -164,14 +164,13 @@ var PlayerPage = {
     });
   },
 
-  // Click outside player-page-content to close
+  // Click outside player-page-inner to close
   _bindClickOutside: function () {
     var self = this;
     this._clickOutsideHandler = function (e) {
-      var content = document.querySelector('.player-page-content');
-      var nav = document.querySelector('.player-page-nav');
-      // If click is on the player-page backdrop but NOT inside the content or nav
-      if (!content.contains(e.target) && !nav.contains(e.target)) {
+      var inner = document.querySelector('.player-page-inner');
+      // If click is on the player-page backdrop but NOT inside the inner content
+      if (!inner.contains(e.target)) {
         self.close();
       }
     };

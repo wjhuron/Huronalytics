@@ -1104,9 +1104,15 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 /* === Player Page === */
 
 .player-page {
+  min-height: 100vh;
+  padding: 16px 24px;
+  cursor: pointer;
+}
+
+.player-page-inner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 16px 24px;
+  cursor: default;
 }
 
 .player-page-nav {
