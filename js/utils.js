@@ -26,6 +26,15 @@ var Utils = {
     return Math.round(value).toString();
   },
 
+  // Convert decimal feet to feet'inches format (e.g., 5.86 → "5'10")
+  formatFeetInches: function (value) {
+    if (value === null || value === undefined) return '--';
+    var ft = Math.floor(value);
+    var inches = Math.round((value - ft) * 12);
+    if (inches === 12) { ft++; inches = 0; }
+    return ft + "'" + inches;
+  },
+
   PITCH_TYPE_LABELS: {
     FF: 'Four-Seam', SI: 'Sinker', CF: 'Cut-Fastball', FC: 'Cutter', CH: 'Changeup',
     CU: 'Curveball', SL: 'Slider', ST: 'Sweeper', FS: 'Splitter',

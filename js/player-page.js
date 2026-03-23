@@ -15,7 +15,7 @@ var PlayerPage = {
     { key: 'barrelPctAgainst',  label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
     { key: 'hardHitPct',        label: 'Hard-Hit %',       format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB %',             format: function(v) { return Utils.formatPct(v); } },
-    { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
+    { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
   ],
 
   // Percentile stat definitions for the hitting section
