@@ -44,6 +44,29 @@ var PlayerPage = {
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
 
+  // Expanded pitch metrics table (full detail view)
+  EXPANDED_PITCH_COLS: [
+    { key: 'pitchType', label: 'Pitch' },
+    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'usagePct', label: 'Usage', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'velocity', label: 'Velo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'maxVelo', label: 'Max Velo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'spinRate', label: 'Spin', format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'breakTilt', label: 'Tilt', format: function(v) { return v || '—'; } },
+    { key: 'indVertBrk', label: 'IVB', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
+    { key: 'horzBrk', label: 'HB', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
+    { key: 'relPosZ', label: 'RelZ', format: function(v) { return v != null ? v.toFixed(1) + "'" : '—'; } },
+    { key: 'relPosX', label: 'RelX', format: function(v) { return v != null ? v.toFixed(1) + "'" : '—'; } },
+    { key: 'extension', label: 'Ext', format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
+    { key: 'armAngle', label: 'Arm Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
+    { key: 'vaa', label: 'VAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+    { key: 'nVAA', label: 'nVAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+    { key: 'haa', label: 'HAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+    { key: 'nHAA', label: 'nHAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+    { key: 'vra', label: 'VRA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+    { key: 'hra', label: 'HRA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+  ],
+
   open: function (mlbId) {
     // Try pitcher first, then hitter
     var pitcherData = this._findPitcherByMlbId(mlbId);
@@ -80,7 +103,6 @@ var PlayerPage = {
   },
 
   _renderPitcherPage: function (data) {
-    // Show pitcher-specific sections, hide hitter-specific
     this._showPitcherLayout();
     this._renderIdentity(data);
     this._renderUsage(data);
@@ -89,6 +111,12 @@ var PlayerPage = {
     this._renderPercentiles(data, this.PITCHING_STATS, true);
     this._renderMovementChart(data);
     this._renderPitchTable(data);
+    this._renderExpandedPitchTable(data);
+    this._currentHand = 'R';
+    this._currentData = data;
+    this._renderHeatMaps(data);
+    this._renderCountTable(data);
+    this._bindHandToggle();
   },
 
   _renderHitterPage: function (data) {
@@ -123,13 +151,20 @@ var PlayerPage = {
 
   close: function () {
     this.isOpen = false;
+    this._currentHand = 'R';
+    this._currentData = null;
     this.destroyChart();
     this._unbindClickOutside();
+    this._unbindHandToggle();
 
-    // Just hide the overlay — leaderboard is still rendered underneath with scroll intact
+    // Hide new sections
+    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section'];
+    for (var i = 0; i < sections.length; i++) {
+      var el = document.getElementById(sections[i]);
+      if (el) el.style.display = 'none';
+    }
+
     document.getElementById('player-page').style.display = 'none';
-
-    // Restore the hash to the leaderboard route (without triggering re-render)
     if (this._lastRoute) {
       history.replaceState(null, '', '#' + this._lastRoute);
     }
@@ -686,6 +721,368 @@ var PlayerPage = {
     }
     table.appendChild(tbody);
     container.appendChild(table);
+  },
+
+  // --- Render: Expanded Pitch Table (full detail view) ---
+
+  _renderExpandedPitchTable: function (data) {
+    var section = document.getElementById('player-expanded-pitch-section');
+    var container = document.getElementById('player-expanded-pitch-table');
+    container.innerHTML = '';
+
+    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+
+    section.style.display = '';
+
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table expanded-pitch-table';
+
+    // Header
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    for (var i = 0; i < this.EXPANDED_PITCH_COLS.length; i++) {
+      var th = document.createElement('th');
+      th.textContent = this.EXPANDED_PITCH_COLS[i].label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body
+    var tbody = document.createElement('tbody');
+    for (var r = 0; r < pitchRows.length; r++) {
+      var row = pitchRows[r];
+      var tr = document.createElement('tr');
+      for (var c = 0; c < this.EXPANDED_PITCH_COLS.length; c++) {
+        var col = this.EXPANDED_PITCH_COLS[c];
+        var td = document.createElement('td');
+        if (col.key === 'pitchType') {
+          var badge = document.createElement('span');
+          badge.className = 'pitch-badge-sm';
+          badge.style.backgroundColor = Utils.getPitchColor(row.pitchType);
+          badge.textContent = row.pitchType;
+          td.appendChild(badge);
+        } else {
+          var val = row[col.key];
+          td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  },
+
+  // --- Render: Heat Maps (pitch location density) ---
+
+  _renderHeatMaps: function(data) {
+    var section = document.getElementById('player-location-section');
+    var grid = document.getElementById('player-heatmap-grid');
+    grid.innerHTML = '';
+
+    var details = window.PITCH_DETAILS || {};
+    var key = data.pitcher + '|' + data.team;
+    var pitches = details[key];
+    if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
+
+    section.style.display = '';
+    var hand = this._currentHand || 'R';
+
+    // Compute average strike zone across ALL pitches (not per-type)
+    var szTopSum = 0, szBotSum = 0, szCount = 0;
+    for (var i = 0; i < pitches.length; i++) {
+      if (pitches[i].szt != null && pitches[i].szb != null) {
+        szTopSum += pitches[i].szt;
+        szBotSum += pitches[i].szb;
+        szCount++;
+      }
+    }
+    var avgSzTop = szCount > 0 ? szTopSum / szCount : 3.5;
+    var avgSzBot = szCount > 0 ? szBotSum / szCount : 1.5;
+
+    // Group by pitch type, filter by hand
+    var byType = {};
+    for (var i = 0; i < pitches.length; i++) {
+      var p = pitches[i];
+      if (p.bh !== hand) continue;
+      if (p.px == null || p.pz == null) continue;
+      if (!byType[p.pt]) byType[p.pt] = [];
+      byType[p.pt].push(p);
+    }
+
+    // Sort pitch types by count (descending)
+    var types = Object.keys(byType);
+    types.sort(function(a, b) { return byType[b].length - byType[a].length; });
+
+    // Render each pitch type
+    for (var t = 0; t < types.length; t++) {
+      var pt = types[t];
+      var cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+
+      var label = document.createElement('div');
+      label.className = 'heatmap-label';
+      var badge = document.createElement('span');
+      badge.className = 'pitch-badge-sm';
+      badge.style.backgroundColor = Utils.getPitchColor(pt);
+      badge.textContent = pt;
+      label.appendChild(badge);
+      var labelText = document.createElement('span');
+      labelText.textContent = Utils.getPitchName ? Utils.getPitchName(pt) : pt;
+      label.appendChild(labelText);
+      cell.appendChild(label);
+
+      var canvas = document.createElement('canvas');
+      canvas.width = 250;
+      canvas.height = 300;
+      cell.appendChild(canvas);
+
+      grid.appendChild(cell);
+      this._renderSingleHeatMap(canvas, byType[pt], avgSzTop, avgSzBot);
+    }
+  },
+
+  _renderSingleHeatMap: function(canvas, pitches, szTop, szBot) {
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width;
+    var H = canvas.height;
+    var isDark = document.body.classList.contains('dark-mode');
+
+    // Plot bounds in feet
+    var xMin = -2.0, xMax = 2.0;
+    var zMin = 0.5, zMax = 4.5;
+
+    // Grid resolution
+    var gridX = 50, gridZ = 60;
+    var cellW = W / gridX;
+    var cellH = H / gridZ;
+    var bw = 0.25; // bandwidth in feet
+    var bw2 = 2 * bw * bw;
+
+    // Compute KDE density grid
+    var density = new Array(gridX * gridZ);
+    var maxDensity = 0;
+    for (var gx = 0; gx < gridX; gx++) {
+      for (var gz = 0; gz < gridZ; gz++) {
+        var cx = xMin + (gx + 0.5) * (xMax - xMin) / gridX;
+        var cz = zMax - (gz + 0.5) * (zMax - zMin) / gridZ; // flip z axis (top = high z)
+        var d = 0;
+        for (var p = 0; p < pitches.length; p++) {
+          var dx = cx - pitches[p].px;
+          var dz = cz - pitches[p].pz;
+          d += Math.exp(-(dx * dx + dz * dz) / bw2);
+        }
+        var idx = gx + gz * gridX;
+        density[idx] = d;
+        if (d > maxDensity) maxDensity = d;
+      }
+    }
+
+    // Clear canvas
+    ctx.fillStyle = isDark ? '#1e1e3a' : '#f8f8f8';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw density
+    if (maxDensity > 0) {
+      for (var gx = 0; gx < gridX; gx++) {
+        for (var gz = 0; gz < gridZ; gz++) {
+          var norm = density[gx + gz * gridX] / maxDensity;
+          if (norm < 0.05) continue;
+          ctx.fillStyle = this._heatColor(norm);
+          ctx.fillRect(gx * cellW, gz * cellH, cellW + 0.5, cellH + 0.5);
+        }
+      }
+    }
+
+    // Draw strike zone rectangle
+    var zoneLeft = ((-0.83 - xMin) / (xMax - xMin)) * W;
+    var zoneRight = ((0.83 - xMin) / (xMax - xMin)) * W;
+    var zoneTop = ((zMax - szTop) / (zMax - zMin)) * H;
+    var zoneBottom = ((zMax - szBot) / (zMax - zMin)) * H;
+
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(zoneLeft, zoneTop, zoneRight - zoneLeft, zoneBottom - zoneTop);
+
+    // Draw home plate at bottom
+    var plateY = ((zMax - 0.5) / (zMax - zMin)) * H; // approximate bottom
+    var plateCX = W / 2;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(plateCX - 8, plateY);
+    ctx.lineTo(plateCX + 8, plateY);
+    ctx.lineTo(plateCX + 5, plateY + 5);
+    ctx.lineTo(plateCX, plateY + 8);
+    ctx.lineTo(plateCX - 5, plateY + 5);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  _heatColor: function(t) {
+    // Blue (cold) -> white (mid) -> red (hot), like Baseball Savant
+    var r, g, b;
+    if (t < 0.5) {
+      var s = t / 0.5;
+      r = Math.round(8 + s * (255 - 8));
+      g = Math.round(48 + s * (255 - 48));
+      b = Math.round(107 + s * (255 - 107));
+    } else {
+      var s = (t - 0.5) / 0.5;
+      r = Math.round(255 - s * (255 - 215));
+      g = Math.round(255 - s * (255 - 48));
+      b = Math.round(255 - s * (255 - 39));
+    }
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  },
+
+  // --- Render: Count Table (pitch usage by count group) ---
+
+  _renderCountTable: function(data) {
+    var section = document.getElementById('player-count-section');
+    var container = document.getElementById('player-count-table');
+    container.innerHTML = '';
+
+    var details = window.PITCH_DETAILS || {};
+    var key = data.pitcher + '|' + data.team;
+    var pitches = details[key];
+    if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
+
+    section.style.display = '';
+    var hand = this._currentHand || 'R';
+
+    var COUNT_GROUPS = {
+      'First Pitch': ['0-0'],
+      'Ahead': ['0-1', '0-2', '1-2'],
+      'Behind': ['1-0', '2-0', '3-0', '2-1', '3-1'],
+      'Even': ['1-1', '2-2'],
+      'Two-Strike': ['0-2', '1-2', '2-2', '3-2']
+    };
+    var groupNames = ['First Pitch', 'Ahead', 'Behind', 'Even', 'Two-Strike'];
+
+    // Build lookup: count string -> array of group names it belongs to
+    var countToGroups = {};
+    for (var g = 0; g < groupNames.length; g++) {
+      var gn = groupNames[g];
+      var counts = COUNT_GROUPS[gn];
+      for (var c = 0; c < counts.length; c++) {
+        if (!countToGroups[counts[c]]) countToGroups[counts[c]] = [];
+        countToGroups[counts[c]].push(gn);
+      }
+    }
+
+    // Filter by hand and group by pitch type and count group
+    var pitchTypes = {};
+    var groupTotals = {};
+    for (var g = 0; g < groupNames.length; g++) groupTotals[groupNames[g]] = 0;
+
+    for (var i = 0; i < pitches.length; i++) {
+      var p = pitches[i];
+      if (p.bh !== hand) continue;
+      if (!p.cnt) continue;
+      var groups = countToGroups[p.cnt];
+      if (!groups) continue;
+
+      if (!pitchTypes[p.pt]) {
+        pitchTypes[p.pt] = { total: 0 };
+        for (var g = 0; g < groupNames.length; g++) pitchTypes[p.pt][groupNames[g]] = 0;
+      }
+      pitchTypes[p.pt].total++;
+      for (var g = 0; g < groups.length; g++) {
+        pitchTypes[p.pt][groups[g]]++;
+        groupTotals[groups[g]]++;
+      }
+    }
+
+    // Sort pitch types by total count descending
+    var types = Object.keys(pitchTypes);
+    types.sort(function(a, b) { return pitchTypes[b].total - pitchTypes[a].total; });
+
+    if (types.length === 0) { section.style.display = 'none'; return; }
+
+    // Build HTML table
+    var table = document.createElement('table');
+    table.className = 'count-table';
+
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    var th0 = document.createElement('th');
+    th0.textContent = '';
+    headRow.appendChild(th0);
+    for (var g = 0; g < groupNames.length; g++) {
+      var th = document.createElement('th');
+      th.textContent = groupNames[g];
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    for (var t = 0; t < types.length; t++) {
+      var pt = types[t];
+      var tr = document.createElement('tr');
+
+      var tdLabel = document.createElement('td');
+      var badge = document.createElement('span');
+      badge.className = 'pitch-badge-sm';
+      badge.style.backgroundColor = Utils.getPitchColor(pt);
+      badge.textContent = pt;
+      tdLabel.appendChild(badge);
+      tr.appendChild(tdLabel);
+
+      for (var g = 0; g < groupNames.length; g++) {
+        var gn = groupNames[g];
+        var td = document.createElement('td');
+        var total = groupTotals[gn];
+        if (total > 0) {
+          var pct = (pitchTypes[pt][gn] / total * 100);
+          td.textContent = pct.toFixed(1) + '%';
+          // Subtle background tint based on usage intensity
+          var intensity = Math.min(pct / 50, 1); // normalize: 50%+ = max intensity
+          var color = Utils.getPitchColor(pt);
+          td.style.backgroundColor = color.replace('rgb', 'rgba').replace(')', ',' + (intensity * 0.2).toFixed(2) + ')');
+        } else {
+          td.textContent = '—';
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  },
+
+  // --- Hand Toggle (for heat maps and count table) ---
+
+  _bindHandToggle: function() {
+    var self = this;
+    this._handToggleHandler = function(e) {
+      var btn = e.target.closest('.hand-toggle-btn');
+      if (!btn) return;
+      var hand = btn.getAttribute('data-hand');
+      if (hand === self._currentHand) return;
+      self._currentHand = hand;
+      // Update active class
+      var btns = document.querySelectorAll('#hand-toggle .hand-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      // Re-render heat maps and count table
+      if (self._currentData) {
+        self._renderHeatMaps(self._currentData);
+        self._renderCountTable(self._currentData);
+      }
+    };
+    var toggle = document.getElementById('hand-toggle');
+    if (toggle) toggle.addEventListener('click', this._handToggleHandler);
+  },
+
+  _unbindHandToggle: function() {
+    if (this._handToggleHandler) {
+      var toggle = document.getElementById('hand-toggle');
+      if (toggle) toggle.removeEventListener('click', this._handToggleHandler);
+      this._handToggleHandler = null;
+    }
   },
 
   // --- Hitter: Batted Ball Chart (donut) ---

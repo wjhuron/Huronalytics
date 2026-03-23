@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Huronalytics</title>
-  <link rel="stylesheet" href="css/styles.css?v=37">
+  <link rel="stylesheet" href="css/styles.css?v=38">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -248,6 +248,33 @@
         <div id="player-pitch-usage-table" class="player-pitch-table"></div>
       </div>
     </div>
+
+    <!-- Expanded Pitch Metrics (full-width, horizontally scrollable) -->
+    <div class="player-full-width" id="player-expanded-pitch-section" style="display:none;">
+      <h3 class="section-title">PITCH METRICS</h3>
+      <div class="pitch-table-scroll-wrapper">
+        <div id="player-expanded-pitch-table"></div>
+      </div>
+    </div>
+
+    <!-- Heat Maps with shared handedness toggle -->
+    <div class="player-full-width" id="player-location-section" style="display:none;">
+      <div class="location-section-header">
+        <h3 class="section-title">PITCH LOCATIONS</h3>
+        <div class="hand-toggle" id="hand-toggle">
+          <button class="hand-toggle-btn active" data-hand="R">vs RHH</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHH</button>
+        </div>
+      </div>
+      <div class="heatmap-grid" id="player-heatmap-grid"></div>
+    </div>
+
+    <!-- Count-Based Usage Table -->
+    <div class="player-full-width" id="player-count-section" style="display:none;">
+      <h3 class="section-title">USAGE BY COUNT</h3>
+      <div id="player-count-table"></div>
+    </div>
+
     </div>
   </section>
 
@@ -271,13 +298,13 @@
     <p>Data: MLB 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=37"></script>
-  <script src="js/utils.js?v=37"></script>
-  <script src="js/aggregator.js?v=37"></script>
-  <script src="js/data.js?v=37"></script>
-  <script src="js/leaderboard.js?v=37"></script>
-  <script src="js/scatter.js?v=37"></script>
-  <script src="js/player-page.js?v=37"></script>
-  <script src="js/app.js?v=37"></script>
+  <script src="data/data_embedded.js?v=38"></script>
+  <script src="js/utils.js?v=38"></script>
+  <script src="js/aggregator.js?v=38"></script>
+  <script src="js/data.js?v=38"></script>
+  <script src="js/leaderboard.js?v=38"></script>
+  <script src="js/scatter.js?v=38"></script>
+  <script src="js/player-page.js?v=38"></script>
+  <script src="js/app.js?v=38"></script>
 </body>
 </html>

@@ -1398,6 +1398,136 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   border-bottom: none;
 }
 
+/* --- Player Page: Full-width sections (expanded table, heat maps, count table) --- */
+
+.player-full-width {
+  background: var(--card-bg, #fff);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  margin-top: 24px;
+}
+.dark-mode .player-full-width {
+  background: var(--row-bg, #1e1e3a);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.player-full-width .section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted, #888);
+  margin: 0 0 12px 0;
+}
+
+/* Expanded pitch table — horizontal scroll */
+.pitch-table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.pitch-table-scroll-wrapper .player-pitch-stats-table {
+  min-width: 900px;
+}
+.pitch-table-scroll-wrapper .player-pitch-stats-table th,
+.pitch-table-scroll-wrapper .player-pitch-stats-table td {
+  white-space: nowrap;
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+/* Handedness toggle */
+.location-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.location-section-header .section-title {
+  margin-bottom: 0;
+}
+.hand-toggle {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border, #ddd);
+}
+.hand-toggle-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #333);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.hand-toggle-btn.active {
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+}
+.dark-mode .hand-toggle {
+  border-color: #444;
+}
+.dark-mode .hand-toggle-btn {
+  color: var(--text-primary, #ccc);
+}
+.dark-mode .hand-toggle-btn.active {
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+}
+
+/* Heat map grid */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.heatmap-cell {
+  text-align: center;
+}
+.heatmap-cell canvas {
+  max-width: 100%;
+  border-radius: 4px;
+}
+.heatmap-label {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Count table */
+.count-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.count-table th {
+  padding: 6px 10px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  border-bottom: 2px solid var(--border, #ddd);
+}
+.count-table td {
+  padding: 6px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-light, #eee);
+}
+.count-table td:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+.dark-mode .count-table th {
+  border-bottom-color: #444;
+}
+.dark-mode .count-table td {
+  border-bottom-color: #333;
+}
+
 /* --- Responsive --- */
 
 @media (max-width: 1100px) {
@@ -1418,6 +1548,9 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   }
   .pctl-row {
     grid-template-columns: 90px 1fr 36px 70px;
+  }
+  .heatmap-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

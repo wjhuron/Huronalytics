@@ -1657,6 +1657,25 @@ def main():
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
                 detail['rz'] = round(rel_z, 2)
+            # Pitch location, strike zone, batter hand, count — for heat maps & count table
+            px_val = safe_float(p.get('PlateX'))
+            pz_val = safe_float(p.get('PlateZ'))
+            szt_val = safe_float(p.get('SzTop'))
+            szb_val = safe_float(p.get('SzBot'))
+            bh_val = p.get('Bats')
+            cnt_val = p.get('Count')
+            if px_val is not None:
+                detail['px'] = round(px_val, 2)
+            if pz_val is not None:
+                detail['pz'] = round(pz_val, 2)
+            if szt_val is not None:
+                detail['szt'] = round(szt_val, 2)
+            if szb_val is not None:
+                detail['szb'] = round(szb_val, 2)
+            if bh_val:
+                detail['bh'] = bh_val
+            if cnt_val:
+                detail['cnt'] = cnt_val
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
