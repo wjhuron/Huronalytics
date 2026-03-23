@@ -43,8 +43,6 @@ var PlayerPage = {
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
 
-  _savedScrollY: 0,
-
   open: function (mlbId) {
     // Try pitcher first, then hitter
     var pitcherData = this._findPitcherByMlbId(mlbId);
@@ -61,18 +59,10 @@ var PlayerPage = {
       this._lastRoute = curHash;
     }
 
-    // Save scroll position so we can restore it when closing
-    this._savedScrollY = window.scrollY;
-
     this.isOpen = true;
     this._playerType = pitcherData ? 'pitcher' : 'hitter';
 
-    // Hide leaderboard, show player page
-    var hideEls = ['tab-bar', 'controls', 'toolbar', 'table-wrapper', 'pagination', 'side-panel', 'panel-overlay', 'home-page'];
-    hideEls.forEach(function (cls) {
-      var els = document.querySelectorAll('.' + cls + ', #' + cls + ', nav.' + cls + ', section.' + cls);
-      els.forEach(function (el) { el.style.display = 'none'; });
-    });
+    // Show player page as fixed overlay (leaderboard stays rendered underneath)
     document.getElementById('player-page').style.display = 'block';
 
     if (pitcherData) {
@@ -81,11 +71,8 @@ var PlayerPage = {
       this._renderHitterPage(hitterData);
     }
 
-    // Update URL
-    window.location.hash = 'player=' + mlbId;
-
-    // Scroll to top of player page
-    window.scrollTo(0, 0);
+    // Scroll overlay to top
+    document.getElementById('player-page').scrollTop = 0;
 
     // Click-outside-to-close: listen on the player-page backdrop
     this._bindClickOutside();
@@ -138,36 +125,12 @@ var PlayerPage = {
     this.destroyChart();
     this._unbindClickOutside();
 
+    // Just hide the overlay — leaderboard is still rendered underneath with scroll intact
     document.getElementById('player-page').style.display = 'none';
 
-    // Show leaderboard elements
-    document.querySelector('nav.tab-bar').style.display = '';
-    document.querySelector('section.controls').style.display = '';
-    document.querySelector('section.toolbar').style.display = '';
-    document.querySelector('section.table-wrapper').style.display = '';
-    document.querySelector('section.pagination').style.display = '';
-
-    // Set pending scroll restore — handleRoute will pick this up after re-rendering
-    this._pendingScrollRestore = this._savedScrollY;
-
-    // Navigate back — use history if available, otherwise go home
-    var hash = window.location.hash.replace(/^#/, '');
-    if (hash.indexOf('player=') !== -1) {
-      if (this._lastRoute) {
-        window.location.hash = this._lastRoute;
-      } else {
-        window.location.hash = 'pitchers/stats';
-      }
-    }
-  },
-
-  // Called after handleRoute finishes rendering the leaderboard
-  restoreScrollIfPending: function () {
-    if (this._pendingScrollRestore != null) {
-      var y = this._pendingScrollRestore;
-      this._pendingScrollRestore = null;
-      // Use setTimeout to ensure DOM has finished layout after re-render
-      setTimeout(function () { window.scrollTo(0, y); }, 0);
+    // Restore the hash to the leaderboard route (without triggering re-render)
+    if (this._lastRoute) {
+      history.replaceState(null, '', '#' + this._lastRoute);
     }
   },
 

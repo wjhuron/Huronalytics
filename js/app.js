@@ -174,7 +174,6 @@
         }
       }
       navigateToTab(tab, true);  // true = don't push hash (already there)
-      PlayerPage.restoreScrollIfPending();
     } else {
       // Unknown route — go home
       showHome();
