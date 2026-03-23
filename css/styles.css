@@ -603,8 +603,9 @@ table {
   font-size: 13px;
 }
 
-/* Name/pitcher column: fit to content, don't stretch */
-.col-pitcher {
+/* All columns fit to content, don't stretch */
+thead th,
+tbody td {
   width: 1%;
   white-space: nowrap;
 }
