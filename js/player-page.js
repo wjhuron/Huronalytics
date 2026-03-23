@@ -35,6 +35,7 @@ var PlayerPage = {
   // Pitch usage table columns
   PITCH_TABLE_COLS: [
     { key: 'pitchType', label: 'Pitch' },
+    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'usagePct', label: 'Usage', format: function(v) { return Utils.formatPct(v); } },
     { key: 'velocity', label: 'MPH',   format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'spinRate', label: 'Spin',   format: function(v) { return v != null ? Math.round(v) : '—'; } },
