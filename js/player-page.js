@@ -844,9 +844,6 @@ var PlayerPage = {
       badge.style.backgroundColor = Utils.getPitchColor(pt);
       badge.textContent = pt;
       label.appendChild(badge);
-      var labelText = document.createElement('span');
-      labelText.textContent = Utils.getPitchName ? Utils.getPitchName(pt) : pt;
-      label.appendChild(labelText);
       cell.appendChild(label);
 
       var canvas = document.createElement('canvas');
