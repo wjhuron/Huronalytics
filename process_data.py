@@ -811,6 +811,46 @@ def generate_micro_data(all_pitches):
         pitch_rows.append(row)
 
     # ==========================================================
+    #  Pitcher BIP records (for avgEV, maxEV, hardHit%, barrel%, LD%, FB%, PU%)
+    #  [pitcherIdx, dateIdx, batterHand, exitVelo, launchAngle, bbType]
+    #  bbType encoded: 0=ground_ball, 1=line_drive, 2=fly_ball, 3=popup
+    # ==========================================================
+    BB_TYPE_CODE = {'ground_ball': 0, 'line_drive': 1, 'fly_ball': 2, 'popup': 3}
+    pitcher_bip_rows = []
+    for p in all_pitches:
+        pitcher = p.get('Pitcher')
+        team = p.get('PTeam')
+        date = normalize_date(p.get('Game Date'))
+        batter_hand = p.get('Bats')
+        bb_type = p.get('BBType')
+
+        if not pitcher or not team or team not in MLB_TEAMS:
+            continue
+        if not date or not batter_hand:
+            continue
+        if not bb_type or bb_type in BUNT_BB_TYPES:
+            continue
+
+        ev = safe_float(p.get('ExitVelo'))
+        la = safe_float(p.get('LaunchAngle'))
+        if ev is None and la is None:
+            continue
+
+        bb_code = BB_TYPE_CODE.get(bb_type, -1)
+        if bb_code < 0:
+            continue
+
+        pitcher_bip_rows.append([
+            pi_idx[pitcher],
+            dt_idx[date],
+            batter_hand,
+            round(ev, 1) if ev is not None else None,
+            round(la, 1) if la is not None else None,
+            bb_code,
+        ])
+    print(f"  Pitcher BIP records: {len(pitcher_bip_rows)}")
+
+    # ==========================================================
     #  Hitter micro-aggs
     #  Key: (hitterIdx, teamIdx, bats, dateIdx, pitcherHand)
     #  bats = actual batting side for these pitches (R/L)
@@ -1120,6 +1160,8 @@ def generate_micro_data(all_pitches):
             'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr',
         ],
         'pitcherMicro': pitcher_rows,
+        'pitcherBipCols': ['pitcherIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType'],
+        'pitcherBip': pitcher_bip_rows,
         'pitchCols': [
             'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
@@ -1962,6 +2004,7 @@ def main():
     print(f"  micro_data.json ({len(micro_data['pitcherMicro'])} pitcher, "
           f"{len(micro_data['pitchMicro'])} pitch, "
           f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "
+          f"{len(micro_data['pitcherBip'])} pitcher BIP, "
           f"{len(micro_data['hitterBip'])} hitter BIP records)")
 
     print(f"\nOutput written to {DATA_DIR}/")

@@ -33,7 +33,7 @@ var Aggregator = {
 
   _buildIndexes: function () {
     var d = this.data;
-    var tables = ['pitcherCols', 'pitchCols', 'hitterCols', 'hitterBipCols', 'hitterPitchCols', 'hitterPitchBipCols'];
+    var tables = ['pitcherCols', 'pitcherBipCols', 'pitchCols', 'hitterCols', 'hitterBipCols', 'hitterPitchCols', 'hitterPitchBipCols'];
     for (var t = 0; t < tables.length; t++) {
       var key = tables[t];
       this._colIdx[key] = {};
@@ -154,9 +154,33 @@ var Aggregator = {
       }
     }
 
+    // Filter pitcher BIP records for batted ball stats
+    var pbci = this._colIdx.pitcherBipCols;
+    var pitcherBipData = d.pitcherBip || [];
+    var bipByPitcher = {};
+    for (var bi = 0; bi < pitcherBipData.length; bi++) {
+      var brow = pitcherBipData[bi];
+      if (!validDates[brow[pbci.dateIdx]]) continue;
+      if (vsHand !== 'all' && brow[pbci.batterHand] !== vsHand) continue;
+      var pIdx = brow[pbci.pitcherIdx];
+      if (!bipByPitcher[pIdx]) bipByPitcher[pIdx] = [];
+      bipByPitcher[pIdx].push(brow);
+    }
+
+    function isBarrel(ev, la) {
+      if (ev == null || la == null) return false;
+      if (ev < 98) return false;
+      var minLA = 26 - (ev - 98) * 0.4;
+      var maxLA = 30 + (ev - 98) * 0.8;
+      if (minLA < 8) minLA = 8;
+      if (maxLA > 50) maxLA = 50;
+      return la >= minLA && la <= maxLA;
+    }
+
     // Convert to row objects
-    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct'];
-    var INVERT = { bbPct: true, babip: true, hrFbPct: true };
+    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
+                     'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct'];
+    var INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
     var rows = [];
 
     for (var gk2 in groups) {
@@ -179,6 +203,28 @@ var Aggregator = {
       var fb_for_hrfb = fb_cnt + ldHr;
       var hrFbPct = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
+      // Compute batted ball stats from pitcher BIP records
+      var bipRecs = bipByPitcher[g.pitcherIdx] || [];
+      var evs = [], n_bip_ev = 0, n_hard = 0, n_barrel = 0;
+      var n_ld = 0, n_fb_bb = 0, n_pu_bb = 0, n_bip_total = bipRecs.length;
+      for (var bri = 0; bri < bipRecs.length; bri++) {
+        var bev = bipRecs[bri][pbci.exitVelo];
+        var bla = bipRecs[bri][pbci.launchAngle];
+        var bbt = bipRecs[bri][pbci.bbType]; // 0=gb, 1=ld, 2=fb, 3=pu
+        if (bev !== null) { evs.push(bev); if (bev >= 95) n_hard++; }
+        if (isBarrel(bev, bla)) n_barrel++;
+        if (bbt === 1) n_ld++;
+        if (bbt === 2) n_fb_bb++;
+        if (bbt === 3) n_pu_bb++;
+      }
+      var avgEVAgainst = evs.length > 0 ? Math.round(evs.reduce(function(a,b){return a+b;},0) / evs.length * 10) / 10 : null;
+      var maxEVAgainst = evs.length > 0 ? Math.round(Math.max.apply(null, evs) * 10) / 10 : null;
+      var hardHitPct_val = n_bip_total > 0 ? n_hard / n_bip_total : null;
+      var barrelPctAgainst = n_bip_total > 0 ? n_barrel / n_bip_total : null;
+      var ldPct_val = n_bip_total > 0 ? n_ld / n_bip_total : null;
+      var fbPct_val = n_bip_total > 0 ? n_fb_bb / n_bip_total : null;
+      var puPct_val = n_bip_total > 0 ? n_pu_bb / n_bip_total : null;
+
       var obj = {
         pitcher: lookups.pitchers[g.pitcherIdx],
         team: lookups.teams[g.teamIdx],
@@ -199,6 +245,13 @@ var Aggregator = {
         babip: babip,
         fpsPct: fpsPct,
         hrFbPct: hrFbPct,
+        avgEVAgainst: avgEVAgainst,
+        maxEVAgainst: maxEVAgainst,
+        hardHitPct: hardHitPct_val,
+        barrelPctAgainst: barrelPctAgainst,
+        ldPct: ldPct_val,
+        fbPct: fbPct_val,
+        puPct: puPct_val,
       };
 
       // Apply non-aggregator filters
