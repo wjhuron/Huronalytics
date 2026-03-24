@@ -698,9 +698,9 @@ var PlayerPage = {
     var ctx = canvas.getContext('2d');
 
     var isDark = document.body.classList.contains('dark');
-    var gridColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.12)';
-    var tickColor = isDark ? '#ccc' : '#555';
-    var crossColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.25)';
+    var gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+    var tickColor = isDark ? '#aaa' : '#666';
+    var crossColor = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)';
 
     this.chart = new Chart(ctx, {
       type: 'scatter',
