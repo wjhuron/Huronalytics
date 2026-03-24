@@ -1503,29 +1503,30 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+  background: #fff !important;
 }
 .count-table th {
   padding: 6px 10px;
   text-align: center;
   font-weight: 700;
   font-size: 11px;
-  color: var(--text-muted, #888);
-  border-bottom: 2px solid var(--border, #ddd);
+  color: #666 !important;
+  border-bottom: 2px solid #ddd;
+  background: #fff !important;
 }
 .count-table td {
   padding: 6px 10px;
   text-align: center;
-  border-bottom: 1px solid var(--border-light, #eee);
+  border-bottom: 1px solid #eee;
+  color: #1a1a2e !important;
+  background: #fff !important;
 }
 .count-table td:first-child {
   text-align: left;
   font-weight: 600;
 }
-.dark-mode .count-table th {
-  border-bottom-color: #444;
-}
-.dark-mode .count-table td {
-  border-bottom-color: #333;
+.count-table tbody tr:hover td {
+  background: #f5f5f5 !important;
 }
 
 /* --- Responsive --- */

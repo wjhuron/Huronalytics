@@ -1038,10 +1038,6 @@ var PlayerPage = {
         if (total > 0) {
           var pct = (pitchTypes[pt][gn] / total * 100);
           td.textContent = pct.toFixed(1) + '%';
-          // Subtle background tint based on usage intensity
-          var intensity = Math.min(pct / 50, 1); // normalize: 50%+ = max intensity
-          var color = Utils.getPitchColor(pt);
-          td.style.backgroundColor = color.replace('rgb', 'rgba').replace(')', ',' + (intensity * 0.2).toFixed(2) + ')');
         } else {
           td.textContent = '—';
         }
