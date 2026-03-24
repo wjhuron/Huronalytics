@@ -531,9 +531,17 @@ var PlayerPage = {
     var overallDisplay = hasAnyRV ? -overallRV : null;
     container.appendChild(buildPctlRow('Overall', overallDisplay, overallPctl));
 
-    // Per-pitch-type rows
-    for (var i = 0; i < pitchRows.length; i++) {
-      var pitch = pitchRows[i];
+    // Per-pitch-type rows (fixed order)
+    var PITCH_ORDER = ['FF','SI','CF','FC','SL','ST','CU','SV','CH','FS','KN'];
+    var sortedPitchRows = pitchRows.slice().sort(function(a, b) {
+      var ai = PITCH_ORDER.indexOf(a.pitchType);
+      var bi = PITCH_ORDER.indexOf(b.pitchType);
+      if (ai === -1) ai = 999;
+      if (bi === -1) bi = 999;
+      return ai - bi;
+    });
+    for (var i = 0; i < sortedPitchRows.length; i++) {
+      var pitch = sortedPitchRows[i];
       var rawRV = pitch.runValue;
       var displayVal = (rawRV != null) ? -rawRV : null;
       var pctl = pitch.runValue_pctl;
