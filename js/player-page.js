@@ -714,13 +714,13 @@ var PlayerPage = {
             title: { display: true, text: 'Horizontal Break (in)', color: tickColor },
             min: -25, max: 25,
             grid: { color: gridColor },
-            ticks: { color: tickColor, stepSize: 6 },
+            ticks: { color: tickColor, stepSize: 5 },
           },
           y: {
             title: { display: true, text: 'Induced Vertical Break (in)', color: tickColor },
             min: -25, max: 25,
             grid: { color: gridColor },
-            ticks: { color: tickColor, stepSize: 6 },
+            ticks: { color: tickColor, stepSize: 5 },
           },
         },
         plugins: {
