@@ -64,6 +64,19 @@ var Aggregator = {
     return [];
   },
 
+  // ---- MLB ID lookup helper (from static pre-aggregated data) ----
+  _getMlbIdMap: function (type) {
+    var data = type === 'pitcher' ? (window.PITCHER_DATA || []) : (window.HITTER_DATA || []);
+    var nameKey = type === 'pitcher' ? 'pitcher' : 'hitter';
+    var map = {};
+    for (var i = 0; i < data.length; i++) {
+      if (data[i].mlbId) {
+        map[data[i][nameKey] + '|' + data[i].team] = data[i].mlbId;
+      }
+    }
+    return map;
+  },
+
   // ---- Date filtering helper ----
   _getValidDateSet: function (filters) {
     var dates = this.data.lookups.dates;
@@ -154,6 +167,9 @@ var Aggregator = {
       }
     }
 
+    // MLB ID lookup for clickable names
+    var mlbIdMap = this._getMlbIdMap('pitcher');
+
     // Filter pitcher BIP records for batted ball stats
     var pbci = this._colIdx.pitcherBipCols;
     var pitcherBipData = d.pitcherBip || [];
@@ -225,9 +241,12 @@ var Aggregator = {
       var fbPct_val = n_bip_total > 0 ? n_fb_bb / n_bip_total : null;
       var puPct_val = n_bip_total > 0 ? n_pu_bb / n_bip_total : null;
 
+      var pitcherName = lookups.pitchers[g.pitcherIdx];
+      var teamName = lookups.teams[g.teamIdx];
       var obj = {
-        pitcher: lookups.pitchers[g.pitcherIdx],
-        team: lookups.teams[g.teamIdx],
+        pitcher: pitcherName,
+        team: teamName,
+        mlbId: mlbIdMap[pitcherName + '|' + teamName] || null,
         throws: g.throws,
         count: n,
         pa: pa,
@@ -295,6 +314,7 @@ var Aggregator = {
     var lookups = d.lookups;
     var validDates = this._getValidDateSet(filters);
     var vsHand = filters.vsHand || 'all';
+    var mlbIdMap = this._getMlbIdMap('pitcher');
 
     var METRIC_MAP = [
       { key: 'velocity', sum: 'sumVelo', cnt: 'nVelo', round: 1 },
@@ -383,9 +403,12 @@ var Aggregator = {
       var babip_val = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
       var fpsPct_val = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
 
+      var pitcherName2 = lookups.pitchers[g.pitcherIdx];
+      var teamName2 = lookups.teams[g.teamIdx];
       var obj = {
-        pitcher: lookups.pitchers[g.pitcherIdx],
-        team: lookups.teams[g.teamIdx],
+        pitcher: pitcherName2,
+        team: teamName2,
+        mlbId: mlbIdMap[pitcherName2 + '|' + teamName2] || null,
         throws: g.throws,
         pitchType: lookups.pitchTypes[g.pitchTypeIdx],
         count: n,
@@ -509,6 +532,7 @@ var Aggregator = {
     var ci = this._colIdx.hitterCols;
     var bci = this._colIdx.hitterBipCols;
     var micro = d.hitterMicro;
+    var hitterMlbIdMap = this._getMlbIdMap('hitter');
     var bipData = d.hitterBip;
     var lookups = d.lookups;
     var validDates = this._getValidDateSet(filters);
@@ -636,9 +660,12 @@ var Aggregator = {
         ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
       }
 
+      var hitterName = lookups.hitters[g.hitterIdx];
+      var hitterTeam = lookups.teams[g.teamIdx];
       var obj = {
-        hitter: lookups.hitters[g.hitterIdx],
-        team: lookups.teams[g.teamIdx],
+        hitter: hitterName,
+        team: hitterTeam,
+        mlbId: hitterMlbIdMap[hitterName + '|' + hitterTeam] || null,
         stands: stands,
         count: n_total,
         pa: pa,
@@ -723,6 +750,7 @@ var Aggregator = {
     var ci = this._colIdx.hitterPitchCols;
     var bci = this._colIdx.hitterPitchBipCols;
     var micro = d.hitterPitchMicro;
+    var hpMlbIdMap = this._getMlbIdMap('hitter');
     var bipData = d.hitterPitchBip;
     var lookups = d.lookups;
     var validDates = this._getValidDateSet(filters);
@@ -957,9 +985,12 @@ var Aggregator = {
         ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
       }
 
+      var hpName = lookups.hitters[gg2.hitterIdx];
+      var hpTeam = lookups.teams[gg2.teamIdx];
       var obj = {
-        hitter: lookups.hitters[gg2.hitterIdx],
-        team: lookups.teams[gg2.teamIdx],
+        hitter: hpName,
+        team: hpTeam,
+        mlbId: hpMlbIdMap[hpName + '|' + hpTeam] || null,
         stands: stands,
         pitchType: gg2.outputName,
         count: n_total,
