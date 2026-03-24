@@ -64,6 +64,11 @@
   var teamSelect, throwsSelect, vsHandSelect, minCountInput, minSwingsInput, searchInput;
   var minIpInput, minTbfInput, minBipInput, minPitcherSwingsInput;
   var dateStartInput, dateEndInput;
+  var currentGameType = null; // 'ST' or 'RS'
+  var GAME_TYPE_DATES = {
+    ST: { start: '2026-02-20', end: '2026-03-24' },
+    RS: { start: '2026-03-25', end: '2026-09-28' }
+  };
   var sidePanel, panelOverlay, panelClose;
 
   // ---- Init ----
@@ -377,6 +382,41 @@
     minPitcherSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
+
+    // Game Type toggle (ST / Regular Season)
+    function setGameType(type) {
+      currentGameType = type;
+      var dates = GAME_TYPE_DATES[type];
+      dateStartInput.value = dates.start;
+      dateEndInput.value = dates.end;
+      var btns = document.querySelectorAll('#game-type-toggle .game-type-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
+      }
+      Leaderboard.currentPage = 1;
+      refresh();
+    }
+    var gameTypeToggle = document.getElementById('game-type-toggle');
+    if (gameTypeToggle) {
+      gameTypeToggle.addEventListener('click', function (e) {
+        var btn = e.target.closest('.game-type-btn');
+        if (!btn) return;
+        var type = btn.getAttribute('data-type');
+        if (type === currentGameType) return;
+        setGameType(type);
+      });
+      // Auto-default based on current date
+      var today = new Date().toISOString().slice(0, 10);
+      var defaultType = today >= '2026-03-25' ? 'RS' : 'ST';
+      currentGameType = defaultType;
+      var dates = GAME_TYPE_DATES[defaultType];
+      dateStartInput.value = dates.start;
+      dateEndInput.value = dates.end;
+      var btns = document.querySelectorAll('#game-type-toggle .game-type-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === defaultType);
+      }
+    }
 
     var searchTimer = null;
     searchInput.addEventListener('input', function () {

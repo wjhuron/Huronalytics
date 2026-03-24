@@ -224,6 +224,42 @@ header {
 .tab:hover { color: #ccc; }
 .tab.active { color: white; border-bottom-color: var(--accent); }
 
+/* === Game Type Toggle === */
+.game-type-toggle {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--accent, #4a6cf7);
+}
+.game-type-btn {
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--accent, #4a6cf7);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.3px;
+}
+.game-type-btn.active {
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+}
+.game-type-btn:hover:not(.active) {
+  background: rgba(74, 108, 247, 0.1);
+}
+.dark-mode .game-type-toggle {
+  border-color: var(--accent, #4a6cf7);
+}
+.dark-mode .game-type-btn {
+  color: var(--accent, #6b8cff);
+}
+.dark-mode .game-type-btn.active {
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+}
+
 /* === Controls === */
 .controls {
   display: flex;
