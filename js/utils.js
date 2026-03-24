@@ -141,7 +141,7 @@ var Utils = {
     'IZSw%': 'In-Zone Swing Rate',
     'IZSw-Ch': 'Discipline Spread (IZ Swing% − Chase%)',
     'Whiff%': 'Whiff Rate (misses / total swings)',
-    'Med EV': 'Median Exit Velocity (mph, LA > 0 only)',
+    'Avg EV': 'Average Exit Velocity (mph, LA > 0 only)',
     'Max EV': 'Max Exit Velocity (mph, LA > 0 only)',
     'Barrel%': 'Barrel Rate (Statcast definition)',
     'LD%': 'Line Drive Rate',

@@ -648,7 +648,7 @@ var Aggregator = {
         if (bla !== null) allLA.push(bla);
       }
 
-      var medEV = evsPos.length > 0 ? Math.round(median(evsPos.slice()) * 10) / 10 : null;
+      var medEV = evsPos.length > 0 ? Math.round(evsPos.reduce(function(a,b){return a+b;},0) / evsPos.length * 10) / 10 : null;
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
@@ -973,7 +973,7 @@ var Aggregator = {
         }
       }
 
-      var medEV = evsPos.length > 0 ? Math.round(median(evsPos.slice()) * 10) / 10 : null;
+      var medEV = evsPos.length > 0 ? Math.round(evsPos.reduce(function(a,b){return a+b;},0) / evsPos.length * 10) / 10 : null;
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 

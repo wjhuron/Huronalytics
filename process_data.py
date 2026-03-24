@@ -544,7 +544,7 @@ def compute_hitter_stats(pitches):
         'iso': iso,
         'babip': babip,
         # Batted Ball tab
-        'medEV': round(median(evs_pos), 1) if evs_pos else None,
+        'medEV': round(sum(evs_pos) / len(evs_pos), 1) if evs_pos else None,
         'ev75': ev75,
         'maxEV': round(max(evs_pos), 1) if evs_pos else None,
         'medLA': round(median(all_la), 1) if all_la else None,

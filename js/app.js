@@ -996,7 +996,7 @@
       { key: 'count', label: '#', format: Utils.formatInt },
       { key: 'swingPct', label: 'Swing%', format: Utils.formatPct },
       { key: 'whiffPct', label: 'Whiff%', format: Utils.formatPct },
-      { key: 'medEV', label: 'Med EV', format: Utils.formatDecimal(1) },
+      { key: 'medEV', label: 'Avg EV', format: Utils.formatDecimal(1) },
     ];
 
     var table = document.createElement('table');
