@@ -26,13 +26,15 @@ var Utils = {
     return Math.round(value).toString();
   },
 
-  // Convert decimal feet to feet'inches format (e.g., 5.86 → "5'10")
+  // Convert decimal feet to feet'inches format (e.g., 5.86 → "5'10", -1.8 → "-1'10")
   formatFeetInches: function (value) {
     if (value === null || value === undefined) return '--';
-    var ft = Math.floor(value);
-    var inches = Math.round((value - ft) * 12);
+    var sign = value < 0 ? '-' : '';
+    var abs = Math.abs(value);
+    var ft = Math.floor(abs);
+    var inches = Math.round((abs - ft) * 12);
     if (inches === 12) { ft++; inches = 0; }
-    return ft + "'" + inches;
+    return sign + ft + "'" + inches + '"';
   },
 
   PITCH_TYPE_LABELS: {
