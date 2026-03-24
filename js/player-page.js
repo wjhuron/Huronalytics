@@ -795,21 +795,47 @@ var PlayerPage = {
       var g = byType[p.pt];
       g.count++;
       if (p.v != null) g.velos.push(p.v);
-      // Spin not in PITCH_DETAILS — skip
+      if (p.sp != null) g.spins.push(p.sp);
       if (p.ivb != null) g.ivbs.push(p.ivb);
       if (p.hb != null) g.hbs.push(p.hb);
+      // Tilt: convert H:MM to angle for circular mean
+      if (p.tl) {
+        var parts = p.tl.split(':');
+        if (parts.length === 2) {
+          var h = parseInt(parts[0], 10);
+          var m = parseInt(parts[1], 10);
+          if (h === 12) h = 0;
+          var totalMin = h * 60 + m;
+          var angle = totalMin * 2 * Math.PI / 720;
+          g.tiltSins.push(Math.sin(angle));
+          g.tiltCoss.push(Math.cos(angle));
+        }
+      }
     }
     var rows = [];
     for (var pt in byType) {
       var g = byType[pt];
       var avg = function(arr) { return arr.length > 0 ? arr.reduce(function(a,b){return a+b;},0) / arr.length : null; };
+      // Circular mean for tilt
+      var tiltStr = null;
+      if (g.tiltSins.length > 0) {
+        var avgSin = avg(g.tiltSins);
+        var avgCos = avg(g.tiltCoss);
+        var avgAngle = Math.atan2(avgSin, avgCos);
+        var avgMin = ((avgAngle * 720 / (2 * Math.PI)) % 720 + 720) % 720;
+        var tH = Math.floor(avgMin / 60);
+        var tM = Math.round(avgMin % 60);
+        if (tM === 60) { tH++; tM = 0; }
+        if (tH === 0) tH = 12;
+        tiltStr = tH + ':' + (tM < 10 ? '0' : '') + tM;
+      }
       rows.push({
         pitchType: pt,
         count: g.count,
         usagePct: total > 0 ? g.count / total : null,
         velocity: avg(g.velos),
-        spinRate: null, // not in PITCH_DETAILS
-        breakTilt: null, // would need circular mean, skip for single-game
+        spinRate: avg(g.spins),
+        breakTilt: tiltStr,
         indVertBrk: avg(g.ivbs),
         horzBrk: avg(g.hbs),
       });

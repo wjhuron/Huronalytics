@@ -1695,6 +1695,8 @@ def main():
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
         velo = safe_float(p.get('Velocity'))
+        spin = safe_float(p.get('Spin Rate'))
+        tilt = p.get('Break Tilt')
         rel_x = safe_float(p.get('RelPosX'))
         rel_z = safe_float(p.get('RelPosZ'))
         if pitcher and pt and ivb is not None and hb is not None:
@@ -1705,6 +1707,10 @@ def main():
             }
             if velo is not None:
                 detail['v'] = round(velo, 1)
+            if spin is not None:
+                detail['sp'] = int(round(spin))
+            if tilt and str(tilt).strip():
+                detail['tl'] = str(tilt).strip()
             if rel_x is not None:
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
