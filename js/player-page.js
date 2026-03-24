@@ -112,11 +112,12 @@ var PlayerPage = {
     this._renderMovementChart(data);
     this._renderPitchTable(data);
     this._renderExpandedPitchTable(data);
-    this._currentHand = 'R';
+    this._heatMapHand = 'R';
+    this._countHand = 'R';
     this._currentData = data;
     this._renderHeatMaps(data);
     this._renderCountTable(data);
-    this._bindHandToggle();
+    this._bindHandToggles();
   },
 
   _renderHitterPage: function (data) {
@@ -151,11 +152,12 @@ var PlayerPage = {
 
   close: function () {
     this.isOpen = false;
-    this._currentHand = 'R';
+    this._heatMapHand = 'R';
+    this._countHand = 'R';
     this._currentData = null;
     this.destroyChart();
     this._unbindClickOutside();
-    this._unbindHandToggle();
+    this._unbindHandToggles();
 
     // Hide new sections
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section'];
@@ -788,7 +790,7 @@ var PlayerPage = {
     if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
 
     section.style.display = '';
-    var hand = this._currentHand || 'R';
+    var hand = this._heatMapHand || 'R';
 
     // Compute average strike zone across ALL pitches (not per-type)
     var szTopSum = 0, szBotSum = 0, szCount = 0;
@@ -950,7 +952,7 @@ var PlayerPage = {
     if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
 
     section.style.display = '';
-    var hand = this._currentHand || 'R';
+    var hand = this._countHand || 'R';
 
     var COUNT_GROUPS = {
       'First Pitch': ['0-0'],
@@ -1051,33 +1053,49 @@ var PlayerPage = {
 
   // --- Hand Toggle (for heat maps and count table) ---
 
-  _bindHandToggle: function() {
+  _bindHandToggles: function() {
     var self = this;
-    this._handToggleHandler = function(e) {
+    // Heat map toggle
+    this._heatToggleHandler = function(e) {
       var btn = e.target.closest('.hand-toggle-btn');
       if (!btn) return;
       var hand = btn.getAttribute('data-hand');
-      if (hand === self._currentHand) return;
-      self._currentHand = hand;
-      // Update active class
+      if (hand === self._heatMapHand) return;
+      self._heatMapHand = hand;
       var btns = document.querySelectorAll('#hand-toggle .hand-toggle-btn');
       for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
       btn.classList.add('active');
-      // Re-render heat maps and count table
-      if (self._currentData) {
-        self._renderHeatMaps(self._currentData);
-        self._renderCountTable(self._currentData);
-      }
+      if (self._currentData) self._renderHeatMaps(self._currentData);
     };
-    var toggle = document.getElementById('hand-toggle');
-    if (toggle) toggle.addEventListener('click', this._handToggleHandler);
+    var heatToggle = document.getElementById('hand-toggle');
+    if (heatToggle) heatToggle.addEventListener('click', this._heatToggleHandler);
+
+    // Count table toggle
+    this._countToggleHandler = function(e) {
+      var btn = e.target.closest('.hand-toggle-btn');
+      if (!btn) return;
+      var hand = btn.getAttribute('data-hand');
+      if (hand === self._countHand) return;
+      self._countHand = hand;
+      var btns = document.querySelectorAll('#count-hand-toggle .hand-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      if (self._currentData) self._renderCountTable(self._currentData);
+    };
+    var countToggle = document.getElementById('count-hand-toggle');
+    if (countToggle) countToggle.addEventListener('click', this._countToggleHandler);
   },
 
-  _unbindHandToggle: function() {
-    if (this._handToggleHandler) {
-      var toggle = document.getElementById('hand-toggle');
-      if (toggle) toggle.removeEventListener('click', this._handToggleHandler);
-      this._handToggleHandler = null;
+  _unbindHandToggles: function() {
+    if (this._heatToggleHandler) {
+      var el = document.getElementById('hand-toggle');
+      if (el) el.removeEventListener('click', this._heatToggleHandler);
+      this._heatToggleHandler = null;
+    }
+    if (this._countToggleHandler) {
+      var el = document.getElementById('count-hand-toggle');
+      if (el) el.removeEventListener('click', this._countToggleHandler);
+      this._countToggleHandler = null;
     }
   },
 

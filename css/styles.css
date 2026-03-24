@@ -1478,7 +1478,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 /* Heat map grid */
 .heatmap-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 .heatmap-cell {
