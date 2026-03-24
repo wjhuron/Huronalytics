@@ -453,23 +453,6 @@ var Leaderboard = {
         leagueTr.cells[ci].style.zIndex = leagueTr.cells[ci].classList.contains('sticky-col') ? '5' : '3';
       }
 
-      // Team Average: only when a single team is selected
-      if (opts.teamFilter && opts.teamFilter !== 'all' && data.length > 0) {
-        var teamAvgRow = this.computeLeagueAvgRow(data, visCols);
-        teamAvgRow.pitcher = opts.teamFilter + ' Avg';
-        teamAvgRow.hitter = opts.teamFilter + ' Avg';
-        teamAvgRow._isTeamAvg = true;
-        var teamTr = this._createRow(teamAvgRow, visCols, -1, isDark, true);
-        teamTr.classList.add('league-avg-row', 'team-avg-row');
-        pinnedBody.appendChild(teamTr);
-
-        var leagueRowHeight = leagueTr.offsetHeight || 30;
-        for (var ti = 0; ti < teamTr.cells.length; ti++) {
-          teamTr.cells[ti].style.position = 'sticky';
-          teamTr.cells[ti].style.top = (thHeight + leagueRowHeight) + 'px';
-          teamTr.cells[ti].style.zIndex = teamTr.cells[ti].classList.contains('sticky-col') ? '5' : '3';
-        }
-      }
     }
 
     var fragment = document.createDocumentFragment();
