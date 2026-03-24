@@ -710,6 +710,7 @@ var PlayerPage = {
         responsive: true,
         maintainAspectRatio: true,
         aspectRatio: 1,
+        animation: false,
         scales: {
           x: {
             title: { display: true, text: 'Horizontal Break (in)', color: tickColor },
