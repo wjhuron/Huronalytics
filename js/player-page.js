@@ -105,6 +105,7 @@ var PlayerPage = {
   _renderPitcherPage: function (data) {
     this._showPitcherLayout();
     this._renderIdentity(data);
+    this._renderUsage(data); // Static — always shows all games
     this._heatMapHand = 'R';
     this._countHand = 'R';
     this._gameDate = null; // null = all games
@@ -115,9 +116,8 @@ var PlayerPage = {
     this._bindGameLog();
   },
 
-  // Render all pitcher content sections (called on initial load and game date change)
+  // Render game-date-sensitive sections (called on initial load and game date change)
   _renderPitcherContent: function (data) {
-    this._renderUsage(data);
     document.getElementById('player-percentiles').innerHTML = '';
     this._renderPitchRunValues(data);
     this._renderPercentiles(data, this.PITCHING_STATS, true);
@@ -386,22 +386,43 @@ var PlayerPage = {
   // --- Render: Pitch Usage (vs LHH / vs RHH) ---
 
   _renderUsage: function (data) {
-    var pitches = this._getFilteredDetails(data);
+    var microData = window.MICRO_DATA;
+    if (!microData || !microData.pitchMicro) return;
 
-    // Aggregate usage from pitch details by batter hand
+    var pitcherName = data.pitcher;
+    var team = data.team;
+
+    var lookups = microData.lookups || {};
+    var pitcherIdx = (lookups.pitchers || []).indexOf(pitcherName);
+    var teamIdx = (lookups.teams || []).indexOf(team);
+    if (pitcherIdx < 0 || teamIdx < 0) return;
+
+    var pitchTypes = lookups.pitchTypes || [];
+
     var usageByHand = { L: {}, R: {} };
     var totalByHand = { L: 0, R: 0 };
 
-    for (var i = 0; i < pitches.length; i++) {
-      var p = pitches[i];
-      var bh = p.bh;
-      var pt = p.pt;
-      if (!bh || !pt) continue;
-      if (!usageByHand[bh]) usageByHand[bh] = {};
-      if (!usageByHand[bh][pt]) usageByHand[bh][pt] = 0;
-      usageByHand[bh][pt]++;
-      if (!totalByHand[bh]) totalByHand[bh] = 0;
-      totalByHand[bh]++;
+    var cols = microData.pitchCols;
+    var piIdx = cols.indexOf('pitcherIdx');
+    var tiIdx = cols.indexOf('teamIdx');
+    var ptIdx = cols.indexOf('pitchTypeIdx');
+    var bhIdx = cols.indexOf('batterHand');
+    var nIdx = cols.indexOf('n');
+
+    var rows = microData.pitchMicro;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r[piIdx] === pitcherIdx && r[tiIdx] === teamIdx) {
+        var bh = r[bhIdx];
+        var ptI = r[ptIdx];
+        var n = r[nIdx];
+        var pt = pitchTypes[ptI];
+        if (!usageByHand[bh]) usageByHand[bh] = {};
+        if (!usageByHand[bh][pt]) usageByHand[bh][pt] = 0;
+        usageByHand[bh][pt] += n;
+        if (!totalByHand[bh]) totalByHand[bh] = 0;
+        totalByHand[bh] += n;
+      }
     }
 
     this._renderUsageBars('player-usage-lhh', usageByHand.L || {}, totalByHand.L || 0);
@@ -763,11 +784,52 @@ var PlayerPage = {
 
   // --- Render: Pitch Usage Table (below chart) ---
 
+  // Aggregate PITCH_DETAILS into per-pitch-type rows (same format as PITCH_DATA)
+  _aggregateDetailsToRows: function (pitches) {
+    var byType = {};
+    var total = pitches.length;
+    for (var i = 0; i < pitches.length; i++) {
+      var p = pitches[i];
+      if (!p.pt) continue;
+      if (!byType[p.pt]) byType[p.pt] = { count: 0, velos: [], spins: [], ivbs: [], hbs: [], tiltSins: [], tiltCoss: [] };
+      var g = byType[p.pt];
+      g.count++;
+      if (p.v != null) g.velos.push(p.v);
+      // Spin not in PITCH_DETAILS — skip
+      if (p.ivb != null) g.ivbs.push(p.ivb);
+      if (p.hb != null) g.hbs.push(p.hb);
+    }
+    var rows = [];
+    for (var pt in byType) {
+      var g = byType[pt];
+      var avg = function(arr) { return arr.length > 0 ? arr.reduce(function(a,b){return a+b;},0) / arr.length : null; };
+      rows.push({
+        pitchType: pt,
+        count: g.count,
+        usagePct: total > 0 ? g.count / total : null,
+        velocity: avg(g.velos),
+        spinRate: null, // not in PITCH_DETAILS
+        breakTilt: null, // would need circular mean, skip for single-game
+        indVertBrk: avg(g.ivbs),
+        horzBrk: avg(g.hbs),
+      });
+    }
+    rows.sort(function(a, b) { return (b.usagePct || 0) - (a.usagePct || 0); });
+    return rows;
+  },
+
   _renderPitchTable: function (data) {
     var container = document.getElementById('player-pitch-usage-table');
     container.innerHTML = '';
 
-    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    var pitchRows;
+    if (this._gameDate) {
+      // Single game: aggregate from filtered pitch details
+      var filtered = this._getFilteredDetails(data);
+      pitchRows = this._aggregateDetailsToRows(filtered);
+    } else {
+      pitchRows = this._getPitchRows(data.pitcher, data.team);
+    }
     if (pitchRows.length === 0) return;
 
     var table = document.createElement('table');
