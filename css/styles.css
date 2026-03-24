@@ -265,7 +265,8 @@ header {
 }
 .dark .game-log-chip {
   border-color: #555;
-  color: #fff;
+  background: #ddd;
+  color: #000;
 }
 .dark .game-log-chip.active {
   background: var(--accent, #4a6cf7);
@@ -1238,7 +1239,18 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .dark .player-col {
   background: var(--row-bg, #1e1e3a);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  color: #fff;
+}
+.dark .player-name,
+.dark .player-position,
+.dark .player-age,
+.dark .section-title,
+.dark .pctl-label,
+.dark .pctl-value,
+.dark .usage-label,
+.dark .usage-pct,
+.dark .usage-hand-label,
+.dark .player-col {
+  color: #fff !important;
 }
 
 .section-title {
@@ -1500,7 +1512,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .dark .player-full-width {
   background: var(--row-bg, #1e1e3a);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  color: #fff;
+  color: #fff !important;
 }
 .player-full-width .section-title {
   font-size: 13px;
