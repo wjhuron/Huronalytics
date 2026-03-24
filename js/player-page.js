@@ -393,7 +393,7 @@ var PlayerPage = {
     var container = document.getElementById('player-percentiles');
     if (!append) container.innerHTML = '';
 
-    var isDark = document.body.classList.contains('dark-mode');
+    var isDark = document.body.classList.contains('dark');
 
     for (var i = 0; i < statsDef.length; i++) {
       var stat = statsDef[i];
@@ -452,7 +452,7 @@ var PlayerPage = {
 
   _renderPitchRunValues: function (data) {
     var container = document.getElementById('player-percentiles');
-    var isDark = document.body.classList.contains('dark-mode');
+    var isDark = document.body.classList.contains('dark');
 
     // Get this pitcher's pitch rows
     var pitchRows = this._getPitchRows(data.pitcher, data.team);
@@ -599,7 +599,7 @@ var PlayerPage = {
     var canvas = document.getElementById('player-pitch-chart');
     var ctx = canvas.getContext('2d');
 
-    var isDark = document.body.classList.contains('dark-mode');
+    var isDark = document.body.classList.contains('dark');
     var gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     var tickColor = isDark ? '#aaa' : '#666';
     var crossColor = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)';
@@ -860,7 +860,7 @@ var PlayerPage = {
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
     var H = canvas.height;
-    var isDark = document.body.classList.contains('dark-mode');
+    var isDark = document.body.classList.contains('dark');
 
     // Plot bounds in feet
     var xMin = -2.0, xMax = 2.0;
@@ -1124,7 +1124,7 @@ var PlayerPage = {
     var fb = data.fbPct || 0;
     var pu = data.puPct || 0;
 
-    var isDark = document.body.classList.contains('dark-mode');
+    var isDark = document.body.classList.contains('dark');
     var labelColor = isDark ? '#ccc' : '#333';
 
     this.chart = new Chart(ctx, {

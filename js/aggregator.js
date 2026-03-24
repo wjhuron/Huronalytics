@@ -145,11 +145,11 @@ var Aggregator = {
           pitcherIdx: row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         };
       }
       var c = groups[gk].counts;
-      for (var f = 0; f < 24; f++) {
+      for (var f = 0; f < 25; f++) {
         c[f] += row[ci.n + f];
       }
     }
@@ -167,7 +167,7 @@ var Aggregator = {
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
       var izSw = c[18], izWh = c[19];
-      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23];
+      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24];
       var ab = pa - bb - hbp - sf - sh - ci_val;
 
       var kPct = pa > 0 ? k / pa : null;
@@ -176,7 +176,8 @@ var Aggregator = {
       var babip_denom = ab - k - hr + sf;
       var babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
       var fpsPct = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
-      var hrFbPct = fb_cnt > 0 ? nHrBip / fb_cnt : null;
+      var fb_for_hrfb = fb_cnt + ldHr;
+      var hrFbPct = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       var obj = {
         pitcher: lookups.pitchers[g.pitcherIdx],
@@ -259,7 +260,7 @@ var Aggregator = {
     ];
     var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ'; });
     var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
-    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA']).concat(PITCH_STAT_KEYS);
+    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -473,15 +474,15 @@ var Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           batsSet: {},
-          counts: new Array(36)
+          counts: new Array(37)
         };
-        for (var z = 0; z < 36; z++) groups[gk].counts[z] = 0;
+        for (var z = 0; z < 37; z++) groups[gk].counts[z] = 0;
       }
 
       var g = groups[gk];
       g.batsSet[row[ci.bats]] = true;
 
-      for (var f = 0; f < 36; f++) {
+      for (var f = 0; f < 37; f++) {
         g.counts[f] += row[5 + f];
       }
     }
@@ -531,7 +532,7 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
-      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35];
+      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35], ldHr = c[36];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -557,7 +558,8 @@ var Aggregator = {
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
       var hardHitPct = bip > 0 ? hardHit / bip : null;
       var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
-      var hrFbPct_val = fb > 0 ? nHrBip / fb : null;
+      var fb_for_hrfb = fb + ldHr;
+      var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians
       var bipRecords = bipByHitter[g.hitterIdx] || [];
@@ -587,6 +589,7 @@ var Aggregator = {
         stands: stands,
         count: n_total,
         pa: pa,
+        ab: ab,
         nSwings: swings,
         nBip: bip,
         avg: batting_avg,
@@ -733,11 +736,11 @@ var Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          counts: new Array(36)
+          counts: new Array(37)
         };
-        for (var z = 0; z < 36; z++) perPT[gk].counts[z] = 0;
+        for (var z = 0; z < 37; z++) perPT[gk].counts[z] = 0;
       }
-      for (var f = 0; f < 36; f++) {
+      for (var f = 0; f < 37; f++) {
         perPT[gk].counts[f] += row[6 + f];
       }
     }
@@ -795,13 +798,13 @@ var Aggregator = {
               hitterIdx: entry.hitterIdx,
               teamIdx: entry.teamIdx,
               outputName: og.name,
-              counts: new Array(36),
+              counts: new Array(37),
               bipPtIdxs: []
             };
-            for (var z2 = 0; z2 < 36; z2++) groups[outKey].counts[z2] = 0;
+            for (var z2 = 0; z2 < 37; z2++) groups[outKey].counts[z2] = 0;
           }
           var gg = groups[outKey];
-          for (var f2 = 0; f2 < 36; f2++) {
+          for (var f2 = 0; f2 < 37; f2++) {
             gg.counts[f2] += entry.counts[f2];
           }
           if (gg.bipPtIdxs.indexOf(ptIdx) === -1) gg.bipPtIdxs.push(ptIdx);
@@ -816,12 +819,12 @@ var Aggregator = {
             hitterIdx: entry.hitterIdx,
             teamIdx: entry.teamIdx,
             outputName: ptName,
-            counts: new Array(36),
+            counts: new Array(37),
             bipPtIdxs: [ptIdx]
           };
-          for (var z3 = 0; z3 < 36; z3++) groups[outKey2].counts[z3] = 0;
+          for (var z3 = 0; z3 < 37; z3++) groups[outKey2].counts[z3] = 0;
         }
-        for (var f3 = 0; f3 < 36; f3++) {
+        for (var f3 = 0; f3 < 37; f3++) {
           groups[outKey2].counts[f3] += entry.counts[f3];
         }
       }
@@ -857,7 +860,7 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
-      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35];
+      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35], ldHr = c[36];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -873,7 +876,8 @@ var Aggregator = {
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
       var hardHitPct = bip > 0 ? hardHit / bip : null;
       var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
-      var hrFbPct_val = fb > 0 ? nHrBip / fb : null;
+      var fb_for_hrfb = fb + ldHr;
+      var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians — combine BIP records from all pitch types in this group
       var evsPos = [], allLA = [];
