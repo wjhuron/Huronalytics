@@ -1206,7 +1206,11 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 }
 
 .player-page-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .player-page-nav .toolbar-btn {
@@ -1231,6 +1235,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .dark .player-col {
   background: var(--row-bg, #1e1e3a);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  color: #e0e0e0;
 }
 
 .section-title {
@@ -1492,6 +1497,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .dark .player-full-width {
   background: var(--row-bg, #1e1e3a);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  color: #e0e0e0;
 }
 .player-full-width .section-title {
   font-size: 13px;
