@@ -550,6 +550,7 @@ var PlayerPage = {
 
     // Section label
     var sectionLabel = document.createElement('div');
+    sectionLabel.className = 'pctl-section-label';
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
     sectionLabel.textContent = 'Pitch Run Value';
     container.appendChild(sectionLabel);

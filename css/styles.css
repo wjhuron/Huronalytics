@@ -1246,10 +1246,12 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .dark .section-title,
 .dark .pctl-label,
 .dark .pctl-value,
+.dark .pctl-section-label,
 .dark .usage-label,
 .dark .usage-pct,
 .dark .usage-hand-label,
-.dark .player-col {
+.dark .player-col,
+.dark .player-page-nav .toolbar-btn {
   color: #fff !important;
 }
 
