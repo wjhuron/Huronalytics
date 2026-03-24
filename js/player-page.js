@@ -386,45 +386,22 @@ var PlayerPage = {
   // --- Render: Pitch Usage (vs LHH / vs RHH) ---
 
   _renderUsage: function (data) {
-    var microData = window.MICRO_DATA;
-    if (!microData || !microData.pitchMicro) return;
+    var pitches = this._getFilteredDetails(data);
 
-    var pitcherName = data.pitcher;
-    var team = data.team;
-
-    // Find pitcher/team indices from micro data lookups
-    var lookups = microData.lookups || {};
-    var pitcherIdx = (lookups.pitchers || []).indexOf(pitcherName);
-    var teamIdx = (lookups.teams || []).indexOf(team);
-    if (pitcherIdx < 0 || teamIdx < 0) return;
-
-    var pitchTypes = lookups.pitchTypes || [];
-
-    // Aggregate usage from pitchMicro by batter hand
+    // Aggregate usage from pitch details by batter hand
     var usageByHand = { L: {}, R: {} };
     var totalByHand = { L: 0, R: 0 };
 
-    var cols = microData.pitchCols;
-    var piIdx = cols.indexOf('pitcherIdx');
-    var tiIdx = cols.indexOf('teamIdx');
-    var ptIdx = cols.indexOf('pitchTypeIdx');
-    var bhIdx = cols.indexOf('batterHand');
-    var nIdx = cols.indexOf('n');
-
-    var rows = microData.pitchMicro;
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      if (r[piIdx] === pitcherIdx && r[tiIdx] === teamIdx) {
-        var bh = r[bhIdx]; // 'L' or 'R' string
-        var ptI = r[ptIdx];
-        var n = r[nIdx];
-        var pt = pitchTypes[ptI];
-        if (!usageByHand[bh]) usageByHand[bh] = {};
-        if (!usageByHand[bh][pt]) usageByHand[bh][pt] = 0;
-        usageByHand[bh][pt] += n;
-        if (!totalByHand[bh]) totalByHand[bh] = 0;
-        totalByHand[bh] += n;
-      }
+    for (var i = 0; i < pitches.length; i++) {
+      var p = pitches[i];
+      var bh = p.bh;
+      var pt = p.pt;
+      if (!bh || !pt) continue;
+      if (!usageByHand[bh]) usageByHand[bh] = {};
+      if (!usageByHand[bh][pt]) usageByHand[bh][pt] = 0;
+      usageByHand[bh][pt]++;
+      if (!totalByHand[bh]) totalByHand[bh] = 0;
+      totalByHand[bh]++;
     }
 
     this._renderUsageBars('player-usage-lhh', usageByHand.L || {}, totalByHand.L || 0);
