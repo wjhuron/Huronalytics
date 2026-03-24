@@ -663,7 +663,7 @@
       pitchTypes: (selectedPitchTypes.length === 0 || (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All')) ? 'all' : selectedPitchTypes,
       throws: throwsSelect.value,
       vsHand: vsHandSelect.value,
-      minCount: parseInt(minCountInput.value) || 1,
+      minCount: currentTab === 'pitcherStats' ? 0 : (parseInt(minCountInput.value) || 1),
       minSwings: parseInt(minSwingsInput.value) || 1,
       minIp: currentTab === 'pitcherStats' ? (parseFloat(minIpInput.value) || 0) : 0,
       minTbf: currentTab === 'pitcherStats' ? (parseInt(minTbfInput.value) || 1) : 0,
