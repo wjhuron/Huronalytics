@@ -329,9 +329,11 @@ def compute_pitcher_batted_ball(pitches):
     fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
     pu = sum(1 for p in bip if p.get('BBType') == 'popup')
 
-    # HR/FB ratio
+    # HR/FB ratio — denominator = fly balls + line drive HRs
     n_hr_bb = sum(1 for p in bip if p.get('Event') == 'Home Run')
-    hr_fb_pct = round(n_hr_bb / fb, 4) if fb > 0 else None
+    ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
+    fb_for_hrfb = fb + ld_hr
+    hr_fb_pct = round(n_hr_bb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     return {
         'avgEVAgainst': avg_ev,
@@ -516,9 +518,11 @@ def compute_hitter_stats(pitches):
     sweet_spot = sum(1 for la in all_la if 8 <= la <= 32)
     la_sweet_spot_pct = sweet_spot / len(all_la) if all_la else None
 
-    # HR/FB ratio for hitters
+    # HR/FB ratio for hitters — denominator = fly balls + line drive HRs
     n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
-    hr_fb_pct = round(n_hr_fb / fb, 4) if fb > 0 else None
+    ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
+    fb_for_hrfb = fb + ld_hr
+    hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     return {
         # Info / counts
