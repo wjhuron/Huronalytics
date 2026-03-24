@@ -1709,6 +1709,10 @@ def main():
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
                 detail['rz'] = round(rel_z, 2)
+            # Game date — for game log filter on player pages
+            gd_val = normalize_date(p.get('Game Date'))
+            if gd_val:
+                detail['gd'] = gd_val
             # Pitch location, strike zone, batter hand, count — for heat maps & count table
             px_val = safe_float(p.get('PlateX'))
             pz_val = safe_float(p.get('PlateZ'))

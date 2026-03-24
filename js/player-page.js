@@ -105,6 +105,18 @@ var PlayerPage = {
   _renderPitcherPage: function (data) {
     this._showPitcherLayout();
     this._renderIdentity(data);
+    this._heatMapHand = 'R';
+    this._countHand = 'R';
+    this._gameDate = null; // null = all games
+    this._currentData = data;
+    this._renderGameLog(data);
+    this._renderPitcherContent(data);
+    this._bindHandToggles();
+    this._bindGameLog();
+  },
+
+  // Render all pitcher content sections (called on initial load and game date change)
+  _renderPitcherContent: function (data) {
     this._renderUsage(data);
     document.getElementById('player-percentiles').innerHTML = '';
     this._renderPitchRunValues(data);
@@ -112,12 +124,90 @@ var PlayerPage = {
     this._renderMovementChart(data);
     this._renderPitchTable(data);
     this._renderExpandedPitchTable(data);
-    this._heatMapHand = 'R';
-    this._countHand = 'R';
-    this._currentData = data;
     this._renderHeatMaps(data);
     this._renderCountTable(data);
-    this._bindHandToggles();
+  },
+
+  // Get PITCH_DETAILS for this pitcher, optionally filtered by _gameDate
+  _getFilteredDetails: function (data) {
+    var details = window.PITCH_DETAILS || {};
+    var key = data.pitcher + '|' + data.team;
+    var pitches = details[key];
+    if (!pitches || pitches.length === 0) return [];
+    if (!this._gameDate) return pitches;
+    var gd = this._gameDate;
+    return pitches.filter(function (p) { return p.gd === gd; });
+  },
+
+  // Get unique game dates for this pitcher from PITCH_DETAILS
+  _getGameDates: function (data) {
+    var details = window.PITCH_DETAILS || {};
+    var key = data.pitcher + '|' + data.team;
+    var pitches = details[key];
+    if (!pitches) return [];
+    var dateSet = {};
+    for (var i = 0; i < pitches.length; i++) {
+      if (pitches[i].gd) dateSet[pitches[i].gd] = true;
+    }
+    return Object.keys(dateSet).sort();
+  },
+
+  _renderGameLog: function (data) {
+    var container = document.getElementById('player-game-log');
+    container.innerHTML = '';
+    var dates = this._getGameDates(data);
+    if (dates.length <= 1) { container.style.display = 'none'; return; }
+
+    container.style.display = '';
+    var label = document.createElement('span');
+    label.className = 'game-log-label';
+    label.textContent = 'Game:';
+    container.appendChild(label);
+
+    // "All" chip
+    var allChip = document.createElement('button');
+    allChip.className = 'game-log-chip active';
+    allChip.setAttribute('data-date', '');
+    allChip.textContent = 'All';
+    container.appendChild(allChip);
+
+    // Date chips
+    for (var i = 0; i < dates.length; i++) {
+      var chip = document.createElement('button');
+      chip.className = 'game-log-chip';
+      chip.setAttribute('data-date', dates[i]);
+      // Format date nicely: "3/5" from "2026-03-05"
+      var parts = dates[i].split('-');
+      chip.textContent = parseInt(parts[1]) + '/' + parseInt(parts[2]);
+      container.appendChild(chip);
+    }
+  },
+
+  _bindGameLog: function () {
+    var self = this;
+    this._gameLogHandler = function (e) {
+      var chip = e.target.closest('.game-log-chip');
+      if (!chip) return;
+      var date = chip.getAttribute('data-date') || null;
+      if (date === (self._gameDate || '')) return;
+      self._gameDate = date || null;
+      // Update active state
+      var chips = document.querySelectorAll('#player-game-log .game-log-chip');
+      for (var i = 0; i < chips.length; i++) chips[i].classList.remove('active');
+      chip.classList.add('active');
+      // Re-render content
+      if (self._currentData) self._renderPitcherContent(self._currentData);
+    };
+    var container = document.getElementById('player-game-log');
+    if (container) container.addEventListener('click', this._gameLogHandler);
+  },
+
+  _unbindGameLog: function () {
+    if (this._gameLogHandler) {
+      var container = document.getElementById('player-game-log');
+      if (container) container.removeEventListener('click', this._gameLogHandler);
+      this._gameLogHandler = null;
+    }
   },
 
   _renderHitterPage: function (data) {
@@ -154,10 +244,12 @@ var PlayerPage = {
     this.isOpen = false;
     this._heatMapHand = 'R';
     this._countHand = 'R';
+    this._gameDate = null;
     this._currentData = null;
     this.destroyChart();
     this._unbindClickOutside();
     this._unbindHandToggles();
+    this._unbindGameLog();
 
     // Hide new sections
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section'];
@@ -568,9 +660,17 @@ var PlayerPage = {
     var pitcherName = data.pitcher;
     var team = data.team;
 
-    // Reuse ScatterChart's data building
-    var groups = ScatterChart._buildMovementData(pitcherName, team);
-    if (!groups) return;
+    // Build movement data from filtered pitch details
+    var filteredPitches = this._getFilteredDetails(data);
+    if (filteredPitches.length === 0) return;
+    var groups = {};
+    for (var fi = 0; fi < filteredPitches.length; fi++) {
+      var fp = filteredPitches[fi];
+      if (fp.ivb == null || fp.hb == null) continue;
+      if (!groups[fp.pt]) groups[fp.pt] = [];
+      groups[fp.pt].push({ x: fp.hb, y: fp.ivb });
+    }
+    if (Object.keys(groups).length === 0) return;
 
     var datasets = [];
     var ellipseMeta = [];
@@ -792,9 +892,7 @@ var PlayerPage = {
     var grid = document.getElementById('player-heatmap-grid');
     grid.innerHTML = '';
 
-    var details = window.PITCH_DETAILS || {};
-    var key = data.pitcher + '|' + data.team;
-    var pitches = details[key];
+    var pitches = this._getFilteredDetails(data);
     if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
 
     section.style.display = '';
@@ -958,10 +1056,8 @@ var PlayerPage = {
     var container = document.getElementById('player-count-table');
     container.innerHTML = '';
 
-    var details = window.PITCH_DETAILS || {};
-    var key = data.pitcher + '|' + data.team;
-    var pitches = details[key];
-    if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
+    var pitches = this._getFilteredDetails(data);
+    if (pitches.length === 0) { section.style.display = 'none'; return; }
 
     section.style.display = '';
     var hand = this._countHand || 'R';
