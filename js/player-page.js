@@ -822,9 +822,14 @@ var PlayerPage = {
       byType[p.pt].push(p);
     }
 
-    // Sort pitch types by count (descending)
+    // Sort pitch types by fixed order
+    var PITCH_ORDER = ['FF','SI','CF','FC','SL','ST','CU','SV','CH','FS','KN'];
     var types = Object.keys(byType);
-    types.sort(function(a, b) { return byType[b].length - byType[a].length; });
+    types.sort(function(a, b) {
+      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+      return ai - bi;
+    });
 
     // Render each pitch type
     for (var t = 0; t < types.length; t++) {
