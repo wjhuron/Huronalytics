@@ -261,7 +261,7 @@ header {
   color: var(--accent, #4a6cf7);
 }
 .dark .game-log-label {
-  color: #fff;
+  color: #000;
 }
 .dark .game-log-chip {
   border-color: #555;
@@ -1251,7 +1251,9 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .dark .usage-pct,
 .dark .usage-hand-label,
 .dark .player-col,
-.dark .player-page-nav .toolbar-btn {
+.dark .player-page-nav .toolbar-btn,
+.dark .player-usage-section h3,
+.dark .player-usage-section h4 {
   color: #fff !important;
 }
 
