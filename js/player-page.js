@@ -852,11 +852,11 @@ var PlayerPage = {
       cell.appendChild(canvas);
 
       grid.appendChild(cell);
-      this._renderSingleHeatMap(canvas, byType[pt], avgSzTop, avgSzBot);
+      this._renderSingleHeatMap(canvas, byType[pt], avgSzTop, avgSzBot, hand);
     }
   },
 
-  _renderSingleHeatMap: function(canvas, pitches, szTop, szBot) {
+  _renderSingleHeatMap: function(canvas, pitches, szTop, szBot, hand) {
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
     var H = canvas.height;
@@ -930,7 +930,9 @@ var PlayerPage = {
     ctx.lineTo(plateCX - 5, plateY + 5);
     ctx.closePath();
     ctx.fill();
+
   },
+
 
   _heatColor: function(t) {
     // Blue (cold) -> white (mid) -> red (hot), like Baseball Savant
