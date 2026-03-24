@@ -129,7 +129,6 @@ var COLUMNS = {
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'puPct',       label: 'PU%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
-    { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     // Spray
     { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'spray' },
     { key: 'middlePct',   label: 'Middle%',  format: Utils.formatPct, sortType: 'numeric', group: 'spray' },
