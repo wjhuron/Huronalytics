@@ -260,11 +260,11 @@ header {
   border-color: var(--accent, #4a6cf7);
   color: var(--accent, #4a6cf7);
 }
-.dark-mode .game-log-chip {
+.dark .game-log-chip {
   border-color: #444;
   color: var(--text-primary, #ccc);
 }
-.dark-mode .game-log-chip.active {
+.dark .game-log-chip.active {
   background: var(--accent, #4a6cf7);
   color: #fff;
   border-color: var(--accent, #4a6cf7);
@@ -295,13 +295,13 @@ header {
 .game-type-btn:hover:not(.active) {
   background: rgba(74, 108, 247, 0.1);
 }
-.dark-mode .game-type-toggle {
+.dark .game-type-toggle {
   border-color: var(--accent, #4a6cf7);
 }
-.dark-mode .game-type-btn {
+.dark .game-type-btn {
   color: var(--accent, #6b8cff);
 }
-.dark-mode .game-type-btn.active {
+.dark .game-type-btn.active {
   background: var(--accent, #4a6cf7);
   color: #fff;
 }
@@ -1228,7 +1228,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
-.dark-mode .player-col {
+.dark .player-col {
   background: var(--row-bg, #1e1e3a);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
@@ -1333,7 +1333,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   overflow: hidden;
 }
 
-.dark-mode .usage-bar-track {
+.dark .usage-bar-track {
   background: rgba(255,255,255,0.08);
 }
 
@@ -1387,7 +1387,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   position: relative;
 }
 
-.dark-mode .pctl-bar-track {
+.dark .pctl-bar-track {
   background: rgba(255,255,255,0.08);
 }
 
@@ -1489,7 +1489,7 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   margin-top: 24px;
 }
-.dark-mode .player-full-width {
+.dark .player-full-width {
   background: var(--row-bg, #1e1e3a);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
@@ -1546,13 +1546,13 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   background: var(--accent, #4a6cf7);
   color: #fff;
 }
-.dark-mode .hand-toggle {
+.dark .hand-toggle {
   border-color: #444;
 }
-.dark-mode .hand-toggle-btn {
+.dark .hand-toggle-btn {
   color: var(--text-primary, #ccc);
 }
-.dark-mode .hand-toggle-btn.active {
+.dark .hand-toggle-btn.active {
   background: var(--accent, #4a6cf7);
   color: #fff;
 }
