@@ -67,16 +67,14 @@ var PlayerPage = {
     { key: 'hra', label: 'HRA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
   ],
 
-  // Stats table (single row, pitcher-level)
+  // Stats table (single row, pitcher-level) — matches leaderboard column order
   STATS_COLS: [
-    { key: 'count', label: 'Pitches', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'pa', label: 'TBF', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kbbPct', label: 'K-BB%', format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; } },
     { key: 'gs', label: 'GS', format: function(v) { return v != null ? v : '—'; } },
     { key: 'ip', label: 'IP', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kbbPct', label: 'K-BB%', format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'era', label: 'ERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'xERA', label: 'xERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'eraMinusXera', label: 'ERA-xERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
