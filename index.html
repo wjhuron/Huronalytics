@@ -247,13 +247,21 @@
         <div id="player-percentiles" class="percentile-bars-container"></div>
       </div>
 
-      <!-- Column 3: Movement Profile -->
+      <!-- Column 3: Movement Profile / Spray Chart -->
       <div class="player-col player-col-movement">
-        <h3 class="section-title">Movement Profile</h3>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h3 class="section-title" style="margin:0;">Movement Profile</h3>
+          <div class="spray-toggle" id="spray-toggle-inline" style="display:none;">
+            <button class="spray-toggle-btn active" data-mode="all">All BIP</button>
+            <button class="spray-toggle-btn" data-mode="hits">Hits</button>
+            <button class="spray-toggle-btn" data-mode="hard">Hard Hit</button>
+          </div>
+        </div>
         <div class="player-chart-container">
           <canvas id="player-pitch-chart"></canvas>
         </div>
         <div id="player-pitch-usage-table" class="player-pitch-table"></div>
+        <div id="spray-legend-inline" class="spray-legend" style="display:none;"></div>
       </div>
     </div>
 

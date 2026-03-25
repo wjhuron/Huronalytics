@@ -354,6 +354,13 @@ var PlayerPage = {
     // Reset section title
     var title = document.querySelector('.player-col-movement .section-title');
     if (title) title.textContent = 'Movement Profile';
+    // Show pitcher pitch table, hide spray elements
+    var pitchTable = document.getElementById('player-pitch-usage-table');
+    if (pitchTable) pitchTable.style.display = '';
+    var sprayToggle = document.getElementById('spray-toggle-inline');
+    if (sprayToggle) sprayToggle.style.display = 'none';
+    var sprayLegend = document.getElementById('spray-legend-inline');
+    if (sprayLegend) sprayLegend.style.display = 'none';
     // Hide hitter-specific sections
     var hitterSections = ['player-spray-section', 'player-hitter-stats-section',
       'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
@@ -376,8 +383,18 @@ var PlayerPage = {
     // Hide pitcher-only sections
     var usageSection = document.querySelector('.player-usage-section');
     if (usageSection) usageSection.style.display = 'none';
+    // Show movement column — repurpose for spray chart
     var movementCol = document.querySelector('.player-col-movement');
-    if (movementCol) movementCol.style.display = 'none';
+    if (movementCol) movementCol.style.display = '';
+    var title = document.querySelector('.player-col-movement .section-title');
+    if (title) title.textContent = 'Spray Chart';
+    // Hide pitcher pitch table below chart, show spray toggle + legend
+    var pitchTable = document.getElementById('player-pitch-usage-table');
+    if (pitchTable) pitchTable.style.display = 'none';
+    var sprayToggle = document.getElementById('spray-toggle-inline');
+    if (sprayToggle) sprayToggle.style.display = '';
+    var sprayLegend = document.getElementById('spray-legend-inline');
+    if (sprayLegend) sprayLegend.style.display = '';
     var pitcherSections = ['player-stats-section', 'player-expanded-pitch-section',
       'player-batted-ball-section', 'player-plate-discipline-section',
       'player-location-section', 'player-count-section'];
@@ -388,14 +405,17 @@ var PlayerPage = {
     // Hide game log for hitters
     var gameLog = document.getElementById('player-game-log');
     if (gameLog) gameLog.style.display = 'none';
-    // Show hitter-specific sections
-    var hitterSections = ['player-spray-section', 'player-hitter-stats-section',
+    // Show hitter-specific full-width sections
+    var hitterSections = ['player-hitter-stats-section',
       'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
       'player-hitter-bat-tracking-section'];
     for (var j = 0; j < hitterSections.length; j++) {
       var el2 = document.getElementById(hitterSections[j]);
       if (el2) el2.style.display = '';
     }
+    // Hide full-width spray section (it's in the column now)
+    var spraySec = document.getElementById('player-spray-section');
+    if (spraySec) spraySec.style.display = 'none';
   },
 
   close: function () {
@@ -1704,7 +1724,7 @@ var PlayerPage = {
   // --- Hitter: Spray Chart ---
 
   _renderSprayChart: function (data) {
-    var canvas = document.getElementById('player-spray-chart');
+    var canvas = document.getElementById('player-pitch-chart');
     if (!canvas) return;
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
@@ -1882,7 +1902,7 @@ var PlayerPage = {
   },
 
   _renderSprayLegend: function (mode) {
-    var container = document.getElementById('player-spray-legend');
+    var container = document.getElementById('spray-legend-inline') || document.getElementById('player-spray-legend');
     if (!container) return;
     container.innerHTML = '';
 
@@ -1923,12 +1943,12 @@ var PlayerPage = {
       var mode = btn.getAttribute('data-mode');
       if (mode === self._sprayMode) return;
       self._sprayMode = mode;
-      var btns = document.querySelectorAll('#spray-toggle .spray-toggle-btn');
+      var btns = document.querySelectorAll('.spray-toggle-btn');
       for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
       btn.classList.add('active');
       if (self._currentData) self._renderSprayChart(self._currentData);
     };
-    var toggle = document.getElementById('spray-toggle');
+    var toggle = document.getElementById('spray-toggle-inline') || document.getElementById('spray-toggle');
     if (toggle) toggle.addEventListener('click', this._sprayToggleHandler);
   },
 
