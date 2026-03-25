@@ -231,9 +231,39 @@ var PlayerPage = {
     this._bindGameLog();
   },
 
+  // Check if filtered details have any data for current game type
+  _hasDataForGameType: function (data) {
+    var details = window.PITCH_DETAILS || {};
+    var name = data.pitcher || data.hitter;
+    var key = name + '|' + data.team;
+    var pitches = details[key];
+    if (!pitches || pitches.length === 0) return false;
+    var gt = this._playerGameType || 'RS';
+    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
+    for (var i = 0; i < pitches.length; i++) {
+      if (pitches[i].gd >= dateRange.start && pitches[i].gd <= dateRange.end) return true;
+    }
+    return false;
+  },
+
   // Render game-date-sensitive sections (called on initial load and game date change)
   _renderPitcherContent: function (data) {
     document.getElementById('player-percentiles').innerHTML = '';
+    // Clear all content sections
+    var sections = ['player-pitch-usage-table', 'player-stats-table', 'player-expanded-pitch-table',
+                    'player-batted-ball-table', 'player-plate-discipline-table',
+                    'player-heat-maps', 'player-count-table'];
+    for (var i = 0; i < sections.length; i++) {
+      var el = document.getElementById(sections[i]);
+      if (el) el.innerHTML = '';
+    }
+    this.destroyChart();
+
+    if (!this._hasDataForGameType(data)) {
+      var container = document.getElementById('player-percentiles');
+      container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
+      return;
+    }
     this._renderPitchRunValues(data);
     this._renderPercentiles(data, this.PITCHING_STATS, true);
     this._renderMovementChart(data);
@@ -358,6 +388,19 @@ var PlayerPage = {
 
   _renderHitterContent: function (data) {
     document.getElementById('player-percentiles').innerHTML = '';
+    // Clear hitter content sections
+    var sections = ['player-hitter-stats-table', 'player-hitter-batted-ball-table',
+                    'player-hitter-plate-discipline-table', 'player-hitter-bat-tracking-table'];
+    for (var i = 0; i < sections.length; i++) {
+      var el = document.getElementById(sections[i]);
+      if (el) el.innerHTML = '';
+    }
+
+    if (!this._hasDataForGameType(data)) {
+      var container = document.getElementById('player-percentiles');
+      container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
+      return;
+    }
     this._renderPercentiles(data, this.HITTING_STATS);
     this._renderSprayChart(data);
     this._renderHitterSmallStats(data);
