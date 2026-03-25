@@ -330,15 +330,25 @@
     panelClose = document.getElementById('panel-close');
   }
 
-  // ---- Filters ----
-  function setupFilters() {
-    // Populate team dropdown
-    DataStore.metadata.teams.forEach(function (team) {
+  // ---- Rebuild team dropdown based on current game type ----
+  function rebuildTeamDropdown() {
+    teamSelect.innerHTML = '<option value="all">All Teams</option>';
+    DataStore.metadata.teams.forEach(function(team) {
+      if (currentGameType === 'RS' && team === 'WBC') return;
       var opt = document.createElement('option');
       opt.value = team;
       opt.textContent = team;
       teamSelect.appendChild(opt);
     });
+  }
+
+  // Expose current game type for player pages
+  window.getCurrentGameType = function() { return currentGameType; };
+
+  // ---- Filters ----
+  function setupFilters() {
+    // Populate team dropdown (will be rebuilt when game type changes)
+    rebuildTeamDropdown();
 
     // Populate pitch type chips (will be rebuilt on tab switch if needed)
     buildPitchChips();
@@ -393,6 +403,7 @@
       for (var i = 0; i < btns.length; i++) {
         btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
       }
+      rebuildTeamDropdown();
       Leaderboard.currentPage = 1;
       refresh();
     }

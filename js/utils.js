@@ -64,16 +64,16 @@ var Utils = {
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      // 0th = rgb(20,60,220), 50th = rgb(235,235,240)
-      r = Math.round(20 + t * 215);
-      g = Math.round(60 + t * 175);
+      // 0th = rgb(30,80,220), 50th = rgb(235,235,240)
+      r = Math.round(30 + t * 205);
+      g = Math.round(80 + t * 155);
       b = Math.round(220 + t * 20);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(235,235,240), 100th = rgb(220,30,30)
+      // 50th = rgb(235,235,240), 100th = rgb(220,40,40)
       r = Math.round(235 - t * 15);
-      g = Math.round(235 - t * 205);
-      b = Math.round(240 - t * 210);
+      g = Math.round(235 - t * 195);
+      b = Math.round(240 - t * 200);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
@@ -90,12 +90,12 @@ var Utils = {
     if (pctl === null || pctl === undefined) return null;
     if (pctl <= 50) {
       // Blue tint, stronger at low percentiles
-      var opacity = ((50 - pctl) / 50 * 0.65).toFixed(2);
-      return 'rgba(50, 110, 255, ' + opacity + ')';
+      var opacity = ((50 - pctl) / 50 * 0.75).toFixed(2);
+      return 'rgba(40, 100, 255, ' + opacity + ')';
     } else {
       // Red tint, stronger at high percentiles
-      var opacity = ((pctl - 50) / 50 * 0.65).toFixed(2);
-      return 'rgba(255, 50, 40, ' + opacity + ')';
+      var opacity = ((pctl - 50) / 50 * 0.75).toFixed(2);
+      return 'rgba(255, 45, 35, ' + opacity + ')';
     }
   },
 

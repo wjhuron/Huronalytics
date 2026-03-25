@@ -1220,6 +1220,9 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .player-page-nav .toolbar-btn {
   font-size: 14px;
 }
+.player-game-type-toggle {
+  margin-left: auto;
+}
 
 .player-page-content {
   display: grid;

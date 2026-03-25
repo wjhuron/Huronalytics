@@ -1077,4 +1077,41 @@ var Aggregator = {
 
     return rows;
   },
+
+  // ==================================================================
+  //  Team games played (distinct game dates per team)
+  // ==================================================================
+  getTeamGamesPlayed: function(dateStart, dateEnd) {
+    var d = this.data;
+    if (!d) return {};
+    var dates = d.lookups.dates;
+    var teams = d.lookups.teams;
+    var ci = this._colIdx.pitcherCols;
+    var micro = d.pitcherMicro;
+
+    // Build valid date set based on optional range
+    var validDates = {};
+    for (var di = 0; di < dates.length; di++) {
+      var dt = dates[di];
+      if (dateStart && dt < dateStart) continue;
+      if (dateEnd && dt > dateEnd) continue;
+      validDates[di] = true;
+    }
+
+    var teamDates = {};  // teamIdx -> { dateIdx: true }
+    for (var i = 0; i < micro.length; i++) {
+      var row = micro[i];
+      var ti = row[ci.teamIdx];
+      var dIdx = row[ci.dateIdx];
+      if (!validDates[dIdx]) continue;
+      if (!teamDates[ti]) teamDates[ti] = {};
+      teamDates[ti][dIdx] = true;
+    }
+
+    var result = {};
+    for (var ti2 in teamDates) {
+      result[teams[ti2]] = Object.keys(teamDates[ti2]).length;
+    }
+    return result;
+  },
 };

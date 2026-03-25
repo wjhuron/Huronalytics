@@ -222,7 +222,9 @@ var PlayerPage = {
     this._heatMapHand = 'R';
     this._countHand = 'R';
     this._gameDate = null; // null = all games
+    this._playerGameType = (typeof window.getCurrentGameType === 'function' ? window.getCurrentGameType() : null) || 'RS';
     this._currentData = data;
+    this._renderPlayerGameTypeToggle();
     this._renderGameLog(data);
     this._renderPitcherContent(data);
     this._bindHandToggles();
@@ -244,26 +246,43 @@ var PlayerPage = {
     this._renderCountTable(data);
   },
 
-  // Get PITCH_DETAILS for this pitcher, optionally filtered by _gameDate
+  // Get PITCH_DETAILS for this pitcher, filtered by game type date range and optionally by _gameDate
   _getFilteredDetails: function (data) {
     var details = window.PITCH_DETAILS || {};
     var key = data.pitcher + '|' + data.team;
     var pitches = details[key];
     if (!pitches || pitches.length === 0) return [];
-    if (!this._gameDate) return pitches;
-    var gd = this._gameDate;
-    return pitches.filter(function (p) { return p.gd === gd; });
+
+    // Filter by game type date range
+    var gt = this._playerGameType || 'RS';
+    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
+    pitches = pitches.filter(function(p) {
+      return p.gd >= dateRange.start && p.gd <= dateRange.end;
+    });
+
+    // Then filter by specific game date if set
+    if (this._gameDate) {
+      var gd = this._gameDate;
+      pitches = pitches.filter(function (p) { return p.gd === gd; });
+    }
+    return pitches;
   },
 
-  // Get unique game dates for this pitcher from PITCH_DETAILS
+  // Get unique game dates for this pitcher from PITCH_DETAILS, filtered by game type
   _getGameDates: function (data) {
     var details = window.PITCH_DETAILS || {};
     var key = data.pitcher + '|' + data.team;
     var pitches = details[key];
     if (!pitches) return [];
+
+    // Filter by game type date range
+    var gt = this._playerGameType || 'RS';
+    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
+
     var dateSet = {};
     for (var i = 0; i < pitches.length; i++) {
-      if (pitches[i].gd) dateSet[pitches[i].gd] = true;
+      var gd = pitches[i].gd;
+      if (gd && gd >= dateRange.start && gd <= dateRange.end) dateSet[gd] = true;
     }
     return Object.keys(dateSet).sort();
   },
@@ -329,8 +348,10 @@ var PlayerPage = {
   _renderHitterPage: function (data) {
     this._showHitterLayout();
     this._renderHitterIdentity(data);
+    this._playerGameType = (typeof window.getCurrentGameType === 'function' ? window.getCurrentGameType() : null) || 'RS';
     this._currentData = data;
     this._sprayMode = 'all';
+    this._renderPlayerGameTypeToggle();
     this._renderHitterContent(data);
     this._bindSprayToggle();
   },
@@ -418,16 +439,74 @@ var PlayerPage = {
     if (spraySec) spraySec.style.display = 'none';
   },
 
+  // --- Render: Player Game Type Toggle ---
+  _renderPlayerGameTypeToggle: function () {
+    // Remove any existing toggle
+    var existing = document.querySelector('.player-game-type-toggle');
+    if (existing) existing.remove();
+
+    var self = this;
+    var gt = this._playerGameType || 'RS';
+
+    var toggleContainer = document.createElement('div');
+    toggleContainer.className = 'player-game-type-toggle game-type-toggle';
+    toggleContainer.innerHTML = '<button class="game-type-btn ' + (gt === 'ST' ? 'active' : '') + '" data-type="ST">Spring Training</button>' +
+      '<button class="game-type-btn ' + (gt === 'RS' ? 'active' : '') + '" data-type="RS">Regular Season</button>';
+
+    // Insert after the back button in the nav area
+    var nav = document.querySelector('.player-page-nav');
+    var backBtn = document.getElementById('player-back');
+    if (nav && backBtn) {
+      // Insert after back button but before game log
+      backBtn.parentNode.insertBefore(toggleContainer, backBtn.nextSibling);
+    }
+
+    this._playerGameTypeHandler = function (e) {
+      var btn = e.target.closest('.game-type-btn');
+      if (!btn) return;
+      var type = btn.getAttribute('data-type');
+      if (type === self._playerGameType) return;
+      self._playerGameType = type;
+      self._gameDate = null; // reset game date filter when switching
+      // Update active state
+      var btns = toggleContainer.querySelectorAll('.game-type-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
+      }
+      // Re-render content
+      if (self._currentData) {
+        if (self._playerType === 'pitcher') {
+          self._renderGameLog(self._currentData);
+          self._bindGameLog();
+          self._renderPitcherContent(self._currentData);
+        } else {
+          self._renderHitterContent(self._currentData);
+        }
+      }
+    };
+    toggleContainer.addEventListener('click', this._playerGameTypeHandler);
+  },
+
+  _unbindPlayerGameTypeToggle: function () {
+    var existing = document.querySelector('.player-game-type-toggle');
+    if (existing && this._playerGameTypeHandler) {
+      existing.removeEventListener('click', this._playerGameTypeHandler);
+      this._playerGameTypeHandler = null;
+    }
+  },
+
   close: function () {
     this.isOpen = false;
     this._heatMapHand = 'R';
     this._countHand = 'R';
     this._gameDate = null;
+    this._playerGameType = null;
     this._currentData = null;
     this.destroyChart();
     this._unbindClickOutside();
     this._unbindHandToggles();
     this._unbindGameLog();
+    this._unbindPlayerGameTypeToggle();
 
     // Hide new sections
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
@@ -677,11 +756,26 @@ var PlayerPage = {
     if (!append) container.innerHTML = '';
 
     var isDark = document.body.classList.contains('dark');
+    var isPitcher = !!(data.pitcher);
+
+    // Determine if player qualifies based on team games played
+    var gt = this._playerGameType || 'RS';
+    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
+    var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed(dateRange.start, dateRange.end) : {};
+    var tg = teamGames[data.team] || 0;
+    var isQualified;
+    if (isPitcher) {
+      isQualified = (data.count || 0) >= tg * 15; // proxy for 1.0 IP/game
+    } else {
+      isQualified = (data.pa || 0) >= tg * 3.1;
+    }
+    var alwaysColorKeys = isPitcher ? { fbVelo: true, extension: true } : { maxEV: true };
 
     for (var i = 0; i < statsDef.length; i++) {
       var stat = statsDef[i];
       var val = data[stat.key];
       var pctl = data[stat.key + '_pctl'];
+      var showColor = isQualified || alwaysColorKeys[stat.key];
 
       var row = document.createElement('div');
       row.className = 'pctl-row';
@@ -703,10 +797,15 @@ var PlayerPage = {
       if (pctl != null) {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
-        var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-        var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
-        circle.style.backgroundColor = bgColor;
-        circle.style.color = textColor;
+        if (showColor) {
+          var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+          circle.style.backgroundColor = bgColor;
+          circle.style.color = textColor;
+        } else {
+          circle.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
+          circle.style.color = isDark ? '#aaa' : '#666';
+        }
         circle.textContent = Math.round(pctl);
         circleWrap.appendChild(circle);
       }
@@ -718,8 +817,12 @@ var PlayerPage = {
       barFill.className = 'pctl-bar-fill';
       if (pctl != null) {
         barFill.style.width = Math.round(pctl) + '%';
-        var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-        barFill.style.backgroundColor = barColor;
+        if (showColor) {
+          var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          barFill.style.backgroundColor = barColor;
+        } else {
+          barFill.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
+        }
       }
       barTrack.appendChild(barFill);
 
