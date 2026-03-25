@@ -67,6 +67,53 @@ var PlayerPage = {
     { key: 'hra', label: 'HRA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
   ],
 
+  // Stats table (single row, pitcher-level)
+  STATS_COLS: [
+    { key: 'count', label: 'Pitches', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'pa', label: 'TBF', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kbbPct', label: 'K-BB%', format: function(v) { return Utils.formatPct(v, true); } },
+    { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'gs', label: 'GS', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'ip', label: 'IP', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'era', label: 'ERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'xERA', label: 'xERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'eraMinusXera', label: 'ERA-xERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'fip', label: 'FIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'xFIP', label: 'xFIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+  ],
+
+  // Batted Ball table (per pitch type + total)
+  BATTED_BALL_COLS: [
+    { key: 'pitchType', label: 'Pitch' },
+    { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+    { key: 'avgEVAgainst', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'maxEVAgainst', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'hardHitPct', label: 'HardHit%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'barrelPctAgainst', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
+  ],
+
+  // Plate Discipline table (per pitch type + total)
+  PLATE_DISCIPLINE_COLS: [
+    { key: 'pitchType', label: 'Pitch' },
+    { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'izPct', label: 'Zone%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'cswPct', label: 'CSW%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'swStrPct', label: 'SwStr%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'swStrRate', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izWhiffPct', label: 'IZ Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'fpsPct', label: 'FPS%', format: function(v) { return Utils.formatPct(v); } },
+  ],
+
   open: function (mlbId) {
     // Try pitcher first, then hitter
     var pitcherData = this._findPitcherByMlbId(mlbId);
@@ -123,7 +170,10 @@ var PlayerPage = {
     this._renderPercentiles(data, this.PITCHING_STATS, true);
     this._renderMovementChart(data);
     this._renderPitchTable(data);
+    this._renderStatsTable(data);
     this._renderExpandedPitchTable(data);
+    this._renderBattedBallTable(data);
+    this._renderPlateDisciplineTable(data);
     this._renderHeatMaps(data);
     this._renderCountTable(data);
   },
@@ -948,6 +998,150 @@ var PlayerPage = {
       }
       tbody.appendChild(tr);
     }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  },
+
+  // --- Render: Stats Table (single pitcher row) ---
+
+  _renderStatsTable: function (data) {
+    var section = document.getElementById('player-stats-section');
+    var container = document.getElementById('player-stats-table');
+    container.innerHTML = '';
+
+    if (!data) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table expanded-pitch-table';
+
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    for (var i = 0; i < this.STATS_COLS.length; i++) {
+      var th = document.createElement('th');
+      th.textContent = this.STATS_COLS[i].label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    var tr = document.createElement('tr');
+    for (var c = 0; c < this.STATS_COLS.length; c++) {
+      var col = this.STATS_COLS[c];
+      var td = document.createElement('td');
+      var val = data[col.key];
+      td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+    table.appendChild(tbody);
+    container.appendChild(table);
+  },
+
+  // --- Render: Batted Ball Table (per pitch type + total) ---
+
+  _renderBattedBallTable: function (data) {
+    var section = document.getElementById('player-batted-ball-section');
+    var container = document.getElementById('player-batted-ball-table');
+    container.innerHTML = '';
+
+    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    // Compute total row from pitcher-level data
+    var totalRow = { pitchType: 'Total' };
+    var pitcherData = data; // data is already the pitcher-level row
+    for (var k = 0; k < this.BATTED_BALL_COLS.length; k++) {
+      var key = this.BATTED_BALL_COLS[k].key;
+      if (key !== 'pitchType') totalRow[key] = pitcherData[key];
+    }
+
+    this._renderPerPitchTable(container, this.BATTED_BALL_COLS, pitchRows, totalRow);
+  },
+
+  // --- Render: Plate Discipline Table (per pitch type + total) ---
+
+  _renderPlateDisciplineTable: function (data) {
+    var section = document.getElementById('player-plate-discipline-section');
+    var container = document.getElementById('player-plate-discipline-table');
+    container.innerHTML = '';
+
+    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    // Compute total row from pitcher-level data
+    var totalRow = { pitchType: 'Total' };
+    var pitcherData = data;
+    for (var k = 0; k < this.PLATE_DISCIPLINE_COLS.length; k++) {
+      var key = this.PLATE_DISCIPLINE_COLS[k].key;
+      if (key !== 'pitchType') totalRow[key] = pitcherData[key];
+    }
+
+    this._renderPerPitchTable(container, this.PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+  },
+
+  // --- Shared: Render per-pitch-type table with total row ---
+
+  _renderPerPitchTable: function (container, cols, pitchRows, totalRow) {
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table expanded-pitch-table';
+
+    // Header
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    for (var i = 0; i < cols.length; i++) {
+      var th = document.createElement('th');
+      th.textContent = cols[i].label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body — pitch type rows
+    var tbody = document.createElement('tbody');
+    for (var r = 0; r < pitchRows.length; r++) {
+      var row = pitchRows[r];
+      var tr = document.createElement('tr');
+      for (var c = 0; c < cols.length; c++) {
+        var col = cols[c];
+        var td = document.createElement('td');
+        if (col.key === 'pitchType') {
+          var badge = document.createElement('span');
+          badge.className = 'pitch-badge-sm';
+          badge.style.backgroundColor = Utils.getPitchColor(row.pitchType);
+          badge.textContent = row.pitchType;
+          td.appendChild(badge);
+        } else {
+          var val = row[col.key];
+          td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+
+    // Total row
+    if (totalRow) {
+      var totalTr = document.createElement('tr');
+      totalTr.style.fontWeight = 'bold';
+      totalTr.style.borderTop = '2px solid var(--border-color, #ccc)';
+      for (var c2 = 0; c2 < cols.length; c2++) {
+        var col2 = cols[c2];
+        var td2 = document.createElement('td');
+        if (col2.key === 'pitchType') {
+          td2.textContent = 'Total';
+        } else {
+          var val2 = totalRow[col2.key];
+          td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
+        }
+        totalTr.appendChild(td2);
+      }
+      tbody.appendChild(totalTr);
+    }
+
     table.appendChild(tbody);
     container.appendChild(table);
   },
