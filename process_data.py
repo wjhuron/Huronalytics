@@ -972,7 +972,7 @@ def generate_micro_data(all_pitches):
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
         row = [hi, ti, bats, di, ph]
-        for i in range(36):
+        for i in range(37):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_rows.append(row)
@@ -1110,7 +1110,7 @@ def generate_micro_data(all_pitches):
     hitter_pitch_rows = []
     for (hi, ti, bats, pti, di, ph), c in hitter_pitch_micro.items():
         row = [hi, ti, bats, pti, di, ph]
-        for i in range(36):
+        for i in range(37):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_pitch_rows.append(row)
@@ -1178,8 +1178,8 @@ def generate_micro_data(all_pitches):
             'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
             'sumVRA', 'nVRA', 'sumHRA', 'nHRA',
             'sumPlateZ', 'nPlateZ',
-            'sumTiltSin', 'sumTiltCos', 'nTilt',
             'sumPlateX', 'nPlateX',
+            'sumTiltSin', 'sumTiltCos', 'nTilt',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -1848,8 +1848,8 @@ def main():
     # --- Hitter pitch-type leaderboard: flatten into one row per hitter-pitch-type ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
-        'medEV', 'ev75', 'maxEV', 'medLA', 'barrelPct',
-        'gbPct', 'ldPct', 'fbPct',
+        'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+        'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
         'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
     ]

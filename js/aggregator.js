@@ -186,8 +186,8 @@ var Aggregator = {
     function isBarrel(ev, la) {
       if (ev == null || la == null) return false;
       if (ev < 98) return false;
-      var minLA = 26 - (ev - 98) * 0.4;
-      var maxLA = 30 + (ev - 98) * 0.8;
+      var minLA = 26 - (ev - 98);
+      var maxLA = 30 + 1.2 * (ev - 98);
       if (minLA < 8) minLA = 8;
       if (maxLA > 50) maxLA = 50;
       return la >= minLA && la <= maxLA;
