@@ -1726,6 +1726,9 @@ var PlayerPage = {
   _renderSprayChart: function (data) {
     var canvas = document.getElementById('player-pitch-chart');
     if (!canvas) return;
+    // Set canvas size for spray chart
+    canvas.width = 500;
+    canvas.height = 500;
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
     var H = canvas.height;
@@ -1737,10 +1740,10 @@ var PlayerPage = {
     var HP_X = 125.42;
     var HP_Y = 198.27;
 
-    // Canvas mapping: HP at bottom center
+    // Canvas mapping: HP at bottom center, field fills canvas
     var canvasHPX = W / 2;
-    var canvasHPY = H - 30;
-    var scale = 1.65; // pixels per statcast unit
+    var canvasHPY = H - 20;
+    var scale = 1.8; // pixels per statcast unit
 
     function toCanvas(hcX, hcY) {
       var dx = hcX - HP_X;
@@ -1748,25 +1751,24 @@ var PlayerPage = {
       return [canvasHPX + dx * scale, canvasHPY - dy * scale];
     }
 
-    // Draw field background
-    ctx.fillStyle = isDark ? '#1a2e1a' : '#e8f5e8';
-    ctx.fillRect(0, 0, W, H);
+    // Clear to transparent
+    ctx.clearRect(0, 0, W, H);
 
-    // Draw outfield grass arc
+    // Draw outfield grass (only inside foul lines — no background fill)
     ctx.fillStyle = isDark ? '#1a3a1a' : '#c8e6c8';
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY);
     // Foul lines angle: LF line at ~135 deg from right, RF line at ~45 deg
     var foulAngleLeft = -Math.PI * 3 / 4;
     var foulAngleRight = -Math.PI / 4;
-    ctx.arc(canvasHPX, canvasHPY, 320, foulAngleLeft, foulAngleRight);
+    ctx.arc(canvasHPX, canvasHPY, canvasHPY - 15, foulAngleLeft, foulAngleRight);
     ctx.closePath();
     ctx.fill();
 
     // Draw infield dirt
     ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
     ctx.beginPath();
-    ctx.arc(canvasHPX, canvasHPY, 95 * scale * 0.6, foulAngleLeft, foulAngleRight);
+    ctx.arc(canvasHPX, canvasHPY, (canvasHPY - 15) * 0.28, foulAngleLeft, foulAngleRight);
     ctx.lineTo(canvasHPX, canvasHPY);
     ctx.closePath();
     ctx.fill();
@@ -1780,7 +1782,8 @@ var PlayerPage = {
       { angle: -Math.PI * 3 / 8, dist: 379 },    // RF gap
       { angle: foulAngleRight, dist: 329 },       // RF
     ];
-    var fenceScale = 320 / 401; // normalize so CF = max radius on canvas
+    var fieldRadius = canvasHPY - 15;
+    var fenceScale = fieldRadius / 401; // normalize so CF = max radius on canvas
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1799,13 +1802,13 @@ var PlayerPage = {
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY);
-    ctx.lineTo(canvasHPX + 340 * Math.cos(foulAngleLeft), canvasHPY + 340 * Math.sin(foulAngleLeft));
+    ctx.lineTo(canvasHPX + fieldRadius * 1.05 * Math.cos(foulAngleLeft), canvasHPY + fieldRadius * 1.05 * Math.sin(foulAngleLeft));
     ctx.moveTo(canvasHPX, canvasHPY);
-    ctx.lineTo(canvasHPX + 340 * Math.cos(foulAngleRight), canvasHPY + 340 * Math.sin(foulAngleRight));
+    ctx.lineTo(canvasHPX + fieldRadius * 1.05 * Math.cos(foulAngleRight), canvasHPY + fieldRadius * 1.05 * Math.sin(foulAngleRight));
     ctx.stroke();
 
     // Draw infield diamond
-    var baseDist = 60; // approximate in canvas units
+    var baseDist = fieldRadius * 0.13; // approximate base distance scaled to field
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
