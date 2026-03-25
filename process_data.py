@@ -713,15 +713,16 @@ def generate_micro_data(all_pitches):
     #  42:sumVRA 43:nVRA  44:sumHRA 45:nHRA
     #  46:sumPlateZ 47:nPlateZ
     #  48:sumTiltSin 49:sumTiltCos 50:nTilt
+    #  51:sumPlateX 52:nPlateX
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('IndVertBrk', 26),
         ('HorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
         ('Extension', 34), ('ArmAngle', 36), ('VAA', 38), ('HAA', 40),
-        ('VRA', 42), ('HRA', 44), ('PlateZ', 46),
+        ('VRA', 42), ('HRA', 44), ('PlateZ', 46), ('PlateX', 51),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 51)
+    pitch_micro = defaultdict(lambda: [0.0] * 53)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -1178,6 +1179,7 @@ def generate_micro_data(all_pitches):
             'sumVRA', 'nVRA', 'sumHRA', 'nHRA',
             'sumPlateZ', 'nPlateZ',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
+            'sumPlateX', 'nPlateX',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -1961,6 +1963,11 @@ def main():
             'slope': round(vaa_slope, 6),
             'intercept': round(vaa_intercept, 6),
             'leagueAvgPlateZ': round(league_avg_plateZ, 6),
+        },
+        'haaRegression': {
+            'slope': round(haa_slope, 6),
+            'intercept': round(haa_intercept, 6),
+            'leagueAvgPlateX': round(league_avg_plateX, 6),
         },
     }
 

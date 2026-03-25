@@ -158,11 +158,11 @@ var Aggregator = {
           pitcherIdx: row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         };
       }
       var c = groups[gk].counts;
-      for (var f = 0; f < 25; f++) {
+      for (var f = 0; f < 26; f++) {
         c[f] += row[ci.n + f];
       }
     }
@@ -331,8 +331,9 @@ var Aggregator = {
       { key: 'vra', sum: 'sumVRA', cnt: 'nVRA', round: 2 },
       { key: 'hra', sum: 'sumHRA', cnt: 'nHRA', round: 2 },
       { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
+      { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
     ];
-    var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ'; });
+    var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ' && k !== '_plateX'; });
     var PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
     var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS);
 
@@ -449,7 +450,16 @@ var Aggregator = {
       } else {
         obj.nVAA = null;
       }
+      // Normalized HAA (location-independent):
+      // nHAA = HAA - slope * (pitcher_avgPlateX - league_avgPlateX)
+      var haaReg = DataStore.metadata && DataStore.metadata.haaRegression;
+      if (obj.haa !== null && obj._plateX !== null && haaReg && haaReg.leagueAvgPlateX != null) {
+        obj.nHAA = Number((obj.haa - haaReg.slope * (obj._plateX - haaReg.leagueAvgPlateX)).toFixed(2));
+      } else {
+        obj.nHAA = null;
+      }
       delete obj._plateZ;  // internal, not displayed
+      delete obj._plateX;  // internal, not displayed
 
       // Break Tilt (circular mean)
       if (ms.nTilt > 0) {

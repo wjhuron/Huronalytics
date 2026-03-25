@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-24 22:17",
+  "generatedAt": "2026-03-24 22:26",
   "totalPitches": 161599,
   "totalPitchers": 1807,
   "totalHitters": 2022,
@@ -375,5 +375,10 @@
     "slope": 1.420276,
     "intercept": -9.771754,
     "leagueAvgPlateZ": 2.378215
+  },
+  "haaRegression": {
+    "slope": 1.296107,
+    "intercept": 0.712645,
+    "leagueAvgPlateX": 0.037099
   }
 }
