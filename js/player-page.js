@@ -1726,9 +1726,9 @@ var PlayerPage = {
   _renderSprayChart: function (data) {
     var canvas = document.getElementById('player-pitch-chart');
     if (!canvas) return;
-    // Set canvas size for spray chart
+    // Set canvas size for spray chart — wider than tall to fit foul lines
     canvas.width = 500;
-    canvas.height = 500;
+    canvas.height = 420;
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
     var H = canvas.height;
@@ -1740,9 +1740,11 @@ var PlayerPage = {
     var HP_X = 125.42;
     var HP_Y = 198.27;
 
-    // Canvas mapping: HP at bottom center, field fills canvas
+    // Canvas mapping: HP at bottom center, field fills canvas with padding
     var canvasHPX = W / 2;
-    var canvasHPY = H - 20;
+    var canvasHPY = H - 15;
+    // Max radius so foul lines don't clip: W/2 / cos(45°) with padding
+    var maxRadius = (W / 2 - 15) / 0.707;
     var scale = 1.8; // pixels per statcast unit
 
     function toCanvas(hcX, hcY) {
@@ -1761,14 +1763,14 @@ var PlayerPage = {
     // Foul lines angle: LF line at ~135 deg from right, RF line at ~45 deg
     var foulAngleLeft = -Math.PI * 3 / 4;
     var foulAngleRight = -Math.PI / 4;
-    ctx.arc(canvasHPX, canvasHPY, canvasHPY - 15, foulAngleLeft, foulAngleRight);
+    ctx.arc(canvasHPX, canvasHPY, maxRadius, foulAngleLeft, foulAngleRight);
     ctx.closePath();
     ctx.fill();
 
     // Draw infield dirt
     ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
     ctx.beginPath();
-    ctx.arc(canvasHPX, canvasHPY, (canvasHPY - 15) * 0.28, foulAngleLeft, foulAngleRight);
+    ctx.arc(canvasHPX, canvasHPY, maxRadius * 0.28, foulAngleLeft, foulAngleRight);
     ctx.lineTo(canvasHPX, canvasHPY);
     ctx.closePath();
     ctx.fill();
@@ -1782,8 +1784,7 @@ var PlayerPage = {
       { angle: -Math.PI * 3 / 8, dist: 379 },    // RF gap
       { angle: foulAngleRight, dist: 329 },       // RF
     ];
-    var fieldRadius = canvasHPY - 15;
-    var fenceScale = fieldRadius / 401; // normalize so CF = max radius on canvas
+    var fenceScale = maxRadius / 401; // normalize so CF = max radius on canvas
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1802,13 +1803,13 @@ var PlayerPage = {
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY);
-    ctx.lineTo(canvasHPX + fieldRadius * 1.05 * Math.cos(foulAngleLeft), canvasHPY + fieldRadius * 1.05 * Math.sin(foulAngleLeft));
+    ctx.lineTo(canvasHPX + maxRadius * 1.02 * Math.cos(foulAngleLeft), canvasHPY + maxRadius * 1.02 * Math.sin(foulAngleLeft));
     ctx.moveTo(canvasHPX, canvasHPY);
-    ctx.lineTo(canvasHPX + fieldRadius * 1.05 * Math.cos(foulAngleRight), canvasHPY + fieldRadius * 1.05 * Math.sin(foulAngleRight));
+    ctx.lineTo(canvasHPX + maxRadius * 1.02 * Math.cos(foulAngleRight), canvasHPY + maxRadius * 1.02 * Math.sin(foulAngleRight));
     ctx.stroke();
 
     // Draw infield diamond
-    var baseDist = fieldRadius * 0.13; // approximate base distance scaled to field
+    var baseDist = maxRadius * 0.13; // approximate base distance scaled to field
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
