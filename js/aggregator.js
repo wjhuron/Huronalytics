@@ -207,7 +207,7 @@ var Aggregator = {
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
       var izSw = c[18], izWh = c[19];
-      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24];
+      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24], pu_cnt = c[25];
       var ab = pa - bb - hbp - sf - sh - ci_val;
 
       var kPct = pa > 0 ? k / pa : null;
@@ -216,7 +216,7 @@ var Aggregator = {
       var babip_denom = ab - k - hr + sf;
       var babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
       var fpsPct = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
-      var fb_for_hrfb = fb_cnt + ldHr;
+      var fb_for_hrfb = fb_cnt + pu_cnt + ldHr;
       var hrFbPct = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // Compute batted ball stats from pitcher BIP records
@@ -637,7 +637,7 @@ var Aggregator = {
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
       var hardHitPct = bip > 0 ? hardHit / bip : null;
       var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
-      var fb_for_hrfb = fb + ldHr;
+      var fb_for_hrfb = fb + pu + ldHr;
       var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians
@@ -959,7 +959,7 @@ var Aggregator = {
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
       var hardHitPct = bip > 0 ? hardHit / bip : null;
       var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
-      var fb_for_hrfb = fb + ldHr;
+      var fb_for_hrfb = fb + pu + ldHr;
       var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians — combine BIP records from all pitch types in this group

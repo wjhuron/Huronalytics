@@ -330,10 +330,10 @@ def compute_pitcher_batted_ball(pitches):
     fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
     pu = sum(1 for p in bip if p.get('BBType') == 'popup')
 
-    # HR/FB ratio — denominator = fly balls + line drive HRs
+    # HR/FB ratio — denominator = fly balls + popups + line drive HRs
     n_hr_bb = sum(1 for p in bip if p.get('Event') == 'Home Run')
     ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
-    fb_for_hrfb = fb + ld_hr
+    fb_for_hrfb = fb + pu + ld_hr
     hr_fb_pct = round(n_hr_bb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     return {
@@ -519,10 +519,10 @@ def compute_hitter_stats(pitches):
     sweet_spot = sum(1 for la in all_la if 8 <= la <= 32)
     la_sweet_spot_pct = sweet_spot / len(all_la) if all_la else None
 
-    # HR/FB ratio for hitters — denominator = fly balls + line drive HRs
+    # HR/FB ratio for hitters — denominator = fly balls + popups + line drive HRs
     n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
     ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
-    fb_for_hrfb = fb + ld_hr
+    fb_for_hrfb = fb + pu + ld_hr
     hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     return {
@@ -626,8 +626,9 @@ def generate_micro_data(all_pitches):
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
     #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
     #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (line-drive HRs)
+    #  25:pu (popups, for HR/FB denominator)
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 25)
+    pitcher_micro = defaultdict(lambda: [0] * 26)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -670,6 +671,8 @@ def generate_micro_data(all_pitches):
                 c[8] += 1  # gb
             if bb_type == 'fly_ball':
                 c[22] += 1  # fb (fly balls for HR/FB)
+            if bb_type == 'popup':
+                c[25] += 1  # pu (popups for HR/FB)
             if p.get('Event') == 'Home Run':
                 c[23] += 1  # nHrBip (HR on BIP)
                 if bb_type == 'line_drive':
