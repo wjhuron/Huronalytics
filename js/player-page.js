@@ -1379,7 +1379,7 @@ var PlayerPage = {
     var thead = document.createElement('thead');
     var headRow = document.createElement('tr');
     var th0 = document.createElement('th');
-    th0.textContent = '';
+    th0.textContent = 'Pitch';
     headRow.appendChild(th0);
     for (var g = 0; g < groupNames.length; g++) {
       var th = document.createElement('th');
@@ -1395,6 +1395,7 @@ var PlayerPage = {
       var tr = document.createElement('tr');
 
       var tdLabel = document.createElement('td');
+      tdLabel.style.textAlign = 'center';
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';
       badge.style.backgroundColor = Utils.getPitchColor(pt);
