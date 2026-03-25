@@ -1702,3 +1702,77 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
     text-align: center;
   }
 }
+
+/* === Hitter Spray Chart === */
+
+.spray-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.spray-section-header .section-title {
+  margin-bottom: 0;
+}
+
+.spray-toggle {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border, #ddd);
+}
+.spray-toggle-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-card, #fff);
+  color: var(--text-secondary, #666);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.spray-toggle-btn.active {
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+}
+.dark .spray-toggle {
+  border-color: #444;
+}
+.dark .spray-toggle-btn {
+  color: var(--text-primary, #ccc);
+}
+.dark .spray-toggle-btn.active {
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+}
+
+#player-spray-chart {
+  display: block;
+  margin: 0 auto;
+  max-width: 400px;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.spray-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+.spray-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.spray-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}

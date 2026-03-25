@@ -545,6 +545,7 @@ def compute_hitter_stats(pitches):
         'iso': iso,
         'babip': babip,
         # Batted Ball tab
+        'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
         'medEV': round(sum(evs_pos) / len(evs_pos), 1) if evs_pos else None,
         'ev75': ev75,
         'maxEV': round(max(evs_pos), 1) if evs_pos else None,
@@ -978,9 +979,16 @@ def generate_micro_data(all_pitches):
         hitter_rows.append(row)
 
     # ==========================================================
-    #  Hitter BIP records (for median EV, EV50, maxEV, medLA)
-    #  [hitterIdx, dateIdx, pitcherHand, exitVelo, launchAngle]
+    #  Hitter BIP records (for EV, LA, spray chart, batted ball stats)
+    #  [hitterIdx, dateIdx, pitcherHand, exitVelo, launchAngle, hcX, hcY, bbType, event]
+    #  bbType: 0=ground_ball, 1=line_drive, 2=fly_ball, 3=popup
+    #  event: 0=out, 1=single, 2=double, 3=triple, 4=hr, 5=error/fc
     # ==========================================================
+    BB_TYPE_ENCODE = {'ground_ball': 0, 'line_drive': 1, 'fly_ball': 2, 'popup': 3}
+    EVENT_ENCODE = {
+        'Single': 1, 'Double': 2, 'Triple': 3, 'Home Run': 4,
+        'Field Error': 5, "Fielder's Choice": 5, "Fielder's Choice Out": 5,
+    }
     hitter_bip_rows = []
     for p in all_pitches:
         batter = p.get('Batter')
@@ -1001,12 +1009,21 @@ def generate_micro_data(all_pitches):
         if ev is None and la is None:
             continue
 
+        hc_x = safe_float(p.get('HC_X'))
+        hc_y = safe_float(p.get('HC_Y'))
+        bb_enc = BB_TYPE_ENCODE.get(bb_type, 0)
+        ev_enc = EVENT_ENCODE.get(p.get('Event'), 0)
+
         hitter_bip_rows.append([
             hi_idx[batter],
             dt_idx[date],
             pitcher_hand,
             round(ev, 1) if ev is not None else None,
             round(la, 1) if la is not None else None,
+            int(round(hc_x)) if hc_x is not None else None,
+            int(round(hc_y)) if hc_y is not None else None,
+            bb_enc,
+            ev_enc,
         ])
 
     # ==========================================================
@@ -1192,7 +1209,7 @@ def generate_micro_data(all_pitches):
             'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip', 'ldHr',
         ],
         'hitterMicro': hitter_rows,
-        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
+        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event'],
         'hitterBip': hitter_bip_rows,
         'hitterPitchCols': [
             'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',
@@ -2005,8 +2022,14 @@ def main():
         f.write('window.HITTER_PITCH_DETAILS = ')
         json.dump(hitter_pitch_details, f)
         f.write(';\n')
+        # Strip _pctl keys from hitter pitch LB for embedding (saves ~10MB)
+        # Percentiles are recomputed by the JS aggregator when filters are active
+        hitter_pitch_lb_slim = []
+        for row in hitter_pitch_leaderboard:
+            slim = {k: v for k, v in row.items() if not k.endswith('_pctl')}
+            hitter_pitch_lb_slim.append(slim)
         f.write('window.HITTER_PITCH_LB = ')
-        json.dump(hitter_pitch_leaderboard, f)
+        json.dump(hitter_pitch_lb_slim, f)
         f.write(';\n')
 
     # --- Generate micro-aggregate data for date/hand filtering ---

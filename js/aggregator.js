@@ -652,14 +652,16 @@ var Aggregator = {
 
       // BIP medians
       var bipRecords = bipByHitter[g.hitterIdx] || [];
-      var evsPos = [], allLA = [];
+      var evsAll = [], evsPos = [], allLA = [];
       for (var bri = 0; bri < bipRecords.length; bri++) {
         var bev = bipRecords[bri][bci.exitVelo];
         var bla = bipRecords[bri][bci.launchAngle];
+        if (bev !== null) evsAll.push(bev);
         if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
         if (bla !== null) allLA.push(bla);
       }
 
+      var avgEVAll = evsAll.length > 0 ? Math.round(evsAll.reduce(function(a,b){return a+b;},0) / evsAll.length * 10) / 10 : null;
       var medEV = evsPos.length > 0 ? Math.round(evsPos.reduce(function(a,b){return a+b;},0) / evsPos.length * 10) / 10 : null;
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
@@ -696,6 +698,7 @@ var Aggregator = {
         bbPct: bbPct,
         iso: iso_val,
         babip: babip_val,
+        avgEVAll: avgEVAll,
         medEV: medEV,
         ev75: ev75,
         maxEV: maxEV,
@@ -973,18 +976,20 @@ var Aggregator = {
       var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians — combine BIP records from all pitch types in this group
-      var evsPos = [], allLA = [];
+      var evsAll2 = [], evsPos = [], allLA = [];
       for (var bpi = 0; bpi < gg2.bipPtIdxs.length; bpi++) {
         var bpKey = gg2.hitterIdx + '|' + gg2.bipPtIdxs[bpi];
         var bipRecords = bipByKey[bpKey] || [];
         for (var bri = 0; bri < bipRecords.length; bri++) {
           var bev = bipRecords[bri][bci.exitVelo];
           var bla = bipRecords[bri][bci.launchAngle];
+          if (bev !== null) evsAll2.push(bev);
           if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
           if (bla !== null) allLA.push(bla);
         }
       }
 
+      var avgEVAll2 = evsAll2.length > 0 ? Math.round(evsAll2.reduce(function(a,b){return a+b;},0) / evsAll2.length * 10) / 10 : null;
       var medEV = evsPos.length > 0 ? Math.round(evsPos.reduce(function(a,b){return a+b;},0) / evsPos.length * 10) / 10 : null;
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
@@ -1013,6 +1018,7 @@ var Aggregator = {
         avg: batting_avg,
         slg: slg_val,
         iso: iso_val,
+        avgEVAll: avgEVAll2,
         medEV: medEV,
         ev75: ev75,
         maxEV: maxEV,

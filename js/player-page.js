@@ -20,16 +20,82 @@ var PlayerPage = {
 
   // Percentile stat definitions for the hitting section
   HITTING_STATS: [
-    { key: 'medEV',        label: 'Avg Exit Velo',  format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'ev75',         label: 'EV75',            format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'maxEV',        label: 'Max Exit Velo',   format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'hardHitPct',   label: 'Hard-Hit %',      format: function(v) { return Utils.formatPct(v); } },
-    { key: 'barrelPct',    label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kPct',         label: 'K %',              format: function(v) { return Utils.formatPct(v); } },
-    { key: 'bbPct',        label: 'BB %',             format: function(v) { return Utils.formatPct(v); } },
-    { key: 'chasePct',     label: 'Chase %',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'whiffPct',     label: 'Whiff %',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'contactPct',   label: 'Contact %',        format: function(v) { return Utils.formatPct(v); } },
+    { key: 'avgEVAll',        label: 'Avg EV (All)',     format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'medEV',           label: 'Avg EV (LA > 0)',  format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'ev75',            label: 'EV75',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'maxEV',           label: 'Max EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'hardHitPct',      label: 'Hard-Hit %',       format: function(v) { return Utils.formatPct(v); } },
+    { key: 'barrelPct',       label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
+    { key: 'laSweetSpotPct',  label: 'Sweet-Spot %',     format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kPct',            label: 'K %',              format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct',           label: 'BB %',             format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izContactPct',    label: 'IZ Contact %',     format: function(v) { return Utils.formatPct(v); } },
+    { key: 'whiffPct',        label: 'Whiff %',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'chasePct',        label: 'Chase %',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+  ],
+
+  // Hitter Stats table columns (single row)
+  HITTER_STATS_COLS: [
+    { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'ab', label: 'AB', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'doubles', label: '2B', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'triples', label: '3B', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'xbh', label: 'XBH', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'avg', label: 'AVG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'obp', label: 'OBP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'slg', label: 'SLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'ops', label: 'OPS', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'iso', label: 'ISO', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
+  ],
+
+  // Hitter Batted Ball table columns (per pitch type + total)
+  HITTER_BATTED_BALL_COLS: [
+    { key: 'pitchType', label: 'Pitch' },
+    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+    { key: 'avgEVAll', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'medEV', label: 'Avg EV (LA>0)', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'ev75', label: 'EV75', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'maxEV', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'hardHitPct', label: 'HardHit%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'barrelPct', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'laSweetSpotPct', label: 'Sweet-Spot%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'pullPct', label: 'Pull%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'middlePct', label: 'Mid%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'oppoPct', label: 'Oppo%', format: function(v) { return Utils.formatPct(v); } },
+  ],
+
+  // Hitter Plate Discipline table columns (per pitch type + total)
+  HITTER_PLATE_DISCIPLINE_COLS: [
+    { key: 'pitchType', label: 'Pitch' },
+    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'swingPct', label: 'Swing%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izSwingPct', label: 'IZ Swing%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izSwChase', label: 'IZ Sw-Chase%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'contactPct', label: 'Contact%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'whiffPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
+  ],
+
+  // Hitter Bat Tracking table columns (placeholder)
+  HITTER_BAT_TRACKING_COLS: [
+    { key: 'batSpeed', label: 'Bat Speed', format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'swingLength', label: 'Swing Length', format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
+    { key: 'attackAngle', label: 'Attack Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
+    { key: 'attackDir', label: 'Attack Dir', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
+    { key: 'swingPathTilt', label: 'Swing Path Tilt', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
   ],
 
   // Pitch usage table columns
@@ -261,12 +327,23 @@ var PlayerPage = {
   },
 
   _renderHitterPage: function (data) {
-    // Show hitter-specific sections, hide pitcher-specific
     this._showHitterLayout();
     this._renderHitterIdentity(data);
+    this._currentData = data;
+    this._sprayMode = 'all';
+    this._renderHitterContent(data);
+    this._bindSprayToggle();
+  },
+
+  _renderHitterContent: function (data) {
+    document.getElementById('player-percentiles').innerHTML = '';
     this._renderPercentiles(data, this.HITTING_STATS);
-    this._renderBattedBallChart(data);
-    this._renderHitterStatsTable(data);
+    this._renderSprayChart(data);
+    this._renderHitterSmallStats(data);
+    this._renderHitterStatsFullTable(data);
+    this._renderHitterBattedBallTable(data);
+    this._renderHitterPlateDisciplineTable(data);
+    this._renderHitterBatTrackingTable(data);
   },
 
   _showPitcherLayout: function () {
@@ -277,17 +354,48 @@ var PlayerPage = {
     // Reset section title
     var title = document.querySelector('.player-col-movement .section-title');
     if (title) title.textContent = 'Movement Profile';
+    // Hide hitter-specific sections
+    var hitterSections = ['player-spray-section', 'player-hitter-stats-section',
+      'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
+      'player-hitter-bat-tracking-section'];
+    for (var i = 0; i < hitterSections.length; i++) {
+      var el = document.getElementById(hitterSections[i]);
+      if (el) el.style.display = 'none';
+    }
+    // Show pitcher sections
+    var pitcherSections = ['player-stats-section', 'player-expanded-pitch-section',
+      'player-batted-ball-section', 'player-plate-discipline-section',
+      'player-location-section', 'player-count-section'];
+    for (var j = 0; j < pitcherSections.length; j++) {
+      var el2 = document.getElementById(pitcherSections[j]);
+      if (el2) el2.style.display = '';
+    }
   },
 
   _showHitterLayout: function () {
-    // Hide pitcher-only usage section
+    // Hide pitcher-only sections
     var usageSection = document.querySelector('.player-usage-section');
     if (usageSection) usageSection.style.display = 'none';
-    // Show movement column (reused for batted ball chart)
     var movementCol = document.querySelector('.player-col-movement');
-    if (movementCol) movementCol.style.display = '';
-    var title = document.querySelector('.player-col-movement .section-title');
-    if (title) title.textContent = 'Batted Ball Profile';
+    if (movementCol) movementCol.style.display = 'none';
+    var pitcherSections = ['player-stats-section', 'player-expanded-pitch-section',
+      'player-batted-ball-section', 'player-plate-discipline-section',
+      'player-location-section', 'player-count-section'];
+    for (var i = 0; i < pitcherSections.length; i++) {
+      var el = document.getElementById(pitcherSections[i]);
+      if (el) el.style.display = 'none';
+    }
+    // Hide game log for hitters
+    var gameLog = document.getElementById('player-game-log');
+    if (gameLog) gameLog.style.display = 'none';
+    // Show hitter-specific sections
+    var hitterSections = ['player-spray-section', 'player-hitter-stats-section',
+      'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
+      'player-hitter-bat-tracking-section'];
+    for (var j = 0; j < hitterSections.length; j++) {
+      var el2 = document.getElementById(hitterSections[j]);
+      if (el2) el2.style.display = '';
+    }
   },
 
   close: function () {
@@ -302,11 +410,14 @@ var PlayerPage = {
     this._unbindGameLog();
 
     // Hide new sections
-    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section'];
+    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
+      'player-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
+      'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var i = 0; i < sections.length; i++) {
       var el = document.getElementById(sections[i]);
       if (el) el.style.display = 'none';
     }
+    this._unbindSprayToggle();
 
     document.getElementById('player-page').style.display = 'none';
     if (this._lastRoute) {
@@ -410,14 +521,14 @@ var PlayerPage = {
     // Headshot
     var img = document.getElementById('player-headshot');
     if (data.mlbId) {
-      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
+      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
       img.alt = data.hitter;
     } else {
       img.src = '';
       img.alt = '';
     }
     img.onerror = function () {
-      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect fill="%23333" width="120" height="120"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
+      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect fill="%23333" width="160" height="160"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
     };
 
     // Name
@@ -425,12 +536,24 @@ var PlayerPage = {
     var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : data.hitter;
     document.getElementById('player-name').textContent = displayName;
 
-    // Bats | Team
-    var batsLabel = data.stands === 'S' ? 'Switch' : (data.stands === 'L' ? 'Bats Left' : 'Bats Right');
-    document.getElementById('player-position').textContent = batsLabel + ' | ' + (data.team || '');
+    // Bats | Team | Age (fetched from MLB API)
+    var batsLabel = data.stands === 'S' ? 'Switch' : (data.stands === 'L' ? 'Bats: L' : 'Bats: R');
+    var posEl = document.getElementById('player-position');
+    var ageEl = document.getElementById('player-age');
+    posEl.textContent = batsLabel + ' | ' + (data.team || '');
+    ageEl.textContent = '';
 
-    // Show PA count
-    document.getElementById('player-age').textContent = (data.pa || 0) + ' PA | ' + (data.count || 0) + ' pitches seen';
+    if (data.mlbId) {
+      fetch('https://statsapi.mlb.com/api/v1/people/' + data.mlbId)
+        .then(function (res) { return res.json(); })
+        .then(function (json) {
+          var person = json.people && json.people[0];
+          if (person && person.currentAge != null) {
+            posEl.textContent = batsLabel + ' | ' + (data.team || '') + ' | Age: ' + person.currentAge;
+          }
+        })
+        .catch(function () { /* silently ignore */ });
+    }
   },
 
   // --- Render: Pitch Usage (vs LHH / vs RHH) ---
@@ -1576,6 +1699,388 @@ var PlayerPage = {
       if (hitterData[i].mlbId === mlbId) return hitterData[i];
     }
     return null;
+  },
+
+  // --- Hitter: Spray Chart ---
+
+  _renderSprayChart: function (data) {
+    var canvas = document.getElementById('player-spray-chart');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width;
+    var H = canvas.height;
+    var isDark = document.body.classList.contains('dark');
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Home plate in Statcast coords
+    var HP_X = 125.42;
+    var HP_Y = 198.27;
+
+    // Canvas mapping: HP at bottom center
+    var canvasHPX = W / 2;
+    var canvasHPY = H - 30;
+    var scale = 1.65; // pixels per statcast unit
+
+    function toCanvas(hcX, hcY) {
+      var dx = hcX - HP_X;
+      var dy = HP_Y - hcY; // Statcast Y increases downward, field Y increases upward
+      return [canvasHPX + dx * scale, canvasHPY - dy * scale];
+    }
+
+    // Draw field background
+    ctx.fillStyle = isDark ? '#1a2e1a' : '#e8f5e8';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw outfield grass arc
+    ctx.fillStyle = isDark ? '#1a3a1a' : '#c8e6c8';
+    ctx.beginPath();
+    ctx.moveTo(canvasHPX, canvasHPY);
+    // Foul lines angle: LF line at ~135 deg from right, RF line at ~45 deg
+    var foulAngleLeft = -Math.PI * 3 / 4;
+    var foulAngleRight = -Math.PI / 4;
+    ctx.arc(canvasHPX, canvasHPY, 320, foulAngleLeft, foulAngleRight);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw infield dirt
+    ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
+    ctx.beginPath();
+    ctx.arc(canvasHPX, canvasHPY, 95 * scale * 0.6, foulAngleLeft, foulAngleRight);
+    ctx.lineTo(canvasHPX, canvasHPY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw fence outline using average distances
+    // Convert feet to statcast-ish units (roughly 2.5 statcast units per foot)
+    var fenceDistances = [
+      { angle: foulAngleLeft, dist: 330 },      // LF
+      { angle: -Math.PI * 5 / 8, dist: 379 },   // LF gap
+      { angle: -Math.PI / 2, dist: 401 },        // CF
+      { angle: -Math.PI * 3 / 8, dist: 379 },    // RF gap
+      { angle: foulAngleRight, dist: 329 },       // RF
+    ];
+    var fenceScale = 320 / 401; // normalize so CF = max radius on canvas
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var fi = 0; fi < fenceDistances.length; fi++) {
+      var fd = fenceDistances[fi];
+      var r = fd.dist * fenceScale;
+      var fx = canvasHPX + r * Math.cos(fd.angle);
+      var fy = canvasHPY + r * Math.sin(fd.angle);
+      if (fi === 0) ctx.moveTo(fx, fy);
+      else ctx.lineTo(fx, fy);
+    }
+    ctx.stroke();
+
+    // Draw foul lines
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(canvasHPX, canvasHPY);
+    ctx.lineTo(canvasHPX + 340 * Math.cos(foulAngleLeft), canvasHPY + 340 * Math.sin(foulAngleLeft));
+    ctx.moveTo(canvasHPX, canvasHPY);
+    ctx.lineTo(canvasHPX + 340 * Math.cos(foulAngleRight), canvasHPY + 340 * Math.sin(foulAngleRight));
+    ctx.stroke();
+
+    // Draw infield diamond
+    var baseDist = 60; // approximate in canvas units
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(canvasHPX, canvasHPY); // home
+    ctx.lineTo(canvasHPX + baseDist * 0.707, canvasHPY - baseDist * 0.707); // 1B
+    ctx.lineTo(canvasHPX, canvasHPY - baseDist * 1.414); // 2B
+    ctx.lineTo(canvasHPX - baseDist * 0.707, canvasHPY - baseDist * 0.707); // 3B
+    ctx.closePath();
+    ctx.stroke();
+
+    // Draw home plate
+    ctx.fillStyle = isDark ? '#ddd' : '#fff';
+    ctx.beginPath();
+    ctx.moveTo(canvasHPX - 5, canvasHPY);
+    ctx.lineTo(canvasHPX + 5, canvasHPY);
+    ctx.lineTo(canvasHPX + 4, canvasHPY + 4);
+    ctx.lineTo(canvasHPX, canvasHPY + 6);
+    ctx.lineTo(canvasHPX - 4, canvasHPY + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Get BIP data
+    var microData = window.MICRO_DATA;
+    if (!microData || !microData.hitterBip) {
+      this._renderSprayLegend('all');
+      return;
+    }
+
+    var lookups = microData.lookups || {};
+    var hitterIdx = (lookups.hitters || []).indexOf(data.hitter);
+    if (hitterIdx < 0) {
+      this._renderSprayLegend('all');
+      return;
+    }
+
+    var bipCols = microData.hitterBipCols;
+    var hiIdx = bipCols.indexOf('hitterIdx');
+    var hcXIdx = bipCols.indexOf('hcX');
+    var hcYIdx = bipCols.indexOf('hcY');
+    var bbTypeIdx = bipCols.indexOf('bbType');
+    var eventIdx = bipCols.indexOf('event');
+    var evIdx = bipCols.indexOf('exitVelo');
+
+    var bips = microData.hitterBip;
+    var filteredBips = [];
+    for (var bi = 0; bi < bips.length; bi++) {
+      if (bips[bi][hiIdx] === hitterIdx) {
+        filteredBips.push(bips[bi]);
+      }
+    }
+
+    var mode = this._sprayMode || 'all';
+    var bbTypeColors = { 0: '#4e79a7', 1: '#59a14f', 2: '#f28e2b', 3: '#e15759' };
+    var hitEventColors = { 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c' };
+
+    // Plot BIP dots
+    for (var di = 0; di < filteredBips.length; di++) {
+      var bip = filteredBips[di];
+      var hcX = bip[hcXIdx];
+      var hcY = bip[hcYIdx];
+      if (hcX == null || hcY == null) continue;
+
+      var bbType = bip[bbTypeIdx];
+      var evtCode = bip[eventIdx];
+      var ev = bip[evIdx];
+
+      var color = null;
+      if (mode === 'all') {
+        color = bbTypeColors[bbType] || '#888';
+      } else if (mode === 'hits') {
+        if (evtCode >= 1 && evtCode <= 4) {
+          color = hitEventColors[evtCode] || '#888';
+        } else {
+          continue;
+        }
+      } else if (mode === 'hard') {
+        if (ev != null && ev >= 95) {
+          color = bbTypeColors[bbType] || '#888';
+        } else {
+          continue;
+        }
+      }
+
+      var pos = toCanvas(hcX, hcY);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.arc(pos[0], pos[1], 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    this._renderSprayLegend(mode);
+  },
+
+  _renderSprayLegend: function (mode) {
+    var container = document.getElementById('player-spray-legend');
+    if (!container) return;
+    container.innerHTML = '';
+
+    var items = [];
+    if (mode === 'all' || mode === 'hard') {
+      items = [
+        { color: '#4e79a7', label: 'GB' },
+        { color: '#59a14f', label: 'LD' },
+        { color: '#f28e2b', label: 'FB' },
+        { color: '#e15759', label: 'PU' },
+      ];
+    } else if (mode === 'hits') {
+      items = [
+        { color: '#ff8c00', label: 'Single' },
+        { color: '#7b68ee', label: 'Double' },
+        { color: '#20b2aa', label: 'Triple' },
+        { color: '#dc143c', label: 'HR' },
+      ];
+    }
+
+    for (var i = 0; i < items.length; i++) {
+      var item = document.createElement('span');
+      item.className = 'spray-legend-item';
+      var dot = document.createElement('span');
+      dot.className = 'spray-legend-dot';
+      dot.style.backgroundColor = items[i].color;
+      item.appendChild(dot);
+      item.appendChild(document.createTextNode(items[i].label));
+      container.appendChild(item);
+    }
+  },
+
+  _bindSprayToggle: function () {
+    var self = this;
+    this._sprayToggleHandler = function (e) {
+      var btn = e.target.closest('.spray-toggle-btn');
+      if (!btn) return;
+      var mode = btn.getAttribute('data-mode');
+      if (mode === self._sprayMode) return;
+      self._sprayMode = mode;
+      var btns = document.querySelectorAll('#spray-toggle .spray-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      if (self._currentData) self._renderSprayChart(self._currentData);
+    };
+    var toggle = document.getElementById('spray-toggle');
+    if (toggle) toggle.addEventListener('click', this._sprayToggleHandler);
+  },
+
+  _unbindSprayToggle: function () {
+    if (this._sprayToggleHandler) {
+      var el = document.getElementById('spray-toggle');
+      if (el) el.removeEventListener('click', this._sprayToggleHandler);
+      this._sprayToggleHandler = null;
+    }
+  },
+
+  // --- Hitter: Small Stats (AVG/OBP/SLG/OPS/ISO below spray chart) ---
+
+  _renderHitterSmallStats: function (data) {
+    // Render into the movement col's table area (reuse player-pitch-usage-table)
+    var container = document.getElementById('player-pitch-usage-table');
+    container.innerHTML = '';
+    // Small stats not shown for hitters since we have full table; leave empty
+  },
+
+  // --- Hitter: Full Stats Table ---
+
+  _renderHitterStatsFullTable: function (data) {
+    var section = document.getElementById('player-hitter-stats-section');
+    var container = document.getElementById('player-hitter-stats-table');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!data) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table expanded-pitch-table';
+
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    for (var i = 0; i < this.HITTER_STATS_COLS.length; i++) {
+      var th = document.createElement('th');
+      th.textContent = this.HITTER_STATS_COLS[i].label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    var tr = document.createElement('tr');
+    for (var c = 0; c < this.HITTER_STATS_COLS.length; c++) {
+      var col = this.HITTER_STATS_COLS[c];
+      var td = document.createElement('td');
+      var val = data[col.key];
+      td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+    table.appendChild(tbody);
+    container.appendChild(table);
+  },
+
+  // --- Hitter: Get pitch rows from HITTER_PITCH_LB ---
+
+  _getHitterPitchRows: function (hitterName, team) {
+    var hpData = window.HITTER_PITCH_LB || [];
+    var rows = [];
+    for (var i = 0; i < hpData.length; i++) {
+      var r = hpData[i];
+      if (r.hitter === hitterName && r.team === team &&
+          r.pitchType !== 'All' && r.pitchType !== 'Hard' &&
+          r.pitchType !== 'Breaking' && r.pitchType !== 'Offspeed') {
+        rows.push(r);
+      }
+    }
+    rows.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    return rows;
+  },
+
+  // --- Hitter: Batted Ball Table ---
+
+  _renderHitterBattedBallTable: function (data) {
+    var section = document.getElementById('player-hitter-batted-ball-section');
+    var container = document.getElementById('player-hitter-batted-ball-table');
+    if (!container) return;
+    container.innerHTML = '';
+
+    var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    var totalRow = { pitchType: 'Total' };
+    for (var k = 0; k < this.HITTER_BATTED_BALL_COLS.length; k++) {
+      var key = this.HITTER_BATTED_BALL_COLS[k].key;
+      if (key !== 'pitchType') totalRow[key] = data[key];
+    }
+
+    this._renderPerPitchTable(container, this.HITTER_BATTED_BALL_COLS, pitchRows, totalRow);
+  },
+
+  // --- Hitter: Plate Discipline Table ---
+
+  _renderHitterPlateDisciplineTable: function (data) {
+    var section = document.getElementById('player-hitter-plate-discipline-section');
+    var container = document.getElementById('player-hitter-plate-discipline-table');
+    if (!container) return;
+    container.innerHTML = '';
+
+    var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    var totalRow = { pitchType: 'Total' };
+    for (var k = 0; k < this.HITTER_PLATE_DISCIPLINE_COLS.length; k++) {
+      var key = this.HITTER_PLATE_DISCIPLINE_COLS[k].key;
+      if (key !== 'pitchType') totalRow[key] = data[key];
+    }
+
+    this._renderPerPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+  },
+
+  // --- Hitter: Bat Tracking Table (placeholder) ---
+
+  _renderHitterBatTrackingTable: function (data) {
+    var section = document.getElementById('player-hitter-bat-tracking-section');
+    var container = document.getElementById('player-hitter-bat-tracking-table');
+    if (!container) return;
+    container.innerHTML = '';
+
+    section.style.display = '';
+
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table expanded-pitch-table';
+
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    for (var i = 0; i < this.HITTER_BAT_TRACKING_COLS.length; i++) {
+      var th = document.createElement('th');
+      th.textContent = this.HITTER_BAT_TRACKING_COLS[i].label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    var tr = document.createElement('tr');
+    for (var c = 0; c < this.HITTER_BAT_TRACKING_COLS.length; c++) {
+      var col = this.HITTER_BAT_TRACKING_COLS[c];
+      var td = document.createElement('td');
+      var val = data[col.key];
+      td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+    table.appendChild(tbody);
+    container.appendChild(table);
   },
 
   // --- URL Routing ---
