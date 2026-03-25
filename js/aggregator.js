@@ -194,7 +194,7 @@ var Aggregator = {
     }
 
     // Convert to row objects
-    var STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
+    var STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
                      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct'];
     var INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
     var rows = [];
@@ -253,6 +253,7 @@ var Aggregator = {
         nSwings: sw,
         nBip: bip,
         izPct: n > 0 ? iz / n : null,
+        swStrRate: n > 0 ? wh / n : null,
         swStrPct: sw > 0 ? wh / sw : null,
         cswPct: n > 0 ? csw / n : null,
         izWhiffPct: izSw > 0 ? izWh / izSw : null,
@@ -332,7 +333,7 @@ var Aggregator = {
       { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
     ];
     var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ'; });
-    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
+    var PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
     var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
@@ -416,6 +417,7 @@ var Aggregator = {
         usagePct: pitcherTotal > 0 ? Math.round(n / pitcherTotal * 10000) / 10000 : null,
         pa: pa,
         izPct: n > 0 ? iz / n : null,
+        swStrRate: n > 0 ? wh / n : null,
         swStrPct: sw > 0 ? wh / sw : null,
         cswPct: n > 0 ? csw / n : null,
         izWhiffPct: izSw > 0 ? izWh / izSw : null,

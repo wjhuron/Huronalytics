@@ -80,6 +80,7 @@ var COLUMNS = {
     // Plate Discipline Stats
     { key: 'izPct',       label: 'Zone%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
+    { key: 'swStrRate',   label: 'SwStr%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'izWhiffPct',  label: 'IZ Whiff%', format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },

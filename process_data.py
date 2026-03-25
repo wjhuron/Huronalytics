@@ -30,8 +30,8 @@ METRIC_KEYS = {
     'VRA': 'vra', 'HRA': 'hra',
 }
 
-PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
-STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
+PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
+STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS
@@ -53,7 +53,7 @@ HITTER_STAT_KEYS = [
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
-BUNT_BB_TYPES = {'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
+BUNT_BB_TYPES = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
 # --- PA event classification ---
 HIT_EVENTS = {'Single', 'Double', 'Triple', 'Home Run'}
@@ -245,6 +245,7 @@ def compute_stats(pitches):
     return {
         'pa': n_pa,
         'izPct': iz / total,
+        'swStrRate': whiffs / total if total > 0 else None,
         'swStrPct': whiffs / swings if swings > 0 else None,
         'cswPct': csw / total,
         'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
