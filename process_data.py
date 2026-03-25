@@ -1479,6 +1479,7 @@ def main():
         row['breakTiltMinutes'] = avg_tilt
 
         row.update(compute_stats(pitches))
+        row.update(compute_pitcher_batted_ball(pitches))
         pitch_leaderboard.append(row)
 
     # --- Fit VAA ~ PlateZ regression for normalized VAA ---

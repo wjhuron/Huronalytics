@@ -86,6 +86,7 @@ var PlayerPage = {
   // Batted Ball table (per pitch type + total)
   BATTED_BALL_COLS: [
     { key: 'pitchType', label: 'Pitch' },
+    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
     { key: 'avgEVAgainst', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
@@ -102,6 +103,7 @@ var PlayerPage = {
   // Plate Discipline table (per pitch type + total)
   PLATE_DISCIPLINE_COLS: [
     { key: 'pitchType', label: 'Pitch' },
+    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; } },
     { key: 'izPct', label: 'Zone%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'cswPct', label: 'CSW%', format: function(v) { return Utils.formatPct(v); } },
