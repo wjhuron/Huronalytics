@@ -1873,7 +1873,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     for pt, pt_rows in pt_groups.items():
         for metric in PITCH_PCTL_KEYS:
-            compute_percentile_ranks(pt_rows, metric, min_count=15)
+            compute_percentile_ranks(pt_rows, metric, min_count=0)
 
     # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
     VAA_NO_INVERT_TYPES = {'FF', 'FC'}
@@ -1944,12 +1944,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         pitcher_leaderboard.append(row)
 
     # Compute percentiles for pitcher leaderboard
-    MIN_PITCHES_PCTL = 75
-    PITCHER_PCTL_EXEMPT = {'fbVelo', 'extension'}
+    # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo']:
-        mc = 0 if stat in PITCHER_PCTL_EXEMPT else MIN_PITCHES_PCTL
-        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=mc)
+        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:
         for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT:
@@ -2184,7 +2182,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
-            compute_percentile_ranks(pt_rows, stat, min_count=15)
+            compute_percentile_ranks(pt_rows, stat, min_count=0)
 
     for row in hitter_pitch_leaderboard:
         for stat in HITTER_PITCH_INVERT_PCTL:
