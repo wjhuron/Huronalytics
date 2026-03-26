@@ -12,7 +12,11 @@ import urllib.parse
 from datetime import datetime, time
 from collections import defaultdict
 
-SPREADSHEET_ID = '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo'
+SPREADSHEET_IDS = {
+    'ST': '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo',   # ST 2026 (all 30 teams + WBC)
+    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',   # AL 2026 (15 AL teams)
+    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',   # NL 2026 (15 NL teams)
+}
 SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -1278,40 +1282,43 @@ def main():
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
-    sh = gc.open_by_key(SPREADSHEET_ID)
-    print(f"Spreadsheet: {sh.title} ({len(sh.worksheets())} sheets)")
 
-    # Read all pitches from all sheets (including WBC as 31st team)
+    # Read all pitches from all spreadsheets (ST + AL + NL)
     all_pitches = []
-    for i, ws in enumerate(sh.worksheets()):
-        if ws.title not in MLB_TEAMS:
-            print(f"  Skipping {ws.title} (not a team sheet)")
-            continue
-        print(f"  Reading {ws.title}...")
-        if i > 0:
-            time_module.sleep(1.5)
-        rows = read_sheet_with_retry(ws)
-        if not rows:
-            continue
-        header = rows[0]
-        col_idx = {name: i for i, name in enumerate(header) if name}
-
-        for row in rows[1:]:
-            pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
-            if not pitcher:
+    sheet_count = 0
+    for sheet_label, sheet_id in SPREADSHEET_IDS.items():
+        sh = gc.open_by_key(sheet_id)
+        print(f"\n[{sheet_label}] {sh.title} ({len(sh.worksheets())} tabs)")
+        for i, ws in enumerate(sh.worksheets()):
+            if ws.title not in MLB_TEAMS:
+                print(f"  Skipping {ws.title} (not a team sheet)")
                 continue
+            print(f"  Reading {ws.title}...")
+            if i > 0:
+                time_module.sleep(1.5)
+            rows = read_sheet_with_retry(ws)
+            if not rows:
+                continue
+            header = rows[0]
+            col_idx = {name: i for i, name in enumerate(header) if name}
 
-            pitch = {}
-            for col_name, idx in col_idx.items():
-                val = row[idx] if idx < len(row) else None
-                # Convert empty strings to None
-                if val == '':
-                    val = None
-                pitch[col_name] = val
+            for row in rows[1:]:
+                pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
+                if not pitcher:
+                    continue
 
-            all_pitches.append(pitch)
+                pitch = {}
+                for col_name, idx in col_idx.items():
+                    val = row[idx] if idx < len(row) else None
+                    # Convert empty strings to None
+                    if val == '':
+                        val = None
+                    pitch[col_name] = val
 
-    print(f"Read {len(all_pitches)} pitches from {len(sh.worksheets())} sheets")
+                all_pitches.append(pitch)
+            sheet_count += 1
+
+    print(f"\nRead {len(all_pitches)} pitches from {sheet_count} team sheets across {len(SPREADSHEET_IDS)} spreadsheets")
 
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
     for p in all_pitches:
