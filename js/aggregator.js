@@ -141,6 +141,38 @@ var Aggregator = {
     }
   },
 
+  // Percentile computation using _qualified flag instead of minCount
+  _computePercentilesQualified: function (rows, metricKey) {
+    var pctlKey = metricKey + '_pctl';
+    var valid = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined && rows[i]._qualified) {
+        valid.push({ idx: i, val: rows[i][metricKey] });
+      }
+    }
+    if (valid.length < 2) {
+      for (var j = 0; j < rows.length; j++) {
+        rows[j][pctlKey] = (rows[j][metricKey] !== null && rows[j][metricKey] !== undefined && rows[j]._qualified) ? 50 : null;
+      }
+      return;
+    }
+    var values = valid.map(function (v) { return v.val; });
+    var n = values.length;
+    for (var k = 0; k < valid.length; k++) {
+      var val = valid[k].val;
+      var below = 0, equal = 0;
+      for (var m = 0; m < n; m++) {
+        if (values[m] < val) below++;
+        if (values[m] === val) equal++;
+      }
+      var pctl = (below + 0.5 * (equal - 1)) / Math.max(1, n - 1) * 100;
+      rows[valid[k].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(pctl)));
+    }
+    for (var j2 = 0; j2 < rows.length; j2++) {
+      if (!(pctlKey in rows[j2])) rows[j2][pctlKey] = null;
+    }
+  },
+
   // ==================================================================
   //  Pitcher aggregation
   // ==================================================================
@@ -297,10 +329,26 @@ var Aggregator = {
       rows.push(obj);
     }
 
-    // Compute percentiles (75-pitch qualifying threshold for rate stats)
-    var MIN_PITCHES_PCTL = 75;
+    // Compute percentiles with IP-based qualifying
+    // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP/team game.
+    var teamGames = this.getTeamGamesPlayed();
+    // Mark each row as qualified or not
+    for (var qi = 0; qi < rows.length; qi++) {
+      var r = rows[qi];
+      var tg = teamGames[r.team] || 0;
+      var ipStr = r.ip;
+      var ipFloat = 0;
+      if (ipStr != null) {
+        var ipp = String(ipStr).split('.');
+        ipFloat = parseInt(ipp[0], 10) + (ipp[1] ? parseInt(ipp[1], 10) / 3 : 0);
+      }
+      var pg = r.g || 0, pgs = r.gs || 0;
+      var isStarter = pg > 0 && (pgs / pg) > 0.5;
+      r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg * 0.1);
+    }
+    // Use _qualified flag for percentile pool: only qualified pitchers get percentiles
     for (var si = 0; si < STAT_KEYS.length; si++) {
-      this._computePercentiles(rows, STAT_KEYS[si], MIN_PITCHES_PCTL);
+      this._computePercentilesQualified(rows, STAT_KEYS[si]);
     }
     // Invert where lower is better
     for (var ri = 0; ri < rows.length; ri++) {
@@ -506,9 +554,10 @@ var Aggregator = {
     });
 
     var self = this;
+    var MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches of that type to qualify
     for (var pt in ptGroups) {
       PITCH_PCTL_KEYS.forEach(function (key) {
-        self._computePercentiles(ptGroups[pt], key);
+        self._computePercentiles(ptGroups[pt], key, MIN_PITCH_TYPE_PCTL);
       });
     }
 
@@ -744,7 +793,7 @@ var Aggregator = {
       rows.push(obj);
     }
 
-    // Compute percentiles
+    // Compute percentiles (no special qualifying for hitters on leaderboard)
     var self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
       self._computePercentiles(rows, key);
