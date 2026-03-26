@@ -9,6 +9,7 @@ var Aggregator = {
   _colIdx: {},
 
   load: function (microData) {
+    this._roleCache = null;  // Clear role cache on reload
     // Accept micro data directly (from DataStore)
     if (microData) {
       this.data = microData;
@@ -319,6 +320,12 @@ var Aggregator = {
       // Apply non-aggregator filters
       if (filters.team !== 'all' && obj.team !== filters.team) continue;
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
+      if (filters.role && filters.role !== 'all') {
+        var pg = obj.g || 0, pgs = obj.gs || 0;
+        var isSP = pg > 0 && (pgs / pg) > 0.5;
+        if (filters.role === 'SP' && !isSP) continue;
+        if (filters.role === 'RP' && isSP) continue;
+      }
       if (obj.count < (filters.minCount || 1)) continue;
       if (filters.minTbf && (obj.pa || 0) < filters.minTbf) continue;
       if (filters.minIp && (obj.ip || 0) < filters.minIp) continue;
@@ -539,6 +546,23 @@ var Aggregator = {
       // Apply non-aggregator filters
       if (filters.team !== 'all' && obj.team !== filters.team) continue;
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
+      if (filters.role && filters.role !== 'all') {
+        // Pitch rows don't have G/GS — look up from pitcher leaderboard
+        var pitcherKey2 = obj.pitcher + '|' + obj.team;
+        if (!this._roleCache) this._roleCache = {};
+        if (!(pitcherKey2 in this._roleCache)) {
+          var pd = window.PITCHER_DATA || [];
+          for (var ri3 = 0; ri3 < pd.length; ri3++) {
+            if (pd[ri3].pitcher === obj.pitcher && pd[ri3].team === obj.team) {
+              var pg2 = pd[ri3].g || 0, pgs2 = pd[ri3].gs || 0;
+              this._roleCache[pitcherKey2] = pg2 > 0 && (pgs2 / pg2) > 0.5 ? 'SP' : 'RP';
+              break;
+            }
+          }
+          if (!(pitcherKey2 in this._roleCache)) this._roleCache[pitcherKey2] = 'RP';
+        }
+        if (this._roleCache[pitcherKey2] !== filters.role) continue;
+      }
       if (filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
       if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;

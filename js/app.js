@@ -263,6 +263,11 @@
     document.getElementById('min-pitcher-swings-filter-group').style.display =
       currentTab === 'pitcherSwingDecisions' ? '' : 'none';
 
+    // Show SP/RP role filter on all pitcher tabs
+    var isPitcherTab = currentTab === 'pitcherStats' || currentTab === 'pitchMetrics' ||
+                       currentTab === 'pitcherBattedBall' || currentTab === 'pitcherSwingDecisions';
+    document.getElementById('role-filter-group').style.display = isPitcherTab ? '' : 'none';
+
     // Hide Min Pitches on pitcherStats (uses Min IP / Min TBF instead)
     document.getElementById('min-count').parentElement.style.display =
       currentTab === 'pitcherStats' ? 'none' : '';
@@ -388,6 +393,7 @@
     minTbfInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minBipInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minPitcherSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    document.getElementById('role-filter').addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
 
@@ -752,6 +758,7 @@
       search: searchInput.value.trim(),
       dateStart: dateStartInput.value || '',
       dateEnd: dateEndInput.value || '',
+      role: document.getElementById('role-filter').value,
     };
   }
 

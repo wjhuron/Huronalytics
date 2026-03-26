@@ -124,6 +124,24 @@ var DataStore = {
         }
       }
 
+      // SP/RP role filter (pitcher tabs only)
+      if (filters.role && filters.role !== 'all' && !isHitter) {
+        var g = row.g, gs = row.gs;
+        // For pitch-level rows without G/GS, look up from pitcher data
+        if (g == null && row.pitcher) {
+          var pitcherData = DataStore.active().pitcherData || [];
+          for (var pi = 0; pi < pitcherData.length; pi++) {
+            if (pitcherData[pi].pitcher === row.pitcher && pitcherData[pi].team === row.team) {
+              g = pitcherData[pi].g; gs = pitcherData[pi].gs; break;
+            }
+          }
+        }
+        g = g || 0; gs = gs || 0;
+        var isStarter = g > 0 && (gs / g) > 0.5;
+        if (filters.role === 'SP' && !isStarter) return false;
+        if (filters.role === 'RP' && isStarter) return false;
+      }
+
       if (hasPitchType && selectedPitchTypes !== 'all') {
         if (selectedPitchTypes.indexOf(row.pitchType) === -1) return false;
       }
