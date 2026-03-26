@@ -1943,6 +1943,20 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         pitcher_leaderboard.append(row)
 
+    # Recompute pitcher runValue as sum of rounded per-pitch-type runValues
+    # so that the overall matches the sum of displayed per-pitch values
+    pitch_rv_by_pitcher = {}
+    for pr in pitch_leaderboard:
+        pk = pr['pitcher'] + '|' + pr['team']
+        if pr.get('runValue') is not None:
+            if pk not in pitch_rv_by_pitcher:
+                pitch_rv_by_pitcher[pk] = 0.0
+            pitch_rv_by_pitcher[pk] += pr['runValue']
+    for row in pitcher_leaderboard:
+        pk = row['pitcher'] + '|' + row['team']
+        if pk in pitch_rv_by_pitcher:
+            row['runValue'] = round(pitch_rv_by_pitcher[pk], 1)
+
     # Compute percentiles for pitcher leaderboard
     # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
