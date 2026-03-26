@@ -131,7 +131,8 @@ var COLUMNS = {
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchBadge: true },
     // Exit Velocity
-    { key: 'medEV',       label: 'Avg EV',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
+    { key: 'avgEVAll',    label: 'Avg EV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
+    { key: 'medEV',       label: 'Avg EV LA>0',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     { key: 'ev75',        label: 'EV75',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     // Batted Ball
