@@ -41,7 +41,7 @@ STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPc
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS
 
 # Pitcher stats where lower is better (invert percentile)
-PITCHER_INVERT_PCTL = {'bbPct', 'babip'}
+PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 
 # --- Hitter Leaderboard constants ---
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
@@ -2286,6 +2286,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['sb'] = None
                 row['cs'] = None
                 row['sbPct'] = None
+
+    # Compute percentiles for boxscore-derived stats (ERA, HR/9, etc.)
+    # These are set AFTER the initial percentile pass, so need a second pass
+    BOXSCORE_PCTL_KEYS = ['era', 'hr9']
+    BOXSCORE_INVERT = {'era', 'hr9'}
+    for stat in BOXSCORE_PCTL_KEYS:
+        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
+    for row in pitcher_leaderboard:
+        for stat in BOXSCORE_INVERT:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,

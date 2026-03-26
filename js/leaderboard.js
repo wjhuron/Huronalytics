@@ -44,10 +44,8 @@ var COLUMNS = {
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
-    // Advanced pitching (FanGraphs — not yet populated)
+    // Advanced pitching
     { key: 'era',         label: 'ERA',      format: Utils.formatDecimal(2), sortType: 'numeric', sectionStart: true, group: 'advanced' },
-    { key: 'xERA',        label: 'xERA',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
-    { key: 'eraMinusXera', label: 'ERA-xERA', format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
     { key: 'fip',         label: 'FIP',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
     { key: 'xFIP',        label: 'xFIP',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
     { key: 'siera',       label: 'SIERA',    format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
