@@ -15,8 +15,8 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-26 16:23",
-  "totalPitches": 532,
+  "generatedAt": "2026-03-26 16:29",
+  "totalPitches": 258,
   "totalPitchers": 8,
   "totalHitters": 18,
   "leagueAverages": {
@@ -208,11 +208,11 @@
       "velocity": 81.4,
       "spinRate": 2664.0,
       "indVertBrk": -8.2,
-      "horzBrk": -8.5,
+      "horzBrk": -8.4,
       "relPosZ": 6.3,
       "relPosX": -2.2,
       "extension": 5.6,
-      "vaa": -10.15,
+      "vaa": -10.14,
       "haa": 3.66,
       "vra": -1.54,
       "hra": 2.17,
@@ -268,7 +268,7 @@
     "relPosX": -1.1125,
     "extension": 6.4125,
     "vaa": -6.5187,
-    "haa": 0.93,
+    "haa": 0.9312,
     "vra": -1.7263,
     "hra": 1.845,
     "count": 8
@@ -308,13 +308,13 @@
     "count": 18
   },
   "vaaRegression": {
-    "slope": 1.593325,
-    "intercept": -10.206889,
-    "leagueAvgPlateZ": 2.498139
+    "slope": 1.488251,
+    "intercept": -10.040595,
+    "leagueAvgPlateZ": 2.441744
   },
   "haaRegression": {
-    "slope": 1.053099,
-    "intercept": 0.633517,
-    "leagueAvgPlateX": -0.053853
+    "slope": 1.091884,
+    "intercept": 0.216741,
+    "leagueAvgPlateX": 0.024922
   }
 }
