@@ -12,10 +12,11 @@
     "FS",
     "SI",
     "SL",
-    "ST"
+    "ST",
+    "SV"
   ],
-  "generatedAt": "2026-03-26 15:21",
-  "totalPitches": 258,
+  "generatedAt": "2026-03-26 16:23",
+  "totalPitches": 532,
   "totalPitchers": 8,
   "totalHitters": 18,
   "leagueAverages": {
@@ -40,8 +41,6 @@
       "chasePct": 0.1342,
       "gbPct": 0.5833,
       "fpsPct": 0.5949,
-      "breakTiltMinutes": 98,
-      "breakTilt": "1:38",
       "count": 8
     },
     "ST": {
@@ -65,8 +64,6 @@
       "chasePct": 0.1667,
       "gbPct": 0.5,
       "fpsPct": 0.3333,
-      "breakTiltMinutes": 612,
-      "breakTilt": "10:12",
       "count": 3
     },
     "CF": {
@@ -90,8 +87,6 @@
       "chasePct": 0.2,
       "gbPct": 0.5,
       "fpsPct": 0.5,
-      "breakTiltMinutes": 33,
-      "breakTilt": "12:33",
       "count": 1
     },
     "SL": {
@@ -115,8 +110,6 @@
       "chasePct": 0.4167,
       "gbPct": 0.0,
       "fpsPct": 0.25,
-      "breakTiltMinutes": 692,
-      "breakTilt": "11:32",
       "count": 4
     },
     "FF": {
@@ -140,8 +133,6 @@
       "chasePct": 0.2,
       "gbPct": 0.2,
       "fpsPct": 0.4,
-      "breakTiltMinutes": 23,
-      "breakTilt": "12:23",
       "count": 5
     },
     "FC": {
@@ -165,8 +156,6 @@
       "chasePct": 0.05,
       "gbPct": 0.1667,
       "fpsPct": 0.75,
-      "breakTiltMinutes": 31,
-      "breakTilt": "12:31",
       "count": 2
     },
     "CH": {
@@ -190,34 +179,53 @@
       "chasePct": 0.4889,
       "gbPct": 0.4375,
       "fpsPct": 0.75,
-      "breakTiltMinutes": 172,
-      "breakTilt": "2:52",
       "count": 3
     },
     "CU": {
-      "velocity": 79.2,
-      "spinRate": 2764.67,
-      "indVertBrk": -12.97,
-      "horzBrk": -2.17,
-      "relPosZ": 6.13,
-      "relPosX": -1.13,
-      "extension": 6.2,
-      "vaa": -10.7,
-      "haa": 1.99,
-      "vra": -0.64,
-      "hra": 1.61,
-      "strikePct": 0.4359,
-      "izPct": 0.2436,
-      "swStrRate": 0.1923,
-      "swStrPct": 0.4444,
-      "cswPct": 0.2179,
+      "velocity": 78.1,
+      "spinRate": 2815.0,
+      "indVertBrk": -15.35,
+      "horzBrk": 0.95,
+      "relPosZ": 6.05,
+      "relPosX": -0.6,
+      "extension": 6.5,
+      "vaa": -10.98,
+      "haa": 1.16,
+      "vra": -0.19,
+      "hra": 1.33,
+      "strikePct": 0.4038,
+      "izPct": 0.1154,
+      "swStrRate": 0.2885,
+      "swStrPct": 0.6667,
+      "cswPct": 0.3269,
       "izWhiffPct": 0.0,
-      "chasePct": 0.2,
-      "gbPct": 0.25,
-      "fpsPct": 0.45,
-      "breakTiltMinutes": 389,
-      "breakTilt": "6:29",
-      "count": 3
+      "chasePct": 0.3,
+      "gbPct": 0.5,
+      "fpsPct": 0.4,
+      "count": 2
+    },
+    "SV": {
+      "velocity": 81.4,
+      "spinRate": 2664.0,
+      "indVertBrk": -8.2,
+      "horzBrk": -8.5,
+      "relPosZ": 6.3,
+      "relPosX": -2.2,
+      "extension": 5.6,
+      "vaa": -10.15,
+      "haa": 3.66,
+      "vra": -1.54,
+      "hra": 2.17,
+      "strikePct": 0.5,
+      "izPct": 0.5,
+      "swStrRate": 0.0,
+      "swStrPct": 0.0,
+      "cswPct": 0.0,
+      "izWhiffPct": 0.0,
+      "chasePct": 0.0,
+      "gbPct": 0.0,
+      "fpsPct": 0.5,
+      "count": 1
     },
     "FS": {
       "velocity": 89.1,
@@ -239,8 +247,6 @@
       "izWhiffPct": 0.6,
       "chasePct": 0.2,
       "fpsPct": 1.0,
-      "breakTiltMinutes": 177,
-      "breakTilt": "2:57",
       "count": 1
     }
   },
@@ -262,7 +268,7 @@
     "relPosX": -1.1125,
     "extension": 6.4125,
     "vaa": -6.5187,
-    "haa": 0.9312,
+    "haa": 0.93,
     "vra": -1.7263,
     "hra": 1.845,
     "count": 8
@@ -302,13 +308,13 @@
     "count": 18
   },
   "vaaRegression": {
-    "slope": 1.488251,
-    "intercept": -10.040595,
-    "leagueAvgPlateZ": 2.441744
+    "slope": 1.593325,
+    "intercept": -10.206889,
+    "leagueAvgPlateZ": 2.498139
   },
   "haaRegression": {
-    "slope": 1.091884,
-    "intercept": 0.216741,
-    "leagueAvgPlateX": 0.024922
+    "slope": 1.053099,
+    "intercept": 0.633517,
+    "leagueAvgPlateX": -0.053853
   }
 }
