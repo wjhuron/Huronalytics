@@ -961,8 +961,15 @@ var PlayerPage = {
       }
     }
 
+    // Compute total pitches for overall RV qualifying
+    var totalPitches = 0;
+    for (var tp = 0; tp < pitchRows.length; tp++) {
+      totalPitches += (pitchRows[tp].count || 0);
+    }
+
     // Helper to build a single percentile row
-    function buildPctlRow(labelContent, displayVal, pctl) {
+    // pitchCount: number of pitches for this row (null = use totalPitches for overall)
+    function buildPctlRow(labelContent, displayVal, pctl, pitchCount) {
       var row = document.createElement('div');
       row.className = 'pctl-row';
 
@@ -981,15 +988,29 @@ var PlayerPage = {
       valEl.textContent = (displayVal != null) ? displayVal.toFixed(1) : '—';
 
       // Percentile circle
+      // Determine if this row qualifies for coloring
+      // Per-pitch: 50 pitches. Overall: 100 pitches.
+      var rvQualified;
+      if (pitchCount === null) {
+        rvQualified = totalPitches >= 100; // overall
+      } else {
+        rvQualified = (pitchCount || 0) >= 50; // per-pitch
+      }
+
       var circleWrap = document.createElement('div');
       circleWrap.className = 'pctl-circle-wrap';
       if (pctl != null) {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
-        var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-        var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
-        circle.style.backgroundColor = bgColor;
-        circle.style.color = textColor;
+        if (rvQualified) {
+          var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+          circle.style.backgroundColor = bgColor;
+          circle.style.color = textColor;
+        } else {
+          circle.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
+          circle.style.color = isDark ? '#aaa' : '#666';
+        }
         circle.textContent = Math.round(pctl);
         circleWrap.appendChild(circle);
       }
@@ -1001,8 +1022,12 @@ var PlayerPage = {
       barFill.className = 'pctl-bar-fill';
       if (pctl != null) {
         barFill.style.width = Math.round(pctl) + '%';
-        var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-        barFill.style.backgroundColor = barColor;
+        if (rvQualified) {
+          var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          barFill.style.backgroundColor = barColor;
+        } else {
+          barFill.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
+        }
       }
       barTrack.appendChild(barFill);
 
@@ -1015,7 +1040,7 @@ var PlayerPage = {
 
     // Overall row (sum of all pitch RVs — positive = good for pitcher)
     var overallDisplay = hasAnyRV ? overallRV : null;
-    container.appendChild(buildPctlRow('Overall', overallDisplay, overallPctl));
+    container.appendChild(buildPctlRow('Overall', overallDisplay, data.runValue_pctl, null));
 
     // Per-pitch-type rows (fixed order)
     var PITCH_ORDER = ['FF','SI','CF','FC','SL','ST','CU','SV','CH','FS','KN'];
@@ -1037,7 +1062,7 @@ var PlayerPage = {
       badge.style.backgroundColor = Utils.getPitchColor(pitch.pitchType);
       badge.textContent = pitch.pitchType;
 
-      container.appendChild(buildPctlRow(badge, displayVal, pctl));
+      container.appendChild(buildPctlRow(badge, displayVal, pctl, pitch.count));
     }
 
     // Divider before the stat percentiles that follow

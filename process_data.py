@@ -38,7 +38,7 @@ PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izW
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue']
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
@@ -1946,7 +1946,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Compute percentiles for pitcher leaderboard
     # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo']:
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo', 'runValue']:
         compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:
