@@ -258,7 +258,7 @@ def compute_stats(pitches):
     # Positive = good for pitcher, negative = bad
     rv_values = [safe_float(p.get('RunExp')) for p in pitches]
     rv_values = [v for v in rv_values if v is not None]
-    run_value = round(sum(rv_values), 3) if rv_values else None
+    run_value = round(sum(rv_values), 1) if rv_values else None
 
     # FPS% — first pitch strike rate (count == "0-0")
     # A strike = called strike, swinging strike, foul, or in play
@@ -599,7 +599,7 @@ def compute_hitter_stats(pitches):
         'whiffPct': whiffs / n_swings if n_swings > 0 else None,
         'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
         # Run Value — negate pitcher RunExp so positive = good for hitter
-        'runValue': (lambda vals: round(-sum(vals), 3) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
+        'runValue': (lambda vals: round(-sum(vals), 1) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
     }
 
 
