@@ -876,7 +876,19 @@ var PlayerPage = {
     var tg = teamGames[data.team] || 0;
     var isQualified;
     if (isPitcher) {
-      isQualified = (data.count || 0) >= tg * 15; // proxy for 1.0 IP/game
+      // Parse IP string (e.g., "6.1" = 6⅓ innings) to float
+      var ipStr = data.ip;
+      var ipFloat = 0;
+      if (ipStr != null) {
+        var parts = String(ipStr).split('.');
+        ipFloat = parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
+      }
+      // Starter (GS/G > 0.5) needs 1.0 IP/game, reliever needs 0.1 IP/game
+      var g = data.g || 0;
+      var gs = data.gs || 0;
+      var isStarter = g > 0 && (gs / g) > 0.5;
+      var ipThreshold = isStarter ? tg * 1.0 : tg * 0.1;
+      isQualified = ipFloat >= ipThreshold;
     } else {
       isQualified = (data.pa || 0) >= tg * 3.1;
     }
