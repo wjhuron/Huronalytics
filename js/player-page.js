@@ -363,48 +363,45 @@ var PlayerPage = {
     label.textContent = 'Game:';
     container.appendChild(label);
 
-    // "All" chip
-    var allChip = document.createElement('button');
-    allChip.className = 'game-log-chip active';
-    allChip.setAttribute('data-date', '');
-    allChip.textContent = 'All';
-    container.appendChild(allChip);
+    var select = document.createElement('select');
+    select.id = 'player-game-select';
+    select.className = 'game-log-select';
 
-    // Date chips
+    var allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'All Games';
+    select.appendChild(allOpt);
+
     for (var i = 0; i < dates.length; i++) {
-      var chip = document.createElement('button');
-      chip.className = 'game-log-chip';
-      chip.setAttribute('data-date', dates[i]);
-      // Format date nicely: "3/5" from "2026-03-05"
+      var opt = document.createElement('option');
+      opt.value = dates[i];
       var parts = dates[i].split('-');
-      chip.textContent = parseInt(parts[1]) + '/' + parseInt(parts[2]);
-      container.appendChild(chip);
+      opt.textContent = parseInt(parts[1]) + '/' + parseInt(parts[2]) + '/' + parts[0];
+      select.appendChild(opt);
     }
+
+    if (this._gameDate) select.value = this._gameDate;
+    container.appendChild(select);
   },
 
   _bindGameLog: function () {
     var self = this;
-    this._gameLogHandler = function (e) {
-      var chip = e.target.closest('.game-log-chip');
-      if (!chip) return;
-      var date = chip.getAttribute('data-date') || null;
+    this._gameLogHandler = function () {
+      var select = document.getElementById('player-game-select');
+      if (!select) return;
+      var date = select.value || null;
       if (date === (self._gameDate || '')) return;
       self._gameDate = date || null;
-      // Update active state
-      var chips = document.querySelectorAll('#player-game-log .game-log-chip');
-      for (var i = 0; i < chips.length; i++) chips[i].classList.remove('active');
-      chip.classList.add('active');
-      // Re-render content
       if (self._currentData) self._renderPitcherContent(self._currentData);
     };
-    var container = document.getElementById('player-game-log');
-    if (container) container.addEventListener('click', this._gameLogHandler);
+    var select = document.getElementById('player-game-select');
+    if (select) select.addEventListener('change', this._gameLogHandler);
   },
 
   _unbindGameLog: function () {
     if (this._gameLogHandler) {
-      var container = document.getElementById('player-game-log');
-      if (container) container.removeEventListener('click', this._gameLogHandler);
+      var select = document.getElementById('player-game-select');
+      if (select) select.removeEventListener('change', this._gameLogHandler);
       this._gameLogHandler = null;
     }
   },
