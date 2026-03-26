@@ -180,6 +180,46 @@ var PlayerPage = {
     { key: 'fpsPct', label: 'FPS%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
+  // Get player data filtered by game type using the Aggregator
+  _getFilteredPlayerData: function (data, isPitcher) {
+    var gt = this._playerGameType || 'RS';
+    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
+    if (!Aggregator.loaded) return data;
+
+    var filters = { dateStart: dateRange.start, dateEnd: dateRange.end };
+    var dataTab = isPitcher ? 'pitcher' : 'hitter';
+    var rows = Aggregator.aggregate(dataTab, filters);
+    if (!rows || rows.length === 0) return null;
+
+    var nameKey = isPitcher ? 'pitcher' : 'hitter';
+    var name = data[nameKey];
+    var team = data.team;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][nameKey] === name && rows[i].team === team) return rows[i];
+    }
+    return null;
+  },
+
+  // Get pitch-level rows filtered by game type
+  _getFilteredPitchRows: function (data) {
+    var gt = this._playerGameType || 'RS';
+    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
+    if (!Aggregator.loaded) return this._getPitchRows(data.pitcher, data.team);
+
+    var filters = { dateStart: dateRange.start, dateEnd: dateRange.end };
+    var rows = Aggregator.aggregate('pitch', filters);
+    if (!rows || rows.length === 0) return [];
+
+    var result = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].pitcher === data.pitcher && rows[i].team === data.team) {
+        result.push(rows[i]);
+      }
+    }
+    result.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    return result;
+  },
+
   open: function (mlbId) {
     // Try pitcher first, then hitter
     var pitcherData = this._findPitcherByMlbId(mlbId);
@@ -264,14 +304,21 @@ var PlayerPage = {
       container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
       return;
     }
-    this._renderPitchRunValues(data);
-    this._renderPercentiles(data, this.PITCHING_STATS, true);
-    this._renderMovementChart(data);
-    this._renderPitchTable(data);
-    this._renderStatsTable(data);
-    this._renderExpandedPitchTable(data);
-    this._renderBattedBallTable(data);
-    this._renderPlateDisciplineTable(data);
+    // Get aggregator-filtered data for stats/percentiles
+    var filteredData = this._getFilteredPlayerData(data, true) || data;
+    var filteredPitchRows = this._getFilteredPitchRows(data);
+    // Store for use by table renderers
+    this._filteredData = filteredData;
+    this._filteredPitchRows = filteredPitchRows;
+
+    this._renderPitchRunValues(filteredData);
+    this._renderPercentiles(filteredData, this.PITCHING_STATS, true);
+    this._renderMovementChart(data); // uses PITCH_DETAILS, already filtered
+    this._renderPitchTable(data); // uses PITCH_DETAILS, already filtered
+    this._renderStatsTable(filteredData);
+    this._renderExpandedPitchTable(data); // will use _filteredPitchRows
+    this._renderBattedBallTable(data); // will use _filteredPitchRows
+    this._renderPlateDisciplineTable(data); // will use _filteredPitchRows
     this._renderHeatMaps(data);
     this._renderCountTable(data);
   },
@@ -1189,14 +1236,9 @@ var PlayerPage = {
     var container = document.getElementById('player-pitch-usage-table');
     container.innerHTML = '';
 
-    var pitchRows;
-    if (this._gameDate) {
-      // Single game: aggregate from filtered pitch details
-      var filtered = this._getFilteredDetails(data);
-      pitchRows = this._aggregateDetailsToRows(filtered);
-    } else {
-      pitchRows = this._getPitchRows(data.pitcher, data.team);
-    }
+    // Always compute from filtered details (respects game type + game date)
+    var filtered = this._getFilteredDetails(data);
+    var pitchRows = filtered.length > 0 ? this._aggregateDetailsToRows(filtered) : [];
     if (pitchRows.length === 0) return;
 
     var table = document.createElement('table');
@@ -1246,7 +1288,7 @@ var PlayerPage = {
     var container = document.getElementById('player-expanded-pitch-table');
     container.innerHTML = '';
 
-    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
 
     section.style.display = '';
@@ -1335,16 +1377,16 @@ var PlayerPage = {
     var container = document.getElementById('player-batted-ball-table');
     container.innerHTML = '';
 
-    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
     section.style.display = '';
 
-    // Compute total row from pitcher-level data
+    // Compute total row from filtered pitcher-level data
     var totalRow = { pitchType: 'Total' };
-    var pitcherData = data; // data is already the pitcher-level row
+    var fd = this._filteredData || data;
     for (var k = 0; k < this.BATTED_BALL_COLS.length; k++) {
       var key = this.BATTED_BALL_COLS[k].key;
-      if (key !== 'pitchType') totalRow[key] = pitcherData[key];
+      if (key !== 'pitchType') totalRow[key] = fd[key];
     }
 
     this._renderPerPitchTable(container, this.BATTED_BALL_COLS, pitchRows, totalRow);
@@ -1357,16 +1399,16 @@ var PlayerPage = {
     var container = document.getElementById('player-plate-discipline-table');
     container.innerHTML = '';
 
-    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
     section.style.display = '';
 
-    // Compute total row from pitcher-level data
+    // Compute total row from filtered pitcher-level data
     var totalRow = { pitchType: 'Total' };
-    var pitcherData = data;
+    var fd = this._filteredData || data;
     for (var k = 0; k < this.PLATE_DISCIPLINE_COLS.length; k++) {
       var key = this.PLATE_DISCIPLINE_COLS[k].key;
-      if (key !== 'pitchType') totalRow[key] = pitcherData[key];
+      if (key !== 'pitchType') totalRow[key] = fd[key];
     }
 
     this._renderPerPitchTable(container, this.PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
