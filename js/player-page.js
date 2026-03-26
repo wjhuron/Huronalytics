@@ -355,7 +355,7 @@ var PlayerPage = {
     var container = document.getElementById('player-game-log');
     container.innerHTML = '';
     var dates = this._getGameDates(data);
-    if (dates.length <= 1) { container.style.display = 'none'; return; }
+    if (dates.length === 0) { container.style.display = 'none'; return; }
 
     container.style.display = '';
     var label = document.createElement('span');
