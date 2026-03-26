@@ -435,7 +435,8 @@ var PlayerPage = {
       container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
       return;
     }
-    this._renderPercentiles(data, this.HITTING_STATS);
+    this._renderHitterRunValue(data);
+    this._renderPercentiles(data, this.HITTING_STATS, true);
     this._renderSprayChart(data);
     this._renderHitterSmallStats(data);
     this._renderHitterStatsFullTable(data);
@@ -950,8 +951,8 @@ var PlayerPage = {
     var container = document.getElementById('player-percentiles');
     var isDark = document.body.classList.contains('dark');
 
-    // Get this pitcher's pitch rows
-    var pitchRows = this._getPitchRows(data.pitcher, data.team);
+    // Get this pitcher's pitch rows (use filtered if available)
+    var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
     if (pitchRows.length === 0) return;
 
     // Section label
@@ -1024,8 +1025,8 @@ var PlayerPage = {
       return row;
     }
 
-    // Overall row (sum of all pitch RVs, negated for display)
-    var overallDisplay = hasAnyRV ? -overallRV : null;
+    // Overall row (sum of all pitch RVs — positive = good for pitcher)
+    var overallDisplay = hasAnyRV ? overallRV : null;
     container.appendChild(buildPctlRow('Overall', overallDisplay, overallPctl));
 
     // Per-pitch-type rows (fixed order)
@@ -1040,7 +1041,7 @@ var PlayerPage = {
     for (var i = 0; i < sortedPitchRows.length; i++) {
       var pitch = sortedPitchRows[i];
       var rawRV = pitch.runValue;
-      var displayVal = (rawRV != null) ? -rawRV : null;
+      var displayVal = rawRV;
       var pctl = pitch.runValue_pctl;
 
       var badge = document.createElement('span');
@@ -1052,6 +1053,43 @@ var PlayerPage = {
     }
 
     // Divider before the stat percentiles that follow
+    var divider = document.createElement('div');
+    divider.style.cssText = 'border-top: 1px solid var(--border, #ddd); margin: 12px 0 8px 0;';
+    container.appendChild(divider);
+  },
+
+  // --- Render: Hitter Run Value (overall only) ---
+
+  _renderHitterRunValue: function (data) {
+    var container = document.getElementById('player-percentiles');
+
+    var sectionLabel = document.createElement('div');
+    sectionLabel.className = 'pctl-section-label';
+    sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
+    sectionLabel.textContent = 'Batter Run Value';
+    container.appendChild(sectionLabel);
+
+    var rv = data.runValue;
+    var row = document.createElement('div');
+    row.className = 'pctl-row';
+    var label = document.createElement('span');
+    label.className = 'pctl-label';
+    label.textContent = 'Overall';
+    var barWrap = document.createElement('div');
+    barWrap.className = 'pctl-bar-wrap';
+    var bar = document.createElement('div');
+    bar.className = 'pctl-bar';
+    bar.style.width = '0%';
+    bar.style.backgroundColor = '#ccc';
+    barWrap.appendChild(bar);
+    var valSpan = document.createElement('span');
+    valSpan.className = 'pctl-value';
+    valSpan.textContent = rv != null ? rv.toFixed(1) : '—';
+    row.appendChild(label);
+    row.appendChild(barWrap);
+    row.appendChild(valSpan);
+    container.appendChild(row);
+
     var divider = document.createElement('div');
     divider.style.cssText = 'border-top: 1px solid var(--border, #ddd); margin: 12px 0 8px 0;';
     container.appendChild(divider);
