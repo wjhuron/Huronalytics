@@ -338,7 +338,8 @@ var Aggregator = {
 
     // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
-    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue'];
+    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue',
+                     'era_pctl', 'hr9_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};
     for (var bi = 0; bi < preAgg.length; bi++) {
