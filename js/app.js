@@ -65,15 +65,13 @@
   var minIpInput, minTbfInput, minBipInput, minPitcherSwingsInput;
   var dateStartInput, dateEndInput;
   var currentGameType = null; // 'ST' or 'RS'
-  var GAME_TYPE_DATES = {
-    ST: { start: '2026-02-20', end: '2026-03-24' },
-    RS: { start: '2026-03-25', end: '2026-09-28' }
-  };
   var sidePanel, panelOverlay, panelClose;
 
   // ---- Init ----
   function init() {
-    Promise.all([DataStore.load(), Aggregator.load()]).then(function () {
+    DataStore.load().then(function () {
+      return Aggregator.load(DataStore.active().microData);
+    }).then(function () {
       if (!DataStore.metadata) {
         document.getElementById('no-results').textContent = 'Failed to load data.';
         document.getElementById('no-results').style.display = '';
@@ -396,14 +394,39 @@
     // Game Type toggle (ST / Regular Season)
     function setGameType(type) {
       currentGameType = type;
-      var dates = GAME_TYPE_DATES[type];
-      dateStartInput.value = dates.start;
-      dateEndInput.value = dates.end;
+      DataStore.gameType = type;
+      DataStore.updateGlobals();
+
+      // Reload aggregator with new micro data
+      var microData = DataStore.active().microData;
+      if (microData) {
+        Aggregator.load(microData);
+      } else {
+        Aggregator.loaded = false;
+      }
+
+      // Clear date inputs (user can set them manually within this game type)
+      dateStartInput.value = '';
+      dateEndInput.value = '';
+
+      // Update date range min/max from new micro data dates
+      if (Aggregator.loaded && Aggregator.data && Aggregator.data.lookups.dates.length > 0) {
+        var dates = Aggregator.data.lookups.dates;
+        dateStartInput.min = dates[0];
+        dateStartInput.max = dates[dates.length - 1];
+        dateEndInput.min = dates[0];
+        dateEndInput.max = dates[dates.length - 1];
+      }
+
+      // Rebuild team dropdown (WBC only in ST)
+      rebuildTeamDropdown();
+
+      // Update active button styling
       var btns = document.querySelectorAll('#game-type-toggle .game-type-btn');
       for (var i = 0; i < btns.length; i++) {
         btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
       }
-      rebuildTeamDropdown();
+
       Leaderboard.currentPage = 1;
       refresh();
     }
@@ -420,9 +443,15 @@
       var today = new Date().toISOString().slice(0, 10);
       var defaultType = today >= '2026-03-25' ? 'RS' : 'ST';
       currentGameType = defaultType;
-      var dates = GAME_TYPE_DATES[defaultType];
-      dateStartInput.value = dates.start;
-      dateEndInput.value = dates.end;
+      DataStore.gameType = defaultType;
+      DataStore.updateGlobals();
+
+      // Reload aggregator with the correct micro data for default game type
+      var defaultMicroData = DataStore.active().microData;
+      if (defaultMicroData) {
+        Aggregator.load(defaultMicroData);
+      }
+
       var btns = document.querySelectorAll('#game-type-toggle .game-type-btn');
       for (var i = 0; i < btns.length; i++) {
         btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === defaultType);

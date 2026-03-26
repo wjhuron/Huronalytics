@@ -180,43 +180,26 @@ var PlayerPage = {
     { key: 'fpsPct', label: 'FPS%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
-  // Get player data filtered by game type using the Aggregator
+  // Get player data for current game type (data is already game-type-specific via DataStore)
   _getFilteredPlayerData: function (data, isPitcher) {
-    var gt = this._playerGameType || 'RS';
-    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
-    if (!Aggregator.loaded) return data;
-
-    var filters = { dateStart: dateRange.start, dateEnd: dateRange.end };
-    var dataTab = isPitcher ? 'pitcher' : 'hitter';
-    var rows = Aggregator.aggregate(dataTab, filters);
-    if (!rows || rows.length === 0) return null;
-
+    // Data is already filtered to the active game type via DataStore/updateGlobals
+    // Just look up the player in the current dataset
     var nameKey = isPitcher ? 'pitcher' : 'hitter';
+    var source = isPitcher ? window.PITCHER_DATA : window.HITTER_DATA;
+    if (!source) return data;
+
     var name = data[nameKey];
     var team = data.team;
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i][nameKey] === name && rows[i].team === team) return rows[i];
+    for (var i = 0; i < source.length; i++) {
+      if (source[i][nameKey] === name && source[i].team === team) return source[i];
     }
     return null;
   },
 
-  // Get pitch-level rows filtered by game type
+  // Get pitch-level rows for current game type (data is already game-type-specific)
   _getFilteredPitchRows: function (data) {
-    var gt = this._playerGameType || 'RS';
-    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
-    if (!Aggregator.loaded) return this._getPitchRows(data.pitcher, data.team);
-
-    var filters = { dateStart: dateRange.start, dateEnd: dateRange.end };
-    var rows = Aggregator.aggregate('pitch', filters);
-    if (!rows || rows.length === 0) return [];
-
-    var result = [];
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i].pitcher === data.pitcher && rows[i].team === data.team) {
-        result.push(rows[i]);
-      }
-    }
-    result.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    // Data is already filtered to the active game type via DataStore/updateGlobals
+    var result = this._getPitchRows(data.pitcher, data.team);
     return result;
   },
 
@@ -262,7 +245,7 @@ var PlayerPage = {
     this._heatMapHand = 'R';
     this._countHand = 'R';
     this._gameDate = null; // null = all games
-    this._playerGameType = (typeof window.getCurrentGameType === 'function' ? window.getCurrentGameType() : null) || 'RS';
+    this._playerGameType = DataStore.gameType || 'RS';
     this._currentData = data;
     this._renderPlayerGameTypeToggle();
     this._renderGameLog(data);
@@ -271,19 +254,22 @@ var PlayerPage = {
     this._bindGameLog();
   },
 
-  // Check if filtered details have any data for current game type
+  // Check if there is data for the current game type (data is already game-type-specific)
   _hasDataForGameType: function (data) {
-    var details = window.PITCH_DETAILS || {};
-    var name = data.pitcher || data.hitter;
-    var key = name + '|' + data.team;
-    var pitches = details[key];
-    if (!pitches || pitches.length === 0) return false;
-    var gt = this._playerGameType || 'RS';
-    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
-    for (var i = 0; i < pitches.length; i++) {
-      if (pitches[i].gd >= dateRange.start && pitches[i].gd <= dateRange.end) return true;
+    var isPitcher = !!(data.pitcher);
+    if (isPitcher) {
+      var details = window.PITCH_DETAILS || {};
+      var key = data.pitcher + '|' + data.team;
+      var pitches = details[key];
+      return pitches && pitches.length > 0;
+    } else {
+      // For hitters, check if they exist in the current dataset
+      var hitterData = window.HITTER_DATA || [];
+      for (var i = 0; i < hitterData.length; i++) {
+        if (hitterData[i].hitter === data.hitter && hitterData[i].team === data.team) return true;
+      }
+      return false;
     }
-    return false;
   },
 
   // Render game-date-sensitive sections (called on initial load and game date change)
@@ -323,21 +309,14 @@ var PlayerPage = {
     this._renderCountTable(data);
   },
 
-  // Get PITCH_DETAILS for this pitcher, filtered by game type date range and optionally by _gameDate
+  // Get PITCH_DETAILS for this pitcher (already game-type-specific), optionally filtered by _gameDate
   _getFilteredDetails: function (data) {
     var details = window.PITCH_DETAILS || {};
     var key = data.pitcher + '|' + data.team;
     var pitches = details[key];
     if (!pitches || pitches.length === 0) return [];
 
-    // Filter by game type date range
-    var gt = this._playerGameType || 'RS';
-    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
-    pitches = pitches.filter(function(p) {
-      return p.gd >= dateRange.start && p.gd <= dateRange.end;
-    });
-
-    // Then filter by specific game date if set
+    // Filter by specific game date if set
     if (this._gameDate) {
       var gd = this._gameDate;
       pitches = pitches.filter(function (p) { return p.gd === gd; });
@@ -345,21 +324,17 @@ var PlayerPage = {
     return pitches;
   },
 
-  // Get unique game dates for this pitcher from PITCH_DETAILS, filtered by game type
+  // Get unique game dates for this pitcher from PITCH_DETAILS (already game-type-specific)
   _getGameDates: function (data) {
     var details = window.PITCH_DETAILS || {};
     var key = data.pitcher + '|' + data.team;
     var pitches = details[key];
     if (!pitches) return [];
 
-    // Filter by game type date range
-    var gt = this._playerGameType || 'RS';
-    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
-
     var dateSet = {};
     for (var i = 0; i < pitches.length; i++) {
       var gd = pitches[i].gd;
-      if (gd && gd >= dateRange.start && gd <= dateRange.end) dateSet[gd] = true;
+      if (gd) dateSet[gd] = true;
     }
     return Object.keys(dateSet).sort();
   },
@@ -425,7 +400,7 @@ var PlayerPage = {
   _renderHitterPage: function (data) {
     this._showHitterLayout();
     this._renderHitterIdentity(data);
-    this._playerGameType = (typeof window.getCurrentGameType === 'function' ? window.getCurrentGameType() : null) || 'RS';
+    this._playerGameType = DataStore.gameType || 'RS';
     this._currentData = data;
     this._sprayMode = 'all';
     this._renderPlayerGameTypeToggle();
@@ -558,11 +533,32 @@ var PlayerPage = {
       if (type === self._playerGameType) return;
       self._playerGameType = type;
       self._gameDate = null; // reset game date filter when switching
+
+      // Switch DataStore to new game type and reload globals + aggregator
+      DataStore.gameType = type;
+      DataStore.updateGlobals();
+      var microData = DataStore.active().microData;
+      if (microData) {
+        Aggregator.load(microData);
+      } else {
+        Aggregator.loaded = false;
+      }
+
       // Update active state
       var btns = toggleContainer.querySelectorAll('.game-type-btn');
       for (var i = 0; i < btns.length; i++) {
         btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
       }
+
+      // Re-find the player in the new dataset
+      var mlbId = self._currentData ? self._currentData.mlbId : null;
+      if (mlbId) {
+        var newData = self._playerType === 'pitcher'
+          ? self._findPitcherByMlbId(mlbId)
+          : self._findHitterByMlbId(mlbId);
+        if (newData) self._currentData = newData;
+      }
+
       // Re-render content
       if (self._currentData) {
         if (self._playerType === 'pitcher') {
@@ -590,13 +586,26 @@ var PlayerPage = {
     this._heatMapHand = 'R';
     this._countHand = 'R';
     this._gameDate = null;
-    this._playerGameType = null;
     this._currentData = null;
     this.destroyChart();
     this._unbindClickOutside();
     this._unbindHandToggles();
     this._unbindGameLog();
     this._unbindPlayerGameTypeToggle();
+
+    // Restore DataStore to the main leaderboard's game type
+    var mainGameType = (typeof window.getCurrentGameType === 'function' ? window.getCurrentGameType() : null) || 'RS';
+    if (DataStore.gameType !== mainGameType) {
+      DataStore.gameType = mainGameType;
+      DataStore.updateGlobals();
+      var microData = DataStore.active().microData;
+      if (microData) {
+        Aggregator.load(microData);
+      } else {
+        Aggregator.loaded = false;
+      }
+    }
+    this._playerGameType = null;
 
     // Hide new sections
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
@@ -849,9 +858,8 @@ var PlayerPage = {
     var isPitcher = !!(data.pitcher);
 
     // Determine if player qualifies based on team games played
-    var gt = this._playerGameType || 'RS';
-    var dateRange = { ST: { start: '2026-02-20', end: '2026-03-24' }, RS: { start: '2026-03-25', end: '2026-09-28' } }[gt];
-    var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed(dateRange.start, dateRange.end) : {};
+    // Micro data is already game-type-specific, so no date range needed
+    var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
     var tg = teamGames[data.team] || 0;
     var isQualified;
     if (isPitcher) {

@@ -59,6 +59,16 @@ HITTER_STAT_KEYS = [
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
 BUNT_BB_TYPES = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
+# Team abbreviation → MLB API team ID mapping
+TEAM_ABBREV_TO_ID = {
+    'ARI': 109, 'ATL': 144, 'BAL': 110, 'BOS': 111, 'CHC': 112,
+    'CWS': 145, 'CIN': 113, 'CLE': 114, 'COL': 115, 'DET': 116,
+    'HOU': 117, 'KCR': 118, 'LAA': 108, 'LAD': 119, 'MIA': 146,
+    'MIL': 158, 'MIN': 142, 'NYM': 121, 'NYY': 147, 'ATH': 133,
+    'PHI': 143, 'PIT': 134, 'SDP': 135, 'SFG': 137, 'SEA': 136,
+    'STL': 138, 'TBR': 139, 'TEX': 140, 'TOR': 141, 'WSH': 120,
+}
+
 # --- PA event classification ---
 HIT_EVENTS = {'Single', 'Double', 'Triple', 'Home Run'}
 K_EVENTS = {'Strikeout', 'Strikeout Double Play'}
@@ -1275,57 +1285,159 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
             row[pctl_key] = None
 
 
-def main():
-    os.makedirs(DATA_DIR, exist_ok=True)
+def load_mlb_id_cache(cache_path):
+    """Load MLB ID cache from disk."""
+    if os.path.exists(cache_path):
+        with open(cache_path, 'r') as f:
+            return json.load(f)
+    return {}
 
-    print(f"Connecting to Google Sheets...")
-    scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    gc = gspread.authorize(creds)
 
-    # Read all pitches from all spreadsheets (ST + AL + NL)
-    all_pitches = []
-    sheet_count = 0
-    for sheet_label, sheet_id in SPREADSHEET_IDS.items():
-        sh = gc.open_by_key(sheet_id)
-        print(f"\n[{sheet_label}] {sh.title} ({len(sh.worksheets())} tabs)")
-        for i, ws in enumerate(sh.worksheets()):
-            if ws.title not in MLB_TEAMS:
-                print(f"  Skipping {ws.title} (not a team sheet)")
+def save_mlb_id_cache(cache, cache_path):
+    """Save MLB ID cache to disk."""
+    with open(cache_path, 'w') as f:
+        json.dump(cache, f, indent=2)
+
+
+def lookup_mlb_id(player_name, team_abbrev, mlb_id_cache):
+    """Look up MLB player ID using the MLB Stats API, matching by name and team."""
+    cache_key = f"{player_name}|{team_abbrev}"
+    if cache_key in mlb_id_cache:
+        return mlb_id_cache[cache_key]
+
+    # Parse "Last, First" format
+    parts = player_name.split(', ')
+    if len(parts) == 2:
+        search_name = f"{parts[1]} {parts[0]}"
+    else:
+        search_name = player_name
+
+    try:
+        url = f"https://statsapi.mlb.com/api/v1/people/search?names={urllib.parse.quote(search_name)}&sportIds=1,11,12,13,14&hydrate=currentTeam&limit=25"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+
+        team_id = TEAM_ABBREV_TO_ID.get(team_abbrev)
+        people = data.get('people', [])
+
+        # Try to match by team first
+        if team_id and people:
+            for person in people:
+                ct = person.get('currentTeam', {})
+                parent = ct.get('parentOrgId') or ct.get('id')
+                if parent == team_id or ct.get('id') == team_id:
+                    mlb_id = person['id']
+                    mlb_id_cache[cache_key] = mlb_id
+                    return mlb_id
+
+        # Fallback: first result with matching last name
+        if people:
+            last_name = parts[0] if len(parts) == 2 else player_name.split()[-1]
+            for person in people:
+                if person.get('lastName', '').lower() == last_name.lower():
+                    mlb_id = person['id']
+                    mlb_id_cache[cache_key] = mlb_id
+                    return mlb_id
+            # Last resort: first result
+            mlb_id = people[0]['id']
+            mlb_id_cache[cache_key] = mlb_id
+            return mlb_id
+
+    except Exception as e:
+        print(f"  Warning: MLB ID lookup failed for {player_name} ({team_abbrev}): {e}")
+
+    mlb_id_cache[cache_key] = None
+    return None
+
+
+def read_pitches_from_sheet(gc, sheet_id):
+    """Read all pitches from a single Google Sheets spreadsheet. Returns a list of pitch dicts."""
+    pitches = []
+    sh = gc.open_by_key(sheet_id)
+    print(f"  {sh.title} ({len(sh.worksheets())} tabs)")
+    for i, ws in enumerate(sh.worksheets()):
+        if ws.title not in MLB_TEAMS:
+            print(f"    Skipping {ws.title} (not a team sheet)")
+            continue
+        print(f"    Reading {ws.title}...")
+        if i > 0:
+            time_module.sleep(1.5)
+        rows = read_sheet_with_retry(ws)
+        if not rows:
+            continue
+        header = rows[0]
+        col_idx = {name: idx for idx, name in enumerate(header) if name}
+
+        for row in rows[1:]:
+            pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
+            if not pitcher:
                 continue
-            print(f"  Reading {ws.title}...")
-            if i > 0:
-                time_module.sleep(1.5)
-            rows = read_sheet_with_retry(ws)
-            if not rows:
-                continue
-            header = rows[0]
-            col_idx = {name: i for i, name in enumerate(header) if name}
 
-            for row in rows[1:]:
-                pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
-                if not pitcher:
-                    continue
+            pitch = {}
+            for col_name, idx in col_idx.items():
+                val = row[idx] if idx < len(row) else None
+                # Convert empty strings to None
+                if val == '':
+                    val = None
+                pitch[col_name] = val
 
-                pitch = {}
-                for col_name, idx in col_idx.items():
-                    val = row[idx] if idx < len(row) else None
-                    # Convert empty strings to None
-                    if val == '':
-                        val = None
-                    pitch[col_name] = val
+            pitches.append(pitch)
+    return pitches
 
-                all_pitches.append(pitch)
-            sheet_count += 1
 
-    print(f"\nRead {len(all_pitches)} pitches from {sheet_count} team sheets across {len(SPREADSHEET_IDS)} spreadsheets")
+def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
+    """Process a set of pitches into all leaderboard outputs.
+
+    Args:
+        all_pitches: list of pitch dicts
+        label: 'ST' or 'RS' (for logging)
+        mlb_id_cache: shared MLB ID cache dict (mutated in place)
+        mlb_id_cache_path: path to MLB ID cache file
+
+    Returns a dict with all outputs: pitcher_leaderboard, pitch_leaderboard,
+    hitter_leaderboard, hitter_pitch_leaderboard, metadata, micro_data,
+    pitch_details, hitter_pitch_details.
+    """
+    if not all_pitches:
+        print(f"  No pitches for {label}, returning empty results")
+        return {
+            'pitcher_leaderboard': [],
+            'pitch_leaderboard': [],
+            'hitter_leaderboard': [],
+            'hitter_pitch_leaderboard': [],
+            'metadata': {
+                'teams': [],
+                'pitchTypes': [],
+                'generatedAt': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'totalPitches': 0,
+                'totalPitchers': 0,
+                'totalHitters': 0,
+                'leagueAverages': {},
+                'pitcherLeagueAverages': {},
+                'hitterLeagueAverages': {},
+                'vaaRegression': {'slope': 0, 'intercept': 0, 'leagueAvgPlateZ': 0},
+                'haaRegression': {'slope': 0, 'intercept': 0, 'leagueAvgPlateX': 0},
+            },
+            'micro_data': {
+                'lookups': {'pitchers': [], 'hitters': [], 'teams': [], 'dates': [], 'pitchTypes': []},
+                'pitcherCols': [], 'pitcherMicro': [],
+                'pitcherBipCols': [], 'pitcherBip': [],
+                'pitchCols': [], 'pitchMicro': [],
+                'hitterCols': [], 'hitterMicro': [],
+                'hitterBipCols': [], 'hitterBip': [],
+                'hitterPitchCols': [], 'hitterPitchMicro': [],
+                'hitterPitchBipCols': [], 'hitterPitchBip': [],
+            },
+            'pitch_details': {},
+            'hitter_pitch_details': {},
+        }
 
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
     for p in all_pitches:
         p['InZone'] = compute_in_zone(p)
 
     # --- Map non-MLB BTeams to MLB teams where possible ---
-    # Build MLB team lookup: batter name → MLB team (only from pitches where BTeam is an MLB team)
     mlb_hitter_teams = {}
     for p in all_pitches:
         batter = p.get('Batter')
@@ -1333,7 +1445,6 @@ def main():
         if batter and b_team and b_team in MLB_TEAMS:
             mlb_hitter_teams[batter] = b_team
 
-    # Remap non-MLB BTeams in all_pitches (e.g., when BOS plays Venezuela in ST)
     remapped_count = 0
     for p in all_pitches:
         b_team = p.get('BTeam')
@@ -1343,7 +1454,7 @@ def main():
                 p['BTeam'] = mlb_hitter_teams[batter]
                 remapped_count += 1
     if remapped_count:
-        print(f"  Remapped {remapped_count} non-MLB BTeam entries in regular data")
+        print(f"  Remapped {remapped_count} non-MLB BTeam entries")
 
     # Collect unique teams (MLB only) and pitch types
     all_teams = sorted(set(
@@ -1353,74 +1464,11 @@ def main():
     all_pitch_types = sorted(set(p['Pitch Type'] for p in all_pitches if p.get('Pitch Type')))
 
     # --- Lookup MLB IDs for all pitchers and hitters ---
-    print("\n--- Looking up MLB player IDs ---")
-    mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')
-    if os.path.exists(mlb_id_cache_path):
-        with open(mlb_id_cache_path, 'r') as f:
-            mlb_id_cache = json.load(f)
-    else:
-        mlb_id_cache = {}
+    print(f"\n--- Looking up MLB player IDs ({label}) ---")
 
-    # Team abbreviation → MLB API team ID mapping
-    TEAM_ABBREV_TO_ID = {
-        'ARI': 109, 'ATL': 144, 'BAL': 110, 'BOS': 111, 'CHC': 112,
-        'CWS': 145, 'CIN': 113, 'CLE': 114, 'COL': 115, 'DET': 116,
-        'HOU': 117, 'KCR': 118, 'LAA': 108, 'LAD': 119, 'MIA': 146,
-        'MIL': 158, 'MIN': 142, 'NYM': 121, 'NYY': 147, 'ATH': 133,
-        'PHI': 143, 'PIT': 134, 'SDP': 135, 'SFG': 137, 'SEA': 136,
-        'STL': 138, 'TBR': 139, 'TEX': 140, 'TOR': 141, 'WSH': 120,
-    }
-
-    def lookup_mlb_id(player_name, team_abbrev):
-        """Look up MLB player ID using the MLB Stats API, matching by name and team."""
-        cache_key = f"{player_name}|{team_abbrev}"
-        if cache_key in mlb_id_cache:
-            return mlb_id_cache[cache_key]
-
-        # Parse "Last, First" format
-        parts = player_name.split(', ')
-        if len(parts) == 2:
-            search_name = f"{parts[1]} {parts[0]}"
-        else:
-            search_name = player_name
-
-        try:
-            url = f"https://statsapi.mlb.com/api/v1/people/search?names={urllib.parse.quote(search_name)}&sportIds=1,11,12,13,14&hydrate=currentTeam&limit=25"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode())
-
-            team_id = TEAM_ABBREV_TO_ID.get(team_abbrev)
-            people = data.get('people', [])
-
-            # Try to match by team first
-            if team_id and people:
-                for person in people:
-                    ct = person.get('currentTeam', {})
-                    parent = ct.get('parentOrgId') or ct.get('id')
-                    if parent == team_id or ct.get('id') == team_id:
-                        mlb_id = person['id']
-                        mlb_id_cache[cache_key] = mlb_id
-                        return mlb_id
-
-            # Fallback: first result with matching last name
-            if people:
-                last_name = parts[0] if len(parts) == 2 else player_name.split()[-1]
-                for person in people:
-                    if person.get('lastName', '').lower() == last_name.lower():
-                        mlb_id = person['id']
-                        mlb_id_cache[cache_key] = mlb_id
-                        return mlb_id
-                # Last resort: first result
-                mlb_id = people[0]['id']
-                mlb_id_cache[cache_key] = mlb_id
-                return mlb_id
-
-        except Exception as e:
-            print(f"  Warning: MLB ID lookup failed for {player_name} ({team_abbrev}): {e}")
-
-        mlb_id_cache[cache_key] = None
-        return None
+    # Helper to get cached MLB ID
+    def get_mlb_id(name, team):
+        return mlb_id_cache.get(f"{name}|{team}")
 
     # Build unique pitcher/hitter lists
     unique_pitchers = set()
@@ -1441,20 +1489,15 @@ def main():
     for name, team in sorted(all_unique):
         cache_key = f"{name}|{team}"
         if cache_key not in mlb_id_cache:
-            lookup_mlb_id(name, team)
+            lookup_mlb_id(name, team, mlb_id_cache)
             new_lookups += 1
             if new_lookups % 20 == 0:
                 time_module.sleep(0.5)  # Rate limit
                 print(f"  Looked up {new_lookups} players...")
 
-    # Save cache
-    with open(mlb_id_cache_path, 'w') as f:
-        json.dump(mlb_id_cache, f, indent=2)
+    # Save cache incrementally
+    save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
     print(f"  MLB ID cache: {len(mlb_id_cache)} entries ({new_lookups} new lookups)")
-
-    # Helper to get cached MLB ID
-    def get_mlb_id(name, team):
-        return mlb_id_cache.get(f"{name}|{team}")
 
     # --- Count total pitches per pitcher (for usage%) ---
     pitcher_total = defaultdict(int)
@@ -1507,7 +1550,6 @@ def main():
         pitch_leaderboard.append(row)
 
     # --- Fit VAA ~ PlateZ regression for normalized VAA ---
-    # Collect all pitches with both VAA and PlateZ
     vaa_plateZ_pairs = []
     for p in all_pitches:
         vaa_val = safe_float(p.get('VAA'))
@@ -1515,7 +1557,6 @@ def main():
         if vaa_val is not None and pz_val is not None:
             vaa_plateZ_pairs.append((pz_val, vaa_val))
 
-    # Simple linear regression: VAA = slope * PlateZ + intercept
     if len(vaa_plateZ_pairs) > 10:
         n_reg = len(vaa_plateZ_pairs)
         sum_x = sum(pair[0] for pair in vaa_plateZ_pairs)
@@ -1531,11 +1572,10 @@ def main():
         else:
             vaa_slope = 0.0
             vaa_intercept = mean_y
-        # R-squared
         ss_res = sum((pair[1] - (vaa_slope * pair[0] + vaa_intercept)) ** 2 for pair in vaa_plateZ_pairs)
         ss_tot = sum((pair[1] - mean_y) ** 2 for pair in vaa_plateZ_pairs)
         r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-        league_avg_plateZ = mean_x  # average PlateZ across all pitches
+        league_avg_plateZ = mean_x
         print(f"\nVAA ~ PlateZ regression: slope={vaa_slope:.4f}, intercept={vaa_intercept:.4f}, "
               f"R²={r_squared:.4f}, league avg PlateZ={league_avg_plateZ:.4f} (n={n_reg})")
     else:
@@ -1545,8 +1585,6 @@ def main():
         print("\nWARNING: Not enough data for VAA ~ PlateZ regression")
 
     # Compute nVAA for each pitch leaderboard row
-    # nVAA = VAA - slope * (pitcher_avgPlateZ - league_avgPlateZ)
-    # This adjusts VAA to what it would be at league-average pitch height
     for row in pitch_leaderboard:
         if row.get('vaa') is not None:
             key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
@@ -1562,7 +1600,6 @@ def main():
             row['nVAA'] = None
 
     # --- Fit HAA ~ PlateX regression for normalized HAA ---
-    # Same approach as nVAA but for horizontal approach angle vs horizontal location
     haa_plateX_pairs = []
     for p in all_pitches:
         haa_val = safe_float(p.get('HAA'))
@@ -1598,8 +1635,6 @@ def main():
         print("\nWARNING: Not enough data for HAA ~ PlateX regression")
 
     # Compute nHAA for each pitch leaderboard row
-    # nHAA = HAA - slope * (pitcher_avgPlateX - league_avgPlateX)
-    # This adjusts HAA to what it would be at league-average horizontal location
     for row in pitch_leaderboard:
         if row.get('haa') is not None:
             key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
@@ -1624,8 +1659,6 @@ def main():
             compute_percentile_ranks(pt_rows, metric, min_count=15)
 
     # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
-    # FF/FC: closer to 0 (e.g. -3) = red (default: higher value = higher pctl = red) — no inversion
-    # All others: further from 0 (e.g. -10) = red (lower value = red) — invert
     VAA_NO_INVERT_TYPES = {'FF', 'FC'}
     for pt, pt_rows in pt_groups.items():
         if pt not in VAA_NO_INVERT_TYPES:
@@ -1636,7 +1669,6 @@ def main():
                     row['nVAA_pctl'] = 100 - row['nVAA_pctl']
 
     # --- Compute Stuff Score ---
-    # Average of velocity and spin rate percentiles within pitch type
     for row in pitch_leaderboard:
         vp = row.get('velocity_pctl')
         sp = row.get('spinRate_pctl')
@@ -1645,7 +1677,6 @@ def main():
         else:
             row['stuffScore'] = None
 
-    # Compute percentile of stuff score within pitch type
     for pt, pt_rows in pt_groups.items():
         compute_percentile_ranks(pt_rows, 'stuffScore')
 
@@ -1668,13 +1699,11 @@ def main():
             'count': len(pitches),
             'mlbId': get_mlb_id(pitcher, team),
         }
-        # Average release/approach metrics across all pitches for this pitcher
         for col in PITCHER_METRIC_COLS:
             values = [safe_float(p.get(col)) for p in pitches]
             key_name = METRIC_KEYS[col]
             row[key_name] = round_metric(col, avg(values))
         row.update(compute_stats(pitches))
-        # Batted-ball-against stats
         row.update(compute_pitcher_batted_ball(pitches))
 
         # Fastball velo: average velo of most-used fastball (FF/SI/CF)
@@ -1687,7 +1716,6 @@ def main():
                 if v is not None:
                     fb_pitches_by_type[pt].append(v)
         if fb_pitches_by_type:
-            # Pick the fastball type with most pitches
             primary_fb_type = max(fb_pitches_by_type, key=lambda t: len(fb_pitches_by_type[t]))
             fb_velos = fb_pitches_by_type[primary_fb_type]
             row['fbVelo'] = round(sum(fb_velos) / len(fb_velos), 1) if fb_velos else None
@@ -1698,8 +1726,7 @@ def main():
 
         pitcher_leaderboard.append(row)
 
-    # Compute percentiles for pitcher leaderboard (across all pitchers)
-    # 75-pitch qualifying threshold for rate stats; fbVelo and extension are exempt
+    # Compute percentiles for pitcher leaderboard
     MIN_PITCHES_PCTL = 75
     PITCHER_PCTL_EXEMPT = {'fbVelo', 'extension'}
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
@@ -1707,7 +1734,6 @@ def main():
         mc = 0 if stat in PITCHER_PCTL_EXEMPT else MIN_PITCHES_PCTL
         compute_percentile_ranks(pitcher_leaderboard, stat, min_count=mc)
 
-    # Invert percentiles where lower is better
     for row in pitcher_leaderboard:
         for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT:
             pctl_key = stat + '_pctl'
@@ -1717,7 +1743,7 @@ def main():
     pitcher_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitcher leaderboard: {len(pitcher_leaderboard)} rows")
 
-    # --- Pitch Details: individual pitch data for scatter plots + velo distribution ---
+    # --- Pitch Details ---
     pitch_details = defaultdict(list)
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -1746,11 +1772,9 @@ def main():
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
                 detail['rz'] = round(rel_z, 2)
-            # Game date — for game log filter on player pages
             gd_val = normalize_date(p.get('Game Date'))
             if gd_val:
                 detail['gd'] = gd_val
-            # Pitch location, strike zone, batter hand, count — for heat maps & count table
             px_val = safe_float(p.get('PlateX'))
             pz_val = safe_float(p.get('PlateZ'))
             szt_val = safe_float(p.get('SzTop'))
@@ -1791,7 +1815,7 @@ def main():
         avgs['count'] = len(pt_rows)
         league_avgs[pt] = avgs
 
-    # League averages for pitcher leaderboard (across all pitchers)
+    # League averages for pitcher leaderboard
     pitcher_league_avgs = {}
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
         vals = [r[stat] for r in pitcher_leaderboard if r.get(stat) is not None]
@@ -1800,13 +1824,10 @@ def main():
     pitcher_league_avgs['count'] = len(pitcher_leaderboard)
 
     # ======================================================================
-    #  HITTER LEADERBOARD (derived from same unified spreadsheet)
+    #  HITTER LEADERBOARD
     # ======================================================================
-    print(f"\n--- Hitter Leaderboard ---")
+    print(f"\n--- Hitter Leaderboard ({label}) ---")
 
-    # Group by (Batter, BTeam) — includes WBC hitter pitches remapped to MLB teams
-    # Only include hitters with an MLB team (country-only hitters excluded)
-    # Switch hitters (who bat from both sides) are combined with stands = "S"
     hitter_groups = defaultdict(list)
     for p in all_pitches:
         batter = p.get('Batter')
@@ -1816,7 +1837,6 @@ def main():
 
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
-        # Determine bats side: if multiple sides seen, mark as Switch
         stands_set = set(p.get('Bats') for p in pitches if p.get('Bats'))
         if len(stands_set) > 1:
             stands = 'S'
@@ -1835,11 +1855,9 @@ def main():
         row.update(compute_hitter_stats(pitches))
         hitter_leaderboard.append(row)
 
-    # Compute percentiles across all hitters
     for stat in HITTER_STAT_KEYS:
         compute_percentile_ranks(hitter_leaderboard, stat)
 
-    # Invert percentiles where lower is better (Swing%, Chase%, Whiff%, GB%)
     for row in hitter_leaderboard:
         for stat in HITTER_INVERT_PCTL:
             pctl_key = stat + '_pctl'
@@ -1849,7 +1867,7 @@ def main():
     hitter_leaderboard.sort(key=lambda r: r.get('pa', 0), reverse=True)
     print(f"Hitter leaderboard: {len(hitter_leaderboard)} rows")
 
-    # --- Hitter pitch details: per-hitter breakdown by pitch type faced ---
+    # --- Hitter pitch details ---
     hitter_pitch_details = {}
     for (hitter, team), pitches in hitter_groups.items():
         pt_map = defaultdict(list)
@@ -1866,11 +1884,10 @@ def main():
             }
             entry.update(compute_hitter_stats(pt_pitches))
             details.append(entry)
-        # Sort by count desc
         details.sort(key=lambda x: x['count'], reverse=True)
         hitter_pitch_details[hitter + '|' + (team or '')] = details
 
-    # --- Hitter pitch-type leaderboard: flatten into one row per hitter-pitch-type ---
+    # --- Hitter pitch-type leaderboard ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
         'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
@@ -1898,7 +1915,6 @@ def main():
             if pt:
                 pt_map[pt].append(p)
 
-        # Per-pitch-type rows
         for pt, pt_pitches in pt_map.items():
             row = {
                 'hitter': hitter,
@@ -1912,7 +1928,6 @@ def main():
             row.update(compute_hitter_stats(pt_pitches))
             hitter_pitch_leaderboard.append(row)
 
-        # "All" combined row
         row_all = {
             'hitter': hitter,
             'team': team,
@@ -1925,7 +1940,6 @@ def main():
         row_all.update(compute_hitter_stats(pitches))
         hitter_pitch_leaderboard.append(row_all)
 
-        # Category combined rows (Hard, Breaking, Offspeed)
         for cat_name, cat_types in PITCH_CATEGORIES.items():
             cat_pitches = []
             cat_seen = 0.0
@@ -1946,16 +1960,15 @@ def main():
                 row_cat.update(compute_hitter_stats(cat_pitches))
                 hitter_pitch_leaderboard.append(row_cat)
 
-    # Compute percentiles per pitch type
-    pt_groups = defaultdict(list)
+    # Compute percentiles per pitch type for hitter pitch LB
+    hpt_groups = defaultdict(list)
     for row in hitter_pitch_leaderboard:
-        pt_groups[row['pitchType']].append(row)
+        hpt_groups[row['pitchType']].append(row)
 
-    for pt, pt_rows in pt_groups.items():
+    for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
             compute_percentile_ranks(pt_rows, stat, min_count=15)
 
-    # Invert percentiles where lower is better
     for row in hitter_pitch_leaderboard:
         for stat in HITTER_PITCH_INVERT_PCTL:
             pctl_key = stat + '_pctl'
@@ -1996,75 +2009,126 @@ def main():
         },
     }
 
-    # Write JSON files
-    with open(os.path.join(DATA_DIR, 'pitch_leaderboard.json'), 'w') as f:
-        json.dump(pitch_leaderboard, f)
-    with open(os.path.join(DATA_DIR, 'pitcher_leaderboard.json'), 'w') as f:
-        json.dump(pitcher_leaderboard, f)
-    with open(os.path.join(DATA_DIR, 'hitter_leaderboard.json'), 'w') as f:
-        json.dump(hitter_leaderboard, f)
-    with open(os.path.join(DATA_DIR, 'hitter_pitch_leaderboard.json'), 'w') as f:
-        json.dump(hitter_pitch_leaderboard, f)
-    with open(os.path.join(DATA_DIR, 'metadata.json'), 'w') as f:
-        json.dump(metadata, f, indent=2)
-
-    # Write embedded JS fallback (for file:// usage)
-    with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'w') as f:
-        f.write('// Auto-generated — do not edit\n')
-        f.write('window.PITCH_DATA = ')
-        json.dump(pitch_leaderboard, f)
-        f.write(';\n')
-        f.write('window.PITCHER_DATA = ')
-        json.dump(pitcher_leaderboard, f)
-        f.write(';\n')
-        f.write('window.HITTER_DATA = ')
-        json.dump(hitter_leaderboard, f)
-        f.write(';\n')
-        f.write('window.METADATA = ')
-        json.dump(metadata, f)
-        f.write(';\n')
-        f.write('window.PITCH_DETAILS = ')
-        json.dump(pitch_details, f)
-        f.write(';\n')
-        f.write('window.HITTER_PITCH_DETAILS = ')
-        json.dump(hitter_pitch_details, f)
-        f.write(';\n')
-        # Strip _pctl keys from hitter pitch LB for embedding (saves ~10MB)
-        # Percentiles are recomputed by the JS aggregator when filters are active
-        hitter_pitch_lb_slim = []
-        for row in hitter_pitch_leaderboard:
-            slim = {k: v for k, v in row.items() if not k.endswith('_pctl')}
-            hitter_pitch_lb_slim.append(slim)
-        f.write('window.HITTER_PITCH_LB = ')
-        json.dump(hitter_pitch_lb_slim, f)
-        f.write(';\n')
-
-    # --- Generate micro-aggregate data for date/hand filtering ---
-    print(f"\n--- Generating micro-aggregate data ---")
+    # --- Generate micro-aggregate data ---
+    print(f"\n--- Generating micro-aggregate data ({label}) ---")
     micro_data = generate_micro_data(all_pitches)
-
-    micro_path = os.path.join(DATA_DIR, 'micro_data.json')
-    with open(micro_path, 'w') as f:
-        json.dump(micro_data, f, separators=(',', ':'))
-
-    # Also append to embedded JS for file:// usage
-    with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'a') as f:
-        f.write('window.MICRO_DATA = ')
-        json.dump(micro_data, f, separators=(',', ':'))
-        f.write(';\n')
-
-    print(f"  micro_data.json ({len(micro_data['pitcherMicro'])} pitcher, "
+    print(f"  micro_data: {len(micro_data['pitcherMicro'])} pitcher, "
           f"{len(micro_data['pitchMicro'])} pitch, "
           f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "
           f"{len(micro_data['pitcherBip'])} pitcher BIP, "
-          f"{len(micro_data['hitterBip'])} hitter BIP records)")
+          f"{len(micro_data['hitterBip'])} hitter BIP records")
+
+    return {
+        'pitcher_leaderboard': pitcher_leaderboard,
+        'pitch_leaderboard': pitch_leaderboard,
+        'hitter_leaderboard': hitter_leaderboard,
+        'hitter_pitch_leaderboard': hitter_pitch_leaderboard,
+        'metadata': metadata,
+        'micro_data': micro_data,
+        'pitch_details': pitch_details,
+        'hitter_pitch_details': hitter_pitch_details,
+    }
+
+
+def write_json_outputs(result, suffix):
+    """Write JSON output files with the given suffix."""
+    with open(os.path.join(DATA_DIR, f'pitch_leaderboard{suffix}.json'), 'w') as f:
+        json.dump(result['pitch_leaderboard'], f)
+    with open(os.path.join(DATA_DIR, f'pitcher_leaderboard{suffix}.json'), 'w') as f:
+        json.dump(result['pitcher_leaderboard'], f)
+    with open(os.path.join(DATA_DIR, f'hitter_leaderboard{suffix}.json'), 'w') as f:
+        json.dump(result['hitter_leaderboard'], f)
+    with open(os.path.join(DATA_DIR, f'hitter_pitch_leaderboard{suffix}.json'), 'w') as f:
+        json.dump(result['hitter_pitch_leaderboard'], f)
+    with open(os.path.join(DATA_DIR, f'metadata{suffix}.json'), 'w') as f:
+        json.dump(result['metadata'], f, indent=2)
+    with open(os.path.join(DATA_DIR, f'micro_data{suffix}.json'), 'w') as f:
+        json.dump(result['micro_data'], f, separators=(',', ':'))
+    print(f"  Wrote JSON files with suffix '{suffix}'")
+
+
+def write_embedded_js(st_result, rs_result):
+    """Write data_embedded.js with window.ST_DATA and window.RS_DATA."""
+    def build_data_obj(result):
+        # Strip _pctl keys from hitter pitch LB for embedding
+        hitter_pitch_lb_slim = []
+        for row in result['hitter_pitch_leaderboard']:
+            slim = {k: v for k, v in row.items() if not k.endswith('_pctl')}
+            hitter_pitch_lb_slim.append(slim)
+        return {
+            'pitcherData': result['pitcher_leaderboard'],
+            'pitchData': result['pitch_leaderboard'],
+            'hitterData': result['hitter_leaderboard'],
+            'hitterPitchData': hitter_pitch_lb_slim,
+            'metadata': result['metadata'],
+            'microData': result['micro_data'],
+            'pitchDetails': result['pitch_details'],
+            'hitterPitchDetails': result['hitter_pitch_details'],
+        }
+
+    with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'w') as f:
+        f.write('// Auto-generated — do not edit\n')
+        f.write('window.ST_DATA = ')
+        json.dump(build_data_obj(st_result), f, separators=(',', ':'))
+        f.write(';\n')
+        f.write('window.RS_DATA = ')
+        json.dump(build_data_obj(rs_result), f, separators=(',', ':'))
+        f.write(';\n')
+    print("  Wrote data_embedded.js")
+
+
+def main():
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    # Connect to Google Sheets
+    print("Connecting to Google Sheets...")
+    scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+    gc = gspread.authorize(creds)
+
+    # Read data separately
+    print("\n=== Reading Spring Training data ===")
+    st_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['ST'])
+    print(f"  Read {len(st_pitches)} ST pitches")
+
+    print("\n=== Reading Regular Season data ===")
+    rs_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
+    rs_pitches += read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'])
+    print(f"  Read {len(rs_pitches)} RS pitches")
+
+    # Shared MLB ID cache
+    mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')
+    mlb_id_cache = load_mlb_id_cache(mlb_id_cache_path)
+
+    # Process each game type independently
+    print("\n" + "=" * 60)
+    print("=== Processing Spring Training ===")
+    print("=" * 60)
+    st_result = process_game_type(st_pitches, 'ST', mlb_id_cache, mlb_id_cache_path)
+
+    print("\n" + "=" * 60)
+    print("=== Processing Regular Season ===")
+    print("=" * 60)
+    rs_result = process_game_type(rs_pitches, 'RS', mlb_id_cache, mlb_id_cache_path)
+
+    # Save shared MLB ID cache
+    save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
+
+    # Write separate output files
+    print("\n--- Writing output files ---")
+    write_json_outputs(st_result, '_st')
+    write_json_outputs(rs_result, '_rs')
+
+    # Write combined embedded JS
+    write_embedded_js(st_result, rs_result)
 
     print(f"\nOutput written to {DATA_DIR}/")
-    print(f"  pitch_leaderboard.json  ({len(pitch_leaderboard)} rows)")
-    print(f"  pitcher_leaderboard.json ({len(pitcher_leaderboard)} rows)")
-    print(f"  hitter_leaderboard.json  ({len(hitter_leaderboard)} rows)")
-    print(f"  metadata.json")
-    print(f"  data_embedded.js")
+    print(f"  ST: {len(st_result['pitcher_leaderboard'])} pitchers, "
+          f"{len(st_result['pitch_leaderboard'])} pitch rows, "
+          f"{len(st_result['hitter_leaderboard'])} hitters")
+    print(f"  RS: {len(rs_result['pitcher_leaderboard'])} pitchers, "
+          f"{len(rs_result['pitch_leaderboard'])} pitch rows, "
+          f"{len(rs_result['hitter_leaderboard'])} hitters")
 
 
 if __name__ == '__main__':

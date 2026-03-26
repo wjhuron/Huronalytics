@@ -1,38 +1,87 @@
 var DataStore = {
-  pitchData: null,
-  pitcherData: null,
-  hitterData: null,
-  hitterPitchData: null,
-  metadata: null,
+  st: {},
+  rs: {},
+  gameType: 'RS',
+
+  active: function () {
+    return this.gameType === 'ST' ? this.st : this.rs;
+  },
+
+  getMetadata: function () {
+    return this.active().metadata;
+  },
 
   load: function () {
-    // Use embedded data (works with file:// and http://)
-    if (window.PITCH_DATA && window.PITCHER_DATA && window.METADATA) {
-      this.pitchData = window.PITCH_DATA;
-      this.pitcherData = window.PITCHER_DATA;
-      this.hitterData = window.HITTER_DATA || [];
-      this.hitterPitchData = window.HITTER_PITCH_LB || [];
-      this.metadata = window.METADATA;
-      return Promise.resolve();
+    // Load from new dual-dataset structure
+    if (window.ST_DATA) {
+      this.st = {
+        pitcherData: window.ST_DATA.pitcherData || [],
+        pitchData: window.ST_DATA.pitchData || [],
+        hitterData: window.ST_DATA.hitterData || [],
+        hitterPitchData: window.ST_DATA.hitterPitchData || [],
+        metadata: window.ST_DATA.metadata || {},
+        microData: window.ST_DATA.microData || null,
+        pitchDetails: window.ST_DATA.pitchDetails || {},
+        hitterPitchDetails: window.ST_DATA.hitterPitchDetails || {},
+      };
+    }
+    if (window.RS_DATA) {
+      this.rs = {
+        pitcherData: window.RS_DATA.pitcherData || [],
+        pitchData: window.RS_DATA.pitchData || [],
+        hitterData: window.RS_DATA.hitterData || [],
+        hitterPitchData: window.RS_DATA.hitterPitchData || [],
+        metadata: window.RS_DATA.metadata || {},
+        microData: window.RS_DATA.microData || null,
+        pitchDetails: window.RS_DATA.pitchDetails || {},
+        hitterPitchDetails: window.RS_DATA.hitterPitchDetails || {},
+      };
     }
 
-    // Fallback: try fetch (only works with http server)
-    var self = this;
-    return Promise.all([
-      fetch('data/pitch_leaderboard.json').then(function (r) { return r.json(); }),
-      fetch('data/pitcher_leaderboard.json').then(function (r) { return r.json(); }),
-      fetch('data/hitter_leaderboard.json').then(function (r) { return r.json(); }).catch(function () { return []; }),
-      fetch('data/hitter_pitch_leaderboard.json').then(function (r) { return r.json(); }).catch(function () { return []; }),
-      fetch('data/metadata.json').then(function (r) { return r.json(); }),
-    ]).then(function (results) {
-      self.pitchData = results[0];
-      self.pitcherData = results[1];
-      self.hitterData = results[2];
-      self.hitterPitchData = results[3];
-      self.metadata = results[4];
-    }).catch(function (e) {
-      console.error('Failed to load data:', e);
-    });
+    // Backwards compat: if old flat globals exist and new ones don't
+    if (!window.ST_DATA && !window.RS_DATA && window.PITCHER_DATA && window.METADATA) {
+      this.rs = {
+        pitcherData: window.PITCHER_DATA || [],
+        pitchData: window.PITCH_DATA || [],
+        hitterData: window.HITTER_DATA || [],
+        hitterPitchData: window.HITTER_PITCH_LB || [],
+        metadata: window.METADATA || {},
+        microData: window.MICRO_DATA || null,
+        pitchDetails: window.PITCH_DETAILS || {},
+        hitterPitchDetails: window.HITTER_PITCH_DETAILS || {},
+      };
+    }
+
+    // Set flat globals for backwards compatibility
+    this.updateGlobals();
+
+    // Expose convenience properties from active dataset
+    this.metadata = this.active().metadata;
+    this.pitcherData = this.active().pitcherData;
+    this.pitchData = this.active().pitchData;
+    this.hitterData = this.active().hitterData;
+    this.hitterPitchData = this.active().hitterPitchData;
+
+    return Promise.resolve();
+  },
+
+  updateGlobals: function () {
+    var d = this.active();
+    window.PITCHER_DATA = d.pitcherData;
+    window.PITCH_DATA = d.pitchData;
+    window.HITTER_DATA = d.hitterData;
+    window.HITTER_PITCH_LB = d.hitterPitchData;
+    window.METADATA = d.metadata;
+    window.MICRO_DATA = d.microData;
+    window.PITCH_DETAILS = d.pitchDetails;
+    window.HITTER_PITCH_DETAILS = d.hitterPitchDetails;
+
+    // Also update convenience properties
+    this.metadata = d.metadata;
+    this.pitcherData = d.pitcherData;
+    this.pitchData = d.pitchData;
+    this.hitterData = d.hitterData;
+    this.hitterPitchData = d.hitterPitchData;
   },
 
   /**
@@ -51,11 +100,12 @@ var DataStore = {
    * pitchTypes can be an array for multi-select: ['FF', 'SI'] or 'all'
    */
   getFilteredData: function (tab, filters) {
+    var d = this.active();
     var source;
-    if (tab === 'pitch') source = this.pitchData;
-    else if (tab === 'pitcher') source = this.pitcherData;
-    else if (tab === 'hitter') source = this.hitterData;
-    else if (tab === 'hitterPitch') source = this.hitterPitchData;
+    if (tab === 'pitch') source = d.pitchData;
+    else if (tab === 'pitcher') source = d.pitcherData;
+    else if (tab === 'hitter') source = d.hitterData;
+    else if (tab === 'hitterPitch') source = d.hitterPitchData;
     if (!source) return [];
 
     var isHitter = (tab === 'hitter' || tab === 'hitterPitch');

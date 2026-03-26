@@ -8,8 +8,15 @@ var Aggregator = {
   loaded: false,
   _colIdx: {},
 
-  load: function () {
-    // Try embedded data first (for file:// usage)
+  load: function (microData) {
+    // Accept micro data directly (from DataStore)
+    if (microData) {
+      this.data = microData;
+      this._buildIndexes();
+      this.loaded = true;
+      return Promise.resolve();
+    }
+    // Try embedded data (for file:// usage, backwards compat)
     if (window.MICRO_DATA) {
       this.data = window.MICRO_DATA;
       this._buildIndexes();
