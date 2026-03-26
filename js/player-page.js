@@ -990,7 +990,7 @@ var PlayerPage = {
       // Value
       var valEl = document.createElement('span');
       valEl.className = 'pctl-value';
-      valEl.textContent = (displayVal != null) ? displayVal.toFixed(1) : '—';
+      valEl.textContent = (displayVal != null) ? displayVal.toFixed(3) : '—';
 
       // Percentile circle
       var circleWrap = document.createElement('div');
@@ -1084,7 +1084,7 @@ var PlayerPage = {
     barWrap.appendChild(bar);
     var valSpan = document.createElement('span');
     valSpan.className = 'pctl-value';
-    valSpan.textContent = rv != null ? rv.toFixed(1) : '—';
+    valSpan.textContent = rv != null ? rv.toFixed(3) : '—';
     row.appendChild(label);
     row.appendChild(barWrap);
     row.appendChild(valSpan);
