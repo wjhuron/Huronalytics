@@ -12,6 +12,7 @@ var PlayerPage = {
     { key: 'swStrPct',          label: 'Whiff %',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct',              label: 'K %',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',             label: 'BB %',             format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kbbPct',            label: 'K-BB %',           format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'barrelPctAgainst',  label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
     { key: 'hardHitPct',        label: 'Hard-Hit %',       format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB %',             format: function(v) { return Utils.formatPct(v); } },
