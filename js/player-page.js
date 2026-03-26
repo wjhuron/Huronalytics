@@ -125,7 +125,7 @@ var PlayerPage = {
     { key: 'velocity', label: 'Velo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'maxVelo', label: 'Max Velo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'spinRate', label: 'Spin', format: function(v) { return v != null ? Math.round(v) : '—'; } },
-    { key: 'breakTilt', label: 'Tilt', format: function(v) { return v || '—'; } },
+    { key: 'breakTilt', label: 'OTilt', format: function(v) { return v || '—'; } },
     { key: 'indVertBrk', label: 'IVB', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'horzBrk', label: 'HB', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'relPosZ', label: 'RelZ', format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
