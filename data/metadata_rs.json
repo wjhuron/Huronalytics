@@ -15,7 +15,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-26 16:29",
+  "generatedAt": "2026-03-26 12:42",
   "totalPitches": 258,
   "totalPitchers": 8,
   "totalHitters": 18,
@@ -41,6 +41,8 @@
       "chasePct": 0.1342,
       "gbPct": 0.5833,
       "fpsPct": 0.5949,
+      "breakTiltMinutes": 98,
+      "breakTilt": "1:38",
       "count": 8
     },
     "ST": {
@@ -64,6 +66,8 @@
       "chasePct": 0.1667,
       "gbPct": 0.5,
       "fpsPct": 0.3333,
+      "breakTiltMinutes": 612,
+      "breakTilt": "10:12",
       "count": 3
     },
     "CF": {
@@ -87,6 +91,8 @@
       "chasePct": 0.2,
       "gbPct": 0.5,
       "fpsPct": 0.5,
+      "breakTiltMinutes": 33,
+      "breakTilt": "12:33",
       "count": 1
     },
     "SL": {
@@ -110,6 +116,8 @@
       "chasePct": 0.4167,
       "gbPct": 0.0,
       "fpsPct": 0.25,
+      "breakTiltMinutes": 692,
+      "breakTilt": "11:32",
       "count": 4
     },
     "FF": {
@@ -133,6 +141,8 @@
       "chasePct": 0.2,
       "gbPct": 0.2,
       "fpsPct": 0.4,
+      "breakTiltMinutes": 23,
+      "breakTilt": "12:23",
       "count": 5
     },
     "FC": {
@@ -156,6 +166,8 @@
       "chasePct": 0.05,
       "gbPct": 0.1667,
       "fpsPct": 0.75,
+      "breakTiltMinutes": 31,
+      "breakTilt": "12:31",
       "count": 2
     },
     "CH": {
@@ -179,6 +191,8 @@
       "chasePct": 0.4889,
       "gbPct": 0.4375,
       "fpsPct": 0.75,
+      "breakTiltMinutes": 172,
+      "breakTilt": "2:52",
       "count": 3
     },
     "CU": {
@@ -202,6 +216,8 @@
       "chasePct": 0.3,
       "gbPct": 0.5,
       "fpsPct": 0.4,
+      "breakTiltMinutes": 356,
+      "breakTilt": "5:56",
       "count": 2
     },
     "SV": {
@@ -225,6 +241,8 @@
       "chasePct": 0.0,
       "gbPct": 0.0,
       "fpsPct": 0.5,
+      "breakTiltMinutes": 444,
+      "breakTilt": "7:24",
       "count": 1
     },
     "FS": {
@@ -247,6 +265,8 @@
       "izWhiffPct": 0.6,
       "chasePct": 0.2,
       "fpsPct": 1.0,
+      "breakTiltMinutes": 177,
+      "breakTilt": "2:57",
       "count": 1
     }
   },

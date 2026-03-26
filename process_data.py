@@ -824,7 +824,7 @@ def generate_micro_data(all_pitches):
                 c[offset + 1] += 1
 
         # Break Tilt (circular sin/cos components)
-        tilt_min = break_tilt_to_minutes(p.get('Break Tilt'))
+        tilt_min = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
         if tilt_min is not None:
             angle = tilt_min / 720.0 * 2 * math.pi
             c[48] += math.sin(angle)
@@ -1756,7 +1756,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row['maxVelo'] = round(max(velos), 1) if velos else None
 
         # Break Tilt (circular mean)
-        tilt_minutes = [break_tilt_to_minutes(p.get('Break Tilt')) for p in pitches]
+        tilt_minutes = [break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt')) for p in pitches]
         tilt_minutes = [m for m in tilt_minutes if m is not None]
         avg_tilt = circular_mean_minutes(tilt_minutes)
         row['breakTilt'] = minutes_to_tilt_display(avg_tilt)
@@ -1970,7 +1970,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         hb = safe_float(p.get('HorzBrk'))
         velo = safe_float(p.get('Velocity'))
         spin = safe_float(p.get('Spin Rate'))
-        tilt = p.get('Break Tilt')
+        tilt = p.get('OTilt') or p.get('Break Tilt')
         rel_x = safe_float(p.get('RelPosX'))
         rel_z = safe_float(p.get('RelPosZ'))
         if pitcher and pt and ivb is not None and hb is not None:
