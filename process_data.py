@@ -1386,6 +1386,206 @@ def read_pitches_from_sheet(gc, sheet_id):
     return pitches
 
 
+# ---- Boxscore Data ----
+
+BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'boxscore_cache.json')
+
+# Full team name to abbreviation (for matching boxscore team names)
+TEAM_NAME_TO_ABBREV = {
+    'Arizona Diamondbacks': 'ARI', 'Athletics': 'ATH', 'Atlanta Braves': 'ATL',
+    'Baltimore Orioles': 'BAL', 'Boston Red Sox': 'BOS', 'Chicago Cubs': 'CHC',
+    'Chicago White Sox': 'CWS', 'Cincinnati Reds': 'CIN', 'Cleveland Guardians': 'CLE',
+    'Colorado Rockies': 'COL', 'Detroit Tigers': 'DET', 'Houston Astros': 'HOU',
+    'Kansas City Royals': 'KCR', 'Los Angeles Angels': 'LAA', 'Los Angeles Dodgers': 'LAD',
+    'Miami Marlins': 'MIA', 'Milwaukee Brewers': 'MIL', 'Minnesota Twins': 'MIN',
+    'New York Mets': 'NYM', 'New York Yankees': 'NYY', 'Philadelphia Phillies': 'PHI',
+    'Pittsburgh Pirates': 'PIT', 'San Diego Padres': 'SDP', 'San Francisco Giants': 'SFG',
+    'Seattle Mariners': 'SEA', 'St. Louis Cardinals': 'STL', 'Tampa Bay Rays': 'TBR',
+    'Texas Rangers': 'TEX', 'Toronto Blue Jays': 'TOR', 'Washington Nationals': 'WSH',
+}
+
+
+def _fullname_to_lastfirst(full_name):
+    """Convert 'First Last' to 'Last, First'. Simple split — handles most cases."""
+    parts = full_name.strip().split()
+    if len(parts) <= 1:
+        return full_name
+    # Handle suffixes
+    suffixes = {'jr.', 'jr', 'sr.', 'sr', 'ii', 'iii', 'iv', 'v'}
+    suffix = ''
+    if len(parts) > 2 and parts[-1].lower().rstrip('.') in suffixes:
+        suffix = ' ' + parts.pop()
+    return parts[-1] + suffix + ', ' + ' '.join(parts[:-1])
+
+
+def load_boxscore_cache():
+    if os.path.exists(BOXSCORE_CACHE_PATH):
+        with open(BOXSCORE_CACHE_PATH) as f:
+            return json.load(f)
+    return {}
+
+
+def save_boxscore_cache(cache):
+    with open(BOXSCORE_CACHE_PATH, 'w') as f:
+        json.dump(cache, f)
+
+
+def fetch_game_pks_for_date(date_str):
+    """Fetch all MLB game PKs for a given date from the schedule API."""
+    url = f"https://statsapi.mlb.com/api/v1/schedule?date={date_str}&sportId=1&gameType=R,F,D,L,W"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        game_pks = []
+        for date_data in data.get('dates', []):
+            for game in date_data.get('games', []):
+                if game.get('status', {}).get('abstractGameState') == 'Final':
+                    game_pks.append(game['gamePk'])
+        return game_pks
+    except Exception as e:
+        print(f"    Error fetching schedule for {date_str}: {e}")
+        return []
+
+
+def fetch_boxscore(game_pk):
+    """Fetch boxscore data for a single game. Returns dict with pitcher and hitter stats."""
+    url = f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            box = json.loads(resp.read())
+    except Exception as e:
+        print(f"    Error fetching boxscore for game {game_pk}: {e}")
+        return None
+
+    result = {'pitchers': [], 'hitters': []}
+
+    for side in ['away', 'home']:
+        team_data = box.get('teams', {}).get(side, {})
+        team_name = team_data.get('team', {}).get('name', '')
+        team_abbrev = TEAM_NAME_TO_ABBREV.get(team_name, team_name)
+        pitcher_ids = team_data.get('pitchers', [])
+        batter_ids = team_data.get('batters', [])
+        players = team_data.get('players', {})
+
+        # Pitchers
+        for idx, pid in enumerate(pitcher_ids):
+            p = players.get(f'ID{pid}', {})
+            full_name = p.get('person', {}).get('fullName', '')
+            stats = p.get('stats', {}).get('pitching', {})
+            if not stats:
+                continue
+            # Get "Last, First" name — try lastFirstName, fall back to lookup
+            last_first = p.get('person', {}).get('lastFirstName', '')
+            if not last_first and full_name:
+                last_first = _fullname_to_lastfirst(full_name)
+            result['pitchers'].append({
+                'name': last_first,
+                'team': team_abbrev,
+                'g': 1,
+                'gs': 1 if idx == 0 else 0,
+                'outs': stats.get('outs', 0),
+                'w': stats.get('wins', 0),
+                'l': stats.get('losses', 0),
+                'sv': stats.get('saves', 0),
+                'hld': stats.get('holds', 0),
+                'er': stats.get('earnedRuns', 0),
+                'hr': stats.get('homeRuns', 0),
+                'tbf': stats.get('battersFaced', 0),
+            })
+
+        # Hitters
+        for pid in batter_ids:
+            p = players.get(f'ID{pid}', {})
+            batting = p.get('stats', {}).get('batting', {})
+            if not batting or batting.get('plateAppearances', 0) == 0:
+                continue
+            full_name = p.get('person', {}).get('fullName', '')
+            last_first = p.get('person', {}).get('lastFirstName', '')
+            if not last_first and full_name:
+                last_first = _fullname_to_lastfirst(full_name)
+            result['hitters'].append({
+                'name': last_first,
+                'team': team_abbrev,
+                'g': 1,
+                'pa': batting.get('plateAppearances', 0),
+                'ab': batting.get('atBats', 0),
+                'tb': batting.get('totalBases', 0),
+                'sb': batting.get('stolenBases', 0),
+                'cs': batting.get('caughtStealing', 0),
+            })
+
+    return result
+
+
+def fetch_and_aggregate_boxscores(game_dates):
+    """Fetch boxscores for all game dates, using cache. Returns aggregated pitcher and hitter stats."""
+    cache = load_boxscore_cache()
+    new_fetches = 0
+
+    # Find dates we need to fetch
+    dates_to_fetch = []
+    for d in sorted(game_dates):
+        if d not in cache:
+            dates_to_fetch.append(d)
+
+    if dates_to_fetch:
+        print(f"  Fetching boxscores for {len(dates_to_fetch)} new date(s): {dates_to_fetch}")
+        for d in dates_to_fetch:
+            game_pks = fetch_game_pks_for_date(d)
+            cache[d] = []
+            for gpk in game_pks:
+                box = fetch_boxscore(gpk)
+                if box:
+                    cache[d].append(box)
+                    new_fetches += 1
+                time_module.sleep(0.1)  # Rate limit
+            time_module.sleep(0.5)
+        save_boxscore_cache(cache)
+        print(f"  Fetched {new_fetches} boxscores, cache now has {len(cache)} dates")
+    else:
+        print(f"  All {len(game_dates)} game dates already cached")
+
+    # Aggregate across all dates that are in our game_dates set
+    pitcher_agg = {}  # key: "name|team" -> accumulated stats
+    hitter_agg = {}
+
+    for d in game_dates:
+        if d not in cache:
+            continue
+        for box in cache[d]:
+            for p in box.get('pitchers', []):
+                key = p['name'] + '|' + p['team']
+                if key not in pitcher_agg:
+                    pitcher_agg[key] = {'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0, 'er': 0, 'hr': 0, 'tbf': 0}
+                a = pitcher_agg[key]
+                for k in a:
+                    a[k] += p.get(k, 0)
+
+            for h in box.get('hitters', []):
+                key = h['name'] + '|' + h['team']
+                if key not in hitter_agg:
+                    hitter_agg[key] = {'g': 0, 'pa': 0, 'ab': 0, 'tb': 0, 'sb': 0, 'cs': 0}
+                a = hitter_agg[key]
+                for k in a:
+                    a[k] += h.get(k, 0)
+
+    return pitcher_agg, hitter_agg
+
+
+def outs_to_ip_str(outs):
+    """Convert total outs to IP string notation (e.g., 19 outs -> '6.1')."""
+    full = outs // 3
+    remainder = outs % 3
+    return f"{full}.{remainder}"
+
+
+def outs_to_ip_float(outs):
+    """Convert outs to float for calculations like ERA (19 outs -> 6.333...)."""
+    return outs / 3.0
+
+
 def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     """Process a set of pitches into all leaderboard outputs.
 
@@ -2017,6 +2217,60 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
           f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "
           f"{len(micro_data['pitcherBip'])} pitcher BIP, "
           f"{len(micro_data['hitterBip'])} hitter BIP records")
+
+    # --- Boxscore Data: G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9 for pitchers; G, PA, AB, TB, SB, CS for hitters ---
+    game_dates = sorted(set(normalize_date(p.get('Game Date')) for p in all_pitches if normalize_date(p.get('Game Date'))))
+    if game_dates:
+        print(f"\n--- Fetching boxscore data ({label}) ---")
+        pitcher_box, hitter_box = fetch_and_aggregate_boxscores(game_dates)
+        print(f"  Boxscore pitchers: {len(pitcher_box)}, hitters: {len(hitter_box)}")
+
+        # Merge pitcher boxscore stats
+        for row in pitcher_leaderboard:
+            key = row['pitcher'] + '|' + row['team']
+            box = pitcher_box.get(key)
+            if box:
+                row['g'] = box['g']
+                row['gs'] = box['gs']
+                row['ip'] = outs_to_ip_str(box['outs'])
+                row['w'] = box['w']
+                row['l'] = box['l']
+                row['sv'] = box['sv']
+                row['hld'] = box['hld']
+                row['tbf'] = box['tbf']  # Override pitch-data TBF with official boxscore TBF
+                ip_float = outs_to_ip_float(box['outs'])
+                row['era'] = round(box['er'] * 9 / ip_float, 2) if ip_float > 0 else None
+                row['hr9'] = round(box['hr'] * 9 / ip_float, 2) if ip_float > 0 else None
+            else:
+                row['g'] = None
+                row['gs'] = None
+                row['ip'] = None
+                row['w'] = None
+                row['l'] = None
+                row['sv'] = None
+                row['hld'] = None
+                row['era'] = None
+                row['hr9'] = None
+
+        # Merge hitter boxscore stats
+        for row in hitter_leaderboard:
+            key = row['hitter'] + '|' + row['team']
+            box = hitter_box.get(key)
+            if box:
+                row['g'] = box['g']
+                row['pa'] = box['pa']  # Override with official PA
+                row['ab'] = box['ab']  # Override with official AB
+                row['tb'] = box['tb']
+                row['sb'] = box['sb']
+                row['cs'] = box['cs']
+                total_attempts = box['sb'] + box['cs']
+                row['sbPct'] = round(box['sb'] / total_attempts * 100, 1) if total_attempts > 0 else None
+            else:
+                row['g'] = None
+                row['tb'] = None
+                row['sb'] = None
+                row['cs'] = None
+                row['sbPct'] = None
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,

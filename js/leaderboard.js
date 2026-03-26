@@ -31,12 +31,15 @@ var COLUMNS = {
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
-    // Counting stats (FanGraphs — not yet populated)
+    // Counting stats (from boxscore API)
     { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'counting' },
     { key: 'gs',          label: 'GS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
-    { key: 'ip',          label: 'IP',       format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'counting' },
-    { key: 'pa',          label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
-    { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'ip',          label: 'IP',       format: function(v){ return v != null ? v : '—'; }, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'w',           label: 'W',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'l',           label: 'L',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'sv',          label: 'SV',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'hld',         label: 'HLD',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'tbf',         label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     // Rate stats
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
@@ -68,6 +71,7 @@ var COLUMNS = {
     { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'puPct',       label: 'PU%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    { key: 'hr9',         label: 'HR/9',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'batted_ball' },
   ],
   pitcherSwingDecisions: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -91,8 +95,9 @@ var COLUMNS = {
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
+    { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'ab',          label: 'AB',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'stats' },
+    { key: 'ab',          label: 'AB',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     // Stats
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'obp',         label: 'OBP',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
@@ -109,6 +114,11 @@ var COLUMNS = {
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'xbh',         label: 'XBH',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'tb',          label: 'TB',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    // Baserunning
+    { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'baserunning' },
+    { key: 'cs',          label: 'CS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
+    { key: 'sbPct',       label: 'SB%',      format: function(v){ return v != null ? v.toFixed(1) + '%' : '—'; }, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
   ],
   hitterBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
