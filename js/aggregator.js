@@ -56,8 +56,8 @@ var Aggregator = {
    */
   needsReaggregation: function (filters) {
     if (!this.loaded) return false;
-    return (filters.vsHand && filters.vsHand !== 'all') ||
-           !!filters.dateStart || !!filters.dateEnd;
+    // Always reaggregate — ensures correct qualifying-based percentiles
+    return true;
   },
 
   /**
