@@ -8,6 +8,7 @@ var COLUMNS = {
     { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchType: true },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'usagePct',    label: 'Usage%',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', group: 'info' },
     // Metrics
     { key: 'velocity',    label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', group: 'metrics' },
@@ -40,6 +41,7 @@ var COLUMNS = {
     { key: 'sv',          label: 'SV',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'hld',         label: 'HLD',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'tbf',         label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'counting' },
     // Rate stats
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },

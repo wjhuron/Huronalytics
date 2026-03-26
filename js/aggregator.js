@@ -339,7 +339,7 @@ var Aggregator = {
     // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
     var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue',
-                     'era_pctl', 'hr9_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl'];
+                     'era_pctl', 'hr9_pctl', 'runValue_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};
     for (var bi = 0; bi < preAgg.length; bi++) {
@@ -588,6 +588,22 @@ var Aggregator = {
       if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
+    }
+
+    // Merge runValue and runValue_pctl from pre-aggregated PITCH_DATA
+    var pitchPreAgg = window.PITCH_DATA || [];
+    var pitchPreMap = {};
+    for (var ppi = 0; ppi < pitchPreAgg.length; ppi++) {
+      var ppk = pitchPreAgg[ppi].pitcher + '|' + pitchPreAgg[ppi].team + '|' + pitchPreAgg[ppi].pitchType;
+      pitchPreMap[ppk] = pitchPreAgg[ppi];
+    }
+    for (var pmi = 0; pmi < rows.length; pmi++) {
+      var pmk = rows[pmi].pitcher + '|' + rows[pmi].team + '|' + rows[pmi].pitchType;
+      var ppre = pitchPreMap[pmk];
+      if (ppre) {
+        if (ppre.runValue !== undefined) rows[pmi].runValue = ppre.runValue;
+        if (ppre.runValue_pctl !== undefined) rows[pmi].runValue_pctl = ppre.runValue_pctl;
+      }
     }
 
     // Percentiles per pitch type
