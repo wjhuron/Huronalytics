@@ -632,17 +632,43 @@ var Leaderboard = {
       if (col.sectionStart) td.classList.add('section-start');
       if (val === null || val === undefined) td.classList.add('col-null');
 
-      // Percentile coloring
+      // Percentile coloring (only for qualified players, with exceptions)
       if (!col.noPercentile && !isAvgRow) {
         var pctlKey = col.key + '_pctl';
         var pctl = row[pctlKey];
         if (pctl !== null && pctl !== undefined) {
-          if (isDark) {
-            td.style.backgroundColor = Utils.percentileColorDark(pctl);
-            td.style.color = Utils.percentileTextColorDark(pctl);
+          // Determine qualifying status
+          var isPitcherRow = !!row.pitcher;
+          var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
+          var tg = teamGames[row.team] || 0;
+          var rowQualified;
+          if (isPitcherRow) {
+            var ipStr = row.ip;
+            var ipFloat = 0;
+            if (ipStr != null) {
+              var ipParts = String(ipStr).split('.');
+              ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
+            }
+            var rg = row.g || 0;
+            var rgs = row.gs || 0;
+            var isStarter = rg > 0 && (rgs / rg) > 0.5;
+            var ipThresh = isStarter ? tg * 1.0 : tg * 0.1;
+            rowQualified = ipFloat >= ipThresh;
           } else {
-            td.style.backgroundColor = Utils.percentileColor(pctl);
-            td.style.color = Utils.percentileTextColor(pctl);
+            rowQualified = (row.pa || 0) >= tg * 3.1;
+          }
+          // Always-color exceptions
+          var alwaysColor = isPitcherRow ? { fbVelo: true, extension: true } : { maxEV: true };
+          var showColor = rowQualified || alwaysColor[col.key];
+
+          if (showColor) {
+            if (isDark) {
+              td.style.backgroundColor = Utils.percentileColorDark(pctl);
+              td.style.color = Utils.percentileTextColorDark(pctl);
+            } else {
+              td.style.backgroundColor = Utils.percentileColor(pctl);
+              td.style.color = Utils.percentileTextColor(pctl);
+            }
           }
           // Store percentile for tooltip
           td.setAttribute('data-pctl', pctl);
