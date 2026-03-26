@@ -34,8 +34,8 @@ METRIC_KEYS = {
     'VRA': 'vra', 'HRA': 'hra',
 }
 
-PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
-STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
+PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
+STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS
@@ -249,6 +249,11 @@ def compute_stats(pitches):
     babip_denom = n_ab - n_k - n_hr + n_sf
     babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
+    # Strike% — total strikes / total pitches
+    BALL_DESCRIPTIONS = {'Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'}
+    n_strikes = sum(1 for p in pitches if p.get('Description') not in BALL_DESCRIPTIONS)
+    strike_pct = n_strikes / total if total > 0 else None
+
     # FPS% — first pitch strike rate (count == "0-0")
     # A strike = called strike, swinging strike, foul, or in play
     first_pitches = [p for p in pitches if p.get('Count') == '0-0']
@@ -258,6 +263,7 @@ def compute_stats(pitches):
 
     return {
         'pa': n_pa,
+        'strikePct': strike_pct,
         'izPct': iz / total,
         'swStrRate': whiffs / total if total > 0 else None,
         'swStrPct': whiffs / swings if swings > 0 else None,
@@ -643,7 +649,7 @@ def generate_micro_data(all_pitches):
     #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (line-drive HRs)
     #  25:pu (popups, for HR/FB denominator)
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 26)
+    pitcher_micro = defaultdict(lambda: [0] * 27)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -679,6 +685,8 @@ def generate_micro_data(all_pitches):
             c[5] += 1  # ooz
             if desc in ('Swinging Strike', 'In Play', 'Foul'):
                 c[6] += 1  # oozSw
+        if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
+            c[26] += 1  # nStrikes
         bb_type = p.get('BBType')
         if bb_type and bb_type not in BUNT_BB_TYPES:
             c[7] += 1  # bip
@@ -1193,7 +1201,7 @@ def generate_micro_data(all_pitches):
             'pitcherIdx', 'teamIdx', 'throws', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
-            'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu',
+            'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu', 'nStrikes',
         ],
         'pitcherMicro': pitcher_rows,
         'pitcherBipCols': ['pitcherIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType'],

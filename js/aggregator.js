@@ -165,11 +165,12 @@ var Aggregator = {
           pitcherIdx: row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
-          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+          counts: new Array(27)
         };
+        for (var z = 0; z < 27; z++) groups[gk].counts[z] = 0;
       }
       var c = groups[gk].counts;
-      for (var f = 0; f < 26; f++) {
+      for (var f = 0; f < 27; f++) {
         c[f] += row[ci.n + f];
       }
     }
@@ -201,7 +202,7 @@ var Aggregator = {
     }
 
     // Convert to row objects
-    var STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
+    var STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
                      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct'];
     var INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
     var rows = [];
@@ -214,9 +215,10 @@ var Aggregator = {
       var pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
       var hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
       var izSw = c[18], izWh = c[19];
-      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24], pu_cnt = c[25];
+      var firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24], pu_cnt = c[25], nStrikes = c[26];
       var ab = pa - bb - hbp - sf - sh - ci_val;
 
+      var strikePct = n > 0 ? nStrikes / n : null;
       var kPct = pa > 0 ? k / pa : null;
       var bbPct = pa > 0 ? bb / pa : null;
       var kbbPct = (kPct !== null && bbPct !== null) ? Math.round((kPct - bbPct) * 10000) / 10000 : null;
@@ -259,6 +261,7 @@ var Aggregator = {
         pa: pa,
         nSwings: sw,
         nBip: bip,
+        strikePct: strikePct,
         izPct: n > 0 ? iz / n : null,
         swStrRate: n > 0 ? wh / n : null,
         swStrPct: sw > 0 ? wh / sw : null,

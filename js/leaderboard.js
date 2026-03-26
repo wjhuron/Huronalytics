@@ -82,7 +82,8 @@ var COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     // Plate Discipline Stats
-    { key: 'izPct',       label: 'Zone%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
+    { key: 'strikePct',   label: 'Strike%',  format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
+    { key: 'izPct',       label: 'Zone%',    format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'swStrRate',   label: 'SwStr%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'stats' },

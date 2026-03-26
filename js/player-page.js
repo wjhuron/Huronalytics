@@ -182,6 +182,7 @@ var PlayerPage = {
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'strikePct', label: 'Strike%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izPct', label: 'Zone%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'cswPct', label: 'CSW%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct', label: 'SwStr%', format: function(v) { return Utils.formatPct(v); } },
