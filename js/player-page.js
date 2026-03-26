@@ -303,8 +303,8 @@ var PlayerPage = {
     this._renderPitchTable(data); // uses PITCH_DETAILS, already filtered
     this._renderStatsTable(filteredData);
     this._renderExpandedPitchTable(data); // will use _filteredPitchRows
-    this._renderBattedBallTable(data); // will use _filteredPitchRows
     this._renderPlateDisciplineTable(data); // will use _filteredPitchRows
+    this._renderBattedBallTable(data); // will use _filteredPitchRows
     this._renderHeatMaps(data);
     this._renderCountTable(data);
   },
@@ -427,8 +427,8 @@ var PlayerPage = {
     this._renderSprayChart(data);
     this._renderHitterSmallStats(data);
     this._renderHitterStatsFullTable(data);
-    this._renderHitterBattedBallTable(data);
     this._renderHitterPlateDisciplineTable(data);
+    this._renderHitterBattedBallTable(data);
     this._renderHitterBatTrackingTable(data);
   },
 

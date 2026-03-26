@@ -51,13 +51,13 @@
     <div class="nav-subtabs" id="pitcher-subtabs">
       <button class="tab active" data-tab="pitcherStats">Stats</button>
       <button class="tab" data-tab="pitchMetrics">Pitch Metrics</button>
-      <button class="tab" data-tab="pitcherBattedBall">Batted Ball</button>
       <button class="tab" data-tab="pitcherSwingDecisions">Plate Discipline</button>
+      <button class="tab" data-tab="pitcherBattedBall">Batted Ball</button>
     </div>
     <div class="nav-subtabs" id="hitter-subtabs" style="display:none;">
       <button class="tab" data-tab="hitterStats">Stats</button>
-      <button class="tab" data-tab="hitterBattedBall">Batted Ball</button>
       <button class="tab" data-tab="hitterSwingDecisions">Plate Discipline</button>
+      <button class="tab" data-tab="hitterBattedBall">Batted Ball</button>
       <button class="tab" data-tab="hitterBatTracking">Bat Tracking</button>
       <span class="tab-divider"></span>
       <button class="tab" data-tab="hitterPitch">Pitch Type</button>
@@ -281,19 +281,19 @@
       </div>
     </div>
 
-    <!-- Batted Ball (per pitch type + total, full-width) -->
-    <div class="player-full-width" id="player-batted-ball-section" style="display:none;">
-      <h3 class="section-title">BATTED BALL</h3>
-      <div class="pitch-table-scroll-wrapper">
-        <div id="player-batted-ball-table"></div>
-      </div>
-    </div>
-
     <!-- Plate Discipline (per pitch type + total, full-width) -->
     <div class="player-full-width" id="player-plate-discipline-section" style="display:none;">
       <h3 class="section-title">PLATE DISCIPLINE</h3>
       <div class="pitch-table-scroll-wrapper">
         <div id="player-plate-discipline-table"></div>
+      </div>
+    </div>
+
+    <!-- Batted Ball (per pitch type + total, full-width) -->
+    <div class="player-full-width" id="player-batted-ball-section" style="display:none;">
+      <h3 class="section-title">BATTED BALL</h3>
+      <div class="pitch-table-scroll-wrapper">
+        <div id="player-batted-ball-table"></div>
       </div>
     </div>
 
@@ -341,16 +341,16 @@
       <div class="pitch-table-scroll-wrapper"><div id="player-hitter-stats-table"></div></div>
     </div>
 
-    <!-- Hitter Batted Ball -->
-    <div class="player-full-width" id="player-hitter-batted-ball-section" style="display:none;">
-      <h3 class="section-title">BATTED BALL</h3>
-      <div class="pitch-table-scroll-wrapper"><div id="player-hitter-batted-ball-table"></div></div>
-    </div>
-
     <!-- Hitter Plate Discipline -->
     <div class="player-full-width" id="player-hitter-plate-discipline-section" style="display:none;">
       <h3 class="section-title">PLATE DISCIPLINE</h3>
       <div class="pitch-table-scroll-wrapper"><div id="player-hitter-plate-discipline-table"></div></div>
+    </div>
+
+    <!-- Hitter Batted Ball -->
+    <div class="player-full-width" id="player-hitter-batted-ball-section" style="display:none;">
+      <h3 class="section-title">BATTED BALL</h3>
+      <div class="pitch-table-scroll-wrapper"><div id="player-hitter-batted-ball-table"></div></div>
     </div>
 
     <!-- Hitter Bat Tracking -->
