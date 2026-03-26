@@ -112,7 +112,7 @@ var PlayerPage = {
     { key: 'usagePct', label: 'Usage', format: function(v) { return Utils.formatPct(v); } },
     { key: 'velocity', label: 'MPH',   format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'spinRate', label: 'Spin',   format: function(v) { return v != null ? Math.round(v) : '—'; } },
-    { key: 'breakTilt', label: 'Tilt',  format: function(v) { return v || '—'; } },
+    { key: 'breakTilt', label: 'OTilt', format: function(v) { return v || '—'; } },
     { key: 'indVertBrk', label: 'IVB',  format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
