@@ -336,6 +336,25 @@ var Aggregator = {
       rows.push(obj);
     }
 
+    // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
+    // from pre-aggregated PITCHER_DATA — these aren't in micro-data
+    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue'];
+    var preAgg = window.PITCHER_DATA || [];
+    var preAggMap = {};
+    for (var bi = 0; bi < preAgg.length; bi++) {
+      preAggMap[preAgg[bi].pitcher + '|' + preAgg[bi].team] = preAgg[bi];
+    }
+    for (var mi = 0; mi < rows.length; mi++) {
+      var key2 = rows[mi].pitcher + '|' + rows[mi].team;
+      var pre = preAggMap[key2];
+      if (pre) {
+        for (var fi = 0; fi < boxFields.length; fi++) {
+          var bf = boxFields[fi];
+          if (pre[bf] !== undefined) rows[mi][bf] = pre[bf];
+        }
+      }
+    }
+
     // Compute percentiles with IP-based qualifying
     // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP/team game.
     var teamGames = this.getTeamGamesPlayed();
@@ -815,6 +834,27 @@ var Aggregator = {
       if (filters.search && obj.hitter.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
+    }
+
+    // Merge boxscore stats from pre-aggregated HITTER_DATA
+    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue'];
+    var hPreAgg = window.HITTER_DATA || [];
+    var hPreAggMap = {};
+    for (var hbi = 0; hbi < hPreAgg.length; hbi++) {
+      hPreAggMap[hPreAgg[hbi].hitter + '|' + hPreAgg[hbi].team] = hPreAgg[hbi];
+    }
+    for (var hmi = 0; hmi < rows.length; hmi++) {
+      var hKey = rows[hmi].hitter + '|' + rows[hmi].team;
+      var hPre = hPreAggMap[hKey];
+      if (hPre) {
+        for (var hfi = 0; hfi < hBoxFields.length; hfi++) {
+          var hbf = hBoxFields[hfi];
+          if (hPre[hbf] !== undefined) rows[hmi][hbf] = hPre[hbf];
+        }
+        // Also override PA and AB with boxscore values
+        if (hPre.pa !== undefined) rows[hmi].pa = hPre.pa;
+        if (hPre.ab !== undefined) rows[hmi].ab = hPre.ab;
+      }
     }
 
     // Compute percentiles (no special qualifying for hitters on leaderboard)
