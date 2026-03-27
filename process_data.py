@@ -2317,6 +2317,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 ip_float = outs_to_ip_float(box['outs'])
                 row['era'] = round(box['er'] * 9 / ip_float, 2) if ip_float > 0 else None
                 row['hr9'] = round(box['hr'] * 9 / ip_float, 2) if ip_float > 0 else None
+                row['_box_er'] = box['er']  # raw ER for league avg calc (includes 0-IP pitchers)
             else:
                 row['g'] = None
                 row['gs'] = None
@@ -2361,19 +2362,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row[pctl_key] = 100 - row[pctl_key]
 
     # Compute ERA league average now that boxscore data is merged
+    # Use total ER / total IP across all pitchers (including 0-IP pitchers' ER)
     total_outs = 0
     total_er = 0.0
     for r in pitcher_leaderboard:
-        if r.get('era') is not None and r.get('ip') is not None:
-            ip_str = str(r['ip'])
+        ip = r.get('ip')
+        era = r.get('era')
+        if ip is not None:
+            ip_str = str(ip)
             if '.' in ip_str:
                 whole, frac = ip_str.split('.')
                 outs = int(whole) * 3 + int(frac)
             else:
                 outs = int(float(ip_str)) * 3
-            if outs > 0:
-                total_outs += outs
-                total_er += r['era'] * outs / 9
+            total_outs += outs
+            if era is not None and outs > 0:
+                total_er += era * outs / 9
+        # Include ER from 0-IP pitchers (ERA=None but ER exists in boxscore)
+        if (era is None or ip == '0.0' or ip == 0) and r.get('_box_er') is not None:
+            total_er += r['_box_er']
     if total_outs > 0:
         metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_outs, 2)
 
