@@ -582,6 +582,7 @@ def compute_hitter_stats(pitches):
         'babip': babip,
         # Batted Ball tab
         'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
+        # Note: key is 'medEV' for historical reasons but this is actually mean EV (LA > 0)
         'medEV': round(sum(evs_pos) / len(evs_pos), 1) if evs_pos else None,
         'ev75': ev75,
         'maxEV': round(max(evs_pos), 1) if evs_pos else None,

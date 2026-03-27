@@ -339,7 +339,7 @@ var Leaderboard = {
     // Group header row
     var groupRow = document.createElement('tr');
     groupRow.id = 'table-group-header';
-    var groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking' };
+    var groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', advanced: 'Advanced', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking' };
     var prevGroup = null;
     var groupSpans = [];
     visCols.forEach(function (col) {

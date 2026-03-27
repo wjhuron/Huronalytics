@@ -317,18 +317,11 @@ var Aggregator = {
         puPct: puPct_val,
       };
 
-      // Apply non-aggregator filters
+      // Apply non-aggregator filters (except role, which needs boxscore G/GS)
       if (filters.team !== 'all' && obj.team !== filters.team) continue;
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
-      if (filters.role && filters.role !== 'all') {
-        var pg = obj.g || 0, pgs = obj.gs || 0;
-        var isSP = pg > 0 && (pgs / pg) > 0.5;
-        if (filters.role === 'SP' && !isSP) continue;
-        if (filters.role === 'RP' && isSP) continue;
-      }
       if (obj.count < (filters.minCount || 1)) continue;
       if (filters.minTbf && (obj.pa || 0) < filters.minTbf) continue;
-      if (filters.minIp && (obj.ip || 0) < filters.minIp) continue;
       if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
       if (filters.minPitcherSwings && (obj.nSwings || 0) < filters.minPitcherSwings) continue;
       if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
@@ -354,6 +347,20 @@ var Aggregator = {
           if (pre[bf] !== undefined) rows[mi][bf] = pre[bf];
         }
       }
+    }
+
+    // Apply role filter AFTER boxscore merge so G/GS are available
+    if (filters.role && filters.role !== 'all') {
+      rows = rows.filter(function (r) {
+        var pg = r.g || 0, pgs = r.gs || 0;
+        var isSP = pg > 0 && (pgs / pg) > 0.5;
+        if (filters.role === 'SP') return isSP;
+        if (filters.role === 'RP') return !isSP;
+        return true;
+      });
+    }
+    if (filters.minIp) {
+      rows = rows.filter(function (r) { return (r.ip || 0) >= filters.minIp; });
     }
 
     // Compute percentiles with IP-based qualifying
