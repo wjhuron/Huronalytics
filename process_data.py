@@ -2048,18 +2048,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
-    # --- League Averages per pitch type ---
+    # --- League Averages per pitch type (weighted by pitch count) ---
     league_avgs = {}
     for pt, pt_rows in pt_groups.items():
         avgs = {}
+        total_count = sum(r.get('count', 0) for r in pt_rows)
+        # Pitch metrics: weighted average by count
         for metric in list(METRIC_KEYS.values()):
-            vals = [r[metric] for r in pt_rows if r.get(metric) is not None]
-            if vals:
-                avgs[metric] = round(sum(vals) / len(vals), 2)
+            pairs = [(r[metric], r.get('count', 0)) for r in pt_rows if r.get(metric) is not None and r.get('count', 0) > 0]
+            if pairs:
+                avgs[metric] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 2)
+        # Rate stats: weighted average by count
         for stat in PITCH_STAT_KEYS:
-            vals = [r[stat] for r in pt_rows if r.get(stat) is not None]
-            if vals:
-                avgs[stat] = round(sum(vals) / len(vals), 4)
+            pairs = [(r[stat], r.get('count', 0)) for r in pt_rows if r.get(stat) is not None and r.get('count', 0) > 0]
+            if pairs:
+                avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
         tilts = [r['breakTiltMinutes'] for r in pt_rows if r.get('breakTiltMinutes') is not None]
         if tilts:
             avgs['breakTiltMinutes'] = circular_mean_minutes(tilts)
@@ -2067,12 +2070,20 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         avgs['count'] = len(pt_rows)
         league_avgs[pt] = avgs
 
-    # League averages for pitcher leaderboard
+    # League averages for pitcher leaderboard (weighted by count/TBF)
     pitcher_league_avgs = {}
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
-        vals = [r[stat] for r in pitcher_leaderboard if r.get(stat) is not None]
-        if vals:
-            pitcher_league_avgs[stat] = round(sum(vals) / len(vals), 4)
+        # Use TBF as weight for rate stats, count (pitches) for pitch metrics
+        weight_key = 'pa' if stat in ('kPct', 'bbPct', 'kbbPct', 'babip') else 'count'
+        pairs = [(r[stat], r.get(weight_key, 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get(weight_key, 0) > 0]
+        if pairs:
+            pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
+    # ERA league avg computed after boxscore merge (ERA not available yet at this point)
+    # Batted ball stats: weighted by nBip
+    for stat in PITCHER_BB_KEYS:
+        pairs = [(r[stat], r.get('nBip', 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get('nBip', 0) > 0]
+        if pairs:
+            pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     pitcher_league_avgs['count'] = len(pitcher_leaderboard)
 
     # ======================================================================
@@ -2230,12 +2241,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
     print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
 
-    # Hitter league averages
+    # Hitter league averages (weighted by PA for rate stats, nBip for batted ball stats)
     hitter_league_avgs = {}
+    # Rate stats weighted by PA
+    pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'hrFbPct',
+                'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
+    # Batted ball stats weighted by nBip
+    bip_stats = {'avgEVAll', 'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
+                 'laSweetSpotPct', 'gbPct', 'ldPct', 'fbPct', 'puPct',
+                 'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     for stat in HITTER_STAT_KEYS:
-        vals = [r[stat] for r in hitter_leaderboard if r.get(stat) is not None]
-        if vals:
-            hitter_league_avgs[stat] = round(sum(vals) / len(vals), 4)
+        if stat in pa_stats:
+            weight_key = 'pa'
+        elif stat in bip_stats:
+            weight_key = 'nBip'
+        else:
+            weight_key = 'pa'  # default
+        pairs = [(r[stat], r.get(weight_key, 0)) for r in hitter_leaderboard if r.get(stat) is not None and r.get(weight_key, 0) > 0]
+        if pairs:
+            hitter_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     hitter_league_avgs['count'] = len(hitter_leaderboard)
 
     # --- Metadata ---
@@ -2335,6 +2359,23 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
+
+    # Compute ERA league average now that boxscore data is merged
+    total_outs = 0
+    total_er = 0.0
+    for r in pitcher_leaderboard:
+        if r.get('era') is not None and r.get('ip') is not None:
+            ip_str = str(r['ip'])
+            if '.' in ip_str:
+                whole, frac = ip_str.split('.')
+                outs = int(whole) * 3 + int(frac)
+            else:
+                outs = int(float(ip_str)) * 3
+            if outs > 0:
+                total_outs += outs
+                total_er += r['era'] * outs / 9
+    if total_outs > 0:
+        metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_outs, 2)
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,
