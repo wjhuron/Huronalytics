@@ -1525,8 +1525,28 @@ def fetch_boxscore(game_pk):
                 'sv': stats.get('saves', 0),
                 'hld': stats.get('holds', 0),
                 'er': stats.get('earnedRuns', 0),
+                'r': stats.get('runs', 0),
+                'h': stats.get('hits', 0),
                 'hr': stats.get('homeRuns', 0),
+                'so': stats.get('strikeOuts', 0),
+                'bb': stats.get('baseOnBalls', 0),
+                'hbp': stats.get('hitByPitch', 0),
+                'ibb': stats.get('intentionalWalks', 0),
                 'tbf': stats.get('battersFaced', 0),
+                'pitchesThrown': stats.get('pitchesThrown', 0),
+                'balls': stats.get('balls', 0),
+                'strikes': stats.get('strikes', 0),
+                'doubles': stats.get('doubles', 0),
+                'triples': stats.get('triples', 0),
+                'groundOuts': stats.get('groundOuts', 0),
+                'flyOuts': stats.get('flyOuts', 0),
+                'popOuts': stats.get('popOuts', 0),
+                'lineOuts': stats.get('lineOuts', 0),
+                'airOuts': stats.get('airOuts', 0),
+                'wp': stats.get('wildPitches', 0),
+                'bk': stats.get('balks', 0),
+                'ir': stats.get('inheritedRunners', 0),
+                'irs': stats.get('inheritedRunnersScored', 0),
             })
 
         # Hitters
@@ -1545,9 +1565,25 @@ def fetch_boxscore(game_pk):
                 'g': 1,
                 'pa': batting.get('plateAppearances', 0),
                 'ab': batting.get('atBats', 0),
+                'h': batting.get('hits', 0),
+                'r': batting.get('runs', 0),
+                'doubles': batting.get('doubles', 0),
+                'triples': batting.get('triples', 0),
+                'hr': batting.get('homeRuns', 0),
+                'rbi': batting.get('rbi', 0),
                 'tb': batting.get('totalBases', 0),
                 'sb': batting.get('stolenBases', 0),
                 'cs': batting.get('caughtStealing', 0),
+                'bb': batting.get('baseOnBalls', 0),
+                'ibb': batting.get('intentionalWalks', 0),
+                'hbp': batting.get('hitByPitch', 0),
+                'so': batting.get('strikeOuts', 0),
+                'sacBunts': batting.get('sacBunts', 0),
+                'sacFlies': batting.get('sacFlies', 0),
+                'groundOuts': batting.get('groundOuts', 0),
+                'flyOuts': batting.get('flyOuts', 0),
+                'popOuts': batting.get('popOuts', 0),
+                'lineOuts': batting.get('lineOuts', 0),
             })
 
     return result
@@ -1598,7 +1634,14 @@ def fetch_and_aggregate_boxscores(game_dates):
             for p in box.get('pitchers', []):
                 key = p['name'] + '|' + p['team']
                 if key not in pitcher_agg:
-                    pitcher_agg[key] = {'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0, 'er': 0, 'hr': 0, 'tbf': 0}
+                    pitcher_agg[key] = {
+                        'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0,
+                        'er': 0, 'r': 0, 'h': 0, 'hr': 0, 'so': 0, 'bb': 0, 'hbp': 0, 'ibb': 0,
+                        'tbf': 0, 'pitchesThrown': 0, 'balls': 0, 'strikes': 0,
+                        'doubles': 0, 'triples': 0,
+                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0, 'airOuts': 0,
+                        'wp': 0, 'bk': 0, 'ir': 0, 'irs': 0,
+                    }
                 a = pitcher_agg[key]
                 for k in a:
                     a[k] += p.get(k, 0)
@@ -1606,7 +1649,14 @@ def fetch_and_aggregate_boxscores(game_dates):
             for h in box.get('hitters', []):
                 key = h['name'] + '|' + h['team']
                 if key not in hitter_agg:
-                    hitter_agg[key] = {'g': 0, 'pa': 0, 'ab': 0, 'tb': 0, 'sb': 0, 'cs': 0}
+                    hitter_agg[key] = {
+                        'g': 0, 'pa': 0, 'ab': 0, 'h': 0, 'r': 0,
+                        'doubles': 0, 'triples': 0, 'hr': 0, 'rbi': 0,
+                        'tb': 0, 'sb': 0, 'cs': 0,
+                        'bb': 0, 'ibb': 0, 'hbp': 0, 'so': 0,
+                        'sacBunts': 0, 'sacFlies': 0,
+                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0,
+                    }
                 a = hitter_agg[key]
                 for k in a:
                     a[k] += h.get(k, 0)
