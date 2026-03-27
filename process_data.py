@@ -237,14 +237,16 @@ def compute_stats(pitches):
     n_h = sum(1 for p in pa_pitches if p['Event'] in HIT_EVENTS)
     n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
     n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
-    n_bb = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
+    n_bb_all = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
+    n_ibb = sum(1 for p in pa_pitches if p['Event'] == 'Intent Walk')
+    n_bb = n_bb_all - n_ibb  # BB% excludes IBB (matches FanGraphs methodology)
     n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
     n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
     n_sh = sum(1 for p in pa_pitches if p['Event'] in SH_EVENTS)
     n_ci = sum(1 for p in pa_pitches if p['Event'] in CI_EVENTS)
-    n_ab = n_pa - n_bb - n_hbp - n_sf - n_sh - n_ci
+    n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci  # AB uses all BB (including IBB)
     k_pct = n_k / n_pa if n_pa > 0 else None
-    bb_pct = n_bb / n_pa if n_pa > 0 else None
+    bb_pct = n_bb / n_pa if n_pa > 0 else None  # excludes IBB
     kbb_pct = round(k_pct - bb_pct, 4) if k_pct is not None and bb_pct is not None else None
 
     # BABIP = (H - HR) / (AB - K - HR + SF)
@@ -433,28 +435,30 @@ def compute_hitter_stats(pitches):
     n_3b = sum(1 for p in pa_pitches if p['Event'] == 'Triple')
     n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
     n_1b = n_h - n_2b - n_3b - n_hr
-    n_bb = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
+    n_bb_all = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
+    n_ibb = sum(1 for p in pa_pitches if p['Event'] == 'Intent Walk')
+    n_bb = n_bb_all - n_ibb  # BB% excludes IBB (matches FanGraphs methodology)
     n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
     n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
     n_sh = sum(1 for p in pa_pitches if p['Event'] in SH_EVENTS)
     n_ci = sum(1 for p in pa_pitches if p['Event'] in CI_EVENTS)
     n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
 
-    # AB = PA - BB - HBP - SF - SH - CI
-    n_ab = n_pa - n_bb - n_hbp - n_sf - n_sh - n_ci
+    # AB = PA - all BB (including IBB) - HBP - SF - SH - CI
+    n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci
 
     # === Traditional batting stats ===
     batting_avg = round(n_h / n_ab, 3) if n_ab > 0 else None
-    obp_denom = n_ab + n_bb + n_hbp + n_sf
-    obp = round((n_h + n_bb + n_hbp) / obp_denom, 3) if obp_denom > 0 else None
+    obp_denom = n_ab + n_bb_all + n_hbp + n_sf  # OBP uses all BB including IBB
+    obp = round((n_h + n_bb_all + n_hbp) / obp_denom, 3) if obp_denom > 0 else None
     tb = n_1b + 2 * n_2b + 3 * n_3b + 4 * n_hr
     slg = round(tb / n_ab, 3) if n_ab > 0 else None
     ops = round(obp + slg, 3) if obp is not None and slg is not None else None
     xbh = n_2b + n_3b + n_hr
 
-    # K% and BB% (per PA)
+    # K% and BB% (per PA — BB% excludes IBB)
     k_pct = n_k / n_pa if n_pa > 0 else None
-    bb_pct = n_bb / n_pa if n_pa > 0 else None
+    bb_pct = n_bb / n_pa if n_pa > 0 else None  # excludes IBB
 
     # ISO = SLG - AVG
     iso = round(slg - batting_avg, 3) if slg is not None and batting_avg is not None else None
@@ -732,7 +736,7 @@ def generate_micro_data(all_pitches):
             if event in HIT_EVENTS:      c[10] += 1  # h
             if event == 'Home Run':      c[11] += 1  # hr
             if event in K_EVENTS:        c[12] += 1  # k
-            if event in BB_EVENTS:       c[13] += 1  # bb
+            if event in BB_EVENTS:       c[13] += 1  # bb (all walks including IBB)
             if event in HBP_EVENTS:      c[14] += 1  # hbp
             if event in SF_EVENTS:       c[15] += 1  # sf
             if event in SH_EVENTS:       c[16] += 1  # sh
@@ -947,7 +951,7 @@ def generate_micro_data(all_pitches):
             if event == 'Double':        c[3] += 1   # db
             if event == 'Triple':        c[4] += 1   # tp
             if event == 'Home Run':      c[5] += 1   # hr
-            if event in BB_EVENTS:       c[6] += 1   # bb
+            if event in BB_EVENTS:       c[6] += 1   # bb (all walks including IBB)
             if event in HBP_EVENTS:      c[7] += 1   # hbp
             if event in SF_EVENTS:       c[8] += 1   # sf
             if event in SH_EVENTS:       c[9] += 1   # sh
