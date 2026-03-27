@@ -1379,7 +1379,7 @@ def read_pitches_from_sheet(gc, sheet_id):
             continue
         print(f"    Reading {ws.title}...")
         if i > 0:
-            time_module.sleep(1.5)
+            time_module.sleep(0.5)
         rows = read_sheet_with_retry(ws)
         if not rows:
             continue
@@ -2382,9 +2382,9 @@ def main():
     gc = gspread.authorize(creds)
 
     # Read data separately
-    print("\n=== Reading Spring Training data ===")
-    st_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['ST'])
-    print(f"  Read {len(st_pitches)} ST pitches")
+    # Skip ST spreadsheet — ST data is already cached and won't change
+    print("\n=== Skipping Spring Training read (cached) ===")
+    st_pitches = []
 
     print("\n=== Reading Regular Season data ===")
     rs_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
