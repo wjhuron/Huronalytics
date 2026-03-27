@@ -54,6 +54,8 @@ HITTER_STAT_KEYS = [
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
     'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
+    # Bat Tracking tab
+    'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
@@ -417,7 +419,7 @@ def compute_hitter_stats(pitches):
     total = len(pitches)
     if total == 0:
         empty = {k: None for k in HITTER_STAT_KEYS}
-        empty.update({'pa': 0, 'nSwings': 0, 'nBip': 0,
+        empty.update({'pa': 0, 'nSwings': 0, 'nBip': 0, 'nCompSwings': 0,
                       'doubles': 0, 'triples': 0, 'hr': 0, 'xbh': 0})
         return empty
 
@@ -552,6 +554,13 @@ def compute_hitter_stats(pitches):
     fb_for_hrfb = fb + pu + ld_hr
     hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
+    # Bat Tracking — only competitive swings (BatSpeed >= 50)
+    bs_vals = [safe_float(p.get('BatSpeed')) for p in pitches if safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
+    sl_vals = [safe_float(p.get('SwingLength')) for p in pitches if safe_float(p.get('SwingLength')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
+    aa_vals = [safe_float(p.get('AttackAngle')) for p in pitches if safe_float(p.get('AttackAngle')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
+    ad_vals = [safe_float(p.get('AttackDirection')) for p in pitches if safe_float(p.get('AttackDirection')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
+    spt_vals = [safe_float(p.get('SwingPathTilt')) for p in pitches if safe_float(p.get('SwingPathTilt')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
+
     return {
         # Info / counts
         'pa': n_pa,
@@ -600,6 +609,13 @@ def compute_hitter_stats(pitches):
         'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
         # Run Value — negate pitcher RunExp so positive = good for hitter
         'runValue': (lambda vals: round(-sum(vals), 1) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
+        # Bat Tracking — averages of competitive swings (BatSpeed >= 50)
+        'batSpeed': round(sum(bs_vals) / len(bs_vals), 1) if bs_vals else None,
+        'swingLength': round(sum(sl_vals) / len(sl_vals), 1) if sl_vals else None,
+        'attackAngle': round(sum(aa_vals) / len(aa_vals), 1) if aa_vals else None,
+        'attackDirection': round(sum(ad_vals) / len(ad_vals), 1) if ad_vals else None,
+        'swingPathTilt': round(sum(spt_vals) / len(spt_vals), 1) if spt_vals else None,
+        'nCompSwings': len(bs_vals),  # competitive swings count
     }
 
 

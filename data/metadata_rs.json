@@ -37,7 +37,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-27 14:27",
+  "generatedAt": "2026-03-27 10:37",
   "totalPitches": 3555,
   "totalPitchers": 113,
   "totalHitters": 242,
@@ -348,6 +348,11 @@
     "contactPct": 0.7231,
     "izContactPct": 0.8228,
     "whiffPct": 0.2769,
+    "batSpeed": 71.3054,
+    "swingLength": 7.2764,
+    "attackAngle": 9.6682,
+    "attackDirection": -0.7579,
+    "swingPathTilt": 32.0169,
     "count": 242
   },
   "vaaRegression": {
