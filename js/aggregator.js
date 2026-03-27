@@ -720,6 +720,7 @@ var Aggregator = {
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
+      'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
     ];
     var HITTER_INVERT = {
       swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true
@@ -854,7 +855,8 @@ var Aggregator = {
     }
 
     // Merge boxscore stats from pre-aggregated HITTER_DATA
-    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue'];
+    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
+                      'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
     for (var hbi = 0; hbi < hPreAgg.length; hbi++) {
