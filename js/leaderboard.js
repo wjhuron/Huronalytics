@@ -274,6 +274,11 @@ var Leaderboard = {
 
   computeLeagueAvgRow: function (data, columns) {
     var avg = {};
+    // Use pre-computed weighted league averages from metadata when available
+    var meta = DataStore.metadata || {};
+    var isPitcher = data.length > 0 && data[0].pitcher;
+    var precomputed = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
+
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
     var ABS_AVG_KEYS = { horzBrk: true, haa: true, hra: true, relPosX: true };
     var numericKeys = [];
@@ -283,6 +288,12 @@ var Leaderboard = {
       }
     }
     numericKeys.forEach(function (key) {
+      // Use precomputed weighted average if available
+      if (precomputed[key] !== undefined && precomputed[key] !== null) {
+        avg[key] = precomputed[key];
+        return;
+      }
+      // Fallback: simple average (for stats not in metadata)
       var sum = 0, count = 0;
       var useAbs = ABS_AVG_KEYS[key] || false;
       for (var j = 0; j < data.length; j++) {
