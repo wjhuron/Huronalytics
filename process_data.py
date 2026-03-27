@@ -1542,9 +1542,15 @@ def fetch_and_aggregate_boxscores(game_dates):
     new_fetches = 0
 
     # Find dates we need to fetch
+    # Always re-fetch dates from the last 2 days (games may have finished since last run)
+    import datetime as _dt
+    today = _dt.date.today().isoformat()
+    yesterday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+    recent_dates = {today, yesterday}
+
     dates_to_fetch = []
     for d in sorted(game_dates):
-        if d not in cache:
+        if d not in cache or d in recent_dates:
             dates_to_fetch.append(d)
 
     if dates_to_fetch:
