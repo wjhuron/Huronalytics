@@ -225,13 +225,9 @@ var Aggregator = {
     }
 
     function isBarrel(ev, la) {
+      // Statcast barrel: code_barrel formula (EV >= 98 per MLB glossary)
       if (ev == null || la == null) return false;
-      if (ev < 98) return false;
-      var minLA = 26 - (ev - 98);
-      var maxLA = 30 + 1.2 * (ev - 98);
-      if (minLA < 8) minLA = 8;
-      if (maxLA > 50) maxLA = 50;
-      return la >= minLA && la <= maxLA;
+      return la <= 50 && ev >= 98 && ev * 1.5 - la >= 117 && ev + la >= 123;
     }
 
     // Convert to row objects

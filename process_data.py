@@ -315,15 +315,13 @@ def median(values):
 
 
 def is_barrel(ev, la):
-    """Statcast barrel definition.
-    EV >= 98 mph, then LA must be within a range that expands with velocity."""
+    """Statcast barrel definition from baseballr code_barrel (EV >= 98 per MLB glossary).
+    Four conditions: LA<=50, EV>=98, EV*1.5-LA>=117, EV+LA>=123."""
     if ev is None or la is None:
         return False
-    if ev < 98:
-        return False
-    lower_la = max(8, 26 - (ev - 98))
-    upper_la = min(50, 30 + 1.2 * (ev - 98))
-    return lower_la <= la <= upper_la
+    return (la <= 50 and ev >= 98 and
+            ev * 1.5 - la >= 117 and
+            ev + la >= 123)
 
 
 def compute_pitcher_batted_ball(pitches):
@@ -348,12 +346,16 @@ def compute_pitcher_batted_ball(pitches):
     hard_hit = sum(1 for v in ev_valid if v >= 95)
     hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
 
-    # Barrel rate
-    ev_la_pairs = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
-                   for p in bip
-                   if safe_float(p.get('ExitVelo')) is not None
-                   and safe_float(p.get('LaunchAngle')) is not None]
-    barrels = sum(1 for ev, la in ev_la_pairs if is_barrel(ev, la))
+    # Barrel rate — use Barrel column from Savant if available, else fall back to formula
+    has_barrel_col = any(str(p.get('Barrel', '')).lower() == 'yes' for p in bip)
+    if has_barrel_col:
+        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).lower() == 'yes')
+    else:
+        ev_la_pairs = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
+                       for p in bip
+                       if safe_float(p.get('ExitVelo')) is not None
+                       and safe_float(p.get('LaunchAngle')) is not None]
+        barrels = sum(1 for ev, la in ev_la_pairs if is_barrel(ev, la))
     barrel_pct = barrels / n_bip if n_bip > 0 else None
 
     # Batted ball type breakdown
@@ -516,12 +518,16 @@ def compute_hitter_stats(pitches):
         top_quarter = sorted_evs[:max(1, len(sorted_evs) // 4)]
         ev75 = round(sum(top_quarter) / len(top_quarter), 1)
 
-    # Barrels: need EV and LA on all batted balls
-    ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
-                 for p in bip
-                 if safe_float(p.get('ExitVelo')) is not None
-                 and safe_float(p.get('LaunchAngle')) is not None]
-    barrels = sum(1 for ev, la in ev_la_all if is_barrel(ev, la))
+    # Barrels — use Barrel column from Savant if available, else fall back to formula
+    has_barrel_col = any(str(p.get('Barrel', '')).lower() == 'yes' for p in bip)
+    if has_barrel_col:
+        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).lower() == 'yes')
+    else:
+        ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
+                     for p in bip
+                     if safe_float(p.get('ExitVelo')) is not None
+                     and safe_float(p.get('LaunchAngle')) is not None]
+        barrels = sum(1 for ev, la in ev_la_all if is_barrel(ev, la))
 
     # Median launch angle on ALL batted balls
     all_la = [safe_float(p.get('LaunchAngle')) for p in bip
@@ -995,7 +1001,7 @@ def generate_micro_data(all_pitches):
             # Barrel, hard-hit, LA sweet-spot, HR on BIP
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
-            if is_barrel(ev, la):
+            if str(p.get('Barrel', '')).lower() == 'yes' or (not p.get('Barrel') and is_barrel(ev, la)):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
@@ -1151,7 +1157,7 @@ def generate_micro_data(all_pitches):
 
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
-            if is_barrel(ev, la):
+            if str(p.get('Barrel', '')).lower() == 'yes' or (not p.get('Barrel') and is_barrel(ev, la)):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
