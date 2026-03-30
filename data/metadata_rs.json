@@ -43,14 +43,14 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-30 14:42",
+  "generatedAt": "2026-03-30 19:00",
   "totalPitches": 14207,
   "totalPitchers": 323,
   "totalHitters": 373,
   "leagueAverages": {
     "FF": {
       "velocity": 94.86,
-      "spinRate": 2315.94,
+      "spinRate": 2315.93,
       "indVertBrk": 16.48,
       "horzBrk": 3.53,
       "relPosZ": 5.65,
@@ -61,7 +61,7 @@
       "vra": -2.03,
       "hra": 1.13,
       "strikePct": 0.6599,
-      "izPct": 0.5172,
+      "izPct": 0.5174,
       "swStrRate": 0.1191,
       "swStrPct": 0.2406,
       "cswPct": 0.2827,
@@ -301,7 +301,7 @@
   },
   "pitcherLeagueAverages": {
     "strikePct": 0.6286,
-    "izPct": 0.4795,
+    "izPct": 0.4796,
     "swStrRate": 0.1309,
     "swStrPct": 0.2814,
     "cswPct": 0.2957,
@@ -314,16 +314,16 @@
     "babip": 0.2887,
     "fpsPct": 0.6003,
     "relPosZ": 5.6384,
-    "relPosX": -0.6536,
+    "relPosX": -0.654,
     "extension": 6.4602,
     "vaa": -6.3999,
-    "haa": 0.6334,
-    "vra": -1.5459,
+    "haa": 0.6335,
+    "vra": -1.546,
     "hra": 0.9349,
     "avgEVAgainst": 88.8553,
     "maxEVAgainst": 105.2173,
     "hardHitPct": 0.3954,
-    "barrelPctAgainst": 0.0887,
+    "barrelPctAgainst": 0.0869,
     "ldPct": 0.2299,
     "fbPct": 0.2648,
     "puPct": 0.0843,
@@ -345,7 +345,7 @@
     "maxEV": 102.5355,
     "medLA": 14.1839,
     "hardHitPct": 0.3954,
-    "barrelPct": 0.0891,
+    "barrelPct": 0.0869,
     "laSweetSpotPct": 0.3429,
     "gbPct": 0.421,
     "ldPct": 0.2299,
@@ -357,7 +357,7 @@
     "oppoPct": 0.2753,
     "airPullPct": 0.1956,
     "swingPct": 0.468,
-    "izSwingPct": 0.6471,
+    "izSwingPct": 0.647,
     "chasePct": 0.2977,
     "izSwChase": 0.3491,
     "contactPct": 0.7222,
@@ -371,13 +371,13 @@
     "count": 373
   },
   "vaaRegression": {
-    "slope": 1.5963,
-    "intercept": -10.14523,
-    "leagueAvgPlateZ": 2.346197
+    "slope": 1.596293,
+    "intercept": -10.145114,
+    "leagueAvgPlateZ": 2.346193
   },
   "haaRegression": {
-    "slope": 1.433468,
-    "intercept": 0.608465,
-    "leagueAvgPlateX": 0.017623
+    "slope": 1.433434,
+    "intercept": 0.608266,
+    "leagueAvgPlateX": 0.017631
   }
 }
