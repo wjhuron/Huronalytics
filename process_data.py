@@ -38,7 +38,7 @@ PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izW
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'xBA', 'xSLG', 'xwOBA']
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
@@ -48,6 +48,8 @@ SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
 HITTER_STAT_KEYS = [
     # Hitter Stats tab
     'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
+    # Expected Stats
+    'xBA', 'xSLG', 'xwOBA',
     # Batted Ball tab
     'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -93,6 +95,11 @@ MLB_TEAMS = {
     'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY',
     'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
     'WBC',
+}
+
+# --- wOBA weights (from FanGraphs Guts page, 2024 values — update yearly) ---
+WOBA_WEIGHTS = {
+    'BB': 0.697, 'HBP': 0.729, '1B': 0.883, '2B': 1.244, '3B': 1.569, 'HR': 2.015,
 }
 
 # Strike zone: ball radius adjustment for "any part of ball touches zone"
@@ -204,6 +211,135 @@ def avg(values):
     if not nums:
         return None
     return sum(nums) / len(nums)
+
+
+def build_ev_la_lookup(all_pitches):
+    """Build EV/LA lookup table for xBA, xSLG, xwOBA from all BIP events.
+
+    For each unique (EV_rounded, LA_rounded) combination in the data, compute
+    smoothed expected values by averaging all BIP events within ±5 mph EV and
+    ±10° LA. Returns dict: (ev_int, la_int) -> (xba, xslg, xwoba_bip).
+    """
+    # Collect all non-bunt BIP with valid EV and LA
+    bip_data = []
+    for p in all_pitches:
+        bb_type = p.get('BBType')
+        if not bb_type or bb_type in BUNT_BB_TYPES:
+            continue
+        ev = safe_float(p.get('ExitVelo'))
+        la = safe_float(p.get('LaunchAngle'))
+        if ev is None or la is None:
+            continue
+        event = p.get('Event', '')
+        is_hit = 1.0 if event in HIT_EVENTS else 0.0
+        if event == 'Single':
+            tb, woba_val = 1.0, WOBA_WEIGHTS['1B']
+        elif event == 'Double':
+            tb, woba_val = 2.0, WOBA_WEIGHTS['2B']
+        elif event == 'Triple':
+            tb, woba_val = 3.0, WOBA_WEIGHTS['3B']
+        elif event == 'Home Run':
+            tb, woba_val = 4.0, WOBA_WEIGHTS['HR']
+        else:
+            tb, woba_val = 0.0, 0.0
+        bip_data.append((ev, la, is_hit, tb, woba_val))
+
+    print(f"  xBA/xSLG/xwOBA: {len(bip_data)} BIP with valid EV/LA for lookup table")
+
+    # Get unique (ev_rounded, la_rounded) keys that appear in the data
+    unique_keys = set()
+    for ev, la, _, _, _ in bip_data:
+        unique_keys.add((round(ev), round(la)))
+
+    # For each unique key, compute smoothed expected values
+    # using all BIP within ±5 mph EV and ±10° LA
+    EV_RADIUS = 5
+    LA_RADIUS = 10
+    lookup = {}
+    for ev_r, la_r in unique_keys:
+        hit_sum = 0.0
+        tb_sum = 0.0
+        woba_sum = 0.0
+        count = 0
+        for ev, la, is_hit, tb, woba_val in bip_data:
+            if abs(ev - ev_r) <= EV_RADIUS and abs(la - la_r) <= LA_RADIUS:
+                hit_sum += is_hit
+                tb_sum += tb
+                woba_sum += woba_val
+                count += 1
+        if count > 0:
+            lookup[(ev_r, la_r)] = (hit_sum / count, tb_sum / count, woba_sum / count)
+
+    print(f"  xBA/xSLG/xwOBA: {len(lookup)} unique EV/LA bins in lookup table")
+    return lookup
+
+
+def compute_expected_stats(pitches, ev_la_lookup):
+    """Compute xBA, xSLG, xwOBA for a group of pitches using EV/LA lookup.
+
+    xBA  = sum(expected_hit_prob for BIP) / AB
+    xSLG = sum(expected_tb for BIP) / AB
+    xwOBA = (wBB*uBB + wHBP*HBP + sum(expected_woba for BIP+SF_BIP)) / (AB + uBB + SF + HBP)
+    """
+    ab = 0
+    ubb = 0   # unintentional BB
+    hbp = 0
+    sf = 0
+    xba_sum = 0.0
+    xslg_sum = 0.0
+    xwoba_bip_sum = 0.0
+
+    for p in pitches:
+        event = p.get('Event')
+        if not event or event in NON_PA_EVENTS:
+            continue
+
+        if event == 'Intent Walk':
+            continue  # IBB excluded from everything
+        elif event in BB_EVENTS:
+            ubb += 1
+            continue
+        elif event in HBP_EVENTS:
+            hbp += 1
+            continue
+        elif event in SF_EVENTS:
+            sf += 1
+            # SF BIP contributes to xwOBA numerator but not AB
+            bb_type = p.get('BBType')
+            if bb_type and bb_type not in BUNT_BB_TYPES:
+                ev = safe_float(p.get('ExitVelo'))
+                la = safe_float(p.get('LaunchAngle'))
+                if ev is not None and la is not None:
+                    vals = ev_la_lookup.get((round(ev), round(la)))
+                    if vals:
+                        xwoba_bip_sum += vals[2]
+            continue
+        elif event in SH_EVENTS or event in CI_EVENTS:
+            continue
+
+        # Regular AB outcome (BIP, K, other outs)
+        ab += 1
+        bb_type = p.get('BBType')
+        if bb_type and bb_type not in BUNT_BB_TYPES:
+            ev = safe_float(p.get('ExitVelo'))
+            la = safe_float(p.get('LaunchAngle'))
+            if ev is not None and la is not None:
+                vals = ev_la_lookup.get((round(ev), round(la)))
+                if vals:
+                    xba_sum += vals[0]
+                    xslg_sum += vals[1]
+                    xwoba_bip_sum += vals[2]
+        # else: K or untracked BIP → 0 contribution
+
+    result = {}
+    result['xBA'] = round(xba_sum / ab, 3) if ab > 0 else None
+    result['xSLG'] = round(xslg_sum / ab, 3) if ab > 0 else None
+    xwoba_denom = ab + ubb + sf + hbp
+    if xwoba_denom > 0:
+        result['xwOBA'] = round((WOBA_WEIGHTS['BB'] * ubb + WOBA_WEIGHTS['HBP'] * hbp + xwoba_bip_sum) / xwoba_denom, 3)
+    else:
+        result['xwOBA'] = None
+    return result
 
 
 def compute_stats(pitches):
@@ -1827,6 +1963,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             continue
         pitcher_total[(p['Pitcher'], p['PTeam'])] += 1
 
+    # --- Build EV/LA lookup table for xBA/xSLG/xwOBA ---
+    ev_la_lookup = build_ev_la_lookup(all_pitches)
+
     # --- Pitch Leaderboard: group by (Pitcher, PTeam, Pitch Type) ---
     pitch_groups = defaultdict(list)
     for p in all_pitches:
@@ -1872,6 +2011,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
+        row.update(compute_expected_stats(pitches, ev_la_lookup))
         # RV/100 for this pitch type
         if row.get('runValue') is not None and row.get('count', 0) > 0:
             row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
@@ -1998,6 +2138,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 if row.get('nVAA_pctl') is not None:
                     row['nVAA_pctl'] = 100 - row['nVAA_pctl']
 
+    # Invert xBA/xSLG/xwOBA percentiles (lower is better for pitchers)
+    for row in pitch_leaderboard:
+        for stat in ('xBA', 'xSLG', 'xwOBA'):
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
     # --- Compute Stuff Score ---
     for row in pitch_leaderboard:
         vp = row.get('velocity_pctl')
@@ -2037,6 +2184,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row[key_name] = round_metric(col, avg(values))
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
+        row.update(compute_expected_stats(pitches, ev_la_lookup))
 
         # Fastball velo: average velo of most-used fastball (FF/SI/CF)
         fb_types = {'FF', 'SI', 'CF'}
@@ -2082,11 +2230,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Compute percentiles for pitcher leaderboard
     # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo', 'runValue', 'rv100']:
+    EXPECTED_KEYS = ['xBA', 'xSLG', 'xwOBA']
+    EXPECTED_PITCHER_INVERT = {'xBA', 'xSLG', 'xwOBA'}  # lower is better for pitchers
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100']:
         compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:
-        for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT:
+        for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT | EXPECTED_PITCHER_INVERT:
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
@@ -2168,6 +2318,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if tilts:
             avgs['breakTiltMinutes'] = circular_mean_minutes(tilts)
             avgs['breakTilt'] = minutes_to_tilt_display(avgs['breakTiltMinutes'])
+        # Expected stats: weighted by PA (from compute_stats)
+        for stat in ['xBA', 'xSLG', 'xwOBA']:
+            pairs = [(r[stat], r.get('pa', 0)) for r in pt_rows if r.get(stat) is not None and r.get('pa', 0) > 0]
+            if pairs:
+                avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
         avgs['count'] = len(pt_rows)
         league_avgs[pt] = avgs
 
@@ -2183,6 +2338,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Batted ball stats: weighted by nBip
     for stat in PITCHER_BB_KEYS:
         pairs = [(r[stat], r.get('nBip', 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get('nBip', 0) > 0]
+        if pairs:
+            pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
+    # Expected stats: weighted by PA
+    for stat in EXPECTED_KEYS:
+        pairs = [(r[stat], r.get('pa', 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get('pa', 0) > 0]
         if pairs:
             pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     pitcher_league_avgs['count'] = len(pitcher_leaderboard)
@@ -2217,9 +2377,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'mlbId': get_mlb_id(hitter, team),
         }
         row.update(compute_hitter_stats(pitches))
+        row.update(compute_expected_stats(pitches, ev_la_lookup))
         hitter_leaderboard.append(row)
 
-    for stat in HITTER_STAT_KEYS:
+    for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
         compute_percentile_ranks(hitter_leaderboard, stat)
 
     for row in hitter_leaderboard:
@@ -2254,6 +2415,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Hitter pitch-type leaderboard ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
+        'xBA', 'xSLG', 'xwOBA',
         'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
@@ -2290,6 +2452,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'mlbId': get_mlb_id(hitter, team),
             }
             row.update(compute_hitter_stats(pt_pitches))
+            row.update(compute_expected_stats(pt_pitches, ev_la_lookup))
             hitter_pitch_leaderboard.append(row)
 
         row_all = {
@@ -2302,6 +2465,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'mlbId': get_mlb_id(hitter, team),
         }
         row_all.update(compute_hitter_stats(pitches))
+        row_all.update(compute_expected_stats(pitches, ev_la_lookup))
         hitter_pitch_leaderboard.append(row_all)
 
         for cat_name, cat_types in PITCH_CATEGORIES.items():
@@ -2322,6 +2486,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     'mlbId': get_mlb_id(hitter, team),
                 }
                 row_cat.update(compute_hitter_stats(cat_pitches))
+                row_cat.update(compute_expected_stats(cat_pitches, ev_la_lookup))
                 hitter_pitch_leaderboard.append(row_cat)
 
     # Compute percentiles per pitch type for hitter pitch LB
@@ -2346,6 +2511,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs = {}
     # Rate stats weighted by PA
     pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'hrFbPct',
+                'xBA', 'xSLG', 'xwOBA',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
