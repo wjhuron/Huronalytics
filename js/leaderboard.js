@@ -43,7 +43,7 @@ var COLUMNS = {
     { key: 'hld',         label: 'HLD',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'tbf',         label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'counting' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(2), sortType: 'numeric', group: 'counting' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'counting' },
     // Rate stats
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
