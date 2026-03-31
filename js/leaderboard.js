@@ -9,7 +9,7 @@ var COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'usagePct',    label: 'Usage%',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', group: 'info' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(2), sortType: 'numeric', group: 'info' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'info' },
     // Metrics
     { key: 'velocity',    label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', group: 'metrics' },
