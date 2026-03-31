@@ -2463,35 +2463,24 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['sbPct'] = None
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
+    # Use ALL pitchers from boxscore data (including EP pitchers excluded from leaderboard)
     total_outs = 0
     total_er = 0
-    for r in pitcher_leaderboard:
-        ip = r.get('ip')
-        box_er = r.get('_box_er')
-        if ip is not None:
-            ip_str = str(ip)
-            if '.' in ip_str:
-                whole, frac = ip_str.split('.')
-                outs = int(whole) * 3 + int(frac)
-            else:
-                outs = int(float(ip_str)) * 3
-            total_outs += outs
-        if box_er is not None:
-            total_er += box_er
+    for box in pitcher_box.values():
+        total_outs += box.get('outs', 0)
+        total_er += box.get('er', 0)
 
     # --- Compute FIP, xFIP, SIERA ---
     FIP_CONSTANT = 3.213  # From FanGraphs Guts page (updates yearly)
 
     # Compute league HR/FB% for xFIP
     # FB includes popups (fly_ball + popup from Statcast BBType)
-    # HR from boxscore data for consistency
-    total_hr_lg = 0
+    # HR from ALL pitchers' boxscore data (including EP pitchers excluded from leaderboard)
+    total_hr_lg = sum(box['hr'] for box in pitcher_box.values())
     total_fb_lg = 0
     for row in pitcher_leaderboard:
-        box = row.get('_box')
         n_bip = row.get('nBip', 0) or 0
-        if box and n_bip > 0:
-            total_hr_lg += box['hr']
+        if n_bip > 0:
             fb_pct = row.get('fbPct') or 0
             pu_pct = row.get('puPct') or 0
             total_fb_lg += round((fb_pct + pu_pct) * n_bip)

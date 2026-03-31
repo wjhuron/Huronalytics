@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-31 16:35",
+  "generatedAt": "2026-03-31 16:44",
   "totalPitches": 18541,
   "totalPitchers": 364,
   "totalHitters": 379,
@@ -330,11 +330,11 @@
     "puPct": 0.0817,
     "hrFbPct": 0.1224,
     "count": 364,
-    "era": 4.02,
+    "era": 4.06,
     "hr9": 1.05,
     "fip": 3.97,
-    "xFIP": 3.99,
-    "siera": 3.99
+    "xFIP": 4.01,
+    "siera": 4.02
   },
   "hitterLeagueAverages": {
     "avg": 0.2326,
