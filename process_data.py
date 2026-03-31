@@ -2462,92 +2462,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['cs'] = None
                 row['sbPct'] = None
 
-    # --- Compute FIP, xFIP, SIERA ---
-    FIP_CONSTANT = 3.213  # From FanGraphs Guts page (updates yearly)
-
-    # Compute league HR/FB% for xFIP (total HR / total FB across all pitchers)
-    total_hr_lg = 0
-    total_fb_lg = 0
-    for row in pitcher_leaderboard:
-        box = row.get('_box')
-        if box and row.get('fbPct') is not None and row.get('nBip', 0) > 0:
-            total_hr_lg += box['hr']
-            total_fb_lg += round(row['fbPct'] * row['nBip'])
-    lg_hr_fb = total_hr_lg / total_fb_lg if total_fb_lg > 0 else 0.10  # fallback
-
-    for row in pitcher_leaderboard:
-        box = row.get('_box')
-        if not box:
-            row['fip'] = None
-            row['xFIP'] = None
-            row['siera'] = None
-            continue
-
-        ip_float = outs_to_ip_float(box['outs'])
-        hr = box['hr']
-        bb = box['bb']
-        hbp = box['hbp']
-        so = box['so']
-        tbf = box['tbf']
-
-        # FIP = ((13*HR)+(3*(BB+HBP))-(2*K))/IP + constant
-        if ip_float > 0:
-            row['fip'] = round(((13 * hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
-        else:
-            row['fip'] = None
-
-        # xFIP = ((13*(FB * lgHR/FB%))+(3*(BB+HBP))-(2*K))/IP + constant
-        n_bip = row.get('nBip', 0) or 0
-        fb_pct = row.get('fbPct') or 0
-        fb_count = round(fb_pct * n_bip)
-        if ip_float > 0:
-            expected_hr = fb_count * lg_hr_fb
-            row['xFIP'] = round(((13 * expected_hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
-        else:
-            row['xFIP'] = None
-
-        # SIERA = 6.145 - 16.986(SO/PA) + 11.434(BB/PA) - 1.858((GB-FB-PU)/PA)
-        #       + 7.653((SO/PA)^2) + 6.664(((GB-FB-PU)/PA)^2)
-        #       + 10.130(SO/PA)((GB-FB-PU)/PA) - 5.195(BB/PA)((GB-FB-PU)/PA)
-        gb_pct = row.get('gbPct') or 0
-        pu_pct = row.get('puPct') or 0
-        gb_count = round(gb_pct * n_bip)
-        pu_count = round(pu_pct * n_bip)
-        if tbf > 0:
-            so_pa = so / tbf
-            bb_pa = bb / tbf
-            net_gb = (gb_count - fb_count - pu_count) / tbf
-            row['siera'] = round(
-                6.145
-                - 16.986 * so_pa
-                + 11.434 * bb_pa
-                - 1.858 * net_gb
-                + 7.653 * (so_pa ** 2)
-                + 6.664 * (net_gb ** 2)
-                + 10.130 * so_pa * net_gb
-                - 5.195 * bb_pa * net_gb,
-                2
-            )
-        else:
-            row['siera'] = None
-
-        # Clean up temp field
-        del row['_box']
-
-    # Compute percentiles for boxscore-derived stats (ERA, HR/9, FIP, xFIP, SIERA)
-    # These are set AFTER the initial percentile pass, so need a second pass
-    BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
-    BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
-    for stat in BOXSCORE_PCTL_KEYS:
-        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
-    for row in pitcher_leaderboard:
-        for stat in BOXSCORE_INVERT:
-            pctl_key = stat + '_pctl'
-            if row.get(pctl_key) is not None:
-                row[pctl_key] = 100 - row[pctl_key]
-
-    # Compute ERA league average now that boxscore data is merged
-    # Use total ER (from boxscore) / total IP across all pitchers
+    # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     total_outs = 0
     total_er = 0
     for r in pitcher_leaderboard:
@@ -2563,6 +2478,125 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             total_outs += outs
         if box_er is not None:
             total_er += box_er
+
+    # --- Compute FIP, xFIP, SIERA ---
+    FIP_CONSTANT = 3.213  # From FanGraphs Guts page (updates yearly)
+
+    # Compute league HR/FB% for xFIP
+    # FB includes popups (fly_ball + popup from Statcast BBType)
+    # HR from boxscore data for consistency
+    total_hr_lg = 0
+    total_fb_lg = 0
+    for row in pitcher_leaderboard:
+        box = row.get('_box')
+        n_bip = row.get('nBip', 0) or 0
+        if box and n_bip > 0:
+            total_hr_lg += box['hr']
+            fb_pct = row.get('fbPct') or 0
+            pu_pct = row.get('puPct') or 0
+            total_fb_lg += round((fb_pct + pu_pct) * n_bip)
+    lg_hr_fb = total_hr_lg / total_fb_lg if total_fb_lg > 0 else 0.105  # fallback to historical avg
+    print(f"  League HR/FB%: {lg_hr_fb:.3f} ({total_hr_lg} HR / {total_fb_lg} FB+PU)")
+
+    # First pass: compute FIP, xFIP, and raw SIERA (without constant) for each pitcher
+    siera_ip_pairs = []  # (raw_siera, ip_float) for constant calibration
+    for row in pitcher_leaderboard:
+        box = row.get('_box')
+        if not box:
+            row['fip'] = None
+            row['xFIP'] = None
+            row['_siera_raw'] = None
+            continue
+
+        ip_float = outs_to_ip_float(box['outs'])
+        hr = box['hr']
+        bb = box['bb']
+        hbp = box['hbp']
+        so = box['so']
+        tbf = box['tbf']
+
+        # FIP = ((13*HR)+(3*(BB+HBP))-(2*K))/IP + constant
+        if ip_float > 0:
+            row['fip'] = round(((13 * hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
+        else:
+            row['fip'] = None
+
+        # xFIP: FB includes popups
+        n_bip = row.get('nBip', 0) or 0
+        fb_pct = row.get('fbPct') or 0
+        pu_pct = row.get('puPct') or 0
+        fb_count = round((fb_pct + pu_pct) * n_bip)  # fly balls + popups
+        if ip_float > 0:
+            expected_hr = fb_count * lg_hr_fb
+            row['xFIP'] = round(((13 * expected_hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
+        else:
+            row['xFIP'] = None
+
+        # SIERA (raw, without constant — constant calibrated below)
+        # netGB = GB - FB (where FB includes popups)
+        # -/+ 4.920 term: minus if GB >= FB, plus if FB > GB
+        gb_pct_val = row.get('gbPct') or 0
+        gb_count = round(gb_pct_val * n_bip)
+        if tbf > 0 and ip_float > 0:
+            so_pa = so / tbf
+            bb_pa = bb / tbf
+            net_gb_pa = (gb_count - fb_count) / tbf
+            # SP/RP ratio: fraction of IP as starter
+            gs = box.get('gs', 0) or 0
+            g = box.get('g', 1) or 1
+            ip_sp_ratio = min(gs / g, 1.0) if g > 0 else 0.0
+            # Sign for 4.920 term: minus if GB >= FB, plus if FB > GB
+            sign_4920 = -1.0 if gb_count >= fb_count else 1.0
+            raw_siera = (
+                - 15.518 * so_pa
+                + 9.146 * (so_pa ** 2)
+                + 8.648 * bb_pa
+                + 27.252 * (bb_pa ** 2)
+                - 2.298 * net_gb_pa
+                + sign_4920 * 4.920 * (net_gb_pa ** 2)
+                - 4.036 * so_pa * bb_pa
+                + 5.155 * so_pa * net_gb_pa
+                + 4.546 * bb_pa * net_gb_pa
+                + 0.367 * ip_sp_ratio
+            )
+            row['_siera_raw'] = raw_siera
+            siera_ip_pairs.append((raw_siera, ip_float))
+        else:
+            row['_siera_raw'] = None
+
+    # Calibrate SIERA constant so league-average SIERA = league-average ERA
+    # (same principle as cFIP for FIP)
+    if siera_ip_pairs and total_outs > 0:
+        total_ip_siera = sum(ip for _, ip in siera_ip_pairs)
+        weighted_raw = sum(raw * ip for raw, ip in siera_ip_pairs) / total_ip_siera if total_ip_siera > 0 else 0
+        league_era = total_er * 9 / (total_outs / 3.0) if total_outs > 0 else 4.00
+        siera_constant = league_era - weighted_raw
+    else:
+        siera_constant = 5.77  # fallback
+    print(f"  SIERA constant: {siera_constant:.3f}")
+
+    # Second pass: apply SIERA constant and clean up
+    for row in pitcher_leaderboard:
+        if row.get('_siera_raw') is not None:
+            row['siera'] = round(row['_siera_raw'] + siera_constant, 2)
+        else:
+            row['siera'] = None
+        row.pop('_siera_raw', None)
+        row.pop('_box', None)
+
+    # Compute percentiles for boxscore-derived stats (ERA, HR/9, FIP, xFIP, SIERA)
+    # These are set AFTER the initial percentile pass, so need a second pass
+    BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
+    BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
+    for stat in BOXSCORE_PCTL_KEYS:
+        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
+    for row in pitcher_leaderboard:
+        for stat in BOXSCORE_INVERT:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
+    # Compute ERA league average (total_outs and total_er computed above)
     if total_outs > 0:
         total_ip = total_outs / 3.0
         metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_ip, 2)
