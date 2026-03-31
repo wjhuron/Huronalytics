@@ -47,7 +47,7 @@
   // Tabs that show pitch type filter
   var PITCH_TYPE_TABS = {
     pitchMetrics: true, hitterPitch: true,
-    pitcherSwingDecisions: true,
+    pitcherBattedBall: true, pitcherSwingDecisions: true,
     hitterBattedBall: true, hitterSwingDecisions: true,
     hitterBatTracking: true
   };
@@ -769,7 +769,7 @@
     // When pitch types are selected, switch to pitch-level data sources
     var hasPitchTypeFilter = selectedPitchTypes.length > 0 && !(selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All');
 
-    if (currentTab === 'pitcherSwingDecisions' && hasPitchTypeFilter) {
+    if ((currentTab === 'pitcherSwingDecisions' || currentTab === 'pitcherBattedBall') && hasPitchTypeFilter) {
       dataTab = 'pitch';
     }
     if ((currentTab === 'hitterBattedBall' || currentTab === 'hitterSwingDecisions') && hasPitchTypeFilter) {
@@ -816,7 +816,8 @@
 
     Leaderboard.render(data, columns, {
       teamFilter: filters.team,
-      leagueData: leagueData
+      leagueData: leagueData,
+      pitchTypes: filters.pitchTypes
     });
     saveURLState();
   }

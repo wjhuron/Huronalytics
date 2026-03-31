@@ -2111,6 +2111,7 @@ var PlayerPage = {
     var bbTypeIdx = bipCols.indexOf('bbType');
     var eventIdx = bipCols.indexOf('event');
     var evIdx = bipCols.indexOf('exitVelo');
+    var distIdx = bipCols.indexOf('distance');
 
     var bips = microData.hitterBip;
     var filteredBips = [];
@@ -2152,7 +2153,20 @@ var PlayerPage = {
         }
       }
 
-      var pos = toCanvas(hcX, hcY);
+      // Use angle from HC_X/HC_Y but distance from Distance field when available
+      var pos;
+      var dist = distIdx >= 0 ? bip[distIdx] : null;
+      if (dist != null && dist > 0) {
+        // Compute angle from HC_X/HC_Y relative to home plate
+        var dx = hcX - HP_X;
+        var dy = HP_Y - hcY; // invert: Statcast Y increases downward
+        var angle = Math.atan2(dy, dx);
+        // Convert distance (feet) to canvas radius
+        var r = dist * fenceScale;
+        pos = [canvasHPX + r * Math.cos(angle), canvasHPY - r * Math.sin(angle)];
+      } else {
+        pos = toCanvas(hcX, hcY);
+      }
       ctx.fillStyle = color;
       ctx.globalAlpha = 0.75;
       ctx.beginPath();

@@ -38,7 +38,7 @@ PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izW
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100']
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
@@ -346,10 +346,10 @@ def compute_pitcher_batted_ball(pitches):
     hard_hit = sum(1 for v in ev_valid if v >= 95)
     hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
 
-    # Barrel rate — use Barrel column from Savant if available, else fall back to formula
-    has_barrel_col = any(str(p.get('Barrel', '')).lower() == 'yes' for p in bip)
+    # Barrel rate — use Barrel column (1-6 scale, 6=barrel) if available, else formula
+    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
     if has_barrel_col:
-        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).lower() == 'yes')
+        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
     else:
         ev_la_pairs = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
                        for p in bip
@@ -518,10 +518,10 @@ def compute_hitter_stats(pitches):
         top_quarter = sorted_evs[:max(1, len(sorted_evs) // 4)]
         ev75 = round(sum(top_quarter) / len(top_quarter), 1)
 
-    # Barrels — use Barrel column from Savant if available, else fall back to formula
-    has_barrel_col = any(str(p.get('Barrel', '')).lower() == 'yes' for p in bip)
+    # Barrels — use Barrel column (1-6 scale, 6=barrel) if available, else formula
+    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
     if has_barrel_col:
-        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).lower() == 'yes')
+        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
     else:
         ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
                      for p in bip
@@ -1001,7 +1001,8 @@ def generate_micro_data(all_pitches):
             # Barrel, hard-hit, LA sweet-spot, HR on BIP
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
-            if str(p.get('Barrel', '')).lower() == 'yes' or (not p.get('Barrel') and is_barrel(ev, la)):
+            barrel_val = str(p.get('Barrel', '')).strip()
+            if barrel_val == '6' or (barrel_val == '' and is_barrel(ev, la)):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
@@ -1072,6 +1073,7 @@ def generate_micro_data(all_pitches):
         bb_enc = BB_TYPE_ENCODE.get(bb_type, 0)
         ev_enc = EVENT_ENCODE.get(p.get('Event'), 0)
 
+        dist = safe_float(p.get('Distance'))
         hitter_bip_rows.append([
             hi_idx[batter],
             dt_idx[date],
@@ -1082,6 +1084,7 @@ def generate_micro_data(all_pitches):
             int(round(hc_y)) if hc_y is not None else None,
             bb_enc,
             ev_enc,
+            int(round(dist)) if dist is not None else None,
         ])
 
     # ==========================================================
@@ -1157,7 +1160,8 @@ def generate_micro_data(all_pitches):
 
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
-            if str(p.get('Barrel', '')).lower() == 'yes' or (not p.get('Barrel') and is_barrel(ev, la)):
+            barrel_val = str(p.get('Barrel', '')).strip()
+            if barrel_val == '6' or (barrel_val == '' and is_barrel(ev, la)):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
@@ -1267,7 +1271,7 @@ def generate_micro_data(all_pitches):
             'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip', 'ldHr',
         ],
         'hitterMicro': hitter_rows,
-        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event'],
+        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance'],
         'hitterBip': hitter_bip_rows,
         'hitterPitchCols': [
             'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',
@@ -1526,6 +1530,7 @@ def fetch_boxscore(game_pk):
                 last_first = _fullname_to_lastfirst(full_name)
             result['pitchers'].append({
                 'name': last_first,
+                'mlbId': pid,
                 'team': team_abbrev,
                 'g': 1,
                 'gs': 1 if idx == 0 else 0,
@@ -1571,6 +1576,7 @@ def fetch_boxscore(game_pk):
                 last_first = _fullname_to_lastfirst(full_name)
             result['hitters'].append({
                 'name': last_first,
+                'mlbId': pid,
                 'team': team_abbrev,
                 'g': 1,
                 'pa': batting.get('plateAppearances', 0),
@@ -1636,6 +1642,9 @@ def fetch_and_aggregate_boxscores(game_dates):
     # Aggregate across all dates that are in our game_dates set
     pitcher_agg = {}  # key: "name|team" -> accumulated stats
     hitter_agg = {}
+    # MLB ID → name|team key (for fallback matching on compound last names)
+    pitcher_id_map = {}  # mlbId -> "name|team"
+    hitter_id_map = {}
 
     for d in game_dates:
         if d not in cache:
@@ -1655,6 +1664,8 @@ def fetch_and_aggregate_boxscores(game_dates):
                 a = pitcher_agg[key]
                 for k in a:
                     a[k] += p.get(k, 0)
+                if p.get('mlbId'):
+                    pitcher_id_map[p['mlbId']] = key
 
             for h in box.get('hitters', []):
                 key = h['name'] + '|' + h['team']
@@ -1670,8 +1681,10 @@ def fetch_and_aggregate_boxscores(game_dates):
                 a = hitter_agg[key]
                 for k in a:
                     a[k] += h.get(k, 0)
+                if h.get('mlbId'):
+                    hitter_id_map[h['mlbId']] = key
 
-    return pitcher_agg, hitter_agg
+    return pitcher_agg, hitter_agg, pitcher_id_map, hitter_id_map
 
 
 def outs_to_ip_str(outs):
@@ -1799,14 +1812,26 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
     print(f"  MLB ID cache: {len(mlb_id_cache)} entries ({new_lookups} new lookups)")
 
+    # --- Exclude position players (anyone who threw EP/Eephus) ---
+    ep_pitchers = set()
+    for p in all_pitches:
+        if p.get('Pitch Type') == 'EP':
+            ep_pitchers.add((p['Pitcher'], p['PTeam']))
+    if ep_pitchers:
+        print(f"  Excluding {len(ep_pitchers)} position player(s): {', '.join(n for n, _ in ep_pitchers)}")
+
     # --- Count total pitches per pitcher (for usage%) ---
     pitcher_total = defaultdict(int)
     for p in all_pitches:
+        if (p['Pitcher'], p['PTeam']) in ep_pitchers:
+            continue
         pitcher_total[(p['Pitcher'], p['PTeam'])] += 1
 
     # --- Pitch Leaderboard: group by (Pitcher, PTeam, Pitch Type) ---
     pitch_groups = defaultdict(list)
     for p in all_pitches:
+        if (p['Pitcher'], p['PTeam']) in ep_pitchers:
+            continue
         key = (p['Pitcher'], p['PTeam'], p['Pitch Type'], p.get('Throws'))
         pitch_groups[key].append(p)
 
@@ -1847,6 +1872,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
+        # RV/100 for this pitch type
+        if row.get('runValue') is not None and row.get('count', 0) > 0:
+            row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
+        else:
+            row['rv100'] = None
         pitch_leaderboard.append(row)
 
     # --- Fit VAA ~ PlateZ regression for normalized VAA ---
@@ -1986,6 +2016,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Pitcher Leaderboard: group by (Pitcher, PTeam) ---
     pitcher_groups = defaultdict(list)
     for p in all_pitches:
+        if (p['Pitcher'], p['PTeam']) in ep_pitchers:
+            continue
         key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
@@ -2040,10 +2072,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if pk in pitch_rv_by_pitcher:
             row['runValue'] = round(pitch_rv_by_pitcher[pk], 1)
 
+    # Compute RV/100 (run value per 100 pitches) for pitcher leaderboard
+    for row in pitcher_leaderboard:
+        if row.get('runValue') is not None and row.get('count', 0) > 0:
+            row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
+        else:
+            row['rv100'] = None
+
     # Compute percentiles for pitcher leaderboard
     # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo', 'runValue']:
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + ['fbVelo', 'runValue', 'rv100']:
         compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:
@@ -2060,6 +2099,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for p in all_pitches:
         pitcher = p.get('Pitcher')
         team = p.get('PTeam')
+        if (pitcher, team) in ep_pitchers:
+            continue
         pt = p.get('Pitch Type')
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
@@ -2358,13 +2399,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     game_dates = sorted(set(normalize_date(p.get('Game Date')) for p in all_pitches if normalize_date(p.get('Game Date'))))
     if game_dates:
         print(f"\n--- Fetching boxscore data ({label}) ---")
-        pitcher_box, hitter_box = fetch_and_aggregate_boxscores(game_dates)
+        pitcher_box, hitter_box, pitcher_id_map, hitter_id_map = fetch_and_aggregate_boxscores(game_dates)
         print(f"  Boxscore pitchers: {len(pitcher_box)}, hitters: {len(hitter_box)}")
 
         # Merge pitcher boxscore stats
         for row in pitcher_leaderboard:
             key = row['pitcher'] + '|' + row['team']
             box = pitcher_box.get(key)
+            # Fallback: match by MLB ID for compound last names (e.g. "Woods Richardson" vs "Richardson")
+            if not box and row.get('mlbId'):
+                alt_key = pitcher_id_map.get(row['mlbId'])
+                if alt_key:
+                    box = pitcher_box.get(alt_key)
             if box:
                 row['g'] = box['g']
                 row['gs'] = box['gs']
@@ -2393,6 +2439,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         for row in hitter_leaderboard:
             key = row['hitter'] + '|' + row['team']
             box = hitter_box.get(key)
+            # Fallback: match by MLB ID for compound last names
+            if not box and row.get('mlbId'):
+                alt_key = hitter_id_map.get(row['mlbId'])
+                if alt_key:
+                    box = hitter_box.get(alt_key)
             if box:
                 row['g'] = box['g']
                 row['pa'] = box['pa']  # Override with official PA
@@ -2441,6 +2492,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     if total_outs > 0:
         total_ip = total_outs / 3.0
         metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_ip, 2)
+
+    # HR/9 league average — weighted by IP
+    hr9_pairs = [(r['hr9'], float(r.get('ip', 0))) for r in pitcher_leaderboard
+                 if r.get('hr9') is not None and r.get('ip') is not None and float(r['ip']) > 0]
+    if hr9_pairs:
+        total_w = sum(w for _, w in hr9_pairs)
+        metadata['pitcherLeagueAverages']['hr9'] = round(sum(v * w for v, w in hr9_pairs) / total_w, 2) if total_w > 0 else None
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,

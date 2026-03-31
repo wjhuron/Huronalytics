@@ -9,6 +9,7 @@ var COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'usagePct',    label: 'Usage%',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', group: 'info' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(2), sortType: 'numeric', group: 'info' },
     // Metrics
     { key: 'velocity',    label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', group: 'metrics' },
@@ -42,6 +43,7 @@ var COLUMNS = {
     { key: 'hld',         label: 'HLD',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'tbf',         label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'counting' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(2), sortType: 'numeric', group: 'counting' },
     // Rate stats
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
@@ -272,12 +274,27 @@ var Leaderboard = {
     return data;
   },
 
-  computeLeagueAvgRow: function (data, columns) {
+  computeLeagueAvgRow: function (data, columns, opts) {
     var avg = {};
     // Use pre-computed weighted league averages from metadata when available
     var meta = DataStore.metadata || {};
     var isPitcher = data.length > 0 && data[0].pitcher;
-    var precomputed = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
+    var overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
+    var pitchTypeAvgs = meta.leagueAverages || {};
+
+    // Determine which precomputed averages to use based on pitch type filter
+    var pitchTypes = (opts && opts.pitchTypes) || 'all';
+    var precomputed;
+    if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
+      // Single pitch type selected — use per-pitch-type averages
+      precomputed = pitchTypeAvgs[pitchTypes[0]];
+    } else if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length > 1) {
+      // Multiple pitch types — fall back to computing from filtered data
+      precomputed = {};
+    } else {
+      // All pitches — use overall averages
+      precomputed = overallAvgs;
+    }
 
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
     var ABS_AVG_KEYS = { horzBrk: true, haa: true, hra: true, relPosX: true };
@@ -465,7 +482,7 @@ var Leaderboard = {
 
       // League Average: computed from all-teams data (ignores team filter)
       var leagueAvgData = opts.leagueData || data;
-      var leagueAvgRow = this.computeLeagueAvgRow(leagueAvgData, visCols);
+      var leagueAvgRow = this.computeLeagueAvgRow(leagueAvgData, visCols, opts);
       leagueAvgRow.pitcher = 'League Avg';
       leagueAvgRow.hitter = 'League Avg';
       var leagueTr = this._createRow(leagueAvgRow, visCols, -1, isDark, true);

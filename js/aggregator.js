@@ -327,8 +327,8 @@ var Aggregator = {
 
     // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
-    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue',
-                     'era_pctl', 'hr9_pctl', 'runValue_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl'];
+    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100',
+                     'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};
     for (var bi = 0; bi < preAgg.length; bi++) {
@@ -606,6 +606,8 @@ var Aggregator = {
       if (ppre) {
         if (ppre.runValue !== undefined) rows[pmi].runValue = ppre.runValue;
         if (ppre.runValue_pctl !== undefined) rows[pmi].runValue_pctl = ppre.runValue_pctl;
+        if (ppre.rv100 !== undefined) rows[pmi].rv100 = ppre.rv100;
+        if (ppre.rv100_pctl !== undefined) rows[pmi].rv100_pctl = ppre.rv100_pctl;
       }
     }
 
