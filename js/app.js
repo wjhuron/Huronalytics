@@ -297,15 +297,10 @@
     // Hide compare button on hitter tabs
     document.getElementById('compare-btn').style.display = isHitterTab(currentTab) ? 'none' : '';
 
-    // Tab banner (e.g., bat tracking placeholder)
+    // Tab banner
     var banner = document.getElementById('tab-banner');
     if (banner) {
-      if (currentTab === 'hitterBatTracking') {
-        banner.textContent = 'Bat tracking data will be available starting in the regular season.';
-        banner.style.display = '';
-      } else {
-        banner.style.display = 'none';
-      }
+      banner.style.display = 'none';
     }
 
     // Reset range filters

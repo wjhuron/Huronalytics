@@ -423,7 +423,9 @@ var Aggregator = {
     ];
     var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ' && k !== '_plateX'; });
     var PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
-    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS);
+    var PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct'];
+    var PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
+    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -593,7 +595,7 @@ var Aggregator = {
       rows.push(obj);
     }
 
-    // Merge runValue and runValue_pctl from pre-aggregated PITCH_DATA
+    // Merge fields from pre-aggregated PITCH_DATA that aren't computed from micro counters
     var pitchPreAgg = window.PITCH_DATA || [];
     var pitchPreMap = {};
     for (var ppi = 0; ppi < pitchPreAgg.length; ppi++) {
@@ -604,10 +606,20 @@ var Aggregator = {
       var pmk = rows[pmi].pitcher + '|' + rows[pmi].team + '|' + rows[pmi].pitchType;
       var ppre = pitchPreMap[pmk];
       if (ppre) {
+        // Run value
         if (ppre.runValue !== undefined) rows[pmi].runValue = ppre.runValue;
         if (ppre.runValue_pctl !== undefined) rows[pmi].runValue_pctl = ppre.runValue_pctl;
         if (ppre.rv100 !== undefined) rows[pmi].rv100 = ppre.rv100;
         if (ppre.rv100_pctl !== undefined) rows[pmi].rv100_pctl = ppre.rv100_pctl;
+        // Plate discipline fields not in micro counters
+        if (ppre.strikePct !== undefined) rows[pmi].strikePct = ppre.strikePct;
+        if (ppre.strikePct_pctl !== undefined) rows[pmi].strikePct_pctl = ppre.strikePct_pctl;
+        if (ppre.nSwings !== undefined) rows[pmi].nSwings = ppre.nSwings;
+        // Batted ball fields (don't overwrite babip/gbPct — computed from counters)
+        for (var bbfi = 0; bbfi < PITCH_BB_KEYS.length; bbfi++) {
+          var bbf = PITCH_BB_KEYS[bbfi];
+          if (ppre[bbf] !== undefined) rows[pmi][bbf] = ppre[bbf];
+        }
       }
     }
 
@@ -641,6 +653,18 @@ var Aggregator = {
           }
         });
       }
+    }
+
+    // Invert batted ball percentiles where lower is better for pitchers
+    for (var ptBB in ptGroups) {
+      ptGroups[ptBB].forEach(function (r) {
+        for (var bbInv in PITCH_BB_INVERT) {
+          var bbPk = bbInv + '_pctl';
+          if (r[bbPk] !== null && r[bbPk] !== undefined) {
+            r[bbPk] = 100 - r[bbPk];
+          }
+        }
+      });
     }
 
     // Stuff Score
@@ -1076,12 +1100,12 @@ var Aggregator = {
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso',
       'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
-      'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
-      'pullPct', 'oppoPct',
+      'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
+      'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
     ];
     var HITTER_PITCH_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, puPct: true
     };
 
     var rows = [];
@@ -1177,8 +1201,11 @@ var Aggregator = {
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,
         hrFbPct: hrFbPct_val,
+        puPct: bip > 0 ? pu / bip : null,
         pullPct: nSpray > 0 ? pull / nSpray : null,
+        middlePct: nSpray > 0 ? center / nSpray : null,
         oppoPct: nSpray > 0 ? oppo / nSpray : null,
+        airPullPct: nSpray > 0 ? airPull / nSpray : null,
         swingPct: n_total > 0 ? swings / n_total : null,
         izSwingPct: izSwingPct,
         chasePct: chasePct_val,
