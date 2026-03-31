@@ -97,10 +97,50 @@ MLB_TEAMS = {
     'WBC',
 }
 
-# --- wOBA weights (from FanGraphs Guts page, 2024 values — update yearly) ---
-WOBA_WEIGHTS = {
-    'BB': 0.697, 'HBP': 0.729, '1B': 0.883, '2B': 1.244, '3B': 1.569, 'HR': 2.015,
+# --- wOBA weights and FIP constant — pulled live from FanGraphs Guts page ---
+WOBA_WEIGHTS = None  # set at runtime by fetch_guts_constants()
+FIP_CONSTANT = None  # set at runtime by fetch_guts_constants()
+
+
+def fetch_guts_constants(year=2026):
+    """Scrape wOBA weights and cFIP from FanGraphs Guts page."""
+    import re as _re
+    url = 'https://www.fangraphs.com/tools/guts'
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+        'Accept': 'text/html',
+    })
+    html = urllib.request.urlopen(req, timeout=15).read().decode('utf-8')
+    match = _re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, _re.DOTALL)
+    if not match:
+        raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs Guts page')
+    data = json.loads(match.group(1))
+    queries = data['props']['pageProps']['dehydratedState']['queries']
+    for q in queries:
+        rows = q.get('state', {}).get('data', [])
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'Season' in rows[0]:
+            for row in rows:
+                if row.get('Season') == year:
+                    weights = {
+                        'BB': round(row['wBB'], 3),
+                        'HBP': round(row['wHBP'], 3),
+                        '1B': round(row['w1B'], 3),
+                        '2B': round(row['w2B'], 3),
+                        '3B': round(row['w3B'], 3),
+                        'HR': round(row['wHR'], 3),
+                    }
+                    cfip = round(row['cFIP'], 3)
+                    print(f"  FanGraphs Guts {year}: wBB={weights['BB']}, wHBP={weights['HBP']}, "
+                          f"w1B={weights['1B']}, w2B={weights['2B']}, w3B={weights['3B']}, "
+                          f"wHR={weights['HR']}, cFIP={cfip}")
+                    return weights, cfip
+    raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
+
+
+WOBA_WEIGHTS_FALLBACK = {
+    'BB': 0.705, 'HBP': 0.737, '1B': 0.905, '2B': 1.291, '3B': 1.639, 'HR': 2.116,
 }
+FIP_CONSTANT_FALLBACK = 3.213
 
 # Strike zone: ball radius adjustment for "any part of ball touches zone"
 BALL_RADIUS_FT = 1.45 / 12  # 1.45 inches = ~0.121 ft
@@ -2637,7 +2677,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         total_er += box.get('er', 0)
 
     # --- Compute FIP, xFIP, SIERA ---
-    FIP_CONSTANT = 3.213  # From FanGraphs Guts page (updates yearly)
+    # FIP_CONSTANT and WOBA_WEIGHTS are set globally from FanGraphs Guts page
 
     # Compute league HR/FB% for xFIP
     # FB includes popups (fly_ball + popup from Statcast BBType)
@@ -2831,7 +2871,17 @@ def write_embedded_js(st_result, rs_result):
 
 
 def main():
+    global WOBA_WEIGHTS, FIP_CONSTANT
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    # Fetch live wOBA weights and FIP constant from FanGraphs
+    print("Fetching FanGraphs Guts constants...")
+    try:
+        WOBA_WEIGHTS, FIP_CONSTANT = fetch_guts_constants(2026)
+    except Exception as e:
+        print(f"  WARNING: Could not fetch Guts data ({e}), using fallback values")
+        WOBA_WEIGHTS = WOBA_WEIGHTS_FALLBACK.copy()
+        FIP_CONSTANT = FIP_CONSTANT_FALLBACK
 
     # Connect to Google Sheets
     print("Connecting to Google Sheets...")
