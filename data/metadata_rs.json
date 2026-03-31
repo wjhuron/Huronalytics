@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-03-31 17:59",
+  "generatedAt": "2026-03-31 18:06",
   "totalPitches": 18541,
   "totalPitchers": 364,
   "totalHitters": 379,
@@ -72,9 +72,9 @@
       "fpsPct": 0.6156,
       "breakTiltMinutes": 24,
       "breakTilt": "12:24",
-      "xBA": 0.2429,
-      "xSLG": 0.4304,
-      "xwOBA": 0.3492,
+      "xBA": 0.2494,
+      "xSLG": 0.452,
+      "xwOBA": 0.3552,
       "count": 312
     },
     "SI": {
@@ -100,9 +100,9 @@
       "fpsPct": 0.6327,
       "breakTiltMinutes": 66,
       "breakTilt": "1:06",
-      "xBA": 0.2748,
-      "xSLG": 0.3917,
-      "xwOBA": 0.3502,
+      "xBA": 0.2772,
+      "xSLG": 0.403,
+      "xwOBA": 0.3529,
       "count": 259
     },
     "SL": {
@@ -128,9 +128,9 @@
       "fpsPct": 0.6287,
       "breakTiltMinutes": 609,
       "breakTilt": "10:09",
-      "xBA": 0.1943,
-      "xSLG": 0.3087,
-      "xwOBA": 0.2579,
+      "xBA": 0.1997,
+      "xSLG": 0.333,
+      "xwOBA": 0.2651,
       "count": 217
     },
     "FS": {
@@ -156,9 +156,9 @@
       "fpsPct": 0.5454,
       "breakTiltMinutes": 137,
       "breakTilt": "2:17",
-      "xBA": 0.1786,
-      "xSLG": 0.2637,
-      "xwOBA": 0.2159,
+      "xBA": 0.1827,
+      "xSLG": 0.2609,
+      "xwOBA": 0.2138,
       "count": 60
     },
     "ST": {
@@ -184,9 +184,9 @@
       "fpsPct": 0.5865,
       "breakTiltMinutes": 574,
       "breakTilt": "9:34",
-      "xBA": 0.1659,
-      "xSLG": 0.2466,
-      "xwOBA": 0.2304,
+      "xBA": 0.1669,
+      "xSLG": 0.2547,
+      "xwOBA": 0.2354,
       "count": 168
     },
     "SV": {
@@ -212,9 +212,9 @@
       "fpsPct": 0.6337,
       "breakTiltMinutes": 454,
       "breakTilt": "7:34",
-      "xBA": 0.1913,
-      "xSLG": 0.3068,
-      "xwOBA": 0.2494,
+      "xBA": 0.1841,
+      "xSLG": 0.2844,
+      "xwOBA": 0.2488,
       "count": 26
     },
     "FC": {
@@ -240,9 +240,9 @@
       "fpsPct": 0.5781,
       "breakTiltMinutes": 708,
       "breakTilt": "11:48",
-      "xBA": 0.2518,
-      "xSLG": 0.4075,
-      "xwOBA": 0.3412,
+      "xBA": 0.2599,
+      "xSLG": 0.4397,
+      "xwOBA": 0.3539,
       "count": 128
     },
     "CH": {
@@ -268,9 +268,9 @@
       "fpsPct": 0.5635,
       "breakTiltMinutes": 104,
       "breakTilt": "1:44",
-      "xBA": 0.2135,
-      "xSLG": 0.3248,
-      "xwOBA": 0.2704,
+      "xBA": 0.2229,
+      "xSLG": 0.3387,
+      "xwOBA": 0.2749,
       "count": 203
     },
     "CU": {
@@ -296,9 +296,9 @@
       "fpsPct": 0.5193,
       "breakTiltMinutes": 391,
       "breakTilt": "6:31",
-      "xBA": 0.2171,
-      "xSLG": 0.3366,
-      "xwOBA": 0.2871,
+      "xBA": 0.2246,
+      "xSLG": 0.3458,
+      "xwOBA": 0.2913,
       "count": 141
     },
     "CF": {
@@ -324,9 +324,9 @@
       "fpsPct": 0.5957,
       "breakTiltMinutes": 717,
       "breakTilt": "11:57",
-      "xBA": 0.1665,
-      "xSLG": 0.2185,
-      "xwOBA": 0.2165,
+      "xBA": 0.1872,
+      "xSLG": 0.2284,
+      "xwOBA": 0.255,
       "count": 16
     }
   },
@@ -359,9 +359,9 @@
     "fbPct": 0.2618,
     "puPct": 0.0817,
     "hrFbPct": 0.1224,
-    "xBA": 0.2268,
-    "xSLG": 0.3612,
-    "xwOBA": 0.3075,
+    "xBA": 0.2323,
+    "xSLG": 0.3775,
+    "xwOBA": 0.3131,
     "count": 364,
     "era": 4.06,
     "hr9": 1.05,
@@ -378,9 +378,9 @@
     "babip": 0.2898,
     "kPct": 0.246,
     "bbPct": 0.0963,
-    "xBA": 0.2287,
-    "xSLG": 0.365,
-    "xwOBA": 0.3081,
+    "xBA": 0.2338,
+    "xSLG": 0.3804,
+    "xwOBA": 0.3136,
     "medEV": 90.598,
     "ev75": 103.2193,
     "maxEV": 103.9554,
