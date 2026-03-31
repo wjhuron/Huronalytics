@@ -329,7 +329,7 @@ var Aggregator = {
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
     var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100',
                      'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
-                     'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl'];
+                     'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};
     for (var bi = 0; bi < preAgg.length; bi++) {
@@ -426,8 +426,8 @@ var Aggregator = {
     var PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
     var PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct'];
     var PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
-    var PITCH_EXPECTED_KEYS = ['xBA', 'xSLG', 'xwOBA'];
-    var PITCH_EXPECTED_INVERT = { xBA: true, xSLG: true, xwOBA: true };
+    var PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
+    var PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
     var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
@@ -624,7 +624,7 @@ var Aggregator = {
           if (ppre[bbf] !== undefined) rows[pmi][bbf] = ppre[bbf];
         }
         // Expected stats
-        var xKeys = ['xBA', 'xSLG', 'xwOBA'];
+        var xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
         for (var xi = 0; xi < xKeys.length; xi++) {
           var xk = xKeys[xi];
           if (ppre[xk] !== undefined) rows[pmi][xk] = ppre[xk];
@@ -760,7 +760,7 @@ var Aggregator = {
     }
 
     var HITTER_STAT_KEYS = [
-      'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
+      'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA',
       'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -903,7 +903,7 @@ var Aggregator = {
     // Merge boxscore stats from pre-aggregated HITTER_DATA
     var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
-                      'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl'];
+                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
     for (var hbi = 0; hbi < hPreAgg.length; hbi++) {
@@ -1116,7 +1116,7 @@ var Aggregator = {
     }
 
     var HITTER_PITCH_PCTL_KEYS = [
-      'avg', 'slg', 'iso',
+      'avg', 'slg', 'iso', 'wOBA',
       'xBA', 'xSLG', 'xwOBA',
       'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -1249,7 +1249,7 @@ var Aggregator = {
       var hpk = hpPreAgg[hpi].hitter + '|' + hpPreAgg[hpi].team + '|' + hpPreAgg[hpi].pitchType;
       hpPreMap[hpk] = hpPreAgg[hpi];
     }
-    var hpXKeys = ['xBA', 'xSLG', 'xwOBA'];
+    var hpXKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
     for (var hpmi = 0; hpmi < rows.length; hpmi++) {
       var hpmk = rows[hpmi].hitter + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType;
       var hpPre = hpPreMap[hpmk];

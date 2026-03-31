@@ -12,6 +12,7 @@ var COLUMNS = {
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'info' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'info' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'info' },
+    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'info' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'info' },
     // Metrics
     { key: 'velocity',    label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
@@ -72,6 +73,7 @@ var COLUMNS = {
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'batted_ball' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'batted_ball' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'batted_ball' },
+    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'batted_ball' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'batted_ball' },
     { key: 'avgEVAgainst', label: 'Avg EV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
     { key: 'maxEVAgainst', label: 'Max EV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
@@ -116,6 +118,7 @@ var COLUMNS = {
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'ops',         label: 'OPS',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'iso',         label: 'ISO',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', group: 'stats' },
     // Expected Stats
@@ -149,6 +152,7 @@ var COLUMNS = {
     // Expected Stats
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
+    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
     // Exit Velocity
     { key: 'avgEVAll',    label: 'Avg EV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
@@ -217,6 +221,7 @@ var COLUMNS = {
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'stats' },
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'iso',         label: 'ISO',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
+    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
