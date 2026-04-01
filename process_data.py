@@ -38,7 +38,7 @@ PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izW
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'xBA', 'xSLG', 'xwOBA']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
@@ -49,7 +49,7 @@ HITTER_STAT_KEYS = [
     # Hitter Stats tab
     'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
     # Expected Stats
-    'xBA', 'xSLG', 'xwOBA',
+    'wOBA', 'xBA', 'xSLG', 'xwOBA',
     # Batted Ball tab
     'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -254,16 +254,24 @@ def avg(values):
 
 
 def compute_expected_stats(pitches):
-    """Compute xBA, xSLG, xwOBA from Statcast per-pitch xBA/xSLG/xwOBA columns.
+    """Compute wOBA, xBA, xSLG, xwOBA from pitch-level data.
 
-    Each BIP pitch has Statcast-provided xBA, xSLG, and xwOBA values.
-    Non-BIP pitches with events (K, BB, HBP) have xwOBA values too.
-    We simply average across all PA events:
-      xBA  = sum(xBA per BIP) / AB
-      xSLG = sum(xSLG per BIP) / AB
-      xwOBA = sum(xwOBA per PA) / (PA - IBB)
+    wOBA uses FanGraphs Guts linear weights applied to actual outcomes.
+    xBA/xSLG/xwOBA use Statcast per-pitch expected values from the spreadsheet.
+
+    wOBA  = (wBB×uBB + wHBP×HBP + w1B×1B + w2B×2B + w3B×3B + wHR×HR) / (AB + uBB + SF + HBP)
+    xBA   = sum(xBA per BIP) / AB
+    xSLG  = sum(xSLG per BIP) / AB
+    xwOBA = sum(xwOBA per PA) / (PA - IBB)
     """
     ab = 0
+    ubb = 0
+    hbp_count = 0
+    sf = 0
+    singles = 0
+    doubles = 0
+    triples = 0
+    hr = 0
     xba_sum = 0.0
     xslg_sum = 0.0
     xwoba_sum = 0.0
@@ -283,23 +291,49 @@ def compute_expected_stats(pitches):
             xwoba_sum += xwoba_val
             xwoba_denom += 1
 
-        # xBA and xSLG: only BIP events contribute to numerator; K/BB/HBP are in AB or excluded
-        if event in BB_EVENTS or event in HBP_EVENTS or event in SF_EVENTS:
+        # Track wOBA components
+        if event in BB_EVENTS:
+            ubb += 1
+            continue
+        elif event in HBP_EVENTS:
+            hbp_count += 1
+            continue
+        elif event in SF_EVENTS:
+            sf += 1
             continue
         elif event in SH_EVENTS or event in CI_EVENTS:
             continue
 
-        # Regular AB outcome (BIP, K, other outs)
+        # Regular AB outcome
         ab += 1
+        if event == 'Single':
+            singles += 1
+        elif event == 'Double':
+            doubles += 1
+        elif event == 'Triple':
+            triples += 1
+        elif event == 'Home Run':
+            hr += 1
+
         xba_val = safe_float(p.get('xBA'))
         xslg_val = safe_float(p.get('xSLG'))
         if xba_val is not None:
             xba_sum += xba_val
         if xslg_val is not None:
             xslg_sum += xslg_val
-        # K or BIP without tracking → 0 contribution (no xBA/xSLG value)
 
     result = {}
+
+    # wOBA from Guts weights
+    woba_denom = ab + ubb + sf + hbp_count
+    if woba_denom > 0 and WOBA_WEIGHTS:
+        woba_num = (WOBA_WEIGHTS['BB'] * ubb + WOBA_WEIGHTS['HBP'] * hbp_count +
+                    WOBA_WEIGHTS['1B'] * singles + WOBA_WEIGHTS['2B'] * doubles +
+                    WOBA_WEIGHTS['3B'] * triples + WOBA_WEIGHTS['HR'] * hr)
+        result['wOBA'] = round(woba_num / woba_denom, 3)
+    else:
+        result['wOBA'] = None
+
     result['xBA'] = round(xba_sum / ab, 3) if ab > 0 else None
     result['xSLG'] = round(xslg_sum / ab, 3) if ab > 0 else None
     result['xwOBA'] = round(xwoba_sum / xwoba_denom, 3) if xwoba_denom > 0 else None
@@ -2099,9 +2133,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 if row.get('nVAA_pctl') is not None:
                     row['nVAA_pctl'] = 100 - row['nVAA_pctl']
 
-    # Invert xBA/xSLG/xwOBA percentiles (lower is better for pitchers)
+    # Invert wOBA/xBA/xSLG/xwOBA percentiles (lower is better for pitchers)
     for row in pitch_leaderboard:
-        for stat in ('xBA', 'xSLG', 'xwOBA'):
+        for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA'):
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
@@ -2191,8 +2225,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Compute percentiles for pitcher leaderboard
     # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    EXPECTED_KEYS = ['xBA', 'xSLG', 'xwOBA']
-    EXPECTED_PITCHER_INVERT = {'xBA', 'xSLG', 'xwOBA'}  # lower is better for pitchers
+    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA']
+    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA'}  # lower is better for pitchers
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100']:
         compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
 
@@ -2376,7 +2410,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Hitter pitch-type leaderboard ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
-        'xBA', 'xSLG', 'xwOBA',
+        'wOBA', 'xBA', 'xSLG', 'xwOBA',
         'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
@@ -2472,7 +2506,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs = {}
     # Rate stats weighted by PA
     pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'hrFbPct',
-                'xBA', 'xSLG', 'xwOBA',
+                'wOBA', 'xBA', 'xSLG', 'xwOBA',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
