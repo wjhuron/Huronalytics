@@ -231,8 +231,8 @@ var Aggregator = {
     }
 
     // Convert to row objects
-    var STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
-                     'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct'];
+    var STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
+                     'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst'];
     var INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
     var rows = [];
 
@@ -425,18 +425,18 @@ var Aggregator = {
       { key: 'armAngle', sum: 'sumArmAngle', cnt: 'nArmAngle', round: 1 },
       { key: 'vaa', sum: 'sumVAA', cnt: 'nVAA', round: 2 },
       { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
-      { key: 'vra', sum: 'sumVRA', cnt: 'nVRA', round: 2 },
-      { key: 'hra', sum: 'sumHRA', cnt: 'nHRA', round: 2 },
       { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
       { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
     ];
     var METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ' && k !== '_plateX'; });
-    var PITCH_STAT_KEYS = ['izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
-    var PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct'];
+    var NO_PCTL_METRICS = { relPosZ: true, relPosX: true, extension: true, armAngle: true };
+    var METRIC_PCTL_KEYS = METRIC_KEYS_LIST.filter(function (k) { return !NO_PCTL_METRICS[k]; });
+    var PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
+    var PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct'];
     var PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     var PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
     var PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
-    var PITCH_PCTL_KEYS = METRIC_KEYS_LIST.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -657,7 +657,7 @@ var Aggregator = {
     // Invert VAA and nVAA percentiles for non-fastball pitch types
     // FF/FC: closer to 0 (e.g. -3) = red (default: higher value = higher pctl) — no inversion
     // All others: further from 0 (e.g. -10) = red (lower value = red) — invert
-    var VAA_NO_INVERT = { FF: true, FC: true };
+    var VAA_NO_INVERT = { FF: true, FC: true, CF: true };
     for (var ptV in ptGroups) {
       if (!VAA_NO_INVERT[ptV]) {
         ptGroups[ptV].forEach(function (r) {
@@ -777,14 +777,14 @@ var Aggregator = {
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA',
-      'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
-      'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
-      'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
+      'avgEVAll', 'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'hrFbPct',
+      'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
-      'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
+      'batSpeed', 'swingLength',
     ];
     var HITTER_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true
     };
 
     var rows = [];
@@ -1140,13 +1140,13 @@ var Aggregator = {
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso', 'wOBA',
       'xBA', 'xSLG', 'xwOBA',
-      'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
-      'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
-      'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
+      'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'hrFbPct',
+      'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
     ];
     var HITTER_PITCH_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, puPct: true
+      swingPct: true, chasePct: true, whiffPct: true
     };
 
     var rows = [];
