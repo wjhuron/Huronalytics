@@ -101,7 +101,7 @@ var Aggregator = {
 
   // ---- Percentile computation (replicates Python's compute_percentile_ranks) ----
   // minCount: minimum value of row[countKey] to qualify for percentile pool (0 = no threshold)
-  _computePercentiles: function (rows, metricKey, minCount, countKey) {
+  _computePercentiles: function (rows, metricKey, minCount, countKey, useAbs) {
     minCount = minCount || 0;
     countKey = countKey || 'count';
     var pctlKey = metricKey + '_pctl';
@@ -109,7 +109,8 @@ var Aggregator = {
     for (var i = 0; i < rows.length; i++) {
       if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined
           && (minCount === 0 || (rows[i][countKey] || 0) >= minCount)) {
-        valid.push({ idx: i, val: rows[i][metricKey] });
+        var rawVal = rows[i][metricKey];
+        valid.push({ idx: i, val: useAbs ? Math.abs(rawVal) : rawVal });
       }
     }
 
@@ -648,9 +649,10 @@ var Aggregator = {
 
     var self = this;
     var MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches of that type to qualify
+    var ABS_PCTL_KEYS = { horzBrk: true, haa: true };  // use |value| for cross-handedness fairness
     for (var pt in ptGroups) {
       PITCH_PCTL_KEYS.forEach(function (key) {
-        self._computePercentiles(ptGroups[pt], key, MIN_PITCH_TYPE_PCTL);
+        self._computePercentiles(ptGroups[pt], key, MIN_PITCH_TYPE_PCTL, 'count', ABS_PCTL_KEYS[key] || false);
       });
     }
 
