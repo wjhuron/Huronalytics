@@ -327,7 +327,8 @@ var Aggregator = {
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
     var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100',
                      'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
-                     'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl'];
+                     'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
+                     'armAngle'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};
     for (var bi = 0; bi < preAgg.length; bi++) {

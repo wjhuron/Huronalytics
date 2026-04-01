@@ -37,6 +37,7 @@ var COLUMNS = {
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
+    { key: 'armAngle',   label: 'Arm\u00B0',  format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'info' },
     // Counting stats (from boxscore API)
     { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'counting' },
     { key: 'gs',          label: 'GS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },

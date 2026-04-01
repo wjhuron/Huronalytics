@@ -1205,6 +1205,13 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   color: var(--text-primary);
 }
 
+.arm-angle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+}
+
 /* --- Column 1: Player Info --- */
 
 .player-card {

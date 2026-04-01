@@ -116,6 +116,7 @@ var PlayerPage = {
     { key: 'breakTilt', label: 'OTilt', format: function(v) { return v || '—'; } },
     { key: 'indVertBrk', label: 'IVB',  format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
+    { key: 'armAngle',  label: 'Arm\u00B0', format: function(v) { return v != null ? v.toFixed(1) + '\u00B0' : '—'; } },
   ],
 
   // Expanded pitch metrics table (full detail view)
@@ -479,6 +480,8 @@ var PlayerPage = {
     // Hide pitcher-only sections
     var usageSection = document.querySelector('.player-usage-section');
     if (usageSection) usageSection.style.display = 'none';
+    var aaLabel = document.getElementById('player-arm-angle');
+    if (aaLabel) aaLabel.style.display = 'none';
     // Show movement column — repurpose for spray chart
     var movementCol = document.querySelector('.player-col-movement');
     if (movementCol) movementCol.style.display = '';
@@ -1119,6 +1122,22 @@ var PlayerPage = {
     // Build movement data from filtered pitch details
     var filteredPitches = this._getFilteredDetails(data);
     if (filteredPitches.length === 0) return;
+
+    // Compute and display average arm angle
+    var aaLabel = document.getElementById('player-arm-angle');
+    if (aaLabel) {
+      var aaVals = [];
+      for (var ai = 0; ai < filteredPitches.length; ai++) {
+        if (filteredPitches[ai].aa != null) aaVals.push(filteredPitches[ai].aa);
+      }
+      if (aaVals.length > 0) {
+        var avgAA = (aaVals.reduce(function(a,b){return a+b;},0) / aaVals.length).toFixed(1);
+        aaLabel.textContent = 'Arm Angle = ' + avgAA + '\u00B0';
+        aaLabel.style.display = '';
+      } else {
+        aaLabel.style.display = 'none';
+      }
+    }
     var groups = {};
     for (var fi = 0; fi < filteredPitches.length; fi++) {
       var fp = filteredPitches[fi];
@@ -1250,13 +1269,14 @@ var PlayerPage = {
     for (var i = 0; i < pitches.length; i++) {
       var p = pitches[i];
       if (!p.pt) continue;
-      if (!byType[p.pt]) byType[p.pt] = { count: 0, velos: [], spins: [], ivbs: [], hbs: [], tiltSins: [], tiltCoss: [] };
+      if (!byType[p.pt]) byType[p.pt] = { count: 0, velos: [], spins: [], ivbs: [], hbs: [], tiltSins: [], tiltCoss: [], armAngles: [] };
       var g = byType[p.pt];
       g.count++;
       if (p.v != null) g.velos.push(p.v);
       if (p.sp != null) g.spins.push(p.sp);
       if (p.ivb != null) g.ivbs.push(p.ivb);
       if (p.hb != null) g.hbs.push(p.hb);
+      if (p.aa != null) g.armAngles.push(p.aa);
       // Tilt: convert H:MM to angle for circular mean
       if (p.tl) {
         var parts = p.tl.split(':');
@@ -1297,6 +1317,7 @@ var PlayerPage = {
         breakTilt: tiltStr,
         indVertBrk: avg(g.ivbs),
         horzBrk: avg(g.hbs),
+        armAngle: avg(g.armAngles),
       });
     }
     rows.sort(function(a, b) { return (b.usagePct || 0) - (a.usagePct || 0); });

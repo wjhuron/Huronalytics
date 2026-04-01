@@ -2163,7 +2163,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
-    PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'VAA', 'HAA', 'VRA', 'HRA']
+    PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA', 'VRA', 'HRA']
     pitcher_leaderboard = []
     for (pitcher, team, throws), pitches in pitcher_groups.items():
         row = {
@@ -2291,6 +2291,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 detail['bh'] = bh_val
             if cnt_val:
                 detail['cnt'] = cnt_val
+            aa_val = safe_float(p.get('ArmAngle'))
+            if aa_val is not None:
+                detail['aa'] = round(aa_val, 1)
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
