@@ -313,14 +313,12 @@ var Aggregator = {
         puPct: puPct_val,
       };
 
-      // Apply non-aggregator filters (except role, which needs boxscore G/GS)
-      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
       if (obj.count < (filters.minCount || 1)) continue;
       if (filters.minTbf && (obj.pa || 0) < filters.minTbf) continue;
       if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
       if (filters.minPitcherSwings && (obj.nSwings || 0) < filters.minPitcherSwings) continue;
-      if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
     }
@@ -389,6 +387,15 @@ var Aggregator = {
           rows[ri][pk] = 100 - rows[ri][pk];
         }
       }
+    }
+
+    // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    if (filters.team !== 'all') {
+      rows = rows.filter(function (r) { return r.team === filters.team; });
+    }
+    if (filters.search) {
+      var searchLower = filters.search.toLowerCase();
+      rows = rows.filter(function (r) { return r.pitcher.toLowerCase().indexOf(searchLower) !== -1; });
     }
 
     return rows;
@@ -571,8 +578,7 @@ var Aggregator = {
         obj.breakTiltMinutes = null;
       }
 
-      // Apply non-aggregator filters
-      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
       if (filters.role && filters.role !== 'all') {
         // Pitch rows don't have G/GS — look up from pitcher leaderboard
@@ -593,7 +599,6 @@ var Aggregator = {
       }
       if (filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
-      if (filters.search && obj.pitcher.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
     }
@@ -695,6 +700,15 @@ var Aggregator = {
     });
     for (var pt2 in ptGroups) {
       self._computePercentiles(ptGroups[pt2], 'stuffScore');
+    }
+
+    // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    if (filters.team !== 'all') {
+      rows = rows.filter(function (r) { return r.team === filters.team; });
+    }
+    if (filters.search) {
+      var searchLower2 = filters.search.toLowerCase();
+      rows = rows.filter(function (r) { return r.pitcher.toLowerCase().indexOf(searchLower2) !== -1; });
     }
 
     return rows;
@@ -890,12 +904,10 @@ var Aggregator = {
         whiffPct: swings > 0 ? whiffs / swings : null,
       };
 
-      // Apply non-aggregator filters
-      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
       if ((obj.pa || 0) < (filters.minCount || 1)) continue;
       if (filters.minSwings && obj.nSwings < filters.minSwings) continue;
-      if (filters.search && obj.hitter.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
     }
@@ -937,6 +949,15 @@ var Aggregator = {
           rows[ri2][pk2] = 100 - rows[ri2][pk2];
         }
       }
+    }
+
+    // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    if (filters.team !== 'all') {
+      rows = rows.filter(function (r) { return r.team === filters.team; });
+    }
+    if (filters.search) {
+      var searchLower = filters.search.toLowerCase();
+      rows = rows.filter(function (r) { return r.hitter.toLowerCase().indexOf(searchLower) !== -1; });
     }
 
     return rows;
@@ -1233,11 +1254,9 @@ var Aggregator = {
         whiffPct: swings > 0 ? whiffs / swings : null,
       };
 
-      // Apply non-aggregator filters
-      if (filters.team !== 'all' && obj.team !== filters.team) continue;
+      // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
       if (obj.count < (filters.minCount || 1)) continue;
-      if (filters.search && obj.hitter.toLowerCase().indexOf(filters.search.toLowerCase()) === -1) continue;
 
       rows.push(obj);
     }
@@ -1286,6 +1305,15 @@ var Aggregator = {
           rows[ri2][pk] = 100 - rows[ri2][pk];
         }
       }
+    }
+
+    // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    if (filters.team !== 'all') {
+      rows = rows.filter(function (r) { return r.team === filters.team; });
+    }
+    if (filters.search) {
+      var searchLower = filters.search.toLowerCase();
+      rows = rows.filter(function (r) { return r.hitter.toLowerCase().indexOf(searchLower) !== -1; });
     }
 
     return rows;
