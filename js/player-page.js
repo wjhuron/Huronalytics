@@ -762,11 +762,11 @@ var PlayerPage = {
     var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : data.hitter;
     document.getElementById('player-name').textContent = displayName;
 
-    // Bats | Team | Age (fetched from MLB API)
-    var batsLabel = data.stands === 'S' ? 'Switch' : (data.stands === 'L' ? 'Bats: L' : 'Bats: R');
+    // Bats/Throws | Team | Age (fetched from MLB API)
+    var batHand = data.stands === 'S' ? 'S' : (data.stands === 'L' ? 'L' : 'R');
     var posEl = document.getElementById('player-position');
     var ageEl = document.getElementById('player-age');
-    posEl.textContent = batsLabel + ' | ' + (data.team || '');
+    posEl.textContent = 'Bats: ' + batHand + ' | ' + (data.team || '');
     ageEl.textContent = '';
 
     if (data.mlbId) {
@@ -774,8 +774,11 @@ var PlayerPage = {
         .then(function (res) { return res.json(); })
         .then(function (json) {
           var person = json.people && json.people[0];
-          if (person && person.currentAge != null) {
-            posEl.textContent = batsLabel + ' | ' + (data.team || '') + ' | Age: ' + person.currentAge;
+          if (person) {
+            var throwHand = person.pitchHand && person.pitchHand.code ? person.pitchHand.code : '';
+            var btLabel = 'Bats/Throws: ' + batHand + '/' + throwHand;
+            var agePart = person.currentAge != null ? ' | Age: ' + person.currentAge : '';
+            posEl.textContent = btLabel + ' | ' + (data.team || '') + agePart;
           }
         })
         .catch(function () { /* silently ignore */ });
