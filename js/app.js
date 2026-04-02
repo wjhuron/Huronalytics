@@ -771,6 +771,11 @@
     };
   }
 
+  // Columns hidden when viewing ROC (AAA) team data
+  var ROC_HIDDEN_PITCHER = ['armAngle', 'runValue', 'rv100', 'xwOBA'];
+  var ROC_HIDDEN_HITTER = ['xwOBA', 'xwOBAcon', 'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings'];
+  var ALL_ROC_HIDDEN = ROC_HIDDEN_PITCHER.concat(ROC_HIDDEN_HITTER);
+
   function refresh() {
     var filters = getFilters();
     var dataTab = TAB_DATA[currentTab] || 'pitcher';
@@ -783,6 +788,37 @@
     }
     if ((currentTab === 'hitterBattedBall' || currentTab === 'hitterSwingDecisions') && hasPitchTypeFilter) {
       dataTab = 'hitterPitch';
+    }
+
+    // ROC column visibility: hide columns that have no data for AAA teams
+    var rocTeamsRefresh = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+    var isROCTeam = rocTeamsRefresh.indexOf(filters.team) !== -1;
+
+    // Clear previous ROC-specific hiding
+    ALL_ROC_HIDDEN.forEach(function (k) {
+      if (Leaderboard._rocHidden && Leaderboard._rocHidden[k]) {
+        delete Leaderboard.hiddenColumns[k];
+      }
+    });
+    Leaderboard._rocHidden = {};
+
+    if (isROCTeam) {
+      var toHide = isPitcherTab(currentTab) ? ROC_HIDDEN_PITCHER : ROC_HIDDEN_HITTER;
+      toHide.forEach(function (k) {
+        Leaderboard.hiddenColumns[k] = true;
+        Leaderboard._rocHidden[k] = true;
+      });
+    }
+
+    // Hide bat tracking tab for ROC (no bat tracking data for AAA)
+    var batTrackingTab = document.querySelector('.tab[data-tab="hitterBatTracking"]');
+    if (batTrackingTab) {
+      batTrackingTab.style.display = isROCTeam ? 'none' : '';
+    }
+    // If on bat tracking tab and ROC selected, switch to hitterStats
+    if (isROCTeam && currentTab === 'hitterBatTracking') {
+      navigateToTab('hitterStats');
+      return;
     }
 
     var data = DataStore.getFilteredDataV2(dataTab, filters);

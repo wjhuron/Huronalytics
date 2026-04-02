@@ -1645,6 +1645,22 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
 # ---- Boxscore Data ----
 
 BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'boxscore_cache.json')
+MILB_BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'milb_boxscore_cache.json')
+
+# MiLB team configuration for boxscore fetching
+# Maps leaderboard team abbreviation -> config for MLB Stats API schedule lookup
+MILB_TEAMS_CONFIG = {
+    'ROC': {
+        'sport_id': 11,        # AAA = sportId 11
+        'search_name': 'Rochester',  # Match in schedule API team names
+        'api_name': 'Rochester Red Wings',  # Full name in API
+    },
+}
+
+# Maps MLB Stats API MiLB team full name -> leaderboard abbreviation
+MILB_TEAM_NAME_TO_ABBREV = {
+    'Rochester Red Wings': 'ROC',
+}
 
 # Full team name to abbreviation (for matching boxscore team names)
 TEAM_NAME_TO_ABBREV = {
@@ -1684,6 +1700,143 @@ def load_boxscore_cache():
 def save_boxscore_cache(cache):
     with open(BOXSCORE_CACHE_PATH, 'w') as f:
         json.dump(cache, f)
+
+
+def load_milb_boxscore_cache():
+    if os.path.exists(MILB_BOXSCORE_CACHE_PATH):
+        with open(MILB_BOXSCORE_CACHE_PATH) as f:
+            return json.load(f)
+    return {}
+
+
+def save_milb_boxscore_cache(cache):
+    with open(MILB_BOXSCORE_CACHE_PATH, 'w') as f:
+        json.dump(cache, f)
+
+
+def fetch_milb_game_pks_for_date(date_str, sport_id=11, team_filter=None):
+    """Fetch MiLB game PKs for a given date, optionally filtered by team name substring."""
+    url = f"https://statsapi.mlb.com/api/v1/schedule?date={date_str}&sportId={sport_id}&gameType=R"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        game_pks = []
+        for date_data in data.get('dates', []):
+            for game in date_data.get('games', []):
+                if game.get('status', {}).get('abstractGameState') != 'Final':
+                    continue
+                if team_filter:
+                    away_name = game.get('teams', {}).get('away', {}).get('team', {}).get('name', '')
+                    home_name = game.get('teams', {}).get('home', {}).get('team', {}).get('name', '')
+                    if team_filter not in away_name and team_filter not in home_name:
+                        continue
+                game_pks.append(game['gamePk'])
+        return game_pks
+    except Exception as e:
+        print(f"    Error fetching MiLB schedule for {date_str}: {e}")
+        return []
+
+
+def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
+    """Fetch MiLB boxscores for a specific AAA team. Returns aggregated pitcher and hitter stats."""
+    config = MILB_TEAMS_CONFIG.get(team_abbrev)
+    if not config:
+        return {}, {}, {}, {}
+
+    cache = load_milb_boxscore_cache()
+    new_fetches = 0
+    cache_key_prefix = team_abbrev + '|'
+
+    import datetime as _dt
+    today = _dt.date.today().isoformat()
+    yesterday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+    recent_dates = {today, yesterday}
+
+    dates_to_fetch = []
+    for d in sorted(game_dates):
+        ck = cache_key_prefix + d
+        if ck not in cache or d in recent_dates:
+            dates_to_fetch.append(d)
+
+    if dates_to_fetch:
+        print(f"  Fetching MiLB boxscores for {team_abbrev}: {len(dates_to_fetch)} date(s): {dates_to_fetch}")
+        for d in dates_to_fetch:
+            ck = cache_key_prefix + d
+            game_pks = fetch_milb_game_pks_for_date(d, sport_id=config['sport_id'],
+                                                      team_filter=config['search_name'])
+            cache[ck] = []
+            for gpk in game_pks:
+                box = fetch_boxscore(gpk)
+                if box:
+                    cache[ck].append(box)
+                    new_fetches += 1
+                time_module.sleep(0.1)
+            time_module.sleep(0.5)
+        save_milb_boxscore_cache(cache)
+        print(f"  Fetched {new_fetches} MiLB boxscores for {team_abbrev}")
+    else:
+        print(f"  All {len(game_dates)} MiLB game dates for {team_abbrev} already cached")
+
+    # Aggregate — only include players from the target team
+    pitcher_agg = {}
+    hitter_agg = {}
+    pitcher_id_map = {}
+    hitter_id_map = {}
+
+    # Build set of accepted team names for this MiLB team
+    accepted_names = set()
+    for full_name, abbrev in MILB_TEAM_NAME_TO_ABBREV.items():
+        if abbrev == team_abbrev:
+            accepted_names.add(full_name)
+
+    for d in game_dates:
+        ck = cache_key_prefix + d
+        if ck not in cache:
+            continue
+        for box in cache[ck]:
+            for p in box.get('pitchers', []):
+                # Remap MiLB API team name to our abbreviation
+                p_team = MILB_TEAM_NAME_TO_ABBREV.get(p['team'], p['team'])
+                if p_team != team_abbrev:
+                    continue
+                key = p['name'] + '|' + team_abbrev
+                if key not in pitcher_agg:
+                    pitcher_agg[key] = {
+                        'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0,
+                        'er': 0, 'r': 0, 'h': 0, 'hr': 0, 'so': 0, 'bb': 0, 'hbp': 0, 'ibb': 0,
+                        'tbf': 0, 'pitchesThrown': 0, 'balls': 0, 'strikes': 0,
+                        'doubles': 0, 'triples': 0,
+                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0, 'airOuts': 0,
+                        'wp': 0, 'bk': 0, 'ir': 0, 'irs': 0,
+                    }
+                a = pitcher_agg[key]
+                for k in a:
+                    a[k] += p.get(k, 0)
+                if p.get('mlbId'):
+                    pitcher_id_map[p['mlbId']] = key
+
+            for h in box.get('hitters', []):
+                h_team = MILB_TEAM_NAME_TO_ABBREV.get(h['team'], h['team'])
+                if h_team != team_abbrev:
+                    continue
+                key = h['name'] + '|' + team_abbrev
+                if key not in hitter_agg:
+                    hitter_agg[key] = {
+                        'g': 0, 'pa': 0, 'ab': 0, 'h': 0, 'r': 0,
+                        'doubles': 0, 'triples': 0, 'hr': 0, 'rbi': 0,
+                        'tb': 0, 'sb': 0, 'cs': 0,
+                        'bb': 0, 'ibb': 0, 'hbp': 0, 'so': 0,
+                        'sacBunts': 0, 'sacFlies': 0,
+                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0,
+                    }
+                a = hitter_agg[key]
+                for k in a:
+                    a[k] += h.get(k, 0)
+                if h.get('mlbId'):
+                    hitter_id_map[h['mlbId']] = key
+
+    return pitcher_agg, hitter_agg, pitcher_id_map, hitter_id_map
 
 
 def fetch_game_pks_for_date(date_str):
@@ -2787,11 +2940,26 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
           f"{len(micro_data['hitterBip'])} hitter BIP records")
 
     # --- Boxscore Data: G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9 for pitchers; G, PA, AB, TB, SB, CS for hitters ---
-    game_dates = sorted(set(normalize_date(p.get('Game Date')) for p in all_pitches if normalize_date(p.get('Game Date'))))
-    if game_dates:
+    mlb_game_dates = sorted(set(normalize_date(p.get('Game Date')) for p in all_pitches
+                                if normalize_date(p.get('Game Date')) and p.get('_source', 'MLB') == 'MLB'))
+    game_dates = mlb_game_dates  # Used later for FIP/ERA calculations
+    if mlb_game_dates:
         print(f"\n--- Fetching boxscore data ({label}) ---")
-        pitcher_box, hitter_box, pitcher_id_map, hitter_id_map = fetch_and_aggregate_boxscores(game_dates)
+        pitcher_box, hitter_box, pitcher_id_map, hitter_id_map = fetch_and_aggregate_boxscores(mlb_game_dates)
         print(f"  Boxscore pitchers: {len(pitcher_box)}, hitters: {len(hitter_box)}")
+
+        # Fetch MiLB boxscores for AAA teams (ROC, etc.)
+        for milb_team in sorted(AAA_TEAMS):
+            milb_dates = sorted(set(normalize_date(p.get('Game Date')) for p in all_pitches
+                                    if normalize_date(p.get('Game Date')) and p.get('_source') in (milb_team, 'AAA')))
+            if milb_dates:
+                print(f"\n--- Fetching MiLB boxscore data for {milb_team} ({label}) ---")
+                mp, mh, mpi, mhi = fetch_and_aggregate_milb_boxscores(milb_dates, milb_team)
+                print(f"  MiLB boxscore {milb_team}: {len(mp)} pitchers, {len(mh)} hitters")
+                pitcher_box.update(mp)
+                hitter_box.update(mh)
+                pitcher_id_map.update(mpi)
+                hitter_id_map.update(mhi)
 
         # Merge pitcher boxscore stats
         for row in pitcher_leaderboard:
@@ -2854,10 +3022,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['sbPct'] = None
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
-    # Use ALL pitchers from boxscore data (including EP pitchers excluded from leaderboard)
+    # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
+    # Exclude MiLB teams from league-wide calculations
     total_outs = 0
     total_er = 0
-    for box in pitcher_box.values():
+    for box_key, box in pitcher_box.items():
+        # box_key format: "Name|TEAM" — skip MiLB teams
+        box_team = box_key.split('|')[-1] if '|' in box_key else ''
+        if box_team in AAA_TEAMS:
+            continue
         total_outs += box.get('outs', 0)
         total_er += box.get('er', 0)
 
@@ -2866,10 +3039,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # Compute league HR/FB% for xFIP
     # FB includes popups (fly_ball + popup from Statcast BBType)
-    # HR from ALL pitchers' boxscore data (including EP pitchers excluded from leaderboard)
-    total_hr_lg = sum(box['hr'] for box in pitcher_box.values())
+    # HR from ALL MLB pitchers' boxscore data (including EP pitchers excluded from leaderboard)
+    total_hr_lg = sum(box['hr'] for k, box in pitcher_box.items()
+                      if k.split('|')[-1] not in AAA_TEAMS)
     total_fb_lg = 0
     for row in pitcher_leaderboard:
+        if row.get('_isROC'):
+            continue
         n_bip = row.get('nBip', 0) or 0
         if n_bip > 0:
             fb_pct = row.get('fbPct') or 0
@@ -2940,7 +3116,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 + 0.367 * ip_sp_ratio
             )
             row['_siera_raw'] = raw_siera
-            siera_ip_pairs.append((raw_siera, ip_float))
+            if not row.get('_isROC'):
+                siera_ip_pairs.append((raw_siera, ip_float))
         else:
             row['_siera_raw'] = None
 
