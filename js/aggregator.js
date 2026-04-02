@@ -808,7 +808,7 @@ var Aggregator = {
 
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
-      'xBA', 'xSLG', 'xwOBA',
+      'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
       'avgEVAll', 'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
       'hrFbPct',
       'airPullPct',
@@ -897,6 +897,7 @@ var Aggregator = {
           sacqZoneMap[sz.spray + '|' + sz.laBin] = sz;
         }
         var sacqQuality = 0, sacqEligible = 0;
+        var xwOBAsp_sum = 0, xwOBAsp_count = 0;
         for (var sri = 0; sri < bipRecords.length; sri++) {
           var sla = bipRecords[sri][bci.launchAngle];
           var shcX = bipRecords[sri][bci.hcX];
@@ -911,9 +912,12 @@ var Aggregator = {
           if (szInfo && szInfo.count >= 20 && szInfo.woba != null) {
             sacqEligible++;
             if (szInfo.quality) sacqQuality++;
+            xwOBAsp_sum += szInfo.woba;
+            xwOBAsp_count++;
           }
         }
         sacqPct_val = sacqEligible > 0 ? sacqQuality / sacqEligible : null;
+        var xwOBAsp_val = xwOBAsp_count > 0 ? xwOBAsp_sum / xwOBAsp_count : null;
       }
 
       var hitterName = lookups.hitters[g.hitterIdx];
@@ -949,6 +953,7 @@ var Aggregator = {
         barrelPct: bip > 0 ? barrels / bip : null,
         laSweetSpotPct: laSweetSpotPct,
         sacqPct: sacqPct_val,
+        xwOBAsp: xwOBAsp_val,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,
@@ -979,7 +984,8 @@ var Aggregator = {
     // Merge boxscore stats from pre-aggregated HITTER_DATA
     var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
-                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl'];
+                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
+                      'xwOBAcon', 'xwOBAcon_pctl'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
     for (var hbi = 0; hbi < hPreAgg.length; hbi++) {

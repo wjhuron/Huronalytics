@@ -49,7 +49,7 @@ HITTER_STAT_KEYS = [
     # Hitter Stats tab
     'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
     # Expected Stats
-    'wOBA', 'xBA', 'xSLG', 'xwOBA',
+    'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
     # Batted Ball tab
     'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -254,15 +254,16 @@ def avg(values):
 
 
 def compute_expected_stats(pitches):
-    """Compute wOBA, xBA, xSLG, xwOBA from pitch-level data.
+    """Compute wOBA, xBA, xSLG, xwOBA, xwOBAcon from pitch-level data.
 
     wOBA uses FanGraphs Guts linear weights applied to actual outcomes.
     xBA/xSLG/xwOBA use Statcast per-pitch expected values from the spreadsheet.
 
-    wOBA  = (wBB×uBB + wHBP×HBP + w1B×1B + w2B×2B + w3B×3B + wHR×HR) / (AB + uBB + SF + HBP)
-    xBA   = sum(xBA per BIP) / AB
-    xSLG  = sum(xSLG per BIP) / AB
-    xwOBA = sum(xwOBA per PA) / (PA - IBB)
+    wOBA     = (wBB×uBB + wHBP×HBP + w1B×1B + w2B×2B + w3B×3B + wHR×HR) / (AB + uBB + SF + HBP)
+    xBA      = sum(xBA per BIP) / AB
+    xSLG     = sum(xSLG per BIP) / AB
+    xwOBA    = sum(xwOBA per PA) / (PA - IBB)
+    xwOBAcon = sum(xwOBA per BIP) / count(BIPs)  — contact only, no K/BB/HBP
     """
     ab = 0
     ubb = 0
@@ -276,6 +277,8 @@ def compute_expected_stats(pitches):
     xslg_sum = 0.0
     xwoba_sum = 0.0
     xwoba_denom = 0
+    xwobacon_sum = 0.0
+    xwobacon_denom = 0
 
     for p in pitches:
         event = p.get('Event')
@@ -300,6 +303,11 @@ def compute_expected_stats(pitches):
             continue
         elif event in SF_EVENTS:
             sf += 1
+            # Sac flies are BIPs — accumulate for xwOBAcon
+            xwobacon_sf = safe_float(p.get('xwOBA'))
+            if xwobacon_sf is not None:
+                xwobacon_sum += xwobacon_sf
+                xwobacon_denom += 1
             continue
         elif event in SH_EVENTS or event in CI_EVENTS:
             continue
@@ -322,6 +330,13 @@ def compute_expected_stats(pitches):
         if xslg_val is not None:
             xslg_sum += xslg_val
 
+        # xwOBAcon: only BIPs (exclude strikeouts from AB outcomes)
+        if event not in K_EVENTS:
+            xwobacon_val = safe_float(p.get('xwOBA'))
+            if xwobacon_val is not None:
+                xwobacon_sum += xwobacon_val
+                xwobacon_denom += 1
+
     result = {}
 
     # wOBA from Guts weights
@@ -337,6 +352,7 @@ def compute_expected_stats(pitches):
     result['xBA'] = round(xba_sum / ab, 3) if ab > 0 else None
     result['xSLG'] = round(xslg_sum / ab, 3) if ab > 0 else None
     result['xwOBA'] = round(xwoba_sum / xwoba_denom, 3) if xwoba_denom > 0 else None
+    result['xwOBAcon'] = round(xwobacon_sum / xwobacon_denom, 3) if xwobacon_denom > 0 else None
     return result
 
 
@@ -2447,9 +2463,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches))
 
-        # Compute SACQ% for this hitter
+        # Compute SACQ% and xwOBAsp for this hitter
         sacq_quality_bips = 0
         sacq_eligible_bips = 0
+        xwobasp_sum = 0.0
+        xwobasp_count = 0
         for p in pitches:
             bb_type = p.get('BBType')
             if not bb_type or bb_type in BUNT_BB_TYPES:
@@ -2477,7 +2495,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 sacq_eligible_bips += 1
                 if zone_info['quality']:
                     sacq_quality_bips += 1
+                # xwOBAsp: accumulate the zone's league-avg wOBA for this BIP
+                xwobasp_sum += zone_info['woba']
+                xwobasp_count += 1
         row['sacqPct'] = round(sacq_quality_bips / sacq_eligible_bips, 4) if sacq_eligible_bips > 0 else None
+        row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 
         hitter_leaderboard.append(row)
 
@@ -2616,7 +2638,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
-                 'laSweetSpotPct', 'sacqPct', 'gbPct', 'ldPct', 'fbPct', 'puPct',
+                 'laSweetSpotPct', 'sacqPct', 'xwOBAcon', 'xwOBAsp',
+                 'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     for stat in HITTER_STAT_KEYS:
         if stat in pa_stats:

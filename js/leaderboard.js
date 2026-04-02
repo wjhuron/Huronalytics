@@ -126,6 +126,7 @@ var COLUMNS = {
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
+    { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on balls in play only', group: 'expected' },
     // Counting
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
@@ -162,6 +163,8 @@ var COLUMNS = {
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
+    { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on balls in play only', group: 'expected' },
+    { key: 'xwOBAsp',    label: 'xwOBAsp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted — avg zone wOBA based on LA × spray direction', group: 'expected' },
     // Composition
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'composition' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'composition' },
