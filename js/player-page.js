@@ -24,7 +24,7 @@ var PlayerPage = {
     { key: 'xBA',             label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'avgEVAll',        label: 'Avg EV (All)',     format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'ev75',            label: 'EV75',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'hardHitPct',      label: 'Hard-Hit %',       format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPct',       label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
