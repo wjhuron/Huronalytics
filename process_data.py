@@ -1239,10 +1239,12 @@ def generate_micro_data(all_pitches):
 
         dist = safe_float(p.get('Distance'))
         woba_val = safe_float(p.get('wOBAval'))
+        bat_side = p.get('Bats') or 'R'
         hitter_bip_rows.append([
             hi_idx[batter],
             dt_idx[date],
             pitcher_hand,
+            bat_side,
             round(ev, 1) if ev is not None else None,
             round(la, 1) if la is not None else None,
             int(round(hc_x)) if hc_x is not None else None,
@@ -1441,7 +1443,7 @@ def generate_micro_data(all_pitches):
             'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip', 'ldHr',
         ],
         'hitterMicro': hitter_rows,
-        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
+        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
         'hitterBip': hitter_bip_rows,
         'hitterPitchCols': [
             'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',

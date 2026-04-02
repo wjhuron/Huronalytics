@@ -413,9 +413,11 @@ var PlayerPage = {
     this._playerGameType = DataStore.gameType || 'RS';
     this._currentData = data;
     this._sprayMode = 'all';
+    this._sprayBatSide = (data.stands === 'S') ? 'L' : null; // null = not switch hitter
     this._renderPlayerGameTypeToggle();
     this._renderHitterContent(data);
     this._bindSprayToggle();
+    this._bindSprayBatSideToggle(data);
   },
 
   _renderHitterContent: function (data) {
@@ -2180,13 +2182,15 @@ var PlayerPage = {
     var eventIdx = bipCols.indexOf('event');
     var evIdx = bipCols.indexOf('exitVelo');
     var distIdx = bipCols.indexOf('distance');
+    var batSideIdx = bipCols.indexOf('batSide');
 
     var bips = microData.hitterBip;
+    var activeSide = this._sprayBatSide; // 'L', 'R', 'both', or null
     var filteredBips = [];
     for (var bi = 0; bi < bips.length; bi++) {
-      if (bips[bi][hiIdx] === hitterIdx) {
-        filteredBips.push(bips[bi]);
-      }
+      if (bips[bi][hiIdx] !== hitterIdx) continue;
+      if (activeSide && activeSide !== 'both' && batSideIdx >= 0 && bips[bi][batSideIdx] !== activeSide) continue;
+      filteredBips.push(bips[bi]);
     }
 
     var mode = this._sprayMode || 'all';
@@ -2297,6 +2301,42 @@ var PlayerPage = {
     if (toggle) toggle.addEventListener('click', this._sprayToggleHandler);
   },
 
+  _bindSprayBatSideToggle: function (data) {
+    var self = this;
+    var isSwitch = data.stands === 'S';
+    // Show/hide bat side toggles
+    var sprayBSToggle = document.getElementById('spray-bat-side-toggle');
+    var laBSToggle = document.getElementById('la-spray-bat-side-toggle');
+    if (sprayBSToggle) sprayBSToggle.style.display = isSwitch ? '' : 'none';
+    if (laBSToggle) laBSToggle.style.display = isSwitch ? '' : 'none';
+    if (!isSwitch) return;
+
+    // Reset active buttons to match default (LHH)
+    var allBSBtns = document.querySelectorAll('#spray-bat-side-toggle .spray-toggle-btn, #la-spray-bat-side-toggle .spray-toggle-btn');
+    for (var i = 0; i < allBSBtns.length; i++) {
+      allBSBtns[i].classList.toggle('active', allBSBtns[i].getAttribute('data-side') === 'L');
+    }
+
+    this._sprayBatSideHandler = function (e) {
+      var btn = e.target.closest('.spray-toggle-btn');
+      if (!btn) return;
+      var side = btn.getAttribute('data-side');
+      if (!side || side === self._sprayBatSide) return;
+      self._sprayBatSide = side === 'both' ? 'both' : side;
+      // Sync active state on both toggles
+      var allBtns = document.querySelectorAll('#spray-bat-side-toggle .spray-toggle-btn, #la-spray-bat-side-toggle .spray-toggle-btn');
+      for (var i = 0; i < allBtns.length; i++) {
+        allBtns[i].classList.toggle('active', allBtns[i].getAttribute('data-side') === side);
+      }
+      if (self._currentData) {
+        self._renderSprayChart(self._currentData);
+        self._renderLASprayChart(self._currentData);
+      }
+    };
+    if (sprayBSToggle) sprayBSToggle.addEventListener('click', this._sprayBatSideHandler);
+    if (laBSToggle) laBSToggle.addEventListener('click', this._sprayBatSideHandler);
+  },
+
   _unbindSprayToggle: function () {
     if (this._sprayToggleHandler) {
       var el = document.getElementById('spray-toggle');
@@ -2307,6 +2347,13 @@ var PlayerPage = {
       var el2 = document.getElementById('la-spray-toggle');
       if (el2) el2.removeEventListener('click', this._laSprayToggleHandler);
       this._laSprayToggleHandler = null;
+    }
+    if (this._sprayBatSideHandler) {
+      var el3 = document.getElementById('spray-bat-side-toggle');
+      if (el3) el3.removeEventListener('click', this._sprayBatSideHandler);
+      var el4 = document.getElementById('la-spray-bat-side-toggle');
+      if (el4) el4.removeEventListener('click', this._sprayBatSideHandler);
+      this._sprayBatSideHandler = null;
     }
     if (this._laSprayChart) {
       this._laSprayChart.destroy();
@@ -2326,7 +2373,9 @@ var PlayerPage = {
     var microData = window.MICRO_DATA;
     if (!microData || !microData.hitterBip || !microData.hitterBipCols) return;
 
-    var bats = data.stands || 'R';
+    var activeSide = this._sprayBatSide; // 'L', 'R', 'both', or null (non-switch)
+    // For pull/oppo labels: use the active side filter (or data.stands for non-switch)
+    var bats = (activeSide && activeSide !== 'both') ? activeSide : (data.stands || 'R');
     var bipCols = microData.hitterBipCols;
     var hiIdx = bipCols.indexOf('hitterIdx');
     var laIdx = bipCols.indexOf('launchAngle');
@@ -2335,6 +2384,7 @@ var PlayerPage = {
     var evIdx = bipCols.indexOf('exitVelo');
     var bbTypeIdx = bipCols.indexOf('bbType');
     var eventIdx = bipCols.indexOf('event');
+    var batSideIdx = bipCols.indexOf('batSide');
 
     // Find hitter index
     var lookups = microData.lookups;
@@ -2351,6 +2401,7 @@ var PlayerPage = {
     for (var bi = 0; bi < bipData.length; bi++) {
       var row = bipData[bi];
       if (row[hiIdx] !== playerIdx) continue;
+      if (activeSide && activeSide !== 'both' && batSideIdx >= 0 && row[batSideIdx] !== activeSide) continue;
       totalBip++;
       var la = row[laIdx];
       var hcX = row[hcXIdx];
