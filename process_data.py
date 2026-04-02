@@ -1229,11 +1229,10 @@ def generate_micro_data(all_pitches):
 
         ev = safe_float(p.get('ExitVelo'))
         la = safe_float(p.get('LaunchAngle'))
-        if ev is None and la is None:
-            continue
-
         hc_x = safe_float(p.get('HC_X'))
         hc_y = safe_float(p.get('HC_Y'))
+        if ev is None and la is None and hc_x is None and hc_y is None:
+            continue
         bb_enc = BB_TYPE_ENCODE.get(bb_type, 0)
         ev_enc = EVENT_ENCODE.get(p.get('Event'), 0)
 
