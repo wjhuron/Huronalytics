@@ -2404,7 +2404,7 @@ var PlayerPage = {
           if (zone.woba == null) continue;
           var bounds = sprayBounds[zone.spray];
           if (!bounds) continue;
-          var laMin = zone.laMin != null ? zone.laMin : -15;
+          var laMin = zone.laMin != null ? zone.laMin : -20;
           var laMax = zone.laMax != null ? zone.laMax : 65;
           var x1 = xScale.getPixelForValue(bounds[0]);
           var x2 = xScale.getPixelForValue(bounds[1]);
@@ -2499,7 +2499,7 @@ var PlayerPage = {
             grid: { color: 'rgba(255,255,255,0.2)' }
           },
           y: {
-            min: -15,
+            min: -20,
             max: 60,
             title: {
               display: true,
