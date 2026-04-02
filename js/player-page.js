@@ -2080,6 +2080,9 @@ var PlayerPage = {
     ctx.closePath();
     ctx.fill();
 
+    // Scale: feet to canvas pixels (CF fence at 401ft = maxRadius)
+    var fenceScale = maxRadius / 401;
+
     // Draw infield dirt — arc at ~155ft from home (real infield dirt extends to ~150-160ft)
     var infieldRadius = 155 * fenceScale;
     ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
@@ -2098,7 +2101,6 @@ var PlayerPage = {
       { angle: -Math.PI * 3 / 8, dist: 379 },    // RF gap
       { angle: foulAngleRight, dist: 329 },       // RF
     ];
-    var fenceScale = maxRadius / 401; // normalize so CF = max radius on canvas
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 2;
     ctx.beginPath();
