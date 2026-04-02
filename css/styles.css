@@ -1680,6 +1680,40 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   width: 100% !important;
   border-radius: 8px;
 }
+.la-spray-gradient-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.la-spray-gradient-label {
+  font-size: 11px;
+  color: #999;
+  font-weight: 600;
+  margin-right: 2px;
+}
+.la-spray-gradient-low,
+.la-spray-gradient-high {
+  font-size: 10px;
+  color: #999;
+  font-family: 'JetBrains Mono', monospace;
+}
+.la-spray-gradient-bar {
+  display: inline-block;
+  width: 120px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: linear-gradient(to right,
+    rgb(8,48,107),
+    rgb(38,148,147),
+    rgb(238,228,47),
+    rgb(215,48,39));
+}
 
 .spray-legend {
   display: flex;

@@ -2364,23 +2364,44 @@ var PlayerPage = {
       pointHoverRadius: 7,
     }];
 
-    // Zone overlay plugin
+    // Zone overlay plugin — wOBA heatmap gradient
+    var SACQ_MIN_BIP = 20;
     var zonePlugin = {
       id: 'sacqZones',
       beforeDatasetsDraw: function (chart) {
         var ctx2 = chart.ctx;
         var xScale = chart.scales.x;
         var yScale = chart.scales.y;
-        // Draw quality zones as shaded rectangles
         var sprayBounds = { pull: [-45, -15], center: [-15, 15], oppo: [15, 45] };
-        // Flip pull/oppo for LHH
         if (bats === 'L') {
           sprayBounds = { pull: [15, 45], center: [-15, 15], oppo: [-45, -15] };
         }
-        var LA_BINS = Aggregator._LA_BINS;
+        // Color scale: blue (cold, low wOBA) → yellow (mid) → red (hot, high wOBA)
+        // Range: 0.0 → 0.5 → 1.0+
+        function wobaColorRGB(woba) {
+          var t = Math.max(0, Math.min(1, woba / 1.0));
+          var r, g, b;
+          if (t < 0.35) {
+            var s = t / 0.35;
+            r = Math.round(8 + s * 30);
+            g = Math.round(48 + s * 100);
+            b = Math.round(107 + s * 40);
+          } else if (t < 0.55) {
+            var s = (t - 0.35) / 0.2;
+            r = Math.round(38 + s * 200);
+            g = Math.round(148 + s * 80);
+            b = Math.round(147 - s * 100);
+          } else {
+            var s = (t - 0.55) / 0.45;
+            r = Math.round(238 - s * 23);
+            g = Math.round(228 - s * 180);
+            b = Math.round(47 - s * 8);
+          }
+          return [r, g, b];
+        }
         for (var zi = 0; zi < sacqZones.length; zi++) {
           var zone = sacqZones[zi];
-          if (!zone.quality) continue;
+          if (zone.woba == null) continue;
           var bounds = sprayBounds[zone.spray];
           if (!bounds) continue;
           var laMin = zone.laMin != null ? zone.laMin : -15;
@@ -2389,13 +2410,35 @@ var PlayerPage = {
           var x2 = xScale.getPixelForValue(bounds[1]);
           var y1 = yScale.getPixelForValue(laMax);
           var y2 = yScale.getPixelForValue(laMin);
-          ctx2.fillStyle = 'rgba(0, 212, 255, 0.08)';
+          var rgb = wobaColorRGB(zone.woba);
+          var lowSample = zone.count < SACQ_MIN_BIP;
+          // Improvement 1: stronger opacity (0.25), muted for low-sample zones (0.10)
+          var alpha = lowSample ? 0.10 : 0.25;
+          ctx2.fillStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + alpha + ')';
           ctx2.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-          ctx2.strokeStyle = 'rgba(0, 212, 255, 0.25)';
-          ctx2.lineWidth = 1;
-          ctx2.setLineDash([4, 4]);
+          // Improvement 4: diagonal hatch pattern for low-sample zones
+          if (lowSample) {
+            ctx2.save();
+            ctx2.beginPath();
+            ctx2.rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+            ctx2.clip();
+            ctx2.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx2.lineWidth = 0.5;
+            var rx = Math.min(x1, x2), ry = Math.min(y1, y2);
+            var rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+            var step = 6;
+            for (var hi = -rh; hi < rw; hi += step) {
+              ctx2.beginPath();
+              ctx2.moveTo(rx + hi, ry);
+              ctx2.lineTo(rx + hi + rh, ry + rh);
+              ctx2.stroke();
+            }
+            ctx2.restore();
+          }
+          // Improvement 3: stronger grid lines (0.15)
+          ctx2.strokeStyle = 'rgba(255,255,255,0.15)';
+          ctx2.lineWidth = 0.5;
           ctx2.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-          ctx2.setLineDash([]);
         }
       }
     };
@@ -2509,6 +2552,13 @@ var PlayerPage = {
         html += '<span class="spray-legend-item"><span class="spray-legend-dot" style="background:' +
           legendItems[li].color + '"></span>' + legendItems[li].label + '</span>';
       }
+      // Improvement 2: wOBA zone gradient legend bar
+      html += '<div class="la-spray-gradient-legend">' +
+        '<span class="la-spray-gradient-label">Zone wOBA:</span>' +
+        '<span class="la-spray-gradient-low">.000</span>' +
+        '<span class="la-spray-gradient-bar"></span>' +
+        '<span class="la-spray-gradient-high">1.000+</span>' +
+        '</div>';
       legendEl.innerHTML = html;
     }
 
