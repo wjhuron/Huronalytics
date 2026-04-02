@@ -10,8 +10,8 @@ var PlayerPage = {
     { key: 'xBA',               label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',              label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    // Stuff & command
-    { key: 'fbVelo',            label: 'Fastball Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    // Stuff & command — velo rows injected dynamically before this point
+    { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
     { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
@@ -899,7 +899,27 @@ var PlayerPage = {
     } else {
       isQualified = (data.pa || 0) >= tg * 3.1;
     }
-    var alwaysColorKeys = isPitcher ? { fbVelo: true, extension: true } : { maxEV: true };
+    var alwaysColorKeys = isPitcher ? { ffVelo: true, siVelo: true, extension: true } : { maxEV: true };
+
+    // Build dynamic velo rows for pitchers from pitch data
+    var dynamicVeloStats = [];
+    if (isPitcher) {
+      var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
+      var veloFormat = function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; };
+      for (var vi = 0; vi < pitchRows.length; vi++) {
+        var pr = pitchRows[vi];
+        if (pr.pitchType === 'FF' || pr.pitchType === 'CF') {
+          dynamicVeloStats.push({ key: 'ffVelo', label: (pr.pitchType === 'FF' ? 'Fastball' : 'Cutter') + ' Velo', format: veloFormat,
+            _val: pr.velocity, _pctl: pr.velocity_pctl });
+        }
+        if (pr.pitchType === 'SI') {
+          dynamicVeloStats.push({ key: 'siVelo', label: 'Sinker Velo', format: veloFormat,
+            _val: pr.velocity, _pctl: pr.velocity_pctl });
+        }
+      }
+      // Sort: FF/CF first, then SI
+      dynamicVeloStats.sort(function(a, b) { return a.key === 'ffVelo' ? -1 : 1; });
+    }
 
     // BIP-dependent stats that show gray when bipQual is false
     var HITTER_BIP_STATS = {
@@ -913,10 +933,22 @@ var PlayerPage = {
       xBA: true, xSLG: true, xwOBA: true
     };
 
-    for (var i = 0; i < statsDef.length; i++) {
-      var stat = statsDef[i];
-      var val = data[stat.key];
-      var pctl = data[stat.key + '_pctl'];
+    // Build effective stats list, replacing _veloPlaceholder with dynamic velo rows
+    var effectiveStats = [];
+    for (var si2 = 0; si2 < statsDef.length; si2++) {
+      if (statsDef[si2]._dynamic) {
+        for (var dv = 0; dv < dynamicVeloStats.length; dv++) {
+          effectiveStats.push(dynamicVeloStats[dv]);
+        }
+      } else {
+        effectiveStats.push(statsDef[si2]);
+      }
+    }
+
+    for (var i = 0; i < effectiveStats.length; i++) {
+      var stat = effectiveStats[i];
+      var val = stat._val !== undefined ? stat._val : data[stat.key];
+      var pctl = stat._pctl !== undefined ? stat._pctl : data[stat.key + '_pctl'];
       // BIP qualification: <20 BIP → show gray outline
       var bipStats = isPitcher ? PITCHER_BIP_STATS : HITTER_BIP_STATS;
       var bipUnqual = bipStats[stat.key] && data.bipQual === false;
@@ -998,19 +1030,8 @@ var PlayerPage = {
     var sectionLabel = document.createElement('div');
     sectionLabel.className = 'pctl-section-label';
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
-    sectionLabel.textContent = 'Pitch Run Value';
+    sectionLabel.textContent = 'Pitch Run Value / 100';
     container.appendChild(sectionLabel);
-
-    // Compute overall RV (sum of all pitch run values)
-    var overallRV = null;
-    var overallPctl = null;  // will need its own percentile eventually
-    var hasAnyRV = false;
-    for (var j = 0; j < pitchRows.length; j++) {
-      if (pitchRows[j].runValue != null) {
-        overallRV = (overallRV || 0) + pitchRows[j].runValue;
-        hasAnyRV = true;
-      }
-    }
 
     // Compute total pitches for overall RV qualifying
     var totalPitches = 0;
@@ -1089,9 +1110,9 @@ var PlayerPage = {
       return row;
     }
 
-    // Overall row (sum of all pitch RVs — positive = good for pitcher)
-    var overallDisplay = hasAnyRV ? overallRV : null;
-    container.appendChild(buildPctlRow('Overall', overallDisplay, data.runValue_pctl, null));
+    // Overall row (RV/100 — positive = good for pitcher)
+    var overallRV100 = data.rv100;
+    container.appendChild(buildPctlRow('Overall', overallRV100, data.rv100_pctl, null));
 
     // Per-pitch-type rows (fixed order)
     var PITCH_ORDER = ['FF','SI','CF','FC','SL','ST','CU','SV','CH','FS','KN'];
@@ -1104,9 +1125,8 @@ var PlayerPage = {
     });
     for (var i = 0; i < sortedPitchRows.length; i++) {
       var pitch = sortedPitchRows[i];
-      var rawRV = pitch.runValue;
-      var displayVal = rawRV;
-      var pctl = pitch.runValue_pctl;
+      var displayVal = pitch.rv100;
+      var pctl = pitch.rv100_pctl;
 
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';

@@ -2391,12 +2391,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in pitch_leaderboard:
         pt_groups[row['pitchType']].append(row)
 
-    for pt, pt_rows in pt_groups.items():
-        for metric in PITCH_PCTL_KEYS:
-            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
+    # CF pairs with FF for velocity, spin rate, VAA, HAA percentiles
+    # For these metrics, CF and FF are computed together in a combined pool
+    CF_FF_PAIRED_METRICS = {'velocity', 'spinRate', 'vaa', 'haa', 'nVAA', 'nHAA'}
+
+    for metric in PITCH_PCTL_KEYS:
+        if metric in CF_FF_PAIRED_METRICS:
+            # Combined FF+CF pool for this metric
+            ff_cf_rows = pt_groups.get('FF', []) + pt_groups.get('CF', [])
+            if ff_cf_rows:
+                compute_percentile_ranks_with_aaa(ff_cf_rows, metric, min_count=0)
+            # All other pitch types get their own pool
+            for pt, pt_rows in pt_groups.items():
+                if pt not in ('FF', 'CF'):
+                    compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
+        else:
+            for pt, pt_rows in pt_groups.items():
+                compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
 
     # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
-    VAA_NO_INVERT_TYPES = {'FF', 'FC'}
+    # CF is paired with FF for VAA, so no inversion needed for CF either
+    VAA_NO_INVERT_TYPES = {'FF', 'FC', 'CF'}
     for pt, pt_rows in pt_groups.items():
         if pt not in VAA_NO_INVERT_TYPES:
             for row in pt_rows:
