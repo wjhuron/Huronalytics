@@ -908,6 +908,7 @@ var Aggregator = {
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
       'batSpeed', 'swingLength',
+      'wRCplus', 'xWRCplus',
     ];
     var HITTER_INVERT = {
       swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true
