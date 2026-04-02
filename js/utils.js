@@ -85,22 +85,25 @@ var Utils = {
     return '#1a1a2e';
   },
 
-  // Dark mode: solid color interpolation (visible at all percentiles)
+  // Dark mode: solid color interpolation with bright midpoint and steep ramp
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
+      // Steeper ramp: square the parameter so color kicks in faster
       var t = pctl / 50;
-      // 0th = rgb(30,80,220), 50th = rgb(75,75,85) muted gray
-      r = Math.round(30 + t * 45);
-      g = Math.round(80 - t * 5);
-      b = Math.round(220 - t * 135);
+      var ease = t * t; // slow departure from blue, fast arrival at gray
+      // 0th = rgb(25,75,230), 50th = rgb(140,140,150)
+      r = Math.round(25 + ease * 115);
+      g = Math.round(75 + ease * 65);
+      b = Math.round(230 - ease * 80);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(75,75,85), 100th = rgb(210,35,30)
-      r = Math.round(75 + t * 135);
-      g = Math.round(75 - t * 40);
-      b = Math.round(85 - t * 55);
+      var ease = t * t;
+      // 50th = rgb(140,140,150), 100th = rgb(225,40,35)
+      r = Math.round(140 + ease * 85);
+      g = Math.round(140 - ease * 100);
+      b = Math.round(150 - ease * 115);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
