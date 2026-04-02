@@ -488,6 +488,11 @@ var Aggregator = {
       }
     }
 
+    // Set bipQual flag for each pitcher (BIP-dependent stats need ≥20 BIP)
+    for (var bqi = 0; bqi < rows.length; bqi++) {
+      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
+    }
+
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
     // Always exclude ROC from "All Teams" view
     var self = this;

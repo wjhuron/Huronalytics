@@ -6,17 +6,25 @@ var PlayerPage = {
 
   // Percentile stat definitions for the pitching section
   PITCHING_STATS: [
+    // Expected stats
+    { key: 'xBA',               label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xSLG',              label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    // Stuff & command
     { key: 'fbVelo',            label: 'Fastball Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'avgEVAgainst',      label: 'Avg Exit Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'chasePct',          label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'swStrPct',          label: 'Whiff%',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kPct',              label: 'K%',              format: function(v) { return Utils.formatPct(v); } },
-    { key: 'bbPct',             label: 'BB%',             format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kbbPct',            label: 'K-BB%',           format: function(v) { return Utils.formatPct(v, true); } },
-    { key: 'barrelPctAgainst',  label: 'Barrel%',         format: function(v) { return Utils.formatPct(v); } },
-    { key: 'hardHitPct',        label: 'Hard-Hit%',       format: function(v) { return Utils.formatPct(v); } },
-    { key: 'gbPct',             label: 'GB%',             format: function(v) { return Utils.formatPct(v); } },
     { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
+    { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
+    { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
+    // Results
+    { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
+    { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
+    // Contact quality
+    { key: 'avgEVAgainst',      label: 'Avg Exit Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
+    { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Percentile stat definitions for the hitting section
@@ -893,20 +901,25 @@ var PlayerPage = {
     }
     var alwaysColorKeys = isPitcher ? { fbVelo: true, extension: true } : { maxEV: true };
 
-    // BIP-dependent hitter stats that show gray when bipQual is false
+    // BIP-dependent stats that show gray when bipQual is false
     var HITTER_BIP_STATS = {
       avgEVAll: true, medEV: true, ev75: true, maxEV: true,
       hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
       xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
       babip: true, hrFbPct: true, airPullPct: true
     };
+    var PITCHER_BIP_STATS = {
+      avgEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, gbPct: true,
+      xBA: true, xSLG: true, xwOBA: true
+    };
 
     for (var i = 0; i < statsDef.length; i++) {
       var stat = statsDef[i];
       var val = data[stat.key];
       var pctl = data[stat.key + '_pctl'];
-      // BIP qualification: if hitter has <20 BIP, BIP stats show gray
-      var bipUnqual = !isPitcher && HITTER_BIP_STATS[stat.key] && data.bipQual === false;
+      // BIP qualification: <20 BIP → show gray outline
+      var bipStats = isPitcher ? PITCHER_BIP_STATS : HITTER_BIP_STATS;
+      var bipUnqual = bipStats[stat.key] && data.bipQual === false;
       var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual;
 
       var row = document.createElement('div');
