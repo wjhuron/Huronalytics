@@ -54,6 +54,7 @@ var PlayerPage = {
     { key: 'slg', label: 'SLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'ops', label: 'OPS', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
+    { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'iso', label: 'ISO', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },

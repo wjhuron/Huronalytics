@@ -3200,9 +3200,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     row['wRCplus'] = round(numerator / lg_rpa * 100)
                 else:
                     row['wRCplus'] = None
+                # xWRC+ (same formula but using xwOBA instead of wOBA)
+                xwoba = row.get('xwOBA')
+                if xwoba is not None:
+                    xwraa_per_pa = (xwoba - lg_woba) / woba_scale
+                    xnumerator = xwraa_per_pa + lg_rpa + (lg_rpa - pf * lg_rpa)
+                    row['xWRCplus'] = round(xnumerator / lg_rpa * 100) if lg_rpa > 0 else None
+                else:
+                    row['xWRCplus'] = None
             else:
                 row['wRC'] = None
                 row['wRCplus'] = None
+                row['xWRCplus'] = None
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
