@@ -104,6 +104,7 @@ ALL_TEAMS = MLB_TEAMS | AAA_TEAMS
 # --- wOBA weights and FIP constant — pulled live from FanGraphs Guts page ---
 WOBA_WEIGHTS = None  # set at runtime by fetch_guts_constants()
 FIP_CONSTANT = None  # set at runtime by fetch_guts_constants()
+GUTS_EXTRA = None    # wOBAScale, lgWOBA, lgRPA — set at runtime
 
 
 def fetch_guts_constants(year=2026):
@@ -134,10 +135,17 @@ def fetch_guts_constants(year=2026):
                         'HR': round(row['wHR'], 3),
                     }
                     cfip = round(row['cFIP'], 3)
+                    guts_extra = {
+                        'wOBAScale': round(row['wOBAScale'], 4),
+                        'lgWOBA': round(row['wOBA'], 4),
+                        'lgRPA': round(row['R/PA'], 4),
+                    }
                     print(f"  FanGraphs Guts {year}: wBB={weights['BB']}, wHBP={weights['HBP']}, "
                           f"w1B={weights['1B']}, w2B={weights['2B']}, w3B={weights['3B']}, "
                           f"wHR={weights['HR']}, cFIP={cfip}")
-                    return weights, cfip
+                    print(f"  wOBA Scale={guts_extra['wOBAScale']}, League wOBA={guts_extra['lgWOBA']}, "
+                          f"League R/PA={guts_extra['lgRPA']}")
+                    return weights, cfip, guts_extra
     raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
 
 
@@ -2788,6 +2796,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         hitter_leaderboard.append(row)
 
+    # Compute wRC for each hitter: (((wOBA - lgWOBA) / wOBAScale) + lgRPA) * PA
+    if GUTS_EXTRA:
+        woba_scale = GUTS_EXTRA['wOBAScale']
+        lg_woba = GUTS_EXTRA['lgWOBA']
+        lg_rpa = GUTS_EXTRA['lgRPA']
+        for row in hitter_leaderboard:
+            woba = row.get('wOBA')
+            pa = row.get('pa') or 0
+            if woba is not None and pa > 0 and woba_scale > 0:
+                row['wRC'] = round(((woba - lg_woba) / woba_scale + lg_rpa) * pa, 2)
+            else:
+                row['wRC'] = None
+
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 20
@@ -3338,17 +3359,18 @@ def write_embedded_js(st_result, rs_result):
 
 
 def main():
-    global WOBA_WEIGHTS, FIP_CONSTANT
+    global WOBA_WEIGHTS, FIP_CONSTANT, GUTS_EXTRA
     os.makedirs(DATA_DIR, exist_ok=True)
 
     # Fetch live wOBA weights and FIP constant from FanGraphs
     print("Fetching FanGraphs Guts constants...")
     try:
-        WOBA_WEIGHTS, FIP_CONSTANT = fetch_guts_constants(2026)
+        WOBA_WEIGHTS, FIP_CONSTANT, GUTS_EXTRA = fetch_guts_constants(2026)
     except Exception as e:
         print(f"  WARNING: Could not fetch Guts data ({e}), using fallback values")
         WOBA_WEIGHTS = WOBA_WEIGHTS_FALLBACK.copy()
         FIP_CONSTANT = FIP_CONSTANT_FALLBACK
+        GUTS_EXTRA = {'wOBAScale': 1.2982, 'lgWOBA': 0.3088, 'lgRPA': 0.1142}
 
     # Connect to Google Sheets
     print("Connecting to Google Sheets...")
