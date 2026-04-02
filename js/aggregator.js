@@ -883,7 +883,7 @@ var Aggregator = {
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
       'avgEVAll', 'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
-      'hrFbPct',
+      'gbPct', 'hrFbPct',
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
       'batSpeed', 'swingLength',
