@@ -1082,7 +1082,8 @@ var Aggregator = {
                       'doubles', 'triples', 'hr', 'xbh',
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
                       'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
-                      'xwOBAcon', 'xwOBAcon_pctl'];
+                      'xwOBAcon', 'xwOBAcon_pctl',
+                      'wRC', 'wRCplus'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
     for (var hbi = 0; hbi < hPreAgg.length; hbi++) {

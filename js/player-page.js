@@ -53,6 +53,7 @@ var PlayerPage = {
     { key: 'obp', label: 'OBP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'slg', label: 'SLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'ops', label: 'OPS', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
     { key: 'iso', label: 'ISO', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
@@ -471,7 +472,7 @@ var PlayerPage = {
     this._renderSprayChart(data);
     this._renderLASprayChart(data);
     this._renderHitterSmallStats(data);
-    this._renderHitterStatsFullTable(data);
+    this._renderHitterStatsFullTable(data, isROCPlayer);
     this._renderHitterPlateDisciplineTable(data);
     this._renderHitterBattedBallTable(data, isROCPlayer);
     if (!isROCPlayer) {
@@ -2798,7 +2799,7 @@ var PlayerPage = {
 
   // --- Hitter: Full Stats Table ---
 
-  _renderHitterStatsFullTable: function (data) {
+  _renderHitterStatsFullTable: function (data, isROC) {
     var section = document.getElementById('player-hitter-stats-section');
     var container = document.getElementById('player-hitter-stats-table');
     if (!container) return;
@@ -2807,14 +2808,19 @@ var PlayerPage = {
     if (!data) { if (section) section.style.display = 'none'; return; }
     section.style.display = '';
 
+    var cols = this.HITTER_STATS_COLS;
+    if (isROC) {
+      cols = cols.filter(function (c) { return !c.rocHide; });
+    }
+
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
 
     var thead = document.createElement('thead');
     var headerRow = document.createElement('tr');
-    for (var i = 0; i < this.HITTER_STATS_COLS.length; i++) {
+    for (var i = 0; i < cols.length; i++) {
       var th = document.createElement('th');
-      th.textContent = this.HITTER_STATS_COLS[i].label;
+      th.textContent = cols[i].label;
       headerRow.appendChild(th);
     }
     thead.appendChild(headerRow);
@@ -2822,8 +2828,8 @@ var PlayerPage = {
 
     var tbody = document.createElement('tbody');
     var tr = document.createElement('tr');
-    for (var c = 0; c < this.HITTER_STATS_COLS.length; c++) {
-      var col = this.HITTER_STATS_COLS[c];
+    for (var c = 0; c < cols.length; c++) {
+      var col = cols[c];
       var td = document.createElement('td');
       var val = data[col.key];
       td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
