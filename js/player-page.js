@@ -2080,10 +2080,10 @@ var PlayerPage = {
     ctx.closePath();
     ctx.fill();
 
-    // Draw infield dirt
+    // Draw infield dirt — arc at ~155ft from home (real infield dirt extends to ~150-160ft)
     ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
     ctx.beginPath();
-    ctx.arc(canvasHPX, canvasHPY, maxRadius * 0.28, foulAngleLeft, foulAngleRight);
+    ctx.arc(canvasHPX, canvasHPY, 155 * fenceScale, foulAngleLeft, foulAngleRight);
     ctx.lineTo(canvasHPX, canvasHPY);
     ctx.closePath();
     ctx.fill();
@@ -2121,8 +2121,8 @@ var PlayerPage = {
     ctx.lineTo(canvasHPX + maxRadius * 1.02 * Math.cos(foulAngleRight), canvasHPY + maxRadius * 1.02 * Math.sin(foulAngleRight));
     ctx.stroke();
 
-    // Draw infield diamond
-    var baseDist = maxRadius * 0.13; // approximate base distance scaled to field
+    // Draw infield diamond — 90ft between bases
+    var baseDist = 90 * fenceScale;
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
