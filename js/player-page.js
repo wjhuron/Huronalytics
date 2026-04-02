@@ -920,7 +920,7 @@ var PlayerPage = {
       for (var vi = 0; vi < pitchRows.length; vi++) {
         var pr = pitchRows[vi];
         if (pr.pitchType === 'FF' || pr.pitchType === 'CF') {
-          dynamicVeloStats.push({ key: 'ffVelo', label: (pr.pitchType === 'FF' ? 'Fastball' : 'Cutter') + ' Velo', format: veloFormat,
+          dynamicVeloStats.push({ key: 'ffVelo', label: 'Fastball Velo', format: veloFormat,
             _val: pr.velocity, _pctl: pr.velocity_pctl });
         }
         if (pr.pitchType === 'SI') {
