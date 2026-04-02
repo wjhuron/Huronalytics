@@ -2083,14 +2083,25 @@ var PlayerPage = {
     // Scale: feet to canvas pixels (CF fence at 401ft = maxRadius)
     var fenceScale = maxRadius / 401;
 
-    // Draw infield dirt — arc at ~155ft from home (real infield dirt extends to ~150-160ft)
-    var infieldRadius = 155 * fenceScale;
-    ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
+    // Draw infield dirt — 94.5ft radius circle centered on pitcher's mound (60.5ft from home)
+    // This gives a dirt boundary 155ft from home toward CF
+    var moundDist = 60.5 * fenceScale; // mound distance from home in pixels
+    var moundX = canvasHPX;
+    var moundY = canvasHPY - moundDist; // mound is straight up from home
+    var dirtRadius = 94.5 * fenceScale;
+    ctx.save();
+    // Clip to foul line wedge so dirt doesn't extend outside fair territory
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY);
-    ctx.arc(canvasHPX, canvasHPY, infieldRadius, foulAngleLeft, foulAngleRight);
+    ctx.arc(canvasHPX, canvasHPY, maxRadius, foulAngleLeft, foulAngleRight);
     ctx.closePath();
+    ctx.clip();
+    // Draw dirt circle centered on mound
+    ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
+    ctx.beginPath();
+    ctx.arc(moundX, moundY, dirtRadius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
 
     // Draw fence outline using average distances
     // Convert feet to statcast-ish units (roughly 2.5 statcast units per foot)
