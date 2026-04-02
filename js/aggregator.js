@@ -971,6 +971,7 @@ var Aggregator = {
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
       if ((obj.pa || 0) < (filters.minCount || 1)) continue;
       if (filters.minSwings && obj.nSwings < filters.minSwings) continue;
+      if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
 
       rows.push(obj);
     }

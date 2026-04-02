@@ -249,9 +249,9 @@
     document.getElementById('pitch-type-filter-group').style.display =
       PITCH_TYPE_TABS[currentTab] ? '' : 'none';
 
-    // Show/hide min swings filter (hitter tabs except hitterPitch)
+    // Show/hide min swings filter (hitter tabs except hitterPitch and hitterBattedBall)
     document.getElementById('min-swings-filter-group').style.display =
-      (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? '' : 'none';
+      (isHitterTab(currentTab) && currentTab !== 'hitterPitch' && currentTab !== 'hitterBattedBall') ? '' : 'none';
 
     // Show/hide pitcher-specific filters
     document.getElementById('min-ip-filter-group').style.display =
@@ -259,7 +259,7 @@
     document.getElementById('min-tbf-filter-group').style.display =
       currentTab === 'pitcherStats' ? '' : 'none';
     document.getElementById('min-bip-filter-group').style.display =
-      currentTab === 'pitcherBattedBall' ? '' : 'none';
+      (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall') ? '' : 'none';
     document.getElementById('min-pitcher-swings-filter-group').style.display =
       currentTab === 'pitcherSwingDecisions' ? '' : 'none';
 
@@ -748,7 +748,7 @@
       minSwings: parseInt(minSwingsInput.value) || 1,
       minIp: currentTab === 'pitcherStats' ? (parseFloat(minIpInput.value) || 0) : 0,
       minTbf: currentTab === 'pitcherStats' ? (parseInt(minTbfInput.value) || 1) : 0,
-      minBip: currentTab === 'pitcherBattedBall' ? (parseInt(minBipInput.value) || 1) : 0,
+      minBip: (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall') ? (parseInt(minBipInput.value) || 1) : 0,
       minPitcherSwings: currentTab === 'pitcherSwingDecisions' ? (parseInt(minPitcherSwingsInput.value) || 1) : 0,
       search: searchInput.value.trim(),
       dateStart: dateStartInput.value || '',

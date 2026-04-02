@@ -154,7 +154,7 @@ var DataStore = {
       if (tab === 'hitter' && filters.minSwings && row.nSwings < filters.minSwings) return false;
       if (tab === 'pitcher' && filters.minTbf && (row.pa || 0) < filters.minTbf) return false;
       if (tab === 'pitcher' && filters.minIp && (row.ip || 0) < filters.minIp) return false;
-      if (tab === 'pitcher' && filters.minBip && row.nBip != null && row.nBip < filters.minBip) return false;
+      if ((tab === 'pitcher' || tab === 'hitter') && filters.minBip && row.nBip != null && row.nBip < filters.minBip) return false;
       if (tab === 'pitcher' && filters.minPitcherSwings && row.nSwings != null && row.nSwings < filters.minPitcherSwings) return false;
       if (filters.search) {
         var name = (row.pitcher || row.hitter || '').toLowerCase();
