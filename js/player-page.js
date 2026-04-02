@@ -2416,15 +2416,28 @@ var PlayerPage = {
       return OUTCOME_COLORS[pt.event] || '#666'; // outcome (default)
     }
 
+    // EV-based dot sizing: 5px (weak) to 10px (barreled)
+    function evRadius(ev) {
+      if (ev == null) return 5;
+      if (ev < 80) return 5;
+      if (ev < 90) return 6;
+      if (ev < 95) return 7;
+      if (ev < 100) return 8;
+      if (ev < 105) return 9;
+      return 10;
+    }
+
     // Build datasets
     var pointColors = points.map(function (p) { return getPointColor(p); });
+    var pointRadii = points.map(function (p) { return evRadius(p.ev); });
+    var pointHoverRadii = pointRadii.map(function (r) { return r + 2; });
     var datasets = [{
       data: points,
       backgroundColor: pointColors,
       borderColor: 'rgba(0,0,0,0.5)',
       borderWidth: 1.5,
-      pointRadius: 6,
-      pointHoverRadius: 8,
+      pointRadius: pointRadii,
+      pointHoverRadius: pointHoverRadii,
     }];
 
     // Zone overlay plugin — wOBA heatmap gradient
@@ -2616,6 +2629,10 @@ var PlayerPage = {
         html += '<span class="spray-legend-item"><span class="spray-legend-dot" style="background:' +
           legendItems[li].color + '"></span>' + legendItems[li].label + '</span>';
       }
+      // EV → size reference
+      html += '<span class="spray-legend-item" style="margin-left:12px;">' +
+        '<span class="spray-legend-dot" style="background:#888;width:10px;height:10px;border-radius:50%;"></span>' +
+        '<span style="font-size:11px;color:var(--text-muted,#888);">Size = EV</span></span>';
       // Improvement 2: wOBA zone gradient legend bar
       html += '<div class="la-spray-gradient-legend">' +
         '<span class="la-spray-gradient-label">Zone wOBA:</span>' +
