@@ -51,7 +51,7 @@ HITTER_STAT_KEYS = [
     # Expected Stats
     'wOBA', 'xBA', 'xSLG', 'xwOBA',
     # Batted Ball tab
-    'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+    'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
@@ -1208,6 +1208,7 @@ def generate_micro_data(all_pitches):
         ev_enc = EVENT_ENCODE.get(p.get('Event'), 0)
 
         dist = safe_float(p.get('Distance'))
+        woba_val = safe_float(p.get('wOBAval'))
         hitter_bip_rows.append([
             hi_idx[batter],
             dt_idx[date],
@@ -1219,6 +1220,7 @@ def generate_micro_data(all_pitches):
             bb_enc,
             ev_enc,
             int(round(dist)) if dist is not None else None,
+            round(woba_val, 3) if woba_val is not None else None,
         ])
 
     # ==========================================================
@@ -1405,7 +1407,7 @@ def generate_micro_data(all_pitches):
             'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip', 'ldHr',
         ],
         'hitterMicro': hitter_rows,
-        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance'],
+        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
         'hitterBip': hitter_bip_rows,
         'hitterPitchCols': [
             'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',
@@ -1865,6 +1867,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'hitterLeagueAverages': {},
                 'vaaRegression': {'slope': 0, 'intercept': 0, 'leagueAvgPlateZ': 0},
                 'haaRegression': {'slope': 0, 'intercept': 0, 'leagueAvgPlateX': 0},
+                'sacqZones': [],
             },
             'micro_data': {
                 'lookups': {'pitchers': [], 'hitters': [], 'teams': [], 'dates': [], 'pitchTypes': []},
@@ -2357,6 +2360,73 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if batter and b_team and b_team in MLB_TEAMS:
             hitter_groups[(batter, b_team)].append(p)
 
+    # --- Compute SACQ zone table (league-wide LA × spray → wOBA) ---
+    LA_BINS = [(-999, 0), (0, 5), (5, 10), (10, 15), (15, 20), (20, 25),
+               (25, 30), (30, 35), (35, 40), (40, 50), (50, 999)]
+    SACQ_MIN_BIP = 20
+    SACQ_QUALITY_THRESHOLD = 0.500
+
+    # Collect all BIPs with spray + wOBA data
+    sacq_bins = {}  # (spray_dir, la_bin_idx) → {'woba_sum': float, 'woba_denom': float, 'count': int}
+    for p in all_pitches:
+        bb_type = p.get('BBType')
+        if not bb_type or bb_type in BUNT_BB_TYPES:
+            continue
+        hc_x = safe_float(p.get('HC_X'))
+        hc_y = safe_float(p.get('HC_Y'))
+        la = safe_float(p.get('LaunchAngle'))
+        woba_val = safe_float(p.get('wOBAval'))
+        woba_dom = safe_float(p.get('wOBAdom'))
+        bats = p.get('Bats')
+        if la is None or hc_x is None or hc_y is None or not bats:
+            continue
+        angle = spray_angle(hc_x, hc_y)
+        direction = spray_direction(angle, bats)
+        if not direction:
+            continue
+        # Find LA bin
+        la_bin_idx = None
+        for bi, (lo, hi) in enumerate(LA_BINS):
+            if lo <= la < hi:
+                la_bin_idx = bi
+                break
+        if la_bin_idx is None:
+            continue
+        key = (direction, la_bin_idx)
+        if key not in sacq_bins:
+            sacq_bins[key] = {'woba_sum': 0.0, 'woba_denom': 0.0, 'count': 0}
+        sacq_bins[key]['count'] += 1
+        if woba_val is not None and woba_dom is not None and woba_dom > 0:
+            sacq_bins[key]['woba_sum'] += woba_val
+            sacq_bins[key]['woba_denom'] += woba_dom
+
+    # Compute wOBA per bin, flag quality bins
+    sacq_zone_table = {}  # (spray_dir, la_bin_idx) → {'woba': float, 'quality': bool, 'count': int}
+    for key, data in sacq_bins.items():
+        woba = data['woba_sum'] / data['woba_denom'] if data['woba_denom'] > 0 else None
+        quality = (data['count'] >= SACQ_MIN_BIP and woba is not None and woba >= SACQ_QUALITY_THRESHOLD)
+        sacq_zone_table[key] = {
+            'woba': round(woba, 3) if woba is not None else None,
+            'quality': quality,
+            'count': data['count'],
+        }
+
+    # Build serializable zone data for frontend
+    sacq_zones_output = []
+    for (direction, la_bin_idx), info in sorted(sacq_zone_table.items(), key=lambda x: (x[0][0], x[0][1])):
+        lo, hi = LA_BINS[la_bin_idx]
+        sacq_zones_output.append({
+            'spray': direction,
+            'laMin': lo if lo > -999 else None,
+            'laMax': hi if hi < 999 else None,
+            'laBin': la_bin_idx,
+            'woba': info['woba'],
+            'quality': info['quality'],
+            'count': info['count'],
+        })
+    print(f"  SACQ zones: {len(sacq_zones_output)} bins, "
+          f"{sum(1 for z in sacq_zones_output if z['quality'])} quality bins")
+
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
         stands_set = set(p.get('Bats') for p in pitches if p.get('Bats'))
@@ -2376,6 +2446,39 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         }
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches))
+
+        # Compute SACQ% for this hitter
+        sacq_quality_bips = 0
+        sacq_eligible_bips = 0
+        for p in pitches:
+            bb_type = p.get('BBType')
+            if not bb_type or bb_type in BUNT_BB_TYPES:
+                continue
+            hc_x = safe_float(p.get('HC_X'))
+            hc_y = safe_float(p.get('HC_Y'))
+            la_val = safe_float(p.get('LaunchAngle'))
+            bats_val = p.get('Bats')
+            if la_val is None or hc_x is None or hc_y is None or not bats_val:
+                continue
+            angle = spray_angle(hc_x, hc_y)
+            direction = spray_direction(angle, bats_val)
+            if not direction:
+                continue
+            la_bin_idx = None
+            for bi, (lo, hi) in enumerate(LA_BINS):
+                if lo <= la_val < hi:
+                    la_bin_idx = bi
+                    break
+            if la_bin_idx is None:
+                continue
+            zone_key = (direction, la_bin_idx)
+            zone_info = sacq_zone_table.get(zone_key)
+            if zone_info and zone_info['count'] >= SACQ_MIN_BIP and zone_info['woba'] is not None:
+                sacq_eligible_bips += 1
+                if zone_info['quality']:
+                    sacq_quality_bips += 1
+        row['sacqPct'] = round(sacq_quality_bips / sacq_eligible_bips, 4) if sacq_eligible_bips > 0 else None
+
         hitter_leaderboard.append(row)
 
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
@@ -2513,7 +2616,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
-                 'laSweetSpotPct', 'gbPct', 'ldPct', 'fbPct', 'puPct',
+                 'laSweetSpotPct', 'sacqPct', 'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     for stat in HITTER_STAT_KEYS:
         if stat in pa_stats:
@@ -2548,6 +2651,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'intercept': round(haa_intercept, 6),
             'leagueAvgPlateX': round(league_avg_plateX, 6),
         },
+        'sacqZones': sacq_zones_output,
     }
 
     # --- Generate micro-aggregate data ---

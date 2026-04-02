@@ -436,6 +436,7 @@ var PlayerPage = {
     this._renderHitterRunValue(data);
     this._renderPercentiles(data, this.HITTING_STATS, true);
     this._renderSprayChart(data);
+    this._renderLASprayChart(data);
     this._renderHitterSmallStats(data);
     this._renderHitterStatsFullTable(data);
     this._renderHitterPlateDisciplineTable(data);
@@ -459,7 +460,7 @@ var PlayerPage = {
     var sprayLegend = document.getElementById('spray-legend-inline');
     if (sprayLegend) sprayLegend.style.display = 'none';
     // Hide hitter-specific sections
-    var hitterSections = ['player-spray-section', 'player-hitter-stats-section',
+    var hitterSections = ['player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section',
       'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
       'player-hitter-bat-tracking-section'];
     for (var i = 0; i < hitterSections.length; i++) {
@@ -505,7 +506,7 @@ var PlayerPage = {
     var gameLog = document.getElementById('player-game-log');
     if (gameLog) gameLog.style.display = 'none';
     // Show hitter-specific full-width sections
-    var hitterSections = ['player-hitter-stats-section',
+    var hitterSections = ['player-la-spray-section', 'player-hitter-stats-section',
       'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
       'player-hitter-bat-tracking-section'];
     for (var j = 0; j < hitterSections.length; j++) {
@@ -622,7 +623,7 @@ var PlayerPage = {
 
     // Hide new sections
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
-      'player-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
+      'player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
       'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var i = 0; i < sections.length; i++) {
       var el = document.getElementById(sections[i]);
@@ -2256,6 +2257,282 @@ var PlayerPage = {
       if (el) el.removeEventListener('click', this._sprayToggleHandler);
       this._sprayToggleHandler = null;
     }
+    if (this._laSprayToggleHandler) {
+      var el2 = document.getElementById('la-spray-toggle');
+      if (el2) el2.removeEventListener('click', this._laSprayToggleHandler);
+      this._laSprayToggleHandler = null;
+    }
+    if (this._laSprayChart) {
+      this._laSprayChart.destroy();
+      this._laSprayChart = null;
+    }
+  },
+
+  // --- Hitter: LA × Spray Scatter Plot ---
+
+  _laSprayChart: null,
+  _laSprayMode: 'outcome',
+
+  _renderLASprayChart: function (data) {
+    var canvas = document.getElementById('player-la-spray-chart');
+    if (!canvas) return;
+
+    var microData = window.MICRO_DATA;
+    if (!microData || !microData.hitterBip || !microData.hitterBipCols) return;
+
+    var bats = data.stands || 'R';
+    var bipCols = microData.hitterBipCols;
+    var hiIdx = bipCols.indexOf('hitterIdx');
+    var laIdx = bipCols.indexOf('launchAngle');
+    var hcXIdx = bipCols.indexOf('hcX');
+    var hcYIdx = bipCols.indexOf('hcY');
+    var evIdx = bipCols.indexOf('exitVelo');
+    var bbTypeIdx = bipCols.indexOf('bbType');
+    var eventIdx = bipCols.indexOf('event');
+
+    // Find hitter index
+    var lookups = microData.lookups;
+    var playerIdx = -1;
+    for (var i = 0; i < lookups.hitters.length; i++) {
+      if (lookups.hitters[i] === data.hitter) { playerIdx = i; break; }
+    }
+    if (playerIdx === -1) return;
+
+    // Collect BIP data points
+    var points = [];
+    var bipData = microData.hitterBip;
+    for (var bi = 0; bi < bipData.length; bi++) {
+      var row = bipData[bi];
+      if (row[hiIdx] !== playerIdx) continue;
+      var la = row[laIdx];
+      var hcX = row[hcXIdx];
+      var hcY = row[hcYIdx];
+      if (la == null || hcX == null || hcY == null) continue;
+      var sprayAngle = Aggregator.computeSprayAngle(hcX, hcY);
+      if (sprayAngle == null) continue;
+      points.push({
+        x: sprayAngle,
+        y: la,
+        ev: row[evIdx],
+        bbType: row[bbTypeIdx],
+        event: row[eventIdx],
+      });
+    }
+
+    // Get SACQ zones for overlay
+    var sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
+
+    var self = this;
+    var mode = this._laSprayMode;
+
+    // Color functions
+    var OUTCOME_COLORS = { 0: '#666', 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c', 5: '#999' };
+    var BBTYPE_COLORS = { 0: '#4e79a7', 1: '#59a14f', 2: '#f28e2b', 3: '#e15759' };
+
+    function evColor(ev) {
+      if (ev == null) return 'rgba(150,150,150,0.6)';
+      var t = Math.max(0, Math.min(1, (ev - 70) / 45)); // 70–115 range
+      var r, g, b;
+      if (t < 0.5) {
+        var s = t / 0.5;
+        r = Math.round(8 + (255 - 8) * s);
+        g = Math.round(48 + (255 - 48) * s);
+        b = Math.round(107 + (255 - 107) * s);
+      } else {
+        var s2 = (t - 0.5) / 0.5;
+        r = Math.round(255 + (215 - 255) * s2);
+        g = Math.round(255 + (48 - 255) * s2);
+        b = Math.round(255 + (39 - 255) * s2);
+      }
+      return 'rgba(' + r + ',' + g + ',' + b + ',0.75)';
+    }
+
+    function getPointColor(pt) {
+      if (mode === 'ev') return evColor(pt.ev);
+      if (mode === 'bbtype') return BBTYPE_COLORS[pt.bbType] || '#999';
+      return OUTCOME_COLORS[pt.event] || '#666'; // outcome (default)
+    }
+
+    // Build datasets
+    var pointColors = points.map(function (p) { return getPointColor(p); });
+    var datasets = [{
+      data: points,
+      backgroundColor: pointColors,
+      borderColor: pointColors.map(function (c) { return c.replace('0.75', '1').replace('0.6', '0.8'); }),
+      borderWidth: 1.5,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    }];
+
+    // Zone overlay plugin
+    var zonePlugin = {
+      id: 'sacqZones',
+      beforeDatasetsDraw: function (chart) {
+        var ctx2 = chart.ctx;
+        var xScale = chart.scales.x;
+        var yScale = chart.scales.y;
+        // Draw quality zones as shaded rectangles
+        var sprayBounds = { pull: [-45, -15], center: [-15, 15], oppo: [15, 45] };
+        // Flip pull/oppo for LHH
+        if (bats === 'L') {
+          sprayBounds = { pull: [15, 45], center: [-15, 15], oppo: [-45, -15] };
+        }
+        var LA_BINS = Aggregator._LA_BINS;
+        for (var zi = 0; zi < sacqZones.length; zi++) {
+          var zone = sacqZones[zi];
+          if (!zone.quality) continue;
+          var bounds = sprayBounds[zone.spray];
+          if (!bounds) continue;
+          var laMin = zone.laMin != null ? zone.laMin : -15;
+          var laMax = zone.laMax != null ? zone.laMax : 65;
+          var x1 = xScale.getPixelForValue(bounds[0]);
+          var x2 = xScale.getPixelForValue(bounds[1]);
+          var y1 = yScale.getPixelForValue(laMax);
+          var y2 = yScale.getPixelForValue(laMin);
+          ctx2.fillStyle = 'rgba(0, 212, 255, 0.08)';
+          ctx2.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+          ctx2.strokeStyle = 'rgba(0, 212, 255, 0.25)';
+          ctx2.lineWidth = 1;
+          ctx2.setLineDash([4, 4]);
+          ctx2.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+          ctx2.setLineDash([]);
+        }
+      }
+    };
+
+    // Determine pull/oppo labels based on handedness
+    var leftLabel = bats === 'L' ? 'Oppo' : 'Pull';
+    var rightLabel = bats === 'L' ? 'Pull' : 'Oppo';
+
+    // Destroy previous chart
+    if (this._laSprayChart) {
+      this._laSprayChart.destroy();
+      this._laSprayChart = null;
+    }
+
+    this._laSprayChart = new Chart(canvas, {
+      type: 'scatter',
+      data: { datasets: datasets },
+      plugins: [zonePlugin],
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 1.2,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                var pt = ctx.raw;
+                var evStr = pt.ev != null ? pt.ev.toFixed(1) + ' mph' : '—';
+                var laStr = pt.y.toFixed(1) + '°';
+                var sprayStr = pt.x.toFixed(1) + '°';
+                var evtNames = ['Out', 'Single', 'Double', 'Triple', 'HR', 'Error/FC'];
+                var result = evtNames[pt.event] || 'Out';
+                return result + ' | EV: ' + evStr + ' | LA: ' + laStr + ' | Spray: ' + sprayStr;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            min: -45,
+            max: 45,
+            title: {
+              display: true,
+              text: '← ' + leftLabel + '          Spray Angle          ' + rightLabel + ' →',
+              color: '#ccc',
+              font: { family: 'Barlow', size: 12 }
+            },
+            ticks: {
+              stepSize: 15,
+              color: '#ccc',
+              font: { family: 'Barlow', size: 11 },
+              callback: function (value) {
+                return value + '°';
+              }
+            },
+            grid: { color: 'rgba(255,255,255,0.2)' }
+          },
+          y: {
+            min: -15,
+            max: 60,
+            title: {
+              display: true,
+              text: 'Launch Angle',
+              color: '#ccc',
+              font: { family: 'Barlow', size: 12 }
+            },
+            ticks: {
+              stepSize: 10,
+              color: '#ccc',
+              font: { family: 'Barlow', size: 11 },
+              callback: function (value) {
+                return value + '°';
+              }
+            },
+            grid: { color: 'rgba(255,255,255,0.2)' }
+          }
+        }
+      }
+    });
+
+    // Render legend
+    var legendEl = document.getElementById('player-la-spray-legend');
+    if (legendEl) {
+      var legendItems = [];
+      if (mode === 'outcome') {
+        legendItems = [
+          { color: '#666', label: 'Out' },
+          { color: '#ff8c00', label: '1B' },
+          { color: '#7b68ee', label: '2B' },
+          { color: '#20b2aa', label: '3B' },
+          { color: '#dc143c', label: 'HR' },
+        ];
+      } else if (mode === 'bbtype') {
+        legendItems = [
+          { color: '#4e79a7', label: 'GB' },
+          { color: '#59a14f', label: 'LD' },
+          { color: '#f28e2b', label: 'FB' },
+          { color: '#e15759', label: 'PU' },
+        ];
+      } else if (mode === 'ev') {
+        legendItems = [
+          { color: 'rgb(8,48,107)', label: '70 mph' },
+          { color: 'rgb(255,255,255)', label: '95 mph' },
+          { color: 'rgb(215,48,39)', label: '115 mph' },
+        ];
+      }
+      var html = '';
+      for (var li = 0; li < legendItems.length; li++) {
+        html += '<span class="spray-legend-item"><span class="spray-legend-dot" style="background:' +
+          legendItems[li].color + '"></span>' + legendItems[li].label + '</span>';
+      }
+      legendEl.innerHTML = html;
+    }
+
+    // Bind toggle buttons
+    this._bindLASprayToggle(data);
+  },
+
+  _bindLASprayToggle: function (data) {
+    if (this._laSprayToggleHandler) return; // already bound
+    var self = this;
+    this._laSprayToggleHandler = function (e) {
+      var btn = e.target.closest('.spray-toggle-btn');
+      if (!btn) return;
+      var mode = btn.getAttribute('data-mode');
+      if (mode === self._laSprayMode) return;
+      self._laSprayMode = mode;
+      // Update active state only within la-spray-toggle
+      var btns = document.querySelectorAll('#la-spray-toggle .spray-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      if (self._currentData) self._renderLASprayChart(self._currentData);
+    };
+    var toggle = document.getElementById('la-spray-toggle');
+    if (toggle) toggle.addEventListener('click', this._laSprayToggleHandler);
   },
 
   // --- Hitter: Small Stats (AVG/OBP/SLG/OPS/ISO below spray chart) ---

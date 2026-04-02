@@ -60,6 +60,36 @@ var Aggregator = {
     return true;
   },
 
+  // --- Spray angle utilities for SACQ% ---
+  _HP_X: 125.42,
+  _HP_Y: 198.27,
+  _LA_BINS: [[-999,0],[0,5],[5,10],[10,15],[15,20],[20,25],[25,30],[30,35],[35,40],[40,50],[50,999]],
+
+  computeSprayAngle: function (hcX, hcY) {
+    if (hcX == null || hcY == null) return null;
+    var dx = hcX - this._HP_X;
+    var dy = this._HP_Y - hcY;
+    if (dy <= 0) return null;
+    return Math.atan2(dx, dy) * (180 / Math.PI);
+  },
+
+  sprayDirection: function (angle, bats) {
+    if (angle == null || !bats) return null;
+    if (bats === 'R') {
+      return angle < -15 ? 'pull' : (angle > 15 ? 'oppo' : 'center');
+    } else {
+      return angle > 15 ? 'pull' : (angle < -15 ? 'oppo' : 'center');
+    }
+  },
+
+  getLABinIdx: function (la) {
+    var bins = this._LA_BINS;
+    for (var i = 0; i < bins.length; i++) {
+      if (la >= bins[i][0] && la < bins[i][1]) return i;
+    }
+    return null;
+  },
+
   /**
    * Main entry: aggregate micro data for the given tab and filters.
    * Returns an array of row objects matching the pre-aggregated format.
@@ -779,7 +809,7 @@ var Aggregator = {
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA',
-      'avgEVAll', 'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'avgEVAll', 'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
       'hrFbPct',
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
@@ -857,6 +887,35 @@ var Aggregator = {
         ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
       }
 
+      // SACQ% — compute from BIP records using zone table
+      var sacqPct_val = null;
+      var sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
+      if (sacqZones.length > 0 && bipRecords.length > 0) {
+        var sacqZoneMap = {};
+        for (var szi = 0; szi < sacqZones.length; szi++) {
+          var sz = sacqZones[szi];
+          sacqZoneMap[sz.spray + '|' + sz.laBin] = sz;
+        }
+        var sacqQuality = 0, sacqEligible = 0;
+        for (var sri = 0; sri < bipRecords.length; sri++) {
+          var sla = bipRecords[sri][bci.launchAngle];
+          var shcX = bipRecords[sri][bci.hcX];
+          var shcY = bipRecords[sri][bci.hcY];
+          if (sla == null || shcX == null || shcY == null) continue;
+          var sAngle = Aggregator.computeSprayAngle(shcX, shcY);
+          var sDir = Aggregator.sprayDirection(sAngle, stands);
+          if (!sDir) continue;
+          var sLaBin = Aggregator.getLABinIdx(sla);
+          if (sLaBin == null) continue;
+          var szInfo = sacqZoneMap[sDir + '|' + sLaBin];
+          if (szInfo && szInfo.count >= 20 && szInfo.woba != null) {
+            sacqEligible++;
+            if (szInfo.quality) sacqQuality++;
+          }
+        }
+        sacqPct_val = sacqEligible > 0 ? sacqQuality / sacqEligible : null;
+      }
+
       var hitterName = lookups.hitters[g.hitterIdx];
       var hitterTeam = lookups.teams[g.teamIdx];
       var obj = {
@@ -889,6 +948,7 @@ var Aggregator = {
         hardHitPct: hardHitPct,
         barrelPct: bip > 0 ? barrels / bip : null,
         laSweetSpotPct: laSweetSpotPct,
+        sacqPct: sacqPct_val,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,

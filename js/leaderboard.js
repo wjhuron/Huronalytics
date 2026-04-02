@@ -157,6 +157,7 @@ var COLUMNS = {
     { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
     { key: 'laSweetSpotPct', label: 'Sweet-Spot%', format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
+    { key: 'sacqPct', label: 'SACQ%', format: Utils.formatPct, sortType: 'numeric', desc: 'Spray-Adjusted Contact Quality — % of BIPs in high-value LA×spray zones', group: 'quality' },
     // Expected Stats
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },

@@ -1672,6 +1672,15 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   border-radius: 8px;
 }
 
+.la-spray-chart-container {
+  max-width: 500px;
+  margin: 0 auto;
+}
+.la-spray-chart-container canvas {
+  width: 100% !important;
+  border-radius: 8px;
+}
+
 .spray-legend {
   display: flex;
   justify-content: center;
