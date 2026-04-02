@@ -318,8 +318,19 @@ var PlayerPage = {
     this._filteredData = filteredData;
     this._filteredPitchRows = filteredPitchRows;
 
-    this._renderPitchRunValues(filteredData);
-    this._renderPercentiles(filteredData, this.PITCHING_STATS, true);
+    // Check if ROC player
+    var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+    var isROCPlayer = rocTeams.indexOf(data.team) !== -1;
+
+    if (!isROCPlayer) {
+      this._renderPitchRunValues(filteredData);
+    }
+
+    var pitchingStats = this.PITCHING_STATS;
+    if (isROCPlayer) {
+      pitchingStats = pitchingStats.filter(function (s) { return !s.rocHide; });
+    }
+    this._renderPercentiles(filteredData, pitchingStats, true);
     this._renderMovementChart(data); // uses PITCH_DETAILS, already filtered
     this._renderPitchTable(data); // uses PITCH_DETAILS, already filtered
     this._renderStatsTable(filteredData);
