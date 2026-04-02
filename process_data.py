@@ -2658,7 +2658,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     SACQ_QUALITY_THRESHOLD = 0.500
 
     # Collect all BIPs with spray + wOBA data (MLB only — exclude ROC/AAA pitches)
-    sacq_bins = {}  # (spray_dir, la_bin_idx) → {'woba_sum': float, 'woba_denom': float, 'count': int}
+    sacq_bins = {}  # (spray_dir, la_bin_idx) → {'woba_sum', 'woba_denom', 'xwoba_sum', 'xwoba_count', 'count'}
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue  # Exclude ROC/AAA pitches from SACQ zone computation
@@ -2670,6 +2670,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         la = safe_float(p.get('LaunchAngle'))
         woba_val = safe_float(p.get('wOBAval'))
         woba_dom = safe_float(p.get('wOBAdom'))
+        xwoba_val = safe_float(p.get('xwOBA'))
         bats = p.get('Bats')
         if la is None or hc_x is None or hc_y is None or not bats:
             continue
@@ -2687,19 +2688,24 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             continue
         key = (direction, la_bin_idx)
         if key not in sacq_bins:
-            sacq_bins[key] = {'woba_sum': 0.0, 'woba_denom': 0.0, 'count': 0}
+            sacq_bins[key] = {'woba_sum': 0.0, 'woba_denom': 0.0, 'xwoba_sum': 0.0, 'xwoba_count': 0, 'count': 0}
         sacq_bins[key]['count'] += 1
         if woba_val is not None and woba_dom is not None and woba_dom > 0:
             sacq_bins[key]['woba_sum'] += woba_val
             sacq_bins[key]['woba_denom'] += woba_dom
+        if xwoba_val is not None:
+            sacq_bins[key]['xwoba_sum'] += xwoba_val
+            sacq_bins[key]['xwoba_count'] += 1
 
-    # Compute wOBA per bin, flag quality bins
-    sacq_zone_table = {}  # (spray_dir, la_bin_idx) → {'woba': float, 'quality': bool, 'count': int}
+    # Compute wOBA and xwOBAcon per bin, flag quality bins
+    sacq_zone_table = {}
     for key, data in sacq_bins.items():
         woba = data['woba_sum'] / data['woba_denom'] if data['woba_denom'] > 0 else None
+        xwobacon = data['xwoba_sum'] / data['xwoba_count'] if data['xwoba_count'] > 0 else None
         quality = (data['count'] >= SACQ_MIN_BIP and woba is not None and woba >= SACQ_QUALITY_THRESHOLD)
         sacq_zone_table[key] = {
             'woba': round(woba, 3) if woba is not None else None,
+            'xwobacon': round(xwobacon, 3) if xwobacon is not None else None,
             'quality': quality,
             'count': data['count'],
         }
@@ -2714,6 +2720,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'laMax': hi if hi < 999 else None,
             'laBin': la_bin_idx,
             'woba': info['woba'],
+            'xwobacon': info['xwobacon'],
             'quality': info['quality'],
             'count': info['count'],
         })

@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-02 21:37",
+  "generatedAt": "2026-04-02 17:55",
   "totalPitches": 27266,
   "totalPitchers": 397,
   "totalHitters": 386,
@@ -206,7 +206,7 @@
       "relPosZ": 5.71,
       "relPosX": -1.51,
       "extension": 6.43,
-      "armAngle": 35.36,
+      "armAngle": 35.35,
       "vaa": -8.93,
       "haa": 3.02,
       "vra": -0.53,
@@ -318,7 +318,7 @@
       "velocity": 93.35,
       "spinRate": 2466.07,
       "indVertBrk": 13.61,
-      "horzBrk": -0.09,
+      "horzBrk": -0.08,
       "relPosZ": 5.86,
       "relPosX": -0.25,
       "extension": 6.54,
@@ -358,15 +358,15 @@
     "kbbPct": 0.1528,
     "babip": 0.2836,
     "fpsPct": 0.6006,
-    "relPosZ": 5.6633,
+    "relPosZ": 5.6632,
     "relPosX": -0.6482,
     "extension": 6.4454,
-    "armAngle": 37.6179,
+    "armAngle": 37.6174,
     "vaa": -6.4516,
     "haa": 0.6418,
     "vra": -1.5633,
     "hra": 0.9201,
-    "avgEVAgainst": 88.906,
+    "avgEVAgainst": 88.9066,
     "maxEVAgainst": 106.6938,
     "hardHitPct": 0.3961,
     "barrelPctAgainst": 0.0816,
@@ -400,9 +400,9 @@
     "xwOBA": 0.3114,
     "xwOBAcon": 0.3657,
     "xwOBAsp": 0.3689,
-    "avgEVAll": 88.9076,
-    "medEV": 90.7142,
-    "ev75": 103.837,
+    "avgEVAll": 88.9082,
+    "medEV": 90.7143,
+    "ev75": 103.8375,
     "maxEV": 105.2764,
     "medLA": 13.963,
     "hardHitPct": 0.3967,
@@ -425,11 +425,11 @@
     "contactPct": 0.7288,
     "izContactPct": 0.8202,
     "whiffPct": 0.2712,
-    "batSpeed": 71.0553,
-    "swingLength": 7.294,
-    "attackAngle": 10.048,
-    "attackDirection": -1.6041,
-    "swingPathTilt": 32.1008,
+    "batSpeed": 71.0551,
+    "swingLength": 7.2938,
+    "attackAngle": 10.0477,
+    "attackDirection": -1.6037,
+    "swingPathTilt": 32.1007,
     "count": 386
   },
   "vaaRegression": {
@@ -449,6 +449,7 @@
       "laMax": 0,
       "laBin": 0,
       "woba": 0.221,
+      "xwobacon": 0.183,
       "quality": false,
       "count": 289
     },
@@ -458,6 +459,7 @@
       "laMax": 5,
       "laBin": 1,
       "woba": 0.474,
+      "xwobacon": 0.405,
       "quality": false,
       "count": 76
     },
@@ -467,6 +469,7 @@
       "laMax": 10,
       "laBin": 2,
       "woba": 0.483,
+      "xwobacon": 0.499,
       "quality": false,
       "count": 104
     },
@@ -476,6 +479,7 @@
       "laMax": 15,
       "laBin": 3,
       "woba": 0.721,
+      "xwobacon": 0.746,
       "quality": true,
       "count": 101
     },
@@ -485,6 +489,7 @@
       "laMax": 20,
       "laBin": 4,
       "woba": 0.588,
+      "xwobacon": 0.654,
       "quality": true,
       "count": 121
     },
@@ -494,6 +499,7 @@
       "laMax": 25,
       "laBin": 5,
       "woba": 0.499,
+      "xwobacon": 0.653,
       "quality": false,
       "count": 92
     },
@@ -503,6 +509,7 @@
       "laMax": 30,
       "laBin": 6,
       "woba": 0.4,
+      "xwobacon": 0.705,
       "quality": false,
       "count": 106
     },
@@ -512,6 +519,7 @@
       "laMax": 35,
       "laBin": 7,
       "woba": 0.36,
+      "xwobacon": 0.6,
       "quality": false,
       "count": 94
     },
@@ -521,6 +529,7 @@
       "laMax": 40,
       "laBin": 8,
       "woba": 0.195,
+      "xwobacon": 0.344,
       "quality": false,
       "count": 67
     },
@@ -530,6 +539,7 @@
       "laMax": 50,
       "laBin": 9,
       "woba": 0.044,
+      "xwobacon": 0.109,
       "quality": false,
       "count": 111
     },
@@ -539,6 +549,7 @@
       "laMax": null,
       "laBin": 10,
       "woba": 0.021,
+      "xwobacon": 0.019,
       "quality": false,
       "count": 104
     },
@@ -548,6 +559,7 @@
       "laMax": 0,
       "laBin": 0,
       "woba": 0.294,
+      "xwobacon": 0.173,
       "quality": false,
       "count": 187
     },
@@ -557,6 +569,7 @@
       "laMax": 5,
       "laBin": 1,
       "woba": 0.507,
+      "xwobacon": 0.361,
       "quality": true,
       "count": 56
     },
@@ -566,6 +579,7 @@
       "laMax": 10,
       "laBin": 2,
       "woba": 0.61,
+      "xwobacon": 0.472,
       "quality": true,
       "count": 69
     },
@@ -575,6 +589,7 @@
       "laMax": 15,
       "laBin": 3,
       "woba": 0.701,
+      "xwobacon": 0.683,
       "quality": true,
       "count": 79
     },
@@ -584,6 +599,7 @@
       "laMax": 20,
       "laBin": 4,
       "woba": 0.636,
+      "xwobacon": 0.641,
       "quality": true,
       "count": 59
     },
@@ -593,6 +609,7 @@
       "laMax": 25,
       "laBin": 5,
       "woba": 0.556,
+      "xwobacon": 0.616,
       "quality": true,
       "count": 94
     },
@@ -602,6 +619,7 @@
       "laMax": 30,
       "laBin": 6,
       "woba": 0.465,
+      "xwobacon": 0.514,
       "quality": false,
       "count": 86
     },
@@ -611,6 +629,7 @@
       "laMax": 35,
       "laBin": 7,
       "woba": 0.305,
+      "xwobacon": 0.419,
       "quality": false,
       "count": 92
     },
@@ -620,6 +639,7 @@
       "laMax": 40,
       "laBin": 8,
       "woba": 0.101,
+      "xwobacon": 0.16,
       "quality": false,
       "count": 69
     },
@@ -629,6 +649,7 @@
       "laMax": 50,
       "laBin": 9,
       "woba": 0.093,
+      "xwobacon": 0.06,
       "quality": false,
       "count": 134
     },
@@ -638,6 +659,7 @@
       "laMax": null,
       "laBin": 10,
       "woba": 0.054,
+      "xwobacon": 0.017,
       "quality": false,
       "count": 254
     },
@@ -647,6 +669,7 @@
       "laMax": 0,
       "laBin": 0,
       "woba": 0.153,
+      "xwobacon": 0.153,
       "quality": false,
       "count": 802
     },
@@ -656,6 +679,7 @@
       "laMax": 5,
       "laBin": 1,
       "woba": 0.27,
+      "xwobacon": 0.375,
       "quality": false,
       "count": 172
     },
@@ -665,6 +689,7 @@
       "laMax": 10,
       "laBin": 2,
       "woba": 0.41,
+      "xwobacon": 0.514,
       "quality": false,
       "count": 179
     },
@@ -674,6 +699,7 @@
       "laMax": 15,
       "laBin": 3,
       "woba": 0.776,
+      "xwobacon": 0.758,
       "quality": true,
       "count": 136
     },
@@ -683,6 +709,7 @@
       "laMax": 20,
       "laBin": 4,
       "woba": 0.777,
+      "xwobacon": 0.696,
       "quality": true,
       "count": 136
     },
@@ -692,6 +719,7 @@
       "laMax": 25,
       "laBin": 5,
       "woba": 0.967,
+      "xwobacon": 0.813,
       "quality": true,
       "count": 123
     },
@@ -701,6 +729,7 @@
       "laMax": 30,
       "laBin": 6,
       "woba": 1.091,
+      "xwobacon": 0.917,
       "quality": true,
       "count": 86
     },
@@ -710,6 +739,7 @@
       "laMax": 35,
       "laBin": 7,
       "woba": 1.035,
+      "xwobacon": 0.729,
       "quality": true,
       "count": 73
     },
@@ -719,6 +749,7 @@
       "laMax": 40,
       "laBin": 8,
       "woba": 0.645,
+      "xwobacon": 0.483,
       "quality": true,
       "count": 65
     },
@@ -728,6 +759,7 @@
       "laMax": 50,
       "laBin": 9,
       "woba": 0.319,
+      "xwobacon": 0.144,
       "quality": false,
       "count": 62
     },
@@ -737,6 +769,7 @@
       "laMax": null,
       "laBin": 10,
       "woba": 0.029,
+      "xwobacon": 0.015,
       "quality": false,
       "count": 97
     }
