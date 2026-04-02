@@ -1058,10 +1058,21 @@ var Aggregator = {
       }
     }
 
-    // Compute percentiles (no special qualifying for hitters on leaderboard)
+    // Compute percentiles — BIP-dependent stats require min 20 BIP
     var self = this;
+    var HITTER_BIP_PCTL = {
+      avg: true, obp: true, slg: true, ops: true, iso: true, wOBA: true, babip: true,
+      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
+      avgEVAll: true, medEV: true, ev75: true, maxEV: true,
+      hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
+      hrFbPct: true, airPullPct: true
+    };
     HITTER_STAT_KEYS.forEach(function (key) {
-      self._computePercentiles(rows, key);
+      if (HITTER_BIP_PCTL[key]) {
+        self._computePercentiles(rows, key, 20, 'nBip');
+      } else {
+        self._computePercentiles(rows, key);
+      }
     });
 
     // Invert where lower is better
@@ -1418,8 +1429,18 @@ var Aggregator = {
     var self = this;
     for (var ptKey in ptGroups) {
       var ptRows = ptGroups[ptKey];
+      var HP_BIP_PCTL = {
+        avg: true, slg: true, iso: true, wOBA: true,
+        xBA: true, xSLG: true, xwOBA: true,
+        medEV: true, ev75: true, maxEV: true, hardHitPct: true, barrelPct: true,
+        laSweetSpotPct: true, hrFbPct: true, airPullPct: true
+      };
       HITTER_PITCH_PCTL_KEYS.forEach(function (key) {
-        self._computePercentiles(ptRows, key);
+        if (HP_BIP_PCTL[key]) {
+          self._computePercentiles(ptRows, key, 20, 'nBip');
+        } else {
+          self._computePercentiles(ptRows, key);
+        }
       });
     }
 

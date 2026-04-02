@@ -2750,8 +2750,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         hitter_leaderboard.append(row)
 
+    # BIP-dependent stats require min 20 BIP for percentile pool
+    HITTER_BIP_PCTL_STATS = {
+        'avgEVAll', 'medEV', 'ev75', 'maxEV', 'medLA',
+        'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
+        'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
+        'babip', 'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
+        'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
+    }
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+        if stat in HITTER_BIP_PCTL_STATS:
+            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat, min_count=20, count_key='nBip')
+        else:
+            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
 
     for row in hitter_leaderboard:
         for stat in HITTER_INVERT_PCTL:
@@ -2868,9 +2879,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in hitter_pitch_leaderboard:
         hpt_groups[row['pitchType']].append(row)
 
+    HITTER_PITCH_BIP_PCTL_STATS = {
+        'avg', 'slg', 'iso',
+        'wOBA', 'xBA', 'xSLG', 'xwOBA',
+        'medEV', 'ev75', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+        'gbPct', 'ldPct', 'fbPct', 'hrFbPct', 'pullPct', 'oppoPct',
+    }
     for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
-            compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=0)
+            if stat in HITTER_PITCH_BIP_PCTL_STATS:
+                compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=20, count_key='nBip')
+            else:
+                compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=0)
 
     for row in hitter_pitch_leaderboard:
         for stat in HITTER_PITCH_INVERT_PCTL:
