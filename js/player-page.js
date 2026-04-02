@@ -930,8 +930,10 @@ var PlayerPage = {
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
         } else {
-          circle.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
-          circle.style.color = isDark ? '#aaa' : '#666';
+          // Unqualified: outline ring instead of filled circle
+          circle.style.backgroundColor = 'transparent';
+          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
+          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
         }
         circle.textContent = Math.round(pctl);
         circleWrap.appendChild(circle);
@@ -948,7 +950,8 @@ var PlayerPage = {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
           barFill.style.backgroundColor = barColor;
         } else {
-          barFill.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
+          // Unqualified: subtle ghost bar
+          barFill.style.backgroundColor = isDark ? 'rgba(160,160,160,0.15)' : 'rgba(180,180,180,0.4)';
         }
       }
       barTrack.appendChild(barFill);
