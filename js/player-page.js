@@ -950,8 +950,10 @@ var PlayerPage = {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
           barFill.style.backgroundColor = barColor;
         } else {
-          // Unqualified: subtle ghost bar
-          barFill.style.backgroundColor = isDark ? 'rgba(160,160,160,0.15)' : 'rgba(180,180,180,0.4)';
+          // Unqualified: gray bar with white diagonal hatching
+          var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
+          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+          barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
         }
       }
       barTrack.appendChild(barFill);
