@@ -21,19 +21,19 @@ var PlayerPage = {
 
   // Percentile stat definitions for the hitting section
   HITTING_STATS: [
+    { key: 'xBA',             label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'avgEVAll',        label: 'Avg EV (All)',     format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'medEV',           label: 'Avg EV (LA > 0)',  format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'ev75',            label: 'EV75',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'maxEV',           label: 'Max EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'hardHitPct',      label: 'Hard-Hit %',       format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPct',       label: 'Barrel %',         format: function(v) { return Utils.formatPct(v); } },
-    { key: 'laSweetSpotPct',  label: 'Sweet-Spot %',     format: function(v) { return Utils.formatPct(v); } },
+    { key: 'sacqPct',         label: 'SACQ %',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct',            label: 'K %',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',           label: 'BB %',             format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izContactPct',    label: 'IZ Contact %',     format: function(v) { return Utils.formatPct(v); } },
     { key: 'whiffPct',        label: 'Whiff %',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',        label: 'Chase %',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true },
   ],
 
   // Hitter Stats table columns (single row)
@@ -433,15 +433,29 @@ var PlayerPage = {
       container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
       return;
     }
-    this._renderHitterRunValue(data);
-    this._renderPercentiles(data, this.HITTING_STATS, true);
+    // Check if this is a ROC/AAA player (no run value, bat speed, or expected stats)
+    var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+    var isROCPlayer = rocTeams.indexOf(data.team) !== -1;
+
+    if (!isROCPlayer) {
+      this._renderHitterRunValue(data);
+    }
+
+    // Filter out stats unavailable for ROC players
+    var hittingStats = this.HITTING_STATS;
+    if (isROCPlayer) {
+      hittingStats = hittingStats.filter(function (s) { return !s.rocHide; });
+    }
+    this._renderPercentiles(data, hittingStats, true);
     this._renderSprayChart(data);
     this._renderLASprayChart(data);
     this._renderHitterSmallStats(data);
     this._renderHitterStatsFullTable(data);
     this._renderHitterPlateDisciplineTable(data);
-    this._renderHitterBattedBallTable(data);
-    this._renderHitterBatTrackingTable(data);
+    this._renderHitterBattedBallTable(data, isROCPlayer);
+    if (!isROCPlayer) {
+      this._renderHitterBatTrackingTable(data);
+    }
   },
 
   _showPitcherLayout: function () {
@@ -2669,7 +2683,7 @@ var PlayerPage = {
 
   // --- Hitter: Batted Ball Table ---
 
-  _renderHitterBattedBallTable: function (data) {
+  _renderHitterBattedBallTable: function (data, isROC) {
     var section = document.getElementById('player-hitter-batted-ball-section');
     var container = document.getElementById('player-hitter-batted-ball-table');
     if (!container) return;
@@ -2679,13 +2693,20 @@ var PlayerPage = {
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
     section.style.display = '';
 
+    // Filter out columns unavailable for ROC players
+    var ROC_HIDE_BB = { xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
+    var cols = this.HITTER_BATTED_BALL_COLS;
+    if (isROC) {
+      cols = cols.filter(function (c) { return !ROC_HIDE_BB[c.key]; });
+    }
+
     var totalRow = { pitchType: 'Total' };
-    for (var k = 0; k < this.HITTER_BATTED_BALL_COLS.length; k++) {
-      var key = this.HITTER_BATTED_BALL_COLS[k].key;
+    for (var k = 0; k < cols.length; k++) {
+      var key = cols[k].key;
       if (key !== 'pitchType') totalRow[key] = data[key];
     }
 
-    this._renderPerPitchTable(container, this.HITTER_BATTED_BALL_COLS, pitchRows, totalRow);
+    this._renderPerPitchTable(container, cols, pitchRows, totalRow);
   },
 
   // --- Hitter: Plate Discipline Table ---
