@@ -2466,7 +2466,7 @@ var PlayerPage = {
         maintainAspectRatio: true,
         aspectRatio: 1.2,
         animation: false,
-        clip: true,
+        clip: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -2517,15 +2517,10 @@ var PlayerPage = {
               color: '#ccc',
               font: { family: 'Barlow', size: 11 },
               callback: function (value) {
-                if (value > 60 || value < -20) return '';
                 return value + '°';
-              },
-              padding: 0
+              }
             },
-            grid: { color: 'rgba(255,255,255,0.2)' },
-            afterBuildTicks: function(axis) {
-              axis.ticks = axis.ticks.filter(function(t) { return t.value >= -20 && t.value <= 60; });
-            }
+            grid: { color: 'rgba(255,255,255,0.2)' }
           }
         }
       }
