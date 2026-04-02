@@ -58,22 +58,22 @@ var Utils = {
     return this.PITCH_COLORS[pt] || '#999';
   },
 
-  // Percentile color: vivid blue (0) -> near-white (50) -> vivid red (100)
+  // Percentile color: Savant-inspired — steel blue (0) -> light gray (50) -> crimson (100)
   percentileColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      // 0th = rgb(20,60,210), 50th = rgb(200,200,210)
-      r = Math.round(20 + t * 180);
-      g = Math.round(60 + t * 140);
-      b = Math.round(210);
+      // 0th = rgb(30,80,190) steel blue, 50th = rgb(210,210,215) light gray
+      r = Math.round(30 + t * 180);
+      g = Math.round(80 + t * 130);
+      b = Math.round(190 + t * 25);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(200,200,210), 100th = rgb(210,25,25)
-      r = Math.round(200 + t * 10);
-      g = Math.round(200 - t * 175);
-      b = Math.round(210 - t * 185);
+      // 50th = rgb(210,210,215), 100th = rgb(190,50,45) crimson
+      r = Math.round(210 - t * 20);
+      g = Math.round(210 - t * 160);
+      b = Math.round(215 - t * 170);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
@@ -85,25 +85,22 @@ var Utils = {
     return '#1a1a2e';
   },
 
-  // Dark mode: solid color interpolation with bright midpoint and steep ramp
+  // Dark mode: Savant-inspired linear ramp, always visible
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
-      // Steeper ramp: square the parameter so color kicks in faster
-      var t = pctl / 50;
-      var ease = t * t; // slow departure from blue, fast arrival at gray
-      // 0th = rgb(25,75,230), 50th = rgb(140,140,150)
-      r = Math.round(25 + ease * 115);
-      g = Math.round(75 + ease * 65);
-      b = Math.round(230 - ease * 80);
+      var t = pctl / 50; // 0 at 0th, 1 at 50th
+      // 0th = rgb(30,75,200) steel blue, 50th = rgb(150,150,155) visible gray
+      r = Math.round(30 + t * 120);
+      g = Math.round(75 + t * 75);
+      b = Math.round(200 - t * 45);
     } else {
-      var t = (pctl - 50) / 50;
-      var ease = t * t;
-      // 50th = rgb(140,140,150), 100th = rgb(225,40,35)
-      r = Math.round(140 + ease * 85);
-      g = Math.round(140 - ease * 100);
-      b = Math.round(150 - ease * 115);
+      var t = (pctl - 50) / 50; // 0 at 50th, 1 at 100th
+      // 50th = rgb(150,150,155), 100th = rgb(200,50,45) crimson
+      r = Math.round(150 + t * 50);
+      g = Math.round(150 - t * 100);
+      b = Math.round(155 - t * 110);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
