@@ -149,6 +149,45 @@ def fetch_guts_constants(year=2026):
     raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
 
 
+def fetch_park_factors(year=2026):
+    """Scrape park factors from FanGraphs, return dict of team abbrev → factor (divided by 100)."""
+    import re as _re
+    url = f'https://www.fangraphs.com/guts.aspx?type=pf&teamid=0&season={year}'
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+        'Accept': 'text/html',
+    })
+    html = urllib.request.urlopen(req, timeout=15).read().decode('utf-8')
+    match = _re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, _re.DOTALL)
+    if not match:
+        raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs park factors page')
+    data = json.loads(match.group(1))
+    # Map FanGraphs team names to our abbreviations
+    FG_TEAM_MAP = {
+        'Angels': 'LAA', 'Orioles': 'BAL', 'Red Sox': 'BOS', 'White Sox': 'CWS',
+        'Guardians': 'CLE', 'Tigers': 'DET', 'Royals': 'KCR', 'Twins': 'MIN',
+        'Yankees': 'NYY', 'Athletics': 'ATH', 'Mariners': 'SEA', 'Rays': 'TBR',
+        'Rangers': 'TEX', 'Blue Jays': 'TOR',
+        'Diamondbacks': 'ARI', 'Braves': 'ATL', 'Cubs': 'CHC', 'Reds': 'CIN',
+        'Rockies': 'COL', 'Marlins': 'MIA', 'Astros': 'HOU', 'Dodgers': 'LAD',
+        'Brewers': 'MIL', 'Nationals': 'WSH', 'Mets': 'NYM', 'Phillies': 'PHI',
+        'Pirates': 'PIT', 'Cardinals': 'STL', 'Padres': 'SDP', 'Giants': 'SFG',
+    }
+    queries = data['props']['pageProps']['dehydratedState']['queries']
+    park_factors = {}
+    for q in queries:
+        rows = q.get('state', {}).get('data', [])
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'Team' in rows[0]:
+            for row in rows:
+                abbr = FG_TEAM_MAP.get(row['Team'])
+                if abbr:
+                    park_factors[abbr] = round(row['Basic (5yr)'] / 100, 4)
+    print(f"  Park factors: {len(park_factors)} teams fetched")
+    return park_factors
+
+
+PARK_FACTORS = None  # set at runtime by fetch_park_factors()
+
 WOBA_WEIGHTS_FALLBACK = {
     'BB': 0.705, 'HBP': 0.737, '1B': 0.905, '2B': 1.291, '3B': 1.639, 'HR': 2.116,
 }
@@ -2796,19 +2835,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         hitter_leaderboard.append(row)
 
-    # Compute wRC for each hitter: (((wOBA - lgWOBA) / wOBAScale) + lgRPA) * PA
-    if GUTS_EXTRA:
-        woba_scale = GUTS_EXTRA['wOBAScale']
-        lg_woba = GUTS_EXTRA['lgWOBA']
-        lg_rpa = GUTS_EXTRA['lgRPA']
-        for row in hitter_leaderboard:
-            woba = row.get('wOBA')
-            pa = row.get('pa') or 0
-            if woba is not None and pa > 0 and woba_scale > 0:
-                row['wRC'] = round(((woba - lg_woba) / woba_scale + lg_rpa) * pa, 2)
-            else:
-                row['wRC'] = None
-
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 20
@@ -3135,12 +3161,48 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 # BABIP = (H - HR) / (AB - K - HR + SF)
                 babip_denom = box_ab - box_so - box_hr + box_sf
                 row['babip'] = round((box_h - box_hr) / babip_denom, 3) if babip_denom > 0 else None
+
+                # wOBA from boxscore counts + FanGraphs Guts weights
+                if WOBA_WEIGHTS:
+                    woba_denom = box_ab + box_ubb + box_sf + box_hbp
+                    if woba_denom > 0:
+                        woba_num = (WOBA_WEIGHTS['BB'] * box_ubb + WOBA_WEIGHTS['HBP'] * box_hbp +
+                                    WOBA_WEIGHTS['1B'] * box_1b + WOBA_WEIGHTS['2B'] * box_2b +
+                                    WOBA_WEIGHTS['3B'] * box_3b + WOBA_WEIGHTS['HR'] * box_hr)
+                        row['wOBA'] = round(woba_num / woba_denom, 3)
+                    else:
+                        row['wOBA'] = None
             else:
                 row['g'] = None
                 row['tb'] = None
                 row['sb'] = None
                 row['cs'] = None
                 row['sbPct'] = None
+
+    # Compute wRC and wRC+ for each hitter (after boxscore merge so wOBA is from official stats)
+    # wRC  = (((wOBA - lgWOBA) / wOBAScale) + lgRPA) * PA
+    # wRC+ = ((wRAA/PA + lgRPA) + (lgRPA - PF * lgRPA)) / lgR/PA * 100
+    if GUTS_EXTRA:
+        woba_scale = GUTS_EXTRA['wOBAScale']
+        lg_woba = GUTS_EXTRA['lgWOBA']
+        lg_rpa = GUTS_EXTRA['lgRPA']
+        park_factors = PARK_FACTORS or {}
+        for row in hitter_leaderboard:
+            woba = row.get('wOBA')
+            pa = row.get('pa') or 0
+            if woba is not None and pa > 0 and woba_scale > 0:
+                wraa_per_pa = (woba - lg_woba) / woba_scale
+                row['wRC'] = round((wraa_per_pa + lg_rpa) * pa, 2)
+                # wRC+
+                pf = park_factors.get(row['team'], 1.0)
+                numerator = wraa_per_pa + lg_rpa + (lg_rpa - pf * lg_rpa)
+                if lg_rpa > 0:
+                    row['wRCplus'] = round(numerator / lg_rpa * 100)
+                else:
+                    row['wRCplus'] = None
+            else:
+                row['wRC'] = None
+                row['wRCplus'] = None
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
@@ -3359,7 +3421,7 @@ def write_embedded_js(st_result, rs_result):
 
 
 def main():
-    global WOBA_WEIGHTS, FIP_CONSTANT, GUTS_EXTRA
+    global WOBA_WEIGHTS, FIP_CONSTANT, GUTS_EXTRA, PARK_FACTORS
     os.makedirs(DATA_DIR, exist_ok=True)
 
     # Fetch live wOBA weights and FIP constant from FanGraphs
@@ -3371,6 +3433,14 @@ def main():
         WOBA_WEIGHTS = WOBA_WEIGHTS_FALLBACK.copy()
         FIP_CONSTANT = FIP_CONSTANT_FALLBACK
         GUTS_EXTRA = {'wOBAScale': 1.2982, 'lgWOBA': 0.3088, 'lgRPA': 0.1142}
+
+    # Fetch park factors
+    print("Fetching FanGraphs park factors...")
+    try:
+        PARK_FACTORS = fetch_park_factors(2026)
+    except Exception as e:
+        print(f"  WARNING: Could not fetch park factors ({e}), defaulting to 1.0")
+        PARK_FACTORS = {}
 
     # Connect to Google Sheets
     print("Connecting to Google Sheets...")
