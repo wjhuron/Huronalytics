@@ -129,22 +129,39 @@ var Aggregator = {
     return valid;
   },
 
+  // Helper: check if a team is a ROC/AAA team (excluded from MLB percentile pool)
+  _isROCTeam: function (team) {
+    var rocTeams = (window.METADATA && window.METADATA.rocTeams) ||
+                   (DataStore && DataStore.metadata && DataStore.metadata.rocTeams) || [];
+    return rocTeams.indexOf(team) !== -1;
+  },
+
   // ---- Percentile computation (replicates Python's compute_percentile_ranks) ----
+  // ROC-aware: excludes ROC teams from the percentile pool, then interpolates ROC players
   // minCount: minimum value of row[countKey] to qualify for percentile pool (0 = no threshold)
   _computePercentiles: function (rows, metricKey, minCount, countKey, useAbs) {
     minCount = minCount || 0;
     countKey = countKey || 'count';
     var pctlKey = metricKey + '_pctl';
-    var valid = [];
+    var self = this;
+
+    // Separate MLB and ROC rows
+    var mlbValid = [];
+    var rocValid = [];
     for (var i = 0; i < rows.length; i++) {
       if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined
           && (minCount === 0 || (rows[i][countKey] || 0) >= minCount)) {
         var rawVal = rows[i][metricKey];
-        valid.push({ idx: i, val: useAbs ? Math.abs(rawVal) : rawVal });
+        var entry = { idx: i, val: useAbs ? Math.abs(rawVal) : rawVal };
+        if (self._isROCTeam(rows[i].team)) {
+          rocValid.push(entry);
+        } else {
+          mlbValid.push(entry);
+        }
       }
     }
 
-    if (valid.length < 2) {
+    if (mlbValid.length < 2) {
       for (var j = 0; j < rows.length; j++) {
         rows[j][pctlKey] = (rows[j][metricKey] !== null && rows[j][metricKey] !== undefined
                             && (minCount === 0 || (rows[j][countKey] || 0) >= minCount)) ? 50 : null;
@@ -152,18 +169,30 @@ var Aggregator = {
       return;
     }
 
-    var values = valid.map(function (v) { return v.val; });
-    var n = values.length;
-
-    for (var k = 0; k < valid.length; k++) {
-      var val = valid[k].val;
+    // Compute percentiles for MLB rows
+    var mlbValues = mlbValid.map(function (v) { return v.val; });
+    var n = mlbValues.length;
+    for (var k = 0; k < mlbValid.length; k++) {
+      var val = mlbValid[k].val;
       var below = 0, equal = 0;
       for (var m = 0; m < n; m++) {
-        if (values[m] < val) below++;
-        if (values[m] === val) equal++;
+        if (mlbValues[m] < val) below++;
+        if (mlbValues[m] === val) equal++;
       }
       var pctl = (below + 0.5 * (equal - 1)) / Math.max(1, n - 1) * 100;
-      rows[valid[k].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(pctl)));
+      rows[mlbValid[k].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(pctl)));
+    }
+
+    // Interpolate ROC rows into MLB distribution
+    for (var r = 0; r < rocValid.length; r++) {
+      var rVal = rocValid[r].val;
+      var rBelow = 0, rEqual = 0;
+      for (var m2 = 0; m2 < n; m2++) {
+        if (mlbValues[m2] < rVal) rBelow++;
+        if (mlbValues[m2] === rVal) rEqual++;
+      }
+      var rPctl = (rBelow + 0.5 * rEqual) / n * 100;
+      rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
 
     for (var j2 = 0; j2 < rows.length; j2++) {
@@ -173,32 +202,50 @@ var Aggregator = {
     }
   },
 
-  // Percentile computation using _qualified flag instead of minCount
+  // Percentile computation using _qualified flag instead of minCount (ROC-aware)
   _computePercentilesQualified: function (rows, metricKey) {
     var pctlKey = metricKey + '_pctl';
-    var valid = [];
+    var self = this;
+    var mlbValid = [];
+    var rocValid = [];
     for (var i = 0; i < rows.length; i++) {
       if (rows[i][metricKey] !== null && rows[i][metricKey] !== undefined && rows[i]._qualified) {
-        valid.push({ idx: i, val: rows[i][metricKey] });
+        var entry = { idx: i, val: rows[i][metricKey] };
+        if (self._isROCTeam(rows[i].team)) {
+          rocValid.push(entry);
+        } else {
+          mlbValid.push(entry);
+        }
       }
     }
-    if (valid.length < 2) {
+    if (mlbValid.length < 2) {
       for (var j = 0; j < rows.length; j++) {
         rows[j][pctlKey] = (rows[j][metricKey] !== null && rows[j][metricKey] !== undefined && rows[j]._qualified) ? 50 : null;
       }
       return;
     }
-    var values = valid.map(function (v) { return v.val; });
-    var n = values.length;
-    for (var k = 0; k < valid.length; k++) {
-      var val = valid[k].val;
+    var mlbValues = mlbValid.map(function (v) { return v.val; });
+    var n = mlbValues.length;
+    for (var k = 0; k < mlbValid.length; k++) {
+      var val = mlbValid[k].val;
       var below = 0, equal = 0;
       for (var m = 0; m < n; m++) {
-        if (values[m] < val) below++;
-        if (values[m] === val) equal++;
+        if (mlbValues[m] < val) below++;
+        if (mlbValues[m] === val) equal++;
       }
       var pctl = (below + 0.5 * (equal - 1)) / Math.max(1, n - 1) * 100;
-      rows[valid[k].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(pctl)));
+      rows[mlbValid[k].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(pctl)));
+    }
+    // Interpolate ROC rows into MLB distribution
+    for (var r = 0; r < rocValid.length; r++) {
+      var rVal = rocValid[r].val;
+      var rBelow = 0, rEqual = 0;
+      for (var m2 = 0; m2 < n; m2++) {
+        if (mlbValues[m2] < rVal) rBelow++;
+        if (mlbValues[m2] === rVal) rEqual++;
+      }
+      var rPctl = (rBelow + 0.5 * rEqual) / n * 100;
+      rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
     for (var j2 = 0; j2 < rows.length; j2++) {
       if (!(pctlKey in rows[j2])) rows[j2][pctlKey] = null;
@@ -422,8 +469,12 @@ var Aggregator = {
     }
 
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    // Always exclude ROC from "All Teams" view
+    var self = this;
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
+    } else {
+      rows = rows.filter(function (r) { return !self._isROCTeam(r.team); });
     }
     if (filters.search) {
       var searchLower = filters.search.toLowerCase();
@@ -738,6 +789,8 @@ var Aggregator = {
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
+    } else {
+      rows = rows.filter(function (r) { return !self._isROCTeam(r.team); });
     }
     if (filters.search) {
       var searchLower2 = filters.search.toLowerCase();
@@ -1022,8 +1075,11 @@ var Aggregator = {
     }
 
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    var self3 = this;
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
+    } else {
+      rows = rows.filter(function (r) { return !self3._isROCTeam(r.team); });
     }
     if (filters.search) {
       var searchLower = filters.search.toLowerCase();
@@ -1378,8 +1434,11 @@ var Aggregator = {
     }
 
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    var self4 = this;
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
+    } else {
+      rows = rows.filter(function (r) { return !self4._isROCTeam(r.team); });
     }
     if (filters.search) {
       var searchLower = filters.search.toLowerCase();

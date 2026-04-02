@@ -68,6 +68,10 @@
   var sidePanel, panelOverlay, panelClose;
 
   // ---- Init ----
+  // Detect ?roc=1 URL parameter for hidden ROC team filter
+  var rocMode = (new URLSearchParams(window.location.search)).get('roc') === '1';
+  window._rocMode = rocMode;
+
   function init() {
     DataStore.load().then(function () {
       return Aggregator.load(DataStore.active().microData);
@@ -93,8 +97,15 @@
       // Populate home page counts
       var pitcherCount = document.getElementById('home-pitcher-count');
       var hitterCount = document.getElementById('home-hitter-count');
-      if (pitcherCount && DataStore.pitcherData) pitcherCount.textContent = DataStore.pitcherData.length + ' pitchers';
-      if (hitterCount && DataStore.hitterData) hitterCount.textContent = DataStore.hitterData.length + ' hitters';
+      var rocTeamsInit = (DataStore.metadata.rocTeams || []);
+      if (pitcherCount && DataStore.pitcherData) {
+        var mlbPitchers = DataStore.pitcherData.filter(function(r) { return rocTeamsInit.indexOf(r.team) === -1; });
+        pitcherCount.textContent = mlbPitchers.length + ' pitchers';
+      }
+      if (hitterCount && DataStore.hitterData) {
+        var mlbHitters = DataStore.hitterData.filter(function(r) { return rocTeamsInit.indexOf(r.team) === -1; });
+        hitterCount.textContent = mlbHitters.length + ' hitters';
+      }
 
       // Player page back button
       document.getElementById('player-back').addEventListener('click', function () {
@@ -331,8 +342,11 @@
   // ---- Rebuild team dropdown based on current game type ----
   function rebuildTeamDropdown() {
     teamSelect.innerHTML = '<option value="all">All Teams</option>';
+    var rocTeams = (DataStore.metadata.rocTeams || []);
     DataStore.metadata.teams.forEach(function(team) {
       if (currentGameType === 'RS' && team === 'WBC') return;
+      // Hide ROC/AAA teams unless ?roc=1 URL parameter is present
+      if (rocTeams.indexOf(team) !== -1 && !window._rocMode) return;
       var opt = document.createElement('option');
       opt.value = team;
       opt.textContent = team;

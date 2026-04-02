@@ -97,6 +97,10 @@ MLB_TEAMS = {
     'WBC',
 }
 
+# Minor league / AAA teams (included in data but excluded from MLB percentile pool)
+AAA_TEAMS = {'ROC'}
+ALL_TEAMS = MLB_TEAMS | AAA_TEAMS
+
 # --- wOBA weights and FIP constant — pulled live from FanGraphs Guts page ---
 WOBA_WEIGHTS = None  # set at runtime by fetch_guts_constants()
 FIP_CONSTANT = None  # set at runtime by fetch_guts_constants()
@@ -796,7 +800,7 @@ def generate_micro_data(all_pitches):
     for p in all_pitches:
         if p.get('Pitcher'):
             pitcher_set.add(p['Pitcher'])
-        if p.get('PTeam') and p['PTeam'] in MLB_TEAMS:
+        if p.get('PTeam') and p['PTeam'] in ALL_TEAMS:
             team_set.add(p['PTeam'])
         d = normalize_date(p.get('Game Date'))
         if d:
@@ -807,7 +811,7 @@ def generate_micro_data(all_pitches):
     for p in all_pitches:
         if p.get('Batter'):
             hitter_set.add(p['Batter'])
-        if p.get('BTeam') and p['BTeam'] in MLB_TEAMS:
+        if p.get('BTeam') and p['BTeam'] in ALL_TEAMS:
             team_set.add(p['BTeam'])
         d = normalize_date(p.get('Game Date'))
         if d:
@@ -844,8 +848,10 @@ def generate_micro_data(all_pitches):
         date = normalize_date(p.get('Game Date'))
         batter_hand = p.get('Bats')
 
-        if not pitcher or not team or team not in MLB_TEAMS:
+        if not pitcher or not team or team not in ALL_TEAMS:
             continue
+        if p.get('_roc_hitter_pitch'):
+            continue  # Skip AAA pitchers facing ROC hitters
         if not date or not batter_hand:
             continue
 
@@ -941,8 +947,10 @@ def generate_micro_data(all_pitches):
         date = normalize_date(p.get('Game Date'))
         batter_hand = p.get('Bats')
 
-        if not pitcher or not team or team not in MLB_TEAMS or not pitch_type:
+        if not pitcher or not team or team not in ALL_TEAMS or not pitch_type:
             continue
+        if p.get('_roc_hitter_pitch'):
+            continue  # Skip AAA pitchers facing ROC hitters
         if not date or not batter_hand:
             continue
 
@@ -1038,8 +1046,10 @@ def generate_micro_data(all_pitches):
         batter_hand = p.get('Bats')
         bb_type = p.get('BBType')
 
-        if not pitcher or not team or team not in MLB_TEAMS:
+        if not pitcher or not team or team not in ALL_TEAMS:
             continue
+        if p.get('_roc_hitter_pitch'):
+            continue  # Skip AAA pitchers facing ROC hitters
         if not date or not batter_hand:
             continue
         if not bb_type or bb_type in BUNT_BB_TYPES:
@@ -1086,8 +1096,10 @@ def generate_micro_data(all_pitches):
         date = normalize_date(p.get('Game Date'))
         pitcher_hand = p.get('Throws')
 
-        if not batter or not team or team not in MLB_TEAMS:
+        if not batter or not team or team not in ALL_TEAMS:
             continue
+        if p.get('_roc_pitcher_pitch'):
+            continue  # Skip AAA hitters facing ROC pitchers
         if not date or not pitcher_hand or not bats:
             continue
 
@@ -1206,8 +1218,10 @@ def generate_micro_data(all_pitches):
         pitcher_hand = p.get('Throws')
         bb_type = p.get('BBType')
 
-        if not batter or not team or team not in MLB_TEAMS:
+        if not batter or not team or team not in ALL_TEAMS:
             continue
+        if p.get('_roc_pitcher_pitch'):
+            continue  # Skip AAA hitters facing ROC pitchers
         if not date or not pitcher_hand:
             continue
         if not bb_type or bb_type in BUNT_BB_TYPES:
@@ -1254,8 +1268,10 @@ def generate_micro_data(all_pitches):
         date = normalize_date(p.get('Game Date'))
         pitcher_hand = p.get('Throws')
 
-        if not batter or not team or team not in MLB_TEAMS:
+        if not batter or not team or team not in ALL_TEAMS:
             continue
+        if p.get('_roc_pitcher_pitch'):
+            continue  # Skip AAA hitters facing ROC pitchers
         if not date or not pitcher_hand or not bats or not pitch_type:
             continue
 
@@ -1357,8 +1373,10 @@ def generate_micro_data(all_pitches):
         pitcher_hand = p.get('Throws')
         bb_type = p.get('BBType')
 
-        if not batter or not team or team not in MLB_TEAMS:
+        if not batter or not team or team not in ALL_TEAMS:
             continue
+        if p.get('_roc_pitcher_pitch'):
+            continue  # Skip AAA hitters facing ROC pitchers
         if not date or not pitcher_hand or not pitch_type:
             continue
         if not bb_type or bb_type in BUNT_BB_TYPES:
@@ -1485,6 +1503,38 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
             row[pctl_key] = None
 
 
+def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count'):
+    """Compute percentiles from MLB-only pool, then interpolate AAA players into that distribution.
+    AAA players (rows with _isROC=True) are excluded from the MLB percentile pool but
+    receive percentile values based on where they'd fall in the MLB distribution."""
+    pctl_key = metric_key + '_pctl'
+
+    mlb_rows = [r for r in rows if not r.get('_isROC')]
+    aaa_rows = [r for r in rows if r.get('_isROC')]
+
+    # Step 1: compute normal percentiles on MLB-only pool
+    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key)
+
+    # Step 2: interpolate AAA rows into MLB distribution
+    mlb_values = sorted([r[metric_key] for r in mlb_rows
+                         if r.get(metric_key) is not None
+                         and (min_count == 0 or (r.get(count_key) or 0) >= min_count)])
+    n = len(mlb_values)
+
+    for row in aaa_rows:
+        val = row.get(metric_key)
+        if val is None or (min_count > 0 and (row.get(count_key) or 0) < min_count):
+            row[pctl_key] = None
+            continue
+        if n < 2:
+            row[pctl_key] = 50
+            continue
+        below = sum(1 for x in mlb_values if x < val)
+        equal = sum(1 for x in mlb_values if x == val)
+        pctl = (below + 0.5 * equal) / n * 100
+        row[pctl_key] = max(0, min(100, round(pctl)))
+
+
 def load_mlb_id_cache(cache_path):
     """Load MLB ID cache from disk."""
     if os.path.exists(cache_path):
@@ -1551,14 +1601,19 @@ def lookup_mlb_id(player_name, team_abbrev, mlb_id_cache):
     return None
 
 
-def read_pitches_from_sheet(gc, sheet_id):
-    """Read all pitches from a single Google Sheets spreadsheet. Returns a list of pitch dicts."""
+def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
+    """Read all pitches from a single Google Sheets spreadsheet. Returns a list of pitch dicts.
+    extra_tabs: optional set of additional tab names to read (e.g. {'ROC', 'AAA'}).
+    Pitches from extra_tabs are tagged with _source=tab_name; MLB pitches get _source='MLB'."""
     pitches = []
+    extra_tabs = extra_tabs or set()
     sh = gc.open_by_key(sheet_id)
     print(f"  {sh.title} ({len(sh.worksheets())} tabs)")
     for i, ws in enumerate(sh.worksheets()):
-        if ws.title not in MLB_TEAMS:
-            print(f"    Skipping {ws.title} (not a team sheet)")
+        tab_name = ws.title
+        is_extra = tab_name in extra_tabs
+        if tab_name not in MLB_TEAMS and not is_extra:
+            print(f"    Skipping {tab_name} (not a team sheet)")
             continue
         print(f"    Reading {ws.title}...")
         if i > 0:
@@ -1582,6 +1637,7 @@ def read_pitches_from_sheet(gc, sheet_id):
                     val = None
                 pitch[col_name] = val
 
+            pitch['_source'] = tab_name if is_extra else 'MLB'
             pitches.append(pitch)
     return pitches
 
@@ -1922,10 +1978,29 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     if remapped_count:
         print(f"  Remapped {remapped_count} non-MLB BTeam entries")
 
-    # Collect unique teams (MLB only) and pitch types
+    # --- Tag ROC/AAA pitches to prevent cross-contamination ---
+    # ROC tab pitches: only the pitcher side matters (batters are AAA opponents)
+    # AAA tab pitches: only the hitter side matters (pitchers are AAA opponents)
+    roc_pitcher_count = 0
+    roc_hitter_count = 0
+    for p in all_pitches:
+        source = p.get('_source', 'MLB')
+        if source == 'ROC':
+            p['_roc_pitcher_pitch'] = True  # Pitcher is ROC, batter is AAA opponent
+            roc_pitcher_count += 1
+        elif source == 'AAA':
+            p['_roc_hitter_pitch'] = True   # Hitter is ROC, pitcher is AAA opponent
+            # Normalize BTeam to 'ROC' if it's 'AAA'
+            if p.get('BTeam') == 'AAA':
+                p['BTeam'] = 'ROC'
+            roc_hitter_count += 1
+    if roc_pitcher_count or roc_hitter_count:
+        print(f"  Tagged {roc_pitcher_count} ROC pitcher pitches, {roc_hitter_count} ROC hitter pitches")
+
+    # Collect unique teams (MLB + AAA) and pitch types
     all_teams = sorted(set(
-        [p['PTeam'] for p in all_pitches if p.get('PTeam') and p['PTeam'] in MLB_TEAMS] +
-        [p['BTeam'] for p in all_pitches if p.get('BTeam') and p['BTeam'] in MLB_TEAMS]
+        [p['PTeam'] for p in all_pitches if p.get('PTeam') and p['PTeam'] in ALL_TEAMS] +
+        [p['BTeam'] for p in all_pitches if p.get('BTeam') and p['BTeam'] in ALL_TEAMS]
     ))
     all_pitch_types = sorted(set(p['Pitch Type'] for p in all_pitches if p.get('Pitch Type')))
 
@@ -1978,6 +2053,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for p in all_pitches:
         if (p['Pitcher'], p['PTeam']) in ep_pitchers:
             continue
+        if p.get('_roc_hitter_pitch'):
+            continue  # Skip AAA pitchers facing ROC hitters
         pitcher_total[(p['Pitcher'], p['PTeam'])] += 1
 
     # --- Pitch Leaderboard: group by (Pitcher, PTeam, Pitch Type) ---
@@ -1985,6 +2062,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for p in all_pitches:
         if (p['Pitcher'], p['PTeam']) in ep_pitchers:
             continue
+        if p.get('_roc_hitter_pitch'):
+            continue  # Skip AAA pitchers facing ROC hitters
         key = (p['Pitcher'], p['PTeam'], p['Pitch Type'], p.get('Throws'))
         pitch_groups[key].append(p)
 
@@ -2003,6 +2082,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'count': len(pitches),
             'usagePct': round(len(pitches) / total_for_pitcher, 4) if total_for_pitcher > 0 else None,
             'mlbId': get_mlb_id(pitcher, team),
+            '_isROC': team in AAA_TEAMS,
         }
 
         # Average metrics
@@ -2033,9 +2113,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['rv100'] = None
         pitch_leaderboard.append(row)
 
-    # --- Fit VAA ~ PlateZ regression for normalized VAA ---
+    # --- Fit VAA ~ PlateZ regression for normalized VAA (MLB only) ---
     vaa_plateZ_pairs = []
     for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue  # Exclude ROC/AAA from regression
         vaa_val = safe_float(p.get('VAA'))
         pz_val = safe_float(p.get('PlateZ'))
         if vaa_val is not None and pz_val is not None:
@@ -2083,9 +2165,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['nVAA'] = None
 
-    # --- Fit HAA ~ PlateX regression for normalized HAA ---
+    # --- Fit HAA ~ PlateX regression for normalized HAA (MLB only) ---
     haa_plateX_pairs = []
     for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue  # Exclude ROC/AAA from regression
         haa_val = safe_float(p.get('HAA'))
         px_val = safe_float(p.get('PlateX'))
         if haa_val is not None and px_val is not None:
@@ -2140,7 +2224,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     for pt, pt_rows in pt_groups.items():
         for metric in PITCH_PCTL_KEYS:
-            compute_percentile_ranks(pt_rows, metric, min_count=0)
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
 
     # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
     VAA_NO_INVERT_TYPES = {'FF', 'FC'}
@@ -2169,7 +2253,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['stuffScore'] = None
 
     for pt, pt_rows in pt_groups.items():
-        compute_percentile_ranks(pt_rows, 'stuffScore')
+        compute_percentile_ranks_with_aaa(pt_rows, 'stuffScore')
 
     pitch_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitch leaderboard: {len(pitch_leaderboard)} rows")
@@ -2179,6 +2263,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for p in all_pitches:
         if (p['Pitcher'], p['PTeam']) in ep_pitchers:
             continue
+        if p.get('_roc_hitter_pitch'):
+            continue  # Skip AAA pitchers facing ROC hitters
         key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
@@ -2191,6 +2277,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'throws': throws,
             'count': len(pitches),
             'mlbId': get_mlb_id(pitcher, team),
+            '_isROC': team in AAA_TEAMS,
         }
         for col in PITCHER_METRIC_COLS:
             values = [safe_float(p.get(col)) for p in pitches]
@@ -2247,7 +2334,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA']
     EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA'}  # lower is better for pitchers
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100']:
-        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:
         for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT | EXPECTED_PITCHER_INVERT:
@@ -2316,9 +2403,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
-    # --- League Averages per pitch type (weighted by pitch count) ---
+    # --- League Averages per pitch type (weighted by pitch count, MLB only) ---
     league_avgs = {}
-    for pt, pt_rows in pt_groups.items():
+    for pt, pt_rows_all in pt_groups.items():
+        pt_rows = [r for r in pt_rows_all if not r.get('_isROC')]  # Exclude ROC from league averages
         avgs = {}
         total_count = sum(r.get('count', 0) for r in pt_rows)
         # Pitch metrics: weighted average by count
@@ -2343,26 +2431,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         avgs['count'] = len(pt_rows)
         league_avgs[pt] = avgs
 
-    # League averages for pitcher leaderboard (weighted by count/TBF)
+    # League averages for pitcher leaderboard (weighted by count/TBF, MLB only)
+    pitcher_lb_mlb = [r for r in pitcher_leaderboard if not r.get('_isROC')]
     pitcher_league_avgs = {}
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
         # Use TBF as weight for rate stats, count (pitches) for pitch metrics
         weight_key = 'pa' if stat in ('kPct', 'bbPct', 'kbbPct', 'babip') else 'count'
-        pairs = [(r[stat], r.get(weight_key, 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get(weight_key, 0) > 0]
+        pairs = [(r[stat], r.get(weight_key, 0)) for r in pitcher_lb_mlb if r.get(stat) is not None and r.get(weight_key, 0) > 0]
         if pairs:
             pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     # ERA league avg computed after boxscore merge (ERA not available yet at this point)
     # Batted ball stats: weighted by nBip
     for stat in PITCHER_BB_KEYS:
-        pairs = [(r[stat], r.get('nBip', 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get('nBip', 0) > 0]
+        pairs = [(r[stat], r.get('nBip', 0)) for r in pitcher_lb_mlb if r.get(stat) is not None and r.get('nBip', 0) > 0]
         if pairs:
             pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     # Expected stats: weighted by PA
     for stat in EXPECTED_KEYS:
-        pairs = [(r[stat], r.get('pa', 0)) for r in pitcher_leaderboard if r.get(stat) is not None and r.get('pa', 0) > 0]
+        pairs = [(r[stat], r.get('pa', 0)) for r in pitcher_lb_mlb if r.get(stat) is not None and r.get('pa', 0) > 0]
         if pairs:
             pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
-    pitcher_league_avgs['count'] = len(pitcher_leaderboard)
+    pitcher_league_avgs['count'] = len(pitcher_lb_mlb)
 
     # ======================================================================
     #  HITTER LEADERBOARD
@@ -2371,9 +2460,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     hitter_groups = defaultdict(list)
     for p in all_pitches:
+        if p.get('_roc_pitcher_pitch'):
+            continue  # Skip AAA hitters facing ROC pitchers
         batter = p.get('Batter')
         b_team = p.get('BTeam')
-        if batter and b_team and b_team in MLB_TEAMS:
+        if batter and b_team and b_team in ALL_TEAMS:
             hitter_groups[(batter, b_team)].append(p)
 
     # --- Compute SACQ zone table (league-wide LA × spray → wOBA) ---
@@ -2382,9 +2473,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     SACQ_MIN_BIP = 20
     SACQ_QUALITY_THRESHOLD = 0.500
 
-    # Collect all BIPs with spray + wOBA data
+    # Collect all BIPs with spray + wOBA data (MLB only — exclude ROC/AAA pitches)
     sacq_bins = {}  # (spray_dir, la_bin_idx) → {'woba_sum': float, 'woba_denom': float, 'count': int}
     for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue  # Exclude ROC/AAA pitches from SACQ zone computation
         bb_type = p.get('BBType')
         if not bb_type or bb_type in BUNT_BB_TYPES:
             continue
@@ -2459,6 +2552,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'stands': stands,
             'count': len(pitches),
             'mlbId': get_mlb_id(hitter, team),
+            '_isROC': team in AAA_TEAMS,
         }
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches))
@@ -2504,7 +2598,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         hitter_leaderboard.append(row)
 
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        compute_percentile_ranks(hitter_leaderboard, stat)
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
 
     for row in hitter_leaderboard:
         for stat in HITTER_INVERT_PCTL:
@@ -2564,6 +2658,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if pt:
                 pt_map[pt].append(p)
 
+        is_roc = team in AAA_TEAMS
         for pt, pt_pitches in pt_map.items():
             row = {
                 'hitter': hitter,
@@ -2573,6 +2668,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'count': len(pt_pitches),
                 'seenPct': round(len(pt_pitches) / total_count, 4) if total_count else 0,
                 'mlbId': get_mlb_id(hitter, team),
+                '_isROC': is_roc,
             }
             row.update(compute_hitter_stats(pt_pitches))
             row.update(compute_expected_stats(pt_pitches))
@@ -2586,6 +2682,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'count': total_count,
             'seenPct': 1.0,
             'mlbId': get_mlb_id(hitter, team),
+            '_isROC': is_roc,
         }
         row_all.update(compute_hitter_stats(pitches))
         row_all.update(compute_expected_stats(pitches))
@@ -2607,6 +2704,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     'count': len(cat_pitches),
                     'seenPct': round(cat_seen, 4),
                     'mlbId': get_mlb_id(hitter, team),
+                    '_isROC': is_roc,
                 }
                 row_cat.update(compute_hitter_stats(cat_pitches))
                 row_cat.update(compute_expected_stats(cat_pitches))
@@ -2619,7 +2717,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
-            compute_percentile_ranks(pt_rows, stat, min_count=0)
+            compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=0)
 
     for row in hitter_pitch_leaderboard:
         for stat in HITTER_PITCH_INVERT_PCTL:
@@ -2630,7 +2728,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
     print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
 
-    # Hitter league averages (weighted by PA for rate stats, nBip for batted ball stats)
+    # Hitter league averages (weighted by PA for rate stats, nBip for batted ball stats, MLB only)
+    hitter_lb_mlb = [r for r in hitter_leaderboard if not r.get('_isROC')]
     hitter_league_avgs = {}
     # Rate stats weighted by PA
     pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'hrFbPct',
@@ -2648,19 +2747,20 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             weight_key = 'nBip'
         else:
             weight_key = 'pa'  # default
-        pairs = [(r[stat], r.get(weight_key, 0)) for r in hitter_leaderboard if r.get(stat) is not None and r.get(weight_key, 0) > 0]
+        pairs = [(r[stat], r.get(weight_key, 0)) for r in hitter_lb_mlb if r.get(stat) is not None and r.get(weight_key, 0) > 0]
         if pairs:
             hitter_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
-    hitter_league_avgs['count'] = len(hitter_leaderboard)
+    hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
     # --- Metadata ---
     metadata = {
         'teams': all_teams,
         'pitchTypes': all_pitch_types,
         'generatedAt': datetime.now().strftime('%Y-%m-%d %H:%M'),
-        'totalPitches': len(all_pitches),
-        'totalPitchers': len(pitcher_leaderboard),
-        'totalHitters': len(hitter_leaderboard),
+        'totalPitches': len([p for p in all_pitches if p.get('_source', 'MLB') == 'MLB']),
+        'totalPitchers': len(pitcher_lb_mlb),
+        'totalHitters': len(hitter_lb_mlb),
+        'rocTeams': sorted(AAA_TEAMS),
         'leagueAverages': league_avgs,
         'pitcherLeagueAverages': pitcher_league_avgs,
         'hitterLeagueAverages': hitter_league_avgs,
@@ -2869,7 +2969,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
     BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
     for stat in BOXSCORE_PCTL_KEYS:
-        compute_percentile_ranks(pitcher_leaderboard, stat, min_count=0)
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
     for row in pitcher_leaderboard:
         for stat in BOXSCORE_INVERT:
             pctl_key = stat + '_pctl'
@@ -2881,17 +2981,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         total_ip = total_outs / 3.0
         metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_ip, 2)
 
-    # HR/9 league average — weighted by IP
+    # HR/9 league average — weighted by IP (MLB only)
     hr9_pairs = [(r['hr9'], float(r.get('ip', 0))) for r in pitcher_leaderboard
-                 if r.get('hr9') is not None and r.get('ip') is not None and float(r['ip']) > 0]
+                 if r.get('hr9') is not None and r.get('ip') is not None and float(r['ip']) > 0 and not r.get('_isROC')]
     if hr9_pairs:
         total_w = sum(w for _, w in hr9_pairs)
         metadata['pitcherLeagueAverages']['hr9'] = round(sum(v * w for v, w in hr9_pairs) / total_w, 2) if total_w > 0 else None
 
-    # FIP, xFIP, SIERA league averages — weighted by IP
+    # FIP, xFIP, SIERA league averages — weighted by IP (MLB only)
     for stat in ['fip', 'xFIP', 'siera']:
         pairs = [(r[stat], float(r.get('ip', 0))) for r in pitcher_leaderboard
-                 if r.get(stat) is not None and r.get('ip') is not None and float(r['ip']) > 0]
+                 if r.get(stat) is not None and r.get('ip') is not None and float(r['ip']) > 0 and not r.get('_isROC')]
         if pairs:
             total_w = sum(w for _, w in pairs)
             metadata['pitcherLeagueAverages'][stat] = round(sum(v * w for v, w in pairs) / total_w, 2) if total_w > 0 else None
@@ -2910,14 +3010,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
 def write_json_outputs(result, suffix):
     """Write JSON output files with the given suffix."""
+    def strip_internal_keys(rows):
+        return [{k: v for k, v in row.items() if not k.startswith('_')} for row in rows]
     with open(os.path.join(DATA_DIR, f'pitch_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(result['pitch_leaderboard'], f)
+        json.dump(strip_internal_keys(result['pitch_leaderboard']), f)
     with open(os.path.join(DATA_DIR, f'pitcher_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(result['pitcher_leaderboard'], f)
+        json.dump(strip_internal_keys(result['pitcher_leaderboard']), f)
     with open(os.path.join(DATA_DIR, f'hitter_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(result['hitter_leaderboard'], f)
+        json.dump(strip_internal_keys(result['hitter_leaderboard']), f)
     with open(os.path.join(DATA_DIR, f'hitter_pitch_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(result['hitter_pitch_leaderboard'], f)
+        json.dump(strip_internal_keys(result['hitter_pitch_leaderboard']), f)
     with open(os.path.join(DATA_DIR, f'metadata{suffix}.json'), 'w') as f:
         json.dump(result['metadata'], f, indent=2)
     with open(os.path.join(DATA_DIR, f'micro_data{suffix}.json'), 'w') as f:
@@ -2928,15 +3030,18 @@ def write_json_outputs(result, suffix):
 def write_embedded_js(st_result, rs_result):
     """Write data_embedded.js with window.ST_DATA and window.RS_DATA."""
     def build_data_obj(result):
+        # Strip internal _-prefixed keys from all leaderboard rows
+        def strip_internal(rows):
+            return [{k: v for k, v in row.items() if not k.startswith('_')} for row in rows]
         # Strip _pctl keys from hitter pitch LB for embedding
         hitter_pitch_lb_slim = []
         for row in result['hitter_pitch_leaderboard']:
-            slim = {k: v for k, v in row.items() if not k.endswith('_pctl')}
+            slim = {k: v for k, v in row.items() if not k.endswith('_pctl') and not k.startswith('_')}
             hitter_pitch_lb_slim.append(slim)
         return {
-            'pitcherData': result['pitcher_leaderboard'],
-            'pitchData': result['pitch_leaderboard'],
-            'hitterData': result['hitter_leaderboard'],
+            'pitcherData': strip_internal(result['pitcher_leaderboard']),
+            'pitchData': strip_internal(result['pitch_leaderboard']),
+            'hitterData': strip_internal(result['hitter_leaderboard']),
             'hitterPitchData': hitter_pitch_lb_slim,
             'metadata': result['metadata'],
             'microData': result['micro_data'],
@@ -2981,7 +3086,7 @@ def main():
 
     print("\n=== Reading Regular Season data ===")
     rs_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
-    rs_pitches += read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'])
+    rs_pitches += read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'], extra_tabs={'ROC', 'AAA'})
     print(f"  Read {len(rs_pitches)} RS pitches")
 
     # Shared MLB ID cache
