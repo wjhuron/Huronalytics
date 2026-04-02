@@ -117,7 +117,16 @@
 
     <div class="filter-group">
       <label for="min-count">Min Pitches</label>
-      <input type="number" id="min-count" value="10" min="1" max="500" step="1">
+      <select id="min-count">
+        <option value="Q" selected>Qualified</option>
+        <option value="1">1</option>
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="150">150</option>
+        <option value="200">200</option>
+      </select>
     </div>
 
     <div class="filter-group" id="min-swings-filter-group" style="display:none;">
@@ -127,7 +136,16 @@
 
     <div class="filter-group" id="min-ip-filter-group" style="display:none;">
       <label for="min-ip">Min IP</label>
-      <input type="number" id="min-ip" value="0" min="0" max="300" step="0.1">
+      <select id="min-ip">
+        <option value="Q" selected>Qualified</option>
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="30">30</option>
+        <option value="50">50</option>
+      </select>
     </div>
 
     <div class="filter-group" id="min-tbf-filter-group" style="display:none;">
@@ -413,12 +431,12 @@
   </footer>
 
   <script src="data/data_embedded.js?v=72"></script>
-  <script src="js/utils.js?v=87"></script>
-  <script src="js/aggregator.js?v=87"></script>
-  <script src="js/data.js?v=87"></script>
-  <script src="js/leaderboard.js?v=87"></script>
-  <script src="js/scatter.js?v=87"></script>
-  <script src="js/player-page.js?v=87"></script>
-  <script src="js/app.js?v=87"></script>
+  <script src="js/utils.js?v=88"></script>
+  <script src="js/aggregator.js?v=88"></script>
+  <script src="js/data.js?v=88"></script>
+  <script src="js/leaderboard.js?v=88"></script>
+  <script src="js/scatter.js?v=88"></script>
+  <script src="js/player-page.js?v=88"></script>
+  <script src="js/app.js?v=88"></script>
 </body>
 </html>

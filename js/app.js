@@ -299,9 +299,27 @@
       throwsLabel.textContent = isHitterTab(currentTab) ? 'Bats' : 'Throws';
     }
     var minCountLabel = document.querySelector('[for="min-count"]');
+    var isMinPA = isHitterTab(currentTab) && currentTab !== 'hitterPitch';
     if (minCountLabel) {
-      minCountLabel.textContent = (isHitterTab(currentTab) && currentTab !== 'hitterPitch') ? 'Min PA' : 'Min Pitches';
+      minCountLabel.textContent = isMinPA ? 'Min PA' : 'Min Pitches';
     }
+    // Update dropdown options based on whether this is PA or pitch count
+    var savedVal = minCountInput.value;
+    var paOpts = [['Q','Qualified'],['1','1'],['10','10'],['25','25'],['50','50'],['75','75'],['100','100'],['150','150']];
+    var pitchOpts = [['Q','Qualified'],['1','1'],['10','10'],['25','25'],['50','50'],['100','100'],['150','150'],['200','200']];
+    var opts = isMinPA ? paOpts : pitchOpts;
+    minCountInput.innerHTML = '';
+    for (var oi = 0; oi < opts.length; oi++) {
+      var o = document.createElement('option');
+      o.value = opts[oi][0]; o.textContent = opts[oi][1];
+      minCountInput.appendChild(o);
+    }
+    // Restore previous value if it exists in new options, otherwise default to Q
+    var found = false;
+    for (var oi2 = 0; oi2 < minCountInput.options.length; oi2++) {
+      if (minCountInput.options[oi2].value === savedVal) { found = true; break; }
+    }
+    minCountInput.value = found ? savedVal : 'Q';
     updateVsHandLabels();
     searchInput.placeholder = isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...';
 
@@ -396,9 +414,9 @@
     teamSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     throwsSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     vsHandSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
-    minCountInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    minCountInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     minSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
-    minIpInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
+    minIpInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     minTbfInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minBipInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minPitcherSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
@@ -752,15 +770,46 @@
   }
 
   // ---- Core refresh ----
+  function _getMaxTeamGames() {
+    var tg = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
+    var max = 0;
+    for (var t in tg) { if (tg[t] > max) max = tg[t]; }
+    return max;
+  }
+
+  function _resolveMinCount() {
+    var val = minCountInput.value;
+    if (val === 'Q') {
+      // Qualified: hitters = 3.1 PA/team game, pitchers = 10 pitches (fallback)
+      if (isHitterTab(currentTab) && currentTab !== 'hitterPitch') {
+        return Math.round(_getMaxTeamGames() * 3.1) || 1;
+      }
+      return 10; // pitch tabs: just use 10 as reasonable default
+    }
+    return parseInt(val) || 1;
+  }
+
+  function _resolveMinIp() {
+    var val = minIpInput.value;
+    if (val === 'Q') {
+      // Qualified: SP = 1.0 IP/game, RP = 0.1 IP/game
+      var maxTg = _getMaxTeamGames();
+      var role = document.getElementById('role-filter').value;
+      if (role === 'RP') return Math.round(maxTg * 0.1 * 10) / 10 || 0;
+      return Math.round(maxTg * 1.0 * 10) / 10 || 0; // default to SP threshold
+    }
+    return parseFloat(val) || 0;
+  }
+
   function getFilters() {
     return {
       team: teamSelect.value,
       pitchTypes: (selectedPitchTypes.length === 0 || (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All')) ? 'all' : selectedPitchTypes,
       throws: throwsSelect.value,
       vsHand: vsHandSelect.value,
-      minCount: currentTab === 'pitcherStats' ? 0 : (parseInt(minCountInput.value) || 1),
+      minCount: currentTab === 'pitcherStats' ? 0 : _resolveMinCount(),
       minSwings: parseInt(minSwingsInput.value) || 1,
-      minIp: currentTab === 'pitcherStats' ? (parseFloat(minIpInput.value) || 0) : 0,
+      minIp: currentTab === 'pitcherStats' ? _resolveMinIp() : 0,
       minTbf: currentTab === 'pitcherStats' ? (parseInt(minTbfInput.value) || 1) : 0,
       minBip: (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall') ? (parseInt(minBipInput.value) || 1) : 0,
       minPitcherSwings: currentTab === 'pitcherSwingDecisions' ? (parseInt(minPitcherSwingsInput.value) || 1) : 0,
@@ -1494,7 +1543,7 @@
     if (teamSelect.value !== 'all') parts.push('team=' + teamSelect.value);
     if (throwsSelect.value !== 'all') parts.push('throws=' + throwsSelect.value);
     if (vsHandSelect.value !== 'all') parts.push('vsHand=' + vsHandSelect.value);
-    if (minCountInput.value !== '10') parts.push('min=' + minCountInput.value);
+    if (minCountInput.value !== 'Q') parts.push('min=' + minCountInput.value);
     if (searchInput.value) parts.push('search=' + encodeURIComponent(searchInput.value));
     if (Leaderboard.currentSort.key) parts.push('sort=' + Leaderboard.currentSort.key);
     if (Leaderboard.currentSort.dir) parts.push('dir=' + Leaderboard.currentSort.dir);
