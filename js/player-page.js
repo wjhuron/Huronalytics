@@ -2362,10 +2362,10 @@ var PlayerPage = {
     var datasets = [{
       data: points,
       backgroundColor: pointColors,
-      borderColor: pointColors.map(function (c) { return c.replace('0.75', '1').replace('0.6', '0.8'); }),
+      borderColor: 'rgba(0,0,0,0.5)',
       borderWidth: 1.5,
-      pointRadius: 5,
-      pointHoverRadius: 7,
+      pointRadius: 6,
+      pointHoverRadius: 8,
     }];
 
     // Zone overlay plugin — wOBA heatmap gradient
@@ -2466,7 +2466,6 @@ var PlayerPage = {
         maintainAspectRatio: true,
         aspectRatio: 1.2,
         animation: false,
-        layout: { padding: { top: 0 } },
         clip: true,
         plugins: {
           legend: { display: false },
