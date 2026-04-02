@@ -2300,10 +2300,12 @@ var PlayerPage = {
 
     // Collect BIP data points
     var points = [];
+    var totalBip = 0;
     var bipData = microData.hitterBip;
     for (var bi = 0; bi < bipData.length; bi++) {
       var row = bipData[bi];
       if (row[hiIdx] !== playerIdx) continue;
+      totalBip++;
       var la = row[laIdx];
       var hcX = row[hcXIdx];
       var hcY = row[hcYIdx];
@@ -2321,6 +2323,17 @@ var PlayerPage = {
         event: row[eventIdx],
         clamped: la !== clampedLA,
       });
+    }
+
+    // Show note if some BIP couldn't be plotted (e.g. missing hit coordinates)
+    var bipNote = document.getElementById('la-spray-bip-note');
+    if (bipNote) {
+      if (points.length < totalBip) {
+        bipNote.textContent = points.length + ' of ' + totalBip + ' BIP shown';
+        bipNote.style.display = '';
+      } else {
+        bipNote.style.display = 'none';
+      }
     }
 
     // Get SACQ zones for overlay
