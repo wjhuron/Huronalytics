@@ -195,6 +195,26 @@ var Aggregator = {
       rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
 
+    // Interpolate sub-minimum rows into the qualified pool (they get percentiles but are "unqualified")
+    if (minCount > 0) {
+      for (var s = 0; s < rows.length; s++) {
+        if (pctlKey in rows[s]) continue; // Already computed above
+        var sVal = rows[s][metricKey];
+        if (sVal === null || sVal === undefined) {
+          rows[s][pctlKey] = null;
+          continue;
+        }
+        var sv = useAbs ? Math.abs(sVal) : sVal;
+        var sBelow = 0, sEqual = 0;
+        for (var sm = 0; sm < n; sm++) {
+          if (mlbValues[sm] < sv) sBelow++;
+          if (mlbValues[sm] === sv) sEqual++;
+        }
+        var sPctl = (sBelow + 0.5 * sEqual) / n * 100;
+        rows[s][pctlKey] = Math.max(0, Math.min(100, Math.round(sPctl)));
+      }
+    }
+
     for (var j2 = 0; j2 < rows.length; j2++) {
       if (!(pctlKey in rows[j2])) {
         rows[j2][pctlKey] = null;
@@ -1074,6 +1094,11 @@ var Aggregator = {
         self._computePercentiles(rows, key);
       }
     });
+
+    // Set bipQual flag for each hitter
+    for (var bqi = 0; bqi < rows.length; bqi++) {
+      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
+    }
 
     // Invert where lower is better
     for (var ri2 = 0; ri2 < rows.length; ri2++) {

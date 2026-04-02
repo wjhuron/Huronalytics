@@ -888,11 +888,21 @@ var PlayerPage = {
     }
     var alwaysColorKeys = isPitcher ? { fbVelo: true, extension: true } : { maxEV: true };
 
+    // BIP-dependent hitter stats that show gray when bipQual is false
+    var HITTER_BIP_STATS = {
+      avgEVAll: true, medEV: true, ev75: true, maxEV: true,
+      hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
+      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
+      babip: true, hrFbPct: true, airPullPct: true
+    };
+
     for (var i = 0; i < statsDef.length; i++) {
       var stat = statsDef[i];
       var val = data[stat.key];
       var pctl = data[stat.key + '_pctl'];
-      var showColor = isQualified || alwaysColorKeys[stat.key];
+      // BIP qualification: if hitter has <20 BIP, BIP stats show gray
+      var bipUnqual = !isPitcher && HITTER_BIP_STATS[stat.key] && data.bipQual === false;
+      var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual;
 
       var row = document.createElement('div');
       row.className = 'pctl-row';

@@ -1476,7 +1476,8 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
     """Compute percentile rank (0-100) for each row's metric value.
     Uses the 'mean rank' method for ties.
     If min_count > 0, only rows with row[count_key] >= min_count participate
-    in the percentile pool. Rows below the threshold get pctl = None."""
+    in the percentile pool. Sub-minimum rows are interpolated into the qualified
+    pool so they still get a percentile value (displayed as unqualified/gray)."""
     pctl_key = metric_key + '_pctl'
     valid = [(i, rows[i][metric_key]) for i in range(len(rows))
              if rows[i].get(metric_key) is not None
@@ -1484,20 +1485,34 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
 
     if len(valid) < 2:
         for row in rows:
-            row[pctl_key] = 50 if (row.get(metric_key) is not None
-                                   and (min_count == 0 or (row.get(count_key) or 0) >= min_count)) else None
+            row[pctl_key] = 50 if row.get(metric_key) is not None else None
         return
 
     values = [v for _, v in valid]
     n = len(values)
 
+    # Compute percentiles for qualified rows (ranked among themselves)
     for idx, val in valid:
         below = sum(1 for x in values if x < val)
         equal = sum(1 for x in values if x == val)
         pctl = (below + 0.5 * (equal - 1)) / max(1, n - 1) * 100
         rows[idx][pctl_key] = max(0, min(100, round(pctl)))
 
-    # Set None for rows that don't have the metric or don't qualify
+    # Interpolate sub-minimum rows into the qualified pool
+    if min_count > 0:
+        for i, row in enumerate(rows):
+            if pctl_key in row:
+                continue  # Already computed above
+            val = row.get(metric_key)
+            if val is None:
+                row[pctl_key] = None
+                continue
+            below = sum(1 for x in values if x < val)
+            equal = sum(1 for x in values if x == val)
+            pctl = (below + 0.5 * equal) / n * 100
+            row[pctl_key] = max(0, min(100, round(pctl)))
+
+    # Set None for rows that don't have the metric
     for row in rows:
         if pctl_key not in row:
             row[pctl_key] = None
@@ -1523,7 +1538,7 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
 
     for row in aaa_rows:
         val = row.get(metric_key)
-        if val is None or (min_count > 0 and (row.get(count_key) or 0) < min_count):
+        if val is None:
             row[pctl_key] = None
             continue
         if n < 2:
@@ -2749,6 +2764,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 
         hitter_leaderboard.append(row)
+
+    # Flag hitters with sufficient BIP for batted ball percentile qualification
+    for row in hitter_leaderboard:
+        row['bipQual'] = (row.get('nBip') or 0) >= 20
 
     # BIP-dependent stats require min 20 BIP for percentile pool
     HITTER_BIP_PCTL_STATS = {
