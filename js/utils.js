@@ -85,18 +85,24 @@ var Utils = {
     return '#1a1a2e';
   },
 
-  // Dark mode: semi-transparent overlays, more vivid
+  // Dark mode: solid color interpolation (visible at all percentiles)
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
+    var r, g, b;
     if (pctl <= 50) {
-      // Blue tint, stronger at low percentiles
-      var opacity = ((50 - pctl) / 50 * 0.85).toFixed(2);
-      return 'rgba(30, 90, 255, ' + opacity + ')';
+      var t = pctl / 50;
+      // 0th = rgb(30,80,220), 50th = rgb(75,75,85) muted gray
+      r = Math.round(30 + t * 45);
+      g = Math.round(80 - t * 5);
+      b = Math.round(220 - t * 135);
     } else {
-      // Red tint, stronger at high percentiles
-      var opacity = ((pctl - 50) / 50 * 0.85).toFixed(2);
-      return 'rgba(240, 40, 30, ' + opacity + ')';
+      var t = (pctl - 50) / 50;
+      // 50th = rgb(75,75,85), 100th = rgb(210,35,30)
+      r = Math.round(75 + t * 135);
+      g = Math.round(75 - t * 40);
+      b = Math.round(85 - t * 55);
     }
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
 
   percentileTextColorDark: function (pctl) {
