@@ -2081,10 +2081,11 @@ var PlayerPage = {
     ctx.fill();
 
     // Draw infield dirt — arc at ~155ft from home (real infield dirt extends to ~150-160ft)
+    var infieldRadius = 155 * fenceScale;
     ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
     ctx.beginPath();
-    ctx.arc(canvasHPX, canvasHPY, 155 * fenceScale, foulAngleLeft, foulAngleRight);
-    ctx.lineTo(canvasHPX, canvasHPY);
+    ctx.moveTo(canvasHPX, canvasHPY);
+    ctx.arc(canvasHPX, canvasHPY, infieldRadius, foulAngleLeft, foulAngleRight);
     ctx.closePath();
     ctx.fill();
 
