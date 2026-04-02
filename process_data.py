@@ -3053,6 +3053,44 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['cs'] = box['cs']
                 total_attempts = box['sb'] + box['cs']
                 row['sbPct'] = round(box['sb'] / total_attempts * 100, 1) if total_attempts > 0 else None
+
+                # Recompute batting stats using boxscore counts (fixes IBB not in pitch data)
+                box_h = box.get('h', 0)
+                box_bb = box.get('bb', 0)  # includes IBB
+                box_ibb = box.get('ibb', 0)
+                box_hbp = box.get('hbp', 0)
+                box_sf = box.get('sacFlies', 0)
+                box_ab = box['ab']
+                box_pa = box['pa']
+                box_hr = box.get('hr', 0)
+                box_2b = box.get('doubles', 0)
+                box_3b = box.get('triples', 0)
+                box_1b = box_h - box_2b - box_3b - box_hr
+                box_tb = box['tb']
+                box_so = box.get('so', 0)
+
+                # AVG, OBP, SLG, OPS
+                row['avg'] = round(box_h / box_ab, 3) if box_ab > 0 else None
+                obp_denom = box_ab + box_bb + box_hbp + box_sf
+                row['obp'] = round((box_h + box_bb + box_hbp) / obp_denom, 3) if obp_denom > 0 else None
+                row['slg'] = round(box_tb / box_ab, 3) if box_ab > 0 else None
+                row['ops'] = round(row['obp'] + row['slg'], 3) if row['obp'] is not None and row['slg'] is not None else None
+                row['iso'] = round(row['slg'] - row['avg'], 3) if row['slg'] is not None and row['avg'] is not None else None
+
+                # Doubles, triples, HR, XBH from boxscore
+                row['doubles'] = box_2b
+                row['triples'] = box_3b
+                row['hr'] = box_hr
+                row['xbh'] = box_2b + box_3b + box_hr
+
+                # K% and BB% (BB% excludes IBB, matching FanGraphs)
+                box_ubb = box_bb - box_ibb
+                row['kPct'] = round(box_so / box_pa, 4) if box_pa > 0 else None
+                row['bbPct'] = round(box_ubb / box_pa, 4) if box_pa > 0 else None
+
+                # BABIP = (H - HR) / (AB - K - HR + SF)
+                babip_denom = box_ab - box_so - box_hr + box_sf
+                row['babip'] = round((box_h - box_hr) / babip_denom, 3) if babip_denom > 0 else None
             else:
                 row['g'] = None
                 row['tb'] = None
