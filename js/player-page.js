@@ -2310,12 +2310,16 @@ var PlayerPage = {
       if (la == null || hcX == null || hcY == null) continue;
       var sprayAngle = Aggregator.computeSprayAngle(hcX, hcY);
       if (sprayAngle == null) continue;
+      // Clamp LA to chart bounds so extreme values appear at edges
+      var clampedLA = Math.max(-20, Math.min(60, la));
       points.push({
         x: sprayAngle,
-        y: la,
+        y: clampedLA,
+        realLA: la,
         ev: row[evIdx],
         bbType: row[bbTypeIdx],
         event: row[eventIdx],
+        clamped: la !== clampedLA,
       });
     }
 
@@ -2462,6 +2466,8 @@ var PlayerPage = {
         maintainAspectRatio: true,
         aspectRatio: 1.2,
         animation: false,
+        layout: { padding: { top: 0 } },
+        clip: true,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -2469,7 +2475,7 @@ var PlayerPage = {
               label: function (ctx) {
                 var pt = ctx.raw;
                 var evStr = pt.ev != null ? pt.ev.toFixed(1) + ' mph' : '—';
-                var laStr = pt.y.toFixed(1) + '°';
+                var laStr = (pt.clamped ? pt.realLA.toFixed(1) : pt.y.toFixed(1)) + '°';
                 var sprayStr = pt.x.toFixed(1) + '°';
                 var evtNames = ['Out', 'Single', 'Double', 'Triple', 'HR', 'Error/FC'];
                 var result = evtNames[pt.event] || 'Out';
@@ -2512,10 +2518,15 @@ var PlayerPage = {
               color: '#ccc',
               font: { family: 'Barlow', size: 11 },
               callback: function (value) {
+                if (value > 60 || value < -20) return '';
                 return value + '°';
-              }
+              },
+              padding: 0
             },
-            grid: { color: 'rgba(255,255,255,0.2)' }
+            grid: { color: 'rgba(255,255,255,0.2)' },
+            afterBuildTicks: function(axis) {
+              axis.ticks = axis.ticks.filter(function(t) { return t.value >= -20 && t.value <= 60; });
+            }
           }
         }
       }
