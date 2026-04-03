@@ -17,6 +17,13 @@ var Utils = {
     };
   },
 
+  formatSignedDecimal: function (places) {
+    return function (value) {
+      if (value === null || value === undefined) return '--';
+      return (value > 0 ? '+' : '') + Number(value).toFixed(places);
+    };
+  },
+
   formatInt: function (value) {
     if (value === null || value === undefined) return '--';
     return Math.round(value).toString();

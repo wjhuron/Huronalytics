@@ -576,7 +576,7 @@ var Aggregator = {
     var PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     var PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
     var PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
-    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -702,6 +702,23 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
+      // IVBOE: IVB over expected (from arm angle regression, per pitch type)
+      var ivbRegs = DataStore.metadata && DataStore.metadata.ivbRegressions;
+      var ivbReg = ivbRegs && ivbRegs[pitchType];
+      if (ivbReg && obj.indVertBrk !== null && obj.armAngle !== null) {
+        obj.ivbOE = Number((obj.indVertBrk - (ivbReg.slope * obj.armAngle + ivbReg.intercept)).toFixed(1));
+      } else {
+        obj.ivbOE = null;
+      }
+      // HBOE: HB over expected (handedness-keyed regression, e.g. "FF_R")
+      var hbRegs = DataStore.metadata && DataStore.metadata.hbRegressions;
+      var hbReg = hbRegs && hbRegs[pitchType + '_' + obj.throws];
+      if (hbReg && obj.horzBrk !== null && obj.armAngle !== null) {
+        obj.hbOE = Number((obj.horzBrk - (hbReg.slope * obj.armAngle + hbReg.intercept)).toFixed(1));
+      } else {
+        obj.hbOE = null;
+      }
+
       // Break Tilt (circular mean)
       if (ms.nTilt > 0) {
         var sinAvg = ms.sumTiltSin / ms.nTilt;
@@ -796,9 +813,9 @@ var Aggregator = {
 
     var self = this;
     var MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches for outcome metrics
-    var ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true };  // use |value| for RHP/LHP fairness
+    var ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true, hbOE: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
-    var SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true };
+    var SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true };
     // CF pairs with FF for velocity, spin rate, VAA, HAA percentiles
     var CF_FF_PAIRED = { velocity: true, spinRate: true, vaa: true, haa: true, nVAA: true, nHAA: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
@@ -838,6 +855,21 @@ var Aggregator = {
       } else if (IVB_SUPPRESS[ptIVB]) {
         ptGroups[ptIVB].forEach(function (r) {
           r.indVertBrk_pctl = null;
+        });
+      }
+    }
+
+    // IVBOE: same inversion/suppression as IVB
+    for (var ptIVBOE in ptGroups) {
+      if (IVB_INVERT[ptIVBOE]) {
+        ptGroups[ptIVBOE].forEach(function (r) {
+          if (r.ivbOE_pctl !== null && r.ivbOE_pctl !== undefined) {
+            r.ivbOE_pctl = 100 - r.ivbOE_pctl;
+          }
+        });
+      } else if (IVB_SUPPRESS[ptIVBOE]) {
+        ptGroups[ptIVBOE].forEach(function (r) {
+          r.ivbOE_pctl = null;
         });
       }
     }
