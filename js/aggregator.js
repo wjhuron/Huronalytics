@@ -41,7 +41,7 @@ var Aggregator = {
 
   _buildIndexes: function () {
     var d = this.data;
-    var tables = ['pitcherCols', 'pitcherBipCols', 'pitchCols', 'hitterCols', 'hitterBipCols', 'hitterPitchCols', 'hitterPitchBipCols'];
+    var tables = ['pitcherCols', 'pitcherBipCols', 'pitchCols', 'hitterCols', 'hitterBipCols', 'hitterPitchCols', 'hitterPitchBipCols', 'veloTrendCols'];
     for (var t = 0; t < tables.length; t++) {
       var key = tables[t];
       this._colIdx[key] = {};
@@ -426,6 +426,9 @@ var Aggregator = {
     var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100',
                      'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
+                     'xwOBAcon', 'xwOBAcon_pctl',
+                     'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
+                     'pitchEntropy', 'pitchEntropy_pctl',
                      'armAngle'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};
@@ -946,7 +949,7 @@ var Aggregator = {
       'wRCplus', 'xWRCplus',
     ];
     var HITTER_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true
     };
 
     var rows = [];
@@ -1119,6 +1122,10 @@ var Aggregator = {
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
                       'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
                       'xwOBAcon', 'xwOBAcon_pctl',
+                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
+                      'firstPitchSwingPct', 'firstPitchSwingPct_pctl',
+                      'avgFbDist', 'avgHrDist',
+                      'squaredUpPct', 'squaredUpPct_pctl',
                       'wRC', 'wRCplus', 'xWRCplus'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
@@ -1558,6 +1565,38 @@ var Aggregator = {
   // ==================================================================
   //  Team games played (distinct game dates per team)
   // ==================================================================
+  /**
+   * Get velocity trend data for a pitcher, grouped by pitch type.
+   * Returns { pitchType: [{ date: 'YYYY-MM-DD', avgVelo: N }, ...], ... }
+   */
+  getVeloTrend: function(pitcherName) {
+    var d = this.data;
+    if (!d || !d.veloTrend) return {};
+    var lookups = d.lookups;
+    var ci = this._colIdx.veloTrendCols;
+    var piIdx = lookups.pitchers.indexOf(pitcherName);
+    if (piIdx < 0) return {};
+
+    var result = {};
+    var rows = d.veloTrend;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r[ci.pitcherIdx] !== piIdx) continue;
+      var pt = lookups.pitchTypes[r[ci.pitchTypeIdx]];
+      var date = lookups.dates[r[ci.dateIdx]];
+      var sumV = r[ci.sumVelo];
+      var nV = r[ci.nVelo];
+      if (nV <= 0) continue;
+      if (!result[pt]) result[pt] = [];
+      result[pt].push({ date: date, avgVelo: Math.round(sumV / nV * 10) / 10 });
+    }
+    // Sort each pitch type's entries by date
+    for (var pt2 in result) {
+      result[pt2].sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+    }
+    return result;
+  },
+
   getTeamGamesPlayed: function(dateStart, dateEnd) {
     var d = this.data;
     if (!d) return {};

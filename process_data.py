@@ -35,7 +35,7 @@ METRIC_KEYS = {
 }
 
 PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
-STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct']
+STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
@@ -58,9 +58,15 @@ HITTER_STAT_KEYS = [
     'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
     # Bat Tracking tab
     'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
+    # Count-leverage stats
+    'twoStrikeWhiffPct', 'firstPitchSwingPct',
+    # Batted ball distance
+    'avgFbDist', 'avgHrDist',
+    # Squared-Up Rate
+    'squaredUpPct',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
-HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct'}
+HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
 BUNT_BB_TYPES = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
 # Team abbreviation → MLB API team ID mapping
@@ -472,6 +478,12 @@ def compute_stats(pitches):
                       if p.get('Description') in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'))
     fps_pct = fps_strikes / len(first_pitches) if first_pitches else None
 
+    # 2-Strike Whiff% — whiff rate on pitches with 2 strikes
+    two_strike_pitches = [p for p in pitches if p.get('Count') and p['Count'].split('-')[1] == '2']
+    two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
+    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
+    two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
+
     return {
         'pa': n_pa,
         'strikePct': strike_pct,
@@ -489,6 +501,7 @@ def compute_stats(pitches):
         'kbbPct': kbb_pct,
         'babip': babip,
         'fpsPct': fps_pct,
+        'twoStrikeWhiffPct': two_strike_whiff_pct,
         'runValue': run_value,
     }
 
@@ -765,6 +778,44 @@ def compute_hitter_stats(pitches):
     fb_for_hrfb = fb + pu + ld_hr
     hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
+    # === Count-leverage stats ===
+    # 2-Strike Whiff%: whiff rate when hitter has 2 strikes
+    two_strike_pitches = [p for p in pitches if p.get('Count') and p['Count'].split('-')[1] == '2']
+    two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
+    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
+    two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
+
+    # First-Pitch Swing%: % of PAs where hitter swings on first pitch (count "0-0")
+    first_pitches_h = [p for p in pitches if p.get('Count') == '0-0']
+    first_pitch_swings = sum(1 for p in first_pitches_h if p['Description'] in SWING_DESCRIPTIONS)
+    first_pitch_swing_pct = first_pitch_swings / len(first_pitches_h) if first_pitches_h else None
+
+    # === Batted ball distance ===
+    # Avg fly ball distance (fly_ball only, not popups/LD)
+    fb_distances = [safe_float(p.get('Distance')) for p in bip if p.get('BBType') == 'fly_ball']
+    fb_distances = [d for d in fb_distances if d is not None]
+    avg_fb_dist = round(sum(fb_distances) / len(fb_distances), 0) if fb_distances else None
+
+    # Avg HR distance
+    hr_distances = [safe_float(p.get('Distance')) for p in bip if p.get('Event') == 'Home Run']
+    hr_distances = [d for d in hr_distances if d is not None]
+    avg_hr_dist = round(sum(hr_distances) / len(hr_distances), 0) if hr_distances else None
+
+    # === Squared-Up Rate ===
+    # % of competitive swings where exitVelo >= 0.80 × batSpeed × 1.23
+    # Uses per-pitch BatSpeed and ExitVelo on BIPs with competitive swings
+    squared_up = 0
+    squared_eligible = 0
+    for p in bip:
+        bs = safe_float(p.get('BatSpeed'))
+        ev_sq = safe_float(p.get('ExitVelo'))
+        if bs is not None and bs >= 50 and ev_sq is not None:
+            squared_eligible += 1
+            threshold = 0.80 * bs * 1.23
+            if ev_sq >= threshold:
+                squared_up += 1
+    squared_up_pct = squared_up / squared_eligible if squared_eligible > 0 else None
+
     # Bat Tracking — only competitive swings (BatSpeed >= 50)
     bs_vals = [safe_float(p.get('BatSpeed')) for p in pitches if safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
     sl_vals = [safe_float(p.get('SwingLength')) for p in pitches if safe_float(p.get('SwingLength')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
@@ -828,6 +879,14 @@ def compute_hitter_stats(pitches):
         'attackDirection': round(sum(ad_vals) / len(ad_vals), 1) if ad_vals else None,
         'swingPathTilt': round(sum(spt_vals) / len(spt_vals), 1) if spt_vals else None,
         'nCompSwings': len(bs_vals),  # competitive swings count
+        # Count-leverage stats
+        'twoStrikeWhiffPct': two_strike_whiff_pct,
+        'firstPitchSwingPct': first_pitch_swing_pct,
+        # Batted ball distance
+        'avgFbDist': avg_fb_dist,
+        'avgHrDist': avg_hr_dist,
+        # Squared-Up Rate
+        'squaredUpPct': squared_up_pct,
     }
 
 
@@ -1445,6 +1504,35 @@ def generate_micro_data(all_pitches):
         ])
 
     # ==========================================================
+    #  Velocity trend sparklines (sparse time-series)
+    #  Key: (pitcherIdx, pitchTypeIdx, dateIdx)
+    #  Values: [sumVelo, nVelo]
+    # ==========================================================
+    velo_trend = defaultdict(lambda: [0.0, 0])
+    for p in all_pitches:
+        pitcher = p.get('Pitcher')
+        team = p.get('PTeam')
+        pitch_type = p.get('Pitch Type')
+        date = normalize_date(p.get('Game Date'))
+        velo = safe_float(p.get('Velocity'))
+
+        if not pitcher or not team or team not in ALL_TEAMS or not pitch_type:
+            continue
+        if p.get('_roc_hitter_pitch'):
+            continue
+        if not date or velo is None:
+            continue
+
+        key = (pi_idx[pitcher], pt_idx[pitch_type], dt_idx[date])
+        velo_trend[key][0] += velo
+        velo_trend[key][1] += 1
+
+    velo_trend_rows = []
+    for (pi, pti, di), (s, n) in velo_trend.items():
+        velo_trend_rows.append([pi, pti, di, round(s, 1), n])
+    print(f"  Velocity trend rows: {len(velo_trend_rows)}")
+
+    # ==========================================================
     #  Build output
     # ==========================================================
     return {
@@ -1503,6 +1591,8 @@ def generate_micro_data(all_pitches):
         'hitterPitchMicro': hitter_pitch_rows,
         'hitterPitchBipCols': ['hitterIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
         'hitterPitchBip': hitter_pitch_bip_rows,
+        'veloTrendCols': ['pitcherIdx', 'pitchTypeIdx', 'dateIdx', 'sumVelo', 'nVelo'],
+        'veloTrend': velo_trend_rows,
     }
 
 
@@ -2474,18 +2564,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
 
-    # --- Compute Stuff Score ---
-    for row in pitch_leaderboard:
-        vp = row.get('velocity_pctl')
-        sp = row.get('spinRate_pctl')
-        if vp is not None and sp is not None:
-            row['stuffScore'] = round((vp + sp) / 2)
-        else:
-            row['stuffScore'] = None
-
-    for pt, pt_rows in pt_groups.items():
-        compute_percentile_ranks_with_aaa(pt_rows, 'stuffScore')
-
     pitch_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitch leaderboard: {len(pitch_leaderboard)} rows")
 
@@ -2559,12 +2637,28 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['rv100'] = None
 
+    # Compute pitch mix entropy: -Σ(p × log₂(p)) for each pitcher's pitch usage distribution
+    # Build usage fractions from pitch_leaderboard
+    pitcher_usage = defaultdict(list)
+    for pr in pitch_leaderboard:
+        pk = pr['pitcher'] + '|' + pr['team']
+        if pr.get('usagePct') is not None and pr['usagePct'] > 0:
+            pitcher_usage[pk].append(pr['usagePct'])
+    for row in pitcher_leaderboard:
+        pk = row['pitcher'] + '|' + row['team']
+        fracs = pitcher_usage.get(pk, [])
+        if len(fracs) >= 2:
+            entropy = -sum(p * math.log2(p) for p in fracs if p > 0)
+            row['pitchEntropy'] = round(entropy, 2)
+        else:
+            row['pitchEntropy'] = None
+
     # Compute percentiles for pitcher leaderboard
     # All pitchers get percentiles (frontend qualifying logic controls coloring)
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA']
-    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA'}  # lower is better for pitchers
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100']:
+    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
+    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'}  # lower is better for pitchers
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'pitchEntropy']:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:

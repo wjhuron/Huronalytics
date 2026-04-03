@@ -25,6 +25,7 @@ var PlayerPage = {
     { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%',        format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Percentile stat definitions for the hitting section
@@ -42,6 +43,8 @@ var PlayerPage = {
     { key: 'whiffPct',        label: 'Whiff%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',        label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true },
+    { key: 'squaredUpPct',   label: 'Sq-Up%',          format: function(v) { return Utils.formatPct(v); }, rocHide: true },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%',    format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Hitter Stats table columns (single row)
@@ -66,6 +69,8 @@ var PlayerPage = {
     { key: 'sb', label: 'SB', format: function(v) { return v != null ? v : '—'; } },
     { key: 'cs', label: 'CS', format: function(v) { return v != null ? v : '—'; } },
     { key: 'sbPct', label: 'SB%', format: function(v) { return v != null ? v.toFixed(1) + '%' : '—'; } },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'firstPitchSwingPct', label: '1st Sw%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Hitter Batted Ball table columns (per pitch type + total)
@@ -166,6 +171,8 @@ var PlayerPage = {
     { key: 'fip', label: 'FIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'xFIP', label: 'xFIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'pitchEntropy', label: 'Entropy', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   ],
 
   // Batted Ball table (per pitch type + total)
@@ -1494,6 +1501,59 @@ var PlayerPage = {
 
   // --- Render: Expanded Pitch Table (full detail view) ---
 
+  /**
+   * Create a small SVG sparkline from an array of {date, avgVelo} points.
+   * Returns an SVG element (inline, ~120×28px).
+   */
+  _createVeloSparkline: function (points, color) {
+    if (!points || points.length < 2) return null;
+    var W = 120, H = 28, PAD = 2;
+    var velos = points.map(function(p) { return p.avgVelo; });
+    var minV = Math.min.apply(null, velos);
+    var maxV = Math.max.apply(null, velos);
+    var range = maxV - minV || 1;
+
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', H);
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.style.display = 'inline-block';
+    svg.style.verticalAlign = 'middle';
+
+    // Build path
+    var pathParts = [];
+    for (var i = 0; i < points.length; i++) {
+      var x = PAD + (i / (points.length - 1)) * (W - 2 * PAD);
+      var y = PAD + (1 - (points[i].avgVelo - minV) / range) * (H - 2 * PAD);
+      pathParts.push((i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1));
+    }
+
+    var path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', pathParts.join(' '));
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color || '#888');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+
+    // End dot
+    var lastX = PAD + (W - 2 * PAD);
+    var lastY = PAD + (1 - (velos[velos.length - 1] - minV) / range) * (H - 2 * PAD);
+    var dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', lastX.toFixed(1));
+    dot.setAttribute('cy', lastY.toFixed(1));
+    dot.setAttribute('r', '2');
+    dot.setAttribute('fill', color || '#888');
+    svg.appendChild(dot);
+
+    // Tooltip showing range
+    svg.setAttribute('title', minV.toFixed(1) + ' – ' + maxV.toFixed(1) + ' mph');
+
+    return svg;
+  },
+
   _renderExpandedPitchTable: function (data) {
     var section = document.getElementById('player-expanded-pitch-section');
     var container = document.getElementById('player-expanded-pitch-table');
@@ -1503,6 +1563,9 @@ var PlayerPage = {
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
 
     section.style.display = '';
+
+    // Get velocity trend data for sparklines
+    var veloTrend = Aggregator.loaded ? Aggregator.getVeloTrend(data.pitcher) : {};
 
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
@@ -1515,6 +1578,11 @@ var PlayerPage = {
       th.textContent = this.EXPANDED_PITCH_COLS[i].label;
       headerRow.appendChild(th);
     }
+    // Add Velo Trend column header
+    var thVt = document.createElement('th');
+    thVt.textContent = 'Velo Trend';
+    thVt.style.minWidth = '130px';
+    headerRow.appendChild(thVt);
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
@@ -1540,6 +1608,18 @@ var PlayerPage = {
         }
         tr.appendChild(td);
       }
+      // Add sparkline cell
+      var tdVt = document.createElement('td');
+      tdVt.style.textAlign = 'center';
+      var trendData = veloTrend[row.pitchType];
+      var sparkColor = Utils.getPitchColor(row.pitchType);
+      var sparkline = this._createVeloSparkline(trendData, sparkColor);
+      if (sparkline) {
+        tdVt.appendChild(sparkline);
+      } else {
+        tdVt.textContent = '—';
+      }
+      tr.appendChild(tdVt);
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
