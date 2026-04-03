@@ -50,7 +50,6 @@ var COLUMNS = {
     { key: 'tbf',         label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     // Traditional / Advanced
     { key: 'era',         label: 'ERA',      format: Utils.formatDecimal(2), sortType: 'numeric', sectionStart: true, group: 'advanced' },
-    { key: 'whip',        label: 'WHIP',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
     { key: 'fip',         label: 'FIP',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
     { key: 'xFIP',        label: 'xFIP',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },
     { key: 'siera',       label: 'SIERA',    format: Utils.formatDecimal(2), sortType: 'numeric', group: 'advanced' },

@@ -41,7 +41,7 @@ STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPc
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
 
 # Pitcher stats where lower is better (invert percentile)
-PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'whip', 'fip', 'xFIP', 'siera'}
+PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 
 # --- Hitter Leaderboard constants ---
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
@@ -3385,7 +3385,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['tbf'] = box['tbf']  # Override pitch-data TBF with official boxscore TBF
                 ip_float = outs_to_ip_float(box['outs'])
                 row['era'] = round(box['er'] * 9 / ip_float, 2) if ip_float > 0 else None
-                row['whip'] = round((box['bb'] + box['h']) / ip_float, 2) if ip_float > 0 else None
                 row['hr9'] = round(box['hr'] * 9 / ip_float, 2) if ip_float > 0 else None
                 row['_box_er'] = box['er']  # raw ER for league avg calc (includes 0-IP pitchers)
                 # Store raw boxscore counts for FIP/xFIP/SIERA (computed below)
@@ -3399,7 +3398,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['sv'] = None
                 row['hld'] = None
                 row['era'] = None
-                row['whip'] = None
                 row['hr9'] = None
 
         # Merge hitter boxscore stats
@@ -3632,8 +3630,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # Compute percentiles for boxscore-derived stats (ERA, HR/9, FIP, xFIP, SIERA)
     # These are set AFTER the initial percentile pass, so need a second pass
-    BOXSCORE_PCTL_KEYS = ['era', 'whip', 'hr9', 'fip', 'xFIP', 'siera']
-    BOXSCORE_INVERT = {'era', 'whip', 'hr9', 'fip', 'xFIP', 'siera'}
+    BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
+    BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
     for stat in BOXSCORE_PCTL_KEYS:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
     for row in pitcher_leaderboard:

@@ -170,7 +170,6 @@ var PlayerPage = {
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'kbbPct', label: 'K-BB%', format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'era', label: 'ERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-    { key: 'whip', label: 'WHIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'fip', label: 'FIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'xFIP', label: 'xFIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
