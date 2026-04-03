@@ -702,21 +702,27 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB: expected IVB from arm angle regression (per pitch type)
+      // xIVB + IVBOE from arm angle regression (per pitch type)
       var ivbRegs = DataStore.metadata && DataStore.metadata.ivbRegressions;
       var ivbReg = ivbRegs && ivbRegs[obj.pitchType];
       if (ivbReg && obj.armAngle !== null) {
-        obj.xIVB = Number((ivbReg.slope * obj.armAngle + ivbReg.intercept).toFixed(1));
+        var expIVB = ivbReg.slope * obj.armAngle + ivbReg.intercept;
+        obj.xIVB = Number(expIVB.toFixed(1));
+        obj.ivbOE = obj.indVertBrk !== null ? Number((obj.indVertBrk - expIVB).toFixed(1)) : null;
       } else {
         obj.xIVB = null;
+        obj.ivbOE = null;
       }
-      // xHB: expected HB from arm angle regression (handedness-keyed, e.g. "FF_R")
+      // xHB + HBOE from arm angle regression (handedness-keyed, e.g. "FF_R")
       var hbRegs = DataStore.metadata && DataStore.metadata.hbRegressions;
       var hbReg = hbRegs && hbRegs[obj.pitchType + '_' + obj.throws];
       if (hbReg && obj.armAngle !== null) {
-        obj.xHB = Number((hbReg.slope * obj.armAngle + hbReg.intercept).toFixed(1));
+        var expHB = hbReg.slope * obj.armAngle + hbReg.intercept;
+        obj.xHB = Number(expHB.toFixed(1));
+        obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - expHB).toFixed(1)) : null;
       } else {
         obj.xHB = null;
+        obj.hbOE = null;
       }
 
       // Break Tilt (circular mean)
