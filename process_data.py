@@ -170,13 +170,14 @@ def fetch_sprint_speed(year=2026):
     })
     try:
         resp = urllib.request.urlopen(req, timeout=30)
-        data = resp.read().decode('utf-8')
+        data = resp.read().decode('utf-8-sig')  # Handle BOM
         reader = csv.DictReader(io.StringIO(data))
         result = {}
         for row in reader:
             try:
-                mlb_id = int(row.get('player_id') or row.get('mlb_id') or 0)
-                speed = float(row.get('hp_to_1b', 0) or row.get('sprint_speed', 0))
+                mlb_id = int(row.get('player_id') or 0)
+                speed_str = row.get('sprint_speed') or row.get('hp_to_1b') or ''
+                speed = float(speed_str) if speed_str else 0
                 if mlb_id and speed > 0:
                     result[mlb_id] = round(speed, 1)
             except (ValueError, TypeError):
