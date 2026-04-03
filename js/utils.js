@@ -1,10 +1,4 @@
 var Utils = {
-  ordinal: function (n) {
-    var s = ['th', 'st', 'nd', 'rd'];
-    var v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-  },
-
   formatPct: function (value) {
     if (value === null || value === undefined) return '--';
     return (value * 100).toFixed(1) + '%';

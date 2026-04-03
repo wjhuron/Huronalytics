@@ -15,8 +15,6 @@ var ScatterChart = {
     CH: { bg: '#800080', border: '#660066' },
     FS: { bg: '#40E0D0', border: '#33B3A6' },
     KN: { bg: '#000000', border: '#333333' },
-    SC: { bg: '#999999', border: '#777777' },
-    CS: { bg: '#666666', border: '#4D4D4D' },
   },
 
   MARKER_STYLES: ['circle', 'triangle', 'rect', 'rectRot'],

@@ -153,10 +153,10 @@ var COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchType: true },
+    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchBadge: true },
     // Exit Velocity
     { key: 'avgEVAll',    label: 'Avg EV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
-    { key: 'medEV',       label: 'Avg EV (LA>0)',format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
+    { key: 'medEV',       label: 'Avg EV LA>0',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     { key: 'ev75',        label: 'EV75',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     // Quality
@@ -227,7 +227,7 @@ var COLUMNS = {
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
-    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchType: true },
+    { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
     { key: 'seenPct',     label: '% Seen',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
