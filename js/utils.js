@@ -109,16 +109,16 @@ var Utils = {
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      // 0th = rgb(20,80,255) vivid blue, 50th = rgb(160,160,160) neutral gray
-      r = Math.round(20 + t * 140);
-      g = Math.round(80 + t * 80);
-      b = Math.round(255 - t * 95);
+      // 0th = rgb(0,100,255) pure blue, 50th = rgb(140,140,140) neutral gray
+      r = Math.round(0 + t * 140);
+      g = Math.round(100 + t * 40);
+      b = Math.round(255 - t * 115);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(160,160,160) neutral gray, 100th = rgb(240,40,35) vivid red
-      r = Math.round(160 + t * 80);
-      g = Math.round(160 - t * 120);
-      b = Math.round(160 - t * 125);
+      // 50th = rgb(140,140,140) neutral gray, 100th = rgb(255,20,20) pure red
+      r = Math.round(140 + t * 115);
+      g = Math.round(140 - t * 120);
+      b = Math.round(140 - t * 120);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
