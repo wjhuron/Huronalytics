@@ -191,7 +191,7 @@ var Aggregator = {
         if (mlbValues[m2] < rVal) rBelow++;
         if (mlbValues[m2] === rVal) rEqual++;
       }
-      var rPctl = (rBelow + 0.5 * rEqual) / n * 100;
+      var rPctl = (rBelow + 0.5 * (rEqual - 1)) / Math.max(1, n - 1) * 100;
       rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
 
@@ -210,7 +210,7 @@ var Aggregator = {
           if (mlbValues[sm] < sv) sBelow++;
           if (mlbValues[sm] === sv) sEqual++;
         }
-        var sPctl = (sBelow + 0.5 * sEqual) / n * 100;
+        var sPctl = (sBelow + 0.5 * (sEqual - 1)) / Math.max(1, n - 1) * 100;
         rows[s][pctlKey] = Math.max(0, Math.min(100, Math.round(sPctl)));
       }
     }
@@ -264,7 +264,7 @@ var Aggregator = {
         if (mlbValues[m2] < rVal) rBelow++;
         if (mlbValues[m2] === rVal) rEqual++;
       }
-      var rPctl = (rBelow + 0.5 * rEqual) / n * 100;
+      var rPctl = (rBelow + 0.5 * (rEqual - 1)) / Math.max(1, n - 1) * 100;
       rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
     for (var j2 = 0; j2 < rows.length; j2++) {
@@ -323,9 +323,9 @@ var Aggregator = {
     }
 
     function isBarrel(ev, la) {
-      // Statcast barrel: code_barrel formula (EV >= 98 per MLB glossary)
+      // Statcast barrel: LA in [8,50], EV>=98, EV*1.5-LA>=117, EV+LA>=124
       if (ev == null || la == null) return false;
-      return la <= 50 && ev >= 98 && ev * 1.5 - la >= 117 && ev + la >= 123;
+      return la >= 8 && la <= 50 && ev >= 98 && ev * 1.5 - la >= 117 && ev + la >= 124;
     }
 
     // Convert to row objects
@@ -423,8 +423,8 @@ var Aggregator = {
 
     // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
-    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100',
-                     'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
+    var boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'whip', 'hr9', 'runValue', 'rv100',
+                     'era_pctl', 'whip_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
                      'xwOBAcon', 'xwOBAcon_pctl',
                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
@@ -492,9 +492,29 @@ var Aggregator = {
       var isStarter = pg > 0 && (pgs / pg) > 0.5;
       r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg * 0.1);
     }
+    // Set bipQual flag BEFORE percentiles so BIP stats can use it
+    var BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
+    for (var bqi = 0; bqi < rows.length; bqi++) {
+      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
+    }
     // Use _qualified flag for percentile pool: only qualified pitchers get percentiles
+    // BIP-dependent stats additionally require bipQual (≥20 BIP)
     for (var si = 0; si < STAT_KEYS.length; si++) {
-      this._computePercentilesQualified(rows, STAT_KEYS[si]);
+      if (BIP_STATS[STAT_KEYS[si]]) {
+        // Temporarily narrow _qualified to also require bipQual
+        var savedQual = [];
+        for (var sq = 0; sq < rows.length; sq++) {
+          savedQual.push(rows[sq]._qualified);
+          rows[sq]._qualified = rows[sq]._qualified && rows[sq].bipQual;
+        }
+        this._computePercentilesQualified(rows, STAT_KEYS[si]);
+        // Restore original _qualified
+        for (var rq = 0; rq < rows.length; rq++) {
+          rows[rq]._qualified = savedQual[rq];
+        }
+      } else {
+        this._computePercentilesQualified(rows, STAT_KEYS[si]);
+      }
     }
     // Invert where lower is better
     for (var ri = 0; ri < rows.length; ri++) {
@@ -504,11 +524,6 @@ var Aggregator = {
           rows[ri][pk] = 100 - rows[ri][pk];
         }
       }
-    }
-
-    // Set bipQual flag for each pitcher (BIP-dependent stats need ≥20 BIP)
-    for (var bqi = 0; bqi < rows.length; bqi++) {
-      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
     }
 
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
@@ -749,21 +764,22 @@ var Aggregator = {
         if (ppre.strikePct !== undefined) rows[pmi].strikePct = ppre.strikePct;
         if (ppre.strikePct_pctl !== undefined) rows[pmi].strikePct_pctl = ppre.strikePct_pctl;
         if (ppre.nSwings !== undefined) rows[pmi].nSwings = ppre.nSwings;
-        // Skip batted ball and expected stats merge when hand filter is active
-        // (micro-computed counters are already hand-filtered; pre-agg values are not)
-        if (vsHand === 'all') {
-          // Batted ball fields (don't overwrite babip/gbPct — computed from counters)
-          for (var bbfi = 0; bbfi < PITCH_BB_KEYS.length; bbfi++) {
-            var bbf = PITCH_BB_KEYS[bbfi];
-            if (ppre[bbf] !== undefined) rows[pmi][bbf] = ppre[bbf];
-          }
-          // Expected stats
-          var xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
-          for (var xi = 0; xi < xKeys.length; xi++) {
-            var xk = xKeys[xi];
-            if (ppre[xk] !== undefined) rows[pmi][xk] = ppre[xk];
-            if (ppre[xk + '_pctl'] !== undefined) rows[pmi][xk + '_pctl'] = ppre[xk + '_pctl'];
-          }
+        // Batted ball and expected stats: use per-hand values when hand filter active
+        var handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
+        // Batted ball fields
+        for (var bbfi = 0; bbfi < PITCH_BB_KEYS.length; bbfi++) {
+          var bbf = PITCH_BB_KEYS[bbfi];
+          var bbSrc = (handSfx && ppre[bbf + handSfx] !== undefined) ? bbf + handSfx : bbf;
+          if (ppre[bbSrc] !== undefined) rows[pmi][bbf] = ppre[bbSrc];
+        }
+        // Expected stats
+        var xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
+        for (var xi = 0; xi < xKeys.length; xi++) {
+          var xk = xKeys[xi];
+          var xSrc = (handSfx && ppre[xk + handSfx] !== undefined) ? xk + handSfx : xk;
+          if (ppre[xSrc] !== undefined) rows[pmi][xk] = ppre[xSrc];
+          // Percentiles are only meaningful for overall (not per-hand)
+          if (!handSfx && ppre[xk + '_pctl'] !== undefined) rows[pmi][xk + '_pctl'] = ppre[xk + '_pctl'];
         }
         // Max velo and tunnel distance
         if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
@@ -857,13 +873,16 @@ var Aggregator = {
       }
     }
 
-    // HAA: uses absolute values, so further from 0 = higher pctl by default
+    // HAA/nHAA: uses absolute values, so further from 0 = higher pctl by default
     // FF/CF/FC: closer to 0 = better, so invert for fastballs
     for (var ptH in ptGroups) {
       if (VAA_NO_INVERT[ptH]) {
         ptGroups[ptH].forEach(function (r) {
           if (r.haa_pctl !== null && r.haa_pctl !== undefined) {
             r.haa_pctl = 100 - r.haa_pctl;
+          }
+          if (r.nHAA_pctl !== null && r.nHAA_pctl !== undefined) {
+            r.nHAA_pctl = 100 - r.nHAA_pctl;
           }
         });
       }

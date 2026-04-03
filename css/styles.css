@@ -7,9 +7,9 @@
   --bg-th: #0d0f12;
   --bg-th-hover: #1e2127;
   --text-primary: #e8e8e8;
-  --text-secondary: #999;
+  --text-secondary: #aaa;
   --text-th: #00d4ff;
-  --text-muted: #777;
+  --text-muted: #888;
   --border: #333840;
   --border-light: #252930;
   --row-alt: #222730;
@@ -58,7 +58,7 @@ header {
 
 .header-main .subtitle {
   font-size: 13px;
-  color: #00d4ff;
+  color: var(--accent);
   margin-top: 4px;
 }
 
@@ -1745,14 +1745,14 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 }
 .la-spray-gradient-label {
   font-size: 11px;
-  color: #999;
+  color: var(--text-secondary);
   font-weight: 600;
   margin-right: 2px;
 }
 .la-spray-gradient-low,
 .la-spray-gradient-high {
   font-size: 10px;
-  color: #999;
+  color: var(--text-secondary);
   font-family: 'JetBrains Mono', monospace;
 }
 .la-spray-gradient-bar {
@@ -1831,4 +1831,41 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   line-height: 22px;
   font-size: 9px;
   opacity: 0.6;
+}
+
+/* === Utility classes === */
+.hidden { display: none; }
+
+/* === Custom scrollbar for dark theme === */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+::-webkit-scrollbar-corner {
+  background: var(--bg-primary);
+}
+
+/* === Focus states for keyboard navigation === */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+table :focus-visible {
+  outline-offset: -2px;
+}
+button:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

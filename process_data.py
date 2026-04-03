@@ -41,7 +41,7 @@ STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPc
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
 
 # Pitcher stats where lower is better (invert percentile)
-PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
+PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'whip', 'fip', 'xFIP', 'siera'}
 
 # --- Hitter Leaderboard constants ---
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
@@ -157,7 +157,7 @@ def fetch_guts_constants(year=2026):
     raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
 
 
-def fetch_sprint_speed(year=2026):
+def fetch_sprint_speed(year=2026, _depth=0):
     """Fetch sprint speed leaderboard from Baseball Savant.
     Returns dict mapping MLB player ID (int) → sprint speed (float, ft/s)."""
     import csv
@@ -183,13 +183,15 @@ def fetch_sprint_speed(year=2026):
             except (ValueError, TypeError):
                 continue
         print(f"  Sprint speed: fetched {len(result)} players from Savant ({year})")
+        if _depth > 0:
+            print(f"  ⚠️  NOTE: Using {year} sprint speed data as fallback (not current season)")
         return result
     except Exception as e:
         print(f"  WARNING: Could not fetch sprint speed data: {e}")
-        # Try previous year as fallback
-        if year > 2024:
+        # Try previous year as fallback (max 2 retries)
+        if year > 2024 and _depth < 2:
             print(f"  Trying {year - 1} as fallback...")
-            return fetch_sprint_speed(year - 1)
+            return fetch_sprint_speed(year - 1, _depth + 1)
         return {}
 
 
@@ -232,10 +234,11 @@ def fetch_park_factors(year=2026):
 
 PARK_FACTORS = None  # set at runtime by fetch_park_factors()
 
+# Fallback GUTS constants (2025 season from FanGraphs, verified via web search)
 WOBA_WEIGHTS_FALLBACK = {
-    'BB': 0.705, 'HBP': 0.737, '1B': 0.905, '2B': 1.291, '3B': 1.639, 'HR': 2.116,
+    'BB': 0.692, 'HBP': 0.723, '1B': 0.884, '2B': 1.256, '3B': 1.591, 'HR': 2.048,
 }
-FIP_CONSTANT_FALLBACK = 3.213
+FIP_CONSTANT_FALLBACK = 3.102
 
 # Strike zone: ball radius adjustment for "any part of ball touches zone"
 BALL_RADIUS_FT = 1.45 / 12  # 1.45 inches = ~0.121 ft
@@ -398,11 +401,7 @@ def compute_expected_stats(pitches):
             continue
         elif event in SF_EVENTS:
             sf += 1
-            # Sac flies are BIPs — accumulate for xwOBAcon
-            xwobacon_sf = safe_float(p.get('xwOBA'))
-            if xwobacon_sf is not None:
-                xwobacon_sum += xwobacon_sf
-                xwobacon_denom += 1
+            # Sac flies are NOT included in xwOBAcon (contact-only = BIPs excluding SF)
             continue
         elif event in SH_EVENTS or event in CI_EVENTS:
             continue
@@ -567,13 +566,13 @@ def median(values):
 
 
 def is_barrel(ev, la):
-    """Statcast barrel definition from baseballr code_barrel (EV >= 98 per MLB glossary).
-    Four conditions: LA<=50, EV>=98, EV*1.5-LA>=117, EV+LA>=123."""
+    """Statcast barrel definition (MLB glossary / baseballr code_barrel).
+    Five conditions: LA in [8,50], EV>=98, EV*1.5-LA>=117, EV+LA>=124."""
     if ev is None or la is None:
         return False
-    return (la <= 50 and ev >= 98 and
+    return (la >= 8 and la <= 50 and ev >= 98 and
             ev * 1.5 - la >= 117 and
-            ev + la >= 123)
+            ev + la >= 124)
 
 
 def compute_pitcher_batted_ball(pitches):
@@ -840,16 +839,28 @@ def compute_hitter_stats(pitches):
     avg_hr_dist = round(sum(hr_distances) / len(hr_distances), 0) if hr_distances else None
 
     # === Squared-Up Rate ===
-    # % of competitive swings where exitVelo >= 0.80 × batSpeed × 1.23
-    # Uses per-pitch BatSpeed and ExitVelo on BIPs with competitive swings
+    # Statcast definition: actual EV >= 80% of maximum possible EV for that swing.
+    # Max possible EV is derived from bat-ball collision physics:
+    #   max_EV = 1.23 × bat_speed + 0.23 × pitch_speed_at_contact
+    #   pitch_speed_at_contact ≈ release_speed × 0.92 (deceleration from mound to plate)
+    # Source: Alan Nathan bat-ball collision model, validated against Statcast examples
+    # (e.g., De La Cruz: 77.3mph bat, 93.6mph pitch → max EV 114.8 → model gives 114.9)
     squared_up = 0
     squared_eligible = 0
     for p in bip:
         bs = safe_float(p.get('BatSpeed'))
         ev_sq = safe_float(p.get('ExitVelo'))
+        pitch_velo = safe_float(p.get('Velocity'))
         if bs is not None and bs >= 50 and ev_sq is not None:
             squared_eligible += 1
-            threshold = 0.80 * bs * 1.23
+            # Use pitch speed if available, otherwise estimate from bat speed alone
+            if pitch_velo is not None:
+                pitch_at_contact = pitch_velo * 0.92
+                max_ev = 1.23 * bs + 0.23 * pitch_at_contact
+            else:
+                # Fallback: assume ~92mph avg pitch speed at contact (85mph)
+                max_ev = 1.23 * bs + 0.23 * 85
+            threshold = 0.80 * max_ev
             if ev_sq >= threshold:
                 squared_up += 1
     squared_up_pct = squared_up / squared_eligible if squared_eligible > 0 else None
@@ -2455,6 +2466,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
         else:
             row['rv100'] = None
+
+        # Per-hand splits at pitch type level (for platoon toggle)
+        for hand_label, hand_val in [('_vsL', 'L'), ('_vsR', 'R')]:
+            hand_pitches = [p for p in pitches if p.get('Bats') == hand_val]
+            if hand_pitches:
+                hand_bb = compute_pitcher_batted_ball(hand_pitches)
+                hand_ex = compute_expected_stats(hand_pitches)
+                for sk in ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst',
+                           'ldPct', 'fbPct', 'puPct', 'hrFbPct']:
+                    if sk in hand_bb and hand_bb[sk] is not None:
+                        row[sk + hand_label] = hand_bb[sk]
+                for sk in ['wOBA', 'xBA', 'xSLG', 'xwOBA']:
+                    if sk in hand_ex and hand_ex[sk] is not None:
+                        row[sk + hand_label] = hand_ex[sk]
+
         pitch_leaderboard.append(row)
 
     # --- Fit VAA ~ PlateZ regression for normalized VAA (MLB only) ---
@@ -2726,6 +2752,28 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
         row.update(compute_expected_stats(pitches))
+
+        # Per-hand splits for stats not in micro data (2K Whiff%, plate disc, batted ball, expected)
+        for hand_label, hand_val in [('_vsL', 'L'), ('_vsR', 'R')]:
+            hand_pitches = [p for p in pitches if p.get('Bats') == hand_val]
+            if hand_pitches:
+                hand_stats = compute_stats(hand_pitches)
+                hand_bb = compute_pitcher_batted_ball(hand_pitches)
+                hand_ex = compute_expected_stats(hand_pitches)
+                for suffix_key in ['twoStrikeWhiffPct', 'fpsPct',
+                                   'strikePct', 'izPct', 'swStrPct', 'cswPct',
+                                   'izWhiffPct', 'chasePct', 'kPct', 'bbPct', 'kbbPct',
+                                   'babip', 'gbPct']:
+                    if suffix_key in hand_stats:
+                        row[suffix_key + hand_label] = hand_stats[suffix_key]
+                for suffix_key in ['avgEV', 'maxEV', 'hardHitPct', 'barrelPct',
+                                   'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
+                                   'medEV']:
+                    if suffix_key in hand_bb:
+                        row[suffix_key + hand_label] = hand_bb[suffix_key]
+                for suffix_key in ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']:
+                    if suffix_key in hand_ex:
+                        row[suffix_key + hand_label] = hand_ex[suffix_key]
 
         # Fastball velo: average velo of most-used fastball (FF/SI/CF)
         fb_types = {'FF', 'SI', 'CF'}
@@ -3337,6 +3385,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['tbf'] = box['tbf']  # Override pitch-data TBF with official boxscore TBF
                 ip_float = outs_to_ip_float(box['outs'])
                 row['era'] = round(box['er'] * 9 / ip_float, 2) if ip_float > 0 else None
+                row['whip'] = round((box['bb'] + box['h']) / ip_float, 2) if ip_float > 0 else None
                 row['hr9'] = round(box['hr'] * 9 / ip_float, 2) if ip_float > 0 else None
                 row['_box_er'] = box['er']  # raw ER for league avg calc (includes 0-IP pitchers)
                 # Store raw boxscore counts for FIP/xFIP/SIERA (computed below)
@@ -3350,6 +3399,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['sv'] = None
                 row['hld'] = None
                 row['era'] = None
+                row['whip'] = None
                 row['hr9'] = None
 
         # Merge hitter boxscore stats
@@ -3582,8 +3632,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # Compute percentiles for boxscore-derived stats (ERA, HR/9, FIP, xFIP, SIERA)
     # These are set AFTER the initial percentile pass, so need a second pass
-    BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
-    BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
+    BOXSCORE_PCTL_KEYS = ['era', 'whip', 'hr9', 'fip', 'xFIP', 'siera']
+    BOXSCORE_INVERT = {'era', 'whip', 'hr9', 'fip', 'xFIP', 'siera'}
     for stat in BOXSCORE_PCTL_KEYS:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
     for row in pitcher_leaderboard:
@@ -3688,7 +3738,8 @@ def main():
         print(f"  WARNING: Could not fetch Guts data ({e}), using fallback values")
         WOBA_WEIGHTS = WOBA_WEIGHTS_FALLBACK.copy()
         FIP_CONSTANT = FIP_CONSTANT_FALLBACK
-        GUTS_EXTRA = {'wOBAScale': 1.2982, 'lgWOBA': 0.3088, 'lgRPA': 0.1142}
+        # Fallback league-level constants (2024 season estimates)
+        GUTS_EXTRA = {'wOBAScale': 1.25, 'lgWOBA': 0.317, 'lgRPA': 0.119}
 
     # Fetch park factors
     print("Fetching FanGraphs park factors...")

@@ -170,6 +170,7 @@ var PlayerPage = {
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'kbbPct', label: 'K-BB%', format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'era', label: 'ERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'whip', label: 'WHIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'fip', label: 'FIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'xFIP', label: 'xFIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
@@ -1021,6 +1022,8 @@ var PlayerPage = {
           var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
+          var qualPool = isPitcher ? 'qualified pitchers' : 'qualified hitters';
+          circle.title = Utils.ordinal(Math.round(pctl)) + ' percentile among ' + qualPool;
         } else {
           // Unqualified: outline ring instead of filled circle
           circle.style.backgroundColor = 'transparent';
