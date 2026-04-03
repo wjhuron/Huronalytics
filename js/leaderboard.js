@@ -10,6 +10,7 @@ var COLUMNS = {
     { key: 'usagePct',    label: 'Usage%',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'info' },
     // Metrics (stuff first)
     { key: 'velocity',    label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'metrics' },
+    { key: 'maxVelo',     label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'metrics' },
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', group: 'metrics' },
     { key: 'breakTilt',   label: 'OTilt',    format: Utils.formatTilt, sortType: 'numeric', sortKey: 'breakTiltMinutes', noPercentile: true, group: 'metrics' },
     { key: 'indVertBrk',  label: 'IVB',      format: Utils.formatDecimal(1), sortType: 'numeric', group: 'metrics' },
@@ -22,9 +23,6 @@ var COLUMNS = {
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
-    { key: 'vra',         label: 'VRA',      format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, group: 'metrics' },
-    { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, group: 'metrics' },
-    { key: 'maxVelo',     label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'metrics' },
     { key: 'tunnelDist', label: 'Tunnel',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Tunnel distance from primary FB (inches) — lower = better deception', group: 'metrics' },
     // Outcomes
     { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'outcomes' },

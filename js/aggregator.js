@@ -746,6 +746,9 @@ var Aggregator = {
           if (ppre[xk] !== undefined) rows[pmi][xk] = ppre[xk];
           if (ppre[xk + '_pctl'] !== undefined) rows[pmi][xk + '_pctl'] = ppre[xk + '_pctl'];
         }
+        // Max velo and tunnel distance
+        if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
+        if (ppre.tunnelDist !== undefined) rows[pmi].tunnelDist = ppre.tunnelDist;
       }
     }
 
