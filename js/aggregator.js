@@ -754,33 +754,67 @@ var Aggregator = {
     });
 
     var self = this;
-    var MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches of that type to qualify
-    var ABS_PCTL_KEYS = { horzBrk: true, haa: true };  // use |value| for cross-handedness fairness
+    var MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches for outcome metrics
+    var ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true };  // use |value| for RHP/LHP fairness
+    // Shape metrics: physical measurements, no minimum needed
+    var SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true };
     // CF pairs with FF for velocity, spin rate, VAA, HAA percentiles
     var CF_FF_PAIRED = { velocity: true, spinRate: true, vaa: true, haa: true, nVAA: true, nHAA: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
+      var minPctl = SHAPE_METRICS[key] ? 0 : MIN_PITCH_TYPE_PCTL;
       if (CF_FF_PAIRED[key]) {
         // Combined FF+CF pool
         var ffCfRows = (ptGroups['FF'] || []).concat(ptGroups['CF'] || []);
         if (ffCfRows.length) {
-          self._computePercentiles(ffCfRows, key, MIN_PITCH_TYPE_PCTL, 'count', ABS_PCTL_KEYS[key] || false);
+          self._computePercentiles(ffCfRows, key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
         }
         // All other pitch types in their own pool
         for (var pt2 in ptGroups) {
           if (pt2 !== 'FF' && pt2 !== 'CF') {
-            self._computePercentiles(ptGroups[pt2], key, MIN_PITCH_TYPE_PCTL, 'count', ABS_PCTL_KEYS[key] || false);
+            self._computePercentiles(ptGroups[pt2], key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
           }
         }
       } else {
         for (var pt in ptGroups) {
-          self._computePercentiles(ptGroups[pt], key, MIN_PITCH_TYPE_PCTL, 'count', ABS_PCTL_KEYS[key] || false);
+          self._computePercentiles(ptGroups[pt], key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
         }
       }
     });
 
-    // Invert VAA/nVAA/nHAA percentiles for non-fastball pitch types
-    // FF/FC/CF: closer to 0 = red (default: higher value = higher pctl) — no inversion
-    // All others: further from 0 = red (lower value = red) — invert
+    // --- Pitch-type-specific percentile inversions ---
+
+    // IVB: FF/CF/FC = higher is better (default). SI/CU/CH/FS = lower is better (invert).
+    // SL/ST/SV = IVB not meaningful, suppress percentile.
+    var IVB_INVERT = { SI: true, CU: true, CH: true, FS: true };
+    var IVB_SUPPRESS = { SL: true, ST: true, SV: true };
+    for (var ptIVB in ptGroups) {
+      if (IVB_INVERT[ptIVB]) {
+        ptGroups[ptIVB].forEach(function (r) {
+          if (r.indVertBrk_pctl !== null && r.indVertBrk_pctl !== undefined) {
+            r.indVertBrk_pctl = 100 - r.indVertBrk_pctl;
+          }
+        });
+      } else if (IVB_SUPPRESS[ptIVB]) {
+        ptGroups[ptIVB].forEach(function (r) {
+          r.indVertBrk_pctl = null;
+        });
+      }
+    }
+
+    // Spin: higher is better for all EXCEPT CH/FS where lower spin = better (invert)
+    var SPIN_INVERT = { CH: true, FS: true };
+    for (var ptSpin in ptGroups) {
+      if (SPIN_INVERT[ptSpin]) {
+        ptGroups[ptSpin].forEach(function (r) {
+          if (r.spinRate_pctl !== null && r.spinRate_pctl !== undefined) {
+            r.spinRate_pctl = 100 - r.spinRate_pctl;
+          }
+        });
+      }
+    }
+
+    // VAA/nVAA/nHAA: FF/FC/CF = closer to 0 is better (default higher = higher pctl, no inversion)
+    // All others: further from 0 = better (invert)
     var VAA_NO_INVERT = { FF: true, FC: true, CF: true };
     for (var ptV in ptGroups) {
       if (!VAA_NO_INVERT[ptV]) {
@@ -798,9 +832,8 @@ var Aggregator = {
       }
     }
 
-    // Invert HAA percentiles for fastball pitch types
-    // HAA uses absolute values (ABS_PCTL_KEYS), so further from 0 = higher pctl by default
-    // For FF/CF/FC: closer to 0 = better, so invert
+    // HAA: uses absolute values, so further from 0 = higher pctl by default
+    // FF/CF/FC: closer to 0 = better, so invert for fastballs
     for (var ptH in ptGroups) {
       if (VAA_NO_INVERT[ptH]) {
         ptGroups[ptH].forEach(function (r) {
