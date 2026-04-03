@@ -246,6 +246,8 @@ var PlayerPage = {
 
     // Show player page as fixed overlay (leaderboard stays rendered underneath)
     document.getElementById('player-page').style.display = 'block';
+    var pctlLeg = document.getElementById('pctl-legend');
+    if (pctlLeg) pctlLeg.style.display = 'none';
 
     if (pitcherData) {
       this._renderPitcherPage(pitcherData);
@@ -669,6 +671,8 @@ var PlayerPage = {
     this._unbindSprayToggle();
 
     document.getElementById('player-page').style.display = 'none';
+    var pctlLeg = document.getElementById('pctl-legend');
+    if (pctlLeg) pctlLeg.style.display = '';
     if (this._lastRoute) {
       history.replaceState(null, '', '#' + this._lastRoute);
     }

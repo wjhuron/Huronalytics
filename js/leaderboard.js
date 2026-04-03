@@ -355,6 +355,9 @@ var Leaderboard = {
     avg.hitter = 'League Avg';
     avg._isLeagueAvg = true;
     avg._rank = '';
+    // wRC+ and xWRC+ are by definition 100 for league average
+    avg.wRCplus = 100;
+    avg.xWRCplus = 100;
     return avg;
   },
 
@@ -416,7 +419,7 @@ var Leaderboard = {
         th.setAttribute('colspan', gs.span);
         th.textContent = groupLabels[gs.group] || '';
         th.classList.add('group-header-cell');
-        if (gs.sticky) { th.classList.add('sticky-col'); }
+        if (gs.sticky) { th.classList.add('sticky-col'); th.classList.add('sticky-col-last'); }
         if (gs.group !== 'info' && groupLabels[gs.group]) th.classList.add('group-header-labeled');
         // Check if first col in this span is sectionStart
         if (visCols[colIdx] && visCols[colIdx].sectionStart) th.classList.add('section-start');
@@ -435,11 +438,29 @@ var Leaderboard = {
         th.classList.add('col-compare');
         th.style.width = col.width || 'auto';
       } else {
-        th.textContent = col.label;
+        var labelSpan = document.createElement('span');
+        labelSpan.textContent = col.label;
+        th.appendChild(labelSpan);
+        // Fixed-width sort indicator to prevent layout shift
+        if (col.sortType !== null) {
+          var sortSpan = document.createElement('span');
+          sortSpan.className = 'sort-indicator';
+          sortSpan.style.display = 'inline-block';
+          sortSpan.style.width = '12px';
+          sortSpan.style.textAlign = 'center';
+          sortSpan.style.fontSize = '9px';
+          sortSpan.style.marginLeft = '2px';
+          sortSpan.style.color = 'var(--accent)';
+          if (self.currentSort.key === col.key) {
+            sortSpan.textContent = self.currentSort.dir === 'asc' ? '\u25B2' : '\u25BC';
+          }
+          th.appendChild(sortSpan);
+        }
       }
       th.setAttribute('data-key', col.key);
       if (col.align) th.classList.add('align-' + col.align);
       if (col.sticky) th.classList.add('sticky-col');
+      if (col.stickyIdx === 1) th.classList.add('sticky-col-last');
       if (col.sectionStart) th.classList.add('section-start');
       if (col.width) th.style.width = col.width;
       if (Utils.TOOLTIPS[col.label]) th.title = Utils.TOOLTIPS[col.label];
@@ -639,6 +660,7 @@ var Leaderboard = {
         if (col.align) td.classList.add('align-' + col.align);
         if (col.sticky) {
           td.classList.add('sticky-col');
+          if (col.stickyIdx === 1) { td.classList.add('sticky-col-last'); }
           if (col.stickyIdx === 1 && self._stickyLeftOffsets[col.key]) {
             td.style.left = self._stickyLeftOffsets[col.key] + 'px';
           }
@@ -663,6 +685,7 @@ var Leaderboard = {
         if (col.align) td.classList.add('align-' + col.align);
         if (col.sticky) {
           td.classList.add('sticky-col');
+          if (col.stickyIdx === 1) { td.classList.add('sticky-col-last'); }
           if (col.stickyIdx === 1 && self._stickyLeftOffsets[col.key]) {
             td.style.left = self._stickyLeftOffsets[col.key] + 'px';
           }
@@ -678,6 +701,7 @@ var Leaderboard = {
       if (col.align) td.classList.add('align-' + col.align);
       if (col.sticky) {
         td.classList.add('sticky-col');
+        if (col.stickyIdx === 1) { td.classList.add('sticky-col-last'); }
         if (col.stickyIdx === 1 && self._stickyLeftOffsets[col.key]) {
           td.style.left = self._stickyLeftOffsets[col.key] + 'px';
         }

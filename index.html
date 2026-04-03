@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=72">
+  <link rel="stylesheet" href="css/styles.css?v=107">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -47,7 +47,7 @@
 
   <nav class="tab-bar" id="main-nav">
     <div class="nav-sections">
-      <button class="section-tab" data-section="home" title="Home">&#8962;</button>
+      <button class="section-tab" data-section="home" title="Home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
       <button class="section-tab active" data-section="pitchers">Pitchers</button>
       <button class="section-tab" data-section="hitters">Hitters</button>
     </div>
@@ -167,7 +167,7 @@
       <label>Date Range</label>
       <div class="date-range-inputs">
         <input type="date" id="date-start">
-        <span class="date-sep">to</span>
+        <span class="date-sep">&mdash;</span>
         <input type="date" id="date-end">
       </div>
     </div>
@@ -199,6 +199,12 @@
     </div>
   </section>
 
+  <div id="pctl-legend" class="pctl-legend" style="display:none;">
+    <span class="pctl-legend-label">Percentile:</span>
+    <span class="pctl-legend-low">Low</span>
+    <span class="pctl-legend-bar"></span>
+    <span class="pctl-legend-high">High</span>
+  </div>
   <div id="tab-banner" class="tab-banner" style="display:none;"></div>
   <section class="table-wrapper">
     <div class="table-container" id="table-container">
@@ -444,13 +450,13 @@
     <p>Data: MLB 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=72"></script>
-  <script src="js/utils.js?v=106"></script>
-  <script src="js/aggregator.js?v=106"></script>
-  <script src="js/data.js?v=106"></script>
-  <script src="js/leaderboard.js?v=106"></script>
-  <script src="js/scatter.js?v=106"></script>
-  <script src="js/player-page.js?v=106"></script>
-  <script src="js/app.js?v=106"></script>
+  <script src="data/data_embedded.js?v=107"></script>
+  <script src="js/utils.js?v=107"></script>
+  <script src="js/aggregator.js?v=107"></script>
+  <script src="js/data.js?v=107"></script>
+  <script src="js/leaderboard.js?v=107"></script>
+  <script src="js/scatter.js?v=107"></script>
+  <script src="js/player-page.js?v=107"></script>
+  <script src="js/app.js?v=107"></script>
 </body>
 </html>

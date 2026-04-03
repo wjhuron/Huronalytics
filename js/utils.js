@@ -70,22 +70,22 @@ var Utils = {
     return lum > 0.25 ? 'black' : 'white';
   },
 
-  // Percentile color: always tinted (blue below 50, red above 50)
+  // Percentile color: blue below 50, neutral gray at 50, red above 50
   percentileColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      // 0th = rgb(30,80,200) vivid blue, 50th = rgb(170,180,210) cool tint
-      r = Math.round(30 + t * 140);
+      // 0th = rgb(30,80,200) vivid blue, 50th = rgb(180,180,180) neutral gray
+      r = Math.round(30 + t * 150);
       g = Math.round(80 + t * 100);
-      b = Math.round(200 + t * 10);
+      b = Math.round(200 - t * 20);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(210,170,165) warm tint, 100th = rgb(200,45,40) vivid red
-      r = Math.round(210 - t * 10);
-      g = Math.round(170 - t * 125);
-      b = Math.round(165 - t * 125);
+      // 50th = rgb(180,180,180) neutral gray, 100th = rgb(200,45,40) vivid red
+      r = Math.round(180 + t * 20);
+      g = Math.round(180 - t * 135);
+      b = Math.round(180 - t * 140);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
@@ -97,22 +97,22 @@ var Utils = {
     return '#1a1a2e';
   },
 
-  // Dark mode: always tinted (blue below 50, red above 50, no muddy gray)
+  // Dark mode: blue below 50, neutral gray at 50, red above 50
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      // 0th = rgb(25,65,220) vivid blue, 50th = rgb(110,120,165) cool gray
-      r = Math.round(25 + t * 85);
-      g = Math.round(65 + t * 55);
-      b = Math.round(220 - t * 55);
+      // 0th = rgb(25,65,220) vivid blue, 50th = rgb(130,130,130) neutral gray
+      r = Math.round(25 + t * 105);
+      g = Math.round(65 + t * 65);
+      b = Math.round(220 - t * 90);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(165,115,110) warm gray, 100th = rgb(215,40,40) vivid red
-      r = Math.round(165 + t * 50);
-      g = Math.round(115 - t * 75);
-      b = Math.round(110 - t * 70);
+      // 50th = rgb(130,130,130) neutral gray, 100th = rgb(215,40,40) vivid red
+      r = Math.round(130 + t * 85);
+      g = Math.round(130 - t * 90);
+      b = Math.round(130 - t * 90);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },

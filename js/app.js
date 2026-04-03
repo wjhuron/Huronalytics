@@ -207,6 +207,8 @@
     document.getElementById('pagination').style.display = 'none';
     var banner = document.getElementById('tab-banner');
     if (banner) banner.style.display = 'none';
+    var pctlLeg = document.getElementById('pctl-legend');
+    if (pctlLeg) pctlLeg.style.display = 'none';
 
     // Update section tabs
     document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -224,6 +226,8 @@
     document.querySelector('.toolbar').style.display = '';
     document.querySelector('.table-wrapper').style.display = '';
     document.getElementById('pagination').style.display = '';
+    var pctlLeg = document.getElementById('pctl-legend');
+    if (pctlLeg) pctlLeg.style.display = '';
   }
 
   function navigateToTab(tab, skipHash) {
@@ -337,6 +341,7 @@
     updateRangeFilterBadge();
 
     refresh();
+    scrollTableToTop();
   }
 
   function setupDOM() {
@@ -355,6 +360,18 @@
     sidePanel = document.getElementById('side-panel');
     panelOverlay = document.getElementById('panel-overlay');
     panelClose = document.getElementById('panel-close');
+
+    // Scroll shadow: add/remove class when table is scrolled horizontally
+    var tableContainer = document.getElementById('table-container');
+    if (tableContainer) {
+      tableContainer.addEventListener('scroll', function () {
+        if (tableContainer.scrollLeft > 0) {
+          tableContainer.classList.add('scrolled-h');
+        } else {
+          tableContainer.classList.remove('scrolled-h');
+        }
+      });
+    }
   }
 
   // ---- Rebuild team dropdown based on current game type ----
@@ -951,6 +968,11 @@
       });
       var csv = Utils.toCSV(allData, visCols);
       Utils.downloadFile(csv, 'leaderboard_' + currentTab + '.csv');
+      // Visual feedback
+      var btn = document.getElementById('export-csv-btn');
+      var orig = btn.textContent;
+      btn.textContent = 'Downloaded!';
+      setTimeout(function () { btn.textContent = orig; }, 1500);
     });
 
     // Copy to clipboard
@@ -996,7 +1018,10 @@
 
   function scrollTableToTop() {
     var container = document.getElementById('table-container');
-    if (container) container.scrollTop = 0;
+    if (container) {
+      container.scrollTop = 0;
+      container.scrollLeft = 0;
+    }
   }
 
   // ---- Side Panel ----
@@ -1186,7 +1211,7 @@
     App.updateCompareButton = function () {
       var list = Leaderboard.getCompareList();
       var btn = document.getElementById('compare-btn');
-      btn.textContent = 'Compare (' + list.length + ')';
+      btn.textContent = list.length > 0 ? 'Compare (' + list.length + ')' : 'Compare';
       btn.disabled = list.length < 2;
     };
 
