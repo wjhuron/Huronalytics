@@ -862,20 +862,6 @@ var Aggregator = {
       });
     }
 
-    // Stuff Score
-    rows.forEach(function (r) {
-      var vp = r.velocity_pctl;
-      var sp = r.spinRate_pctl;
-      if (vp != null && sp != null) {
-        r.stuffScore = Math.round((vp + sp) / 2);
-      } else {
-        r.stuffScore = null;
-      }
-    });
-    for (var pt2 in ptGroups) {
-      self._computePercentiles(ptGroups[pt2], 'stuffScore');
-    }
-
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
@@ -960,7 +946,7 @@ var Aggregator = {
       'wRCplus', 'xWRCplus',
     ];
     var HITTER_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true
     };
 
     var rows = [];

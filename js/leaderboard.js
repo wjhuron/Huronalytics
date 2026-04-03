@@ -22,6 +22,9 @@ var COLUMNS = {
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', group: 'metrics' },
+    { key: 'vra',         label: 'VRA',      format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, group: 'metrics' },
+    { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, group: 'metrics' },
+    { key: 'maxVelo',     label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'metrics' },
     // Outcomes
     { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'outcomes' },
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'outcomes' },
@@ -83,7 +86,6 @@ var COLUMNS = {
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'batted_ball' },
     { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'batted_ball' },
     { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
-    { key: 'hr9',         label: 'HR/9',     format: Utils.formatDecimal(2), sortType: 'numeric', group: 'batted_ball' },
   ],
   pitcherSwingDecisions: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -133,8 +135,6 @@ var COLUMNS = {
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
-    { key: 'xbh',         label: 'XBH',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
-    { key: 'tb',          label: 'TB',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     // Baserunning
     { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'baserunning' },
     { key: 'cs',          label: 'CS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
@@ -228,7 +228,7 @@ var COLUMNS = {
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'stats' },
-    { key: 'medEV',       label: 'Avg EV',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
+    { key: 'medEV',       label: 'Avg EV (LA>0)',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'ev' },
     { key: 'ev75',        label: 'EV75',     format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'ev' },
     { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'batted_ball' },

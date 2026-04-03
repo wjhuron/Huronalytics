@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=109">
+  <link rel="stylesheet" href="css/styles.css?v=110">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -304,7 +304,14 @@
 
     <!-- Stats (single row, full-width) -->
     <div class="player-full-width" id="player-stats-section" style="display:none;">
-      <h3 class="section-title">STATS</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">STATS</h3>
+        <div class="hand-toggle" id="pitcher-platoon-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHH</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHH</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper">
         <div id="player-stats-table"></div>
       </div>
@@ -405,7 +412,14 @@
 
     <!-- Hitter Stats -->
     <div class="player-full-width" id="player-hitter-stats-section" style="display:none;">
-      <h3 class="section-title">STATS</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">STATS</h3>
+        <div class="hand-toggle" id="hitter-platoon-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHP</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHP</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper"><div id="player-hitter-stats-table"></div></div>
     </div>
 
@@ -450,13 +464,13 @@
     <p>Data: MLB 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=109"></script>
-  <script src="js/utils.js?v=109"></script>
-  <script src="js/aggregator.js?v=109"></script>
-  <script src="js/data.js?v=109"></script>
-  <script src="js/leaderboard.js?v=109"></script>
-  <script src="js/scatter.js?v=109"></script>
-  <script src="js/player-page.js?v=109"></script>
-  <script src="js/app.js?v=109"></script>
+  <script src="data/data_embedded.js?v=110"></script>
+  <script src="js/utils.js?v=110"></script>
+  <script src="js/aggregator.js?v=110"></script>
+  <script src="js/data.js?v=110"></script>
+  <script src="js/leaderboard.js?v=110"></script>
+  <script src="js/scatter.js?v=110"></script>
+  <script src="js/player-page.js?v=110"></script>
+  <script src="js/app.js?v=110"></script>
 </body>
 </html>

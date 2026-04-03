@@ -63,8 +63,6 @@ var PlayerPage = {
     { key: 'doubles', label: '2B', format: function(v) { return v != null ? v : '—'; } },
     { key: 'triples', label: '3B', format: function(v) { return v != null ? v : '—'; } },
     { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'xbh', label: 'XBH', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'tb', label: 'TB', format: function(v) { return v != null ? v : '—'; } },
     { key: 'sb', label: 'SB', format: function(v) { return v != null ? v : '—'; } },
     { key: 'cs', label: 'CS', format: function(v) { return v != null ? v : '—'; } },
     { key: 'sbPct', label: 'SB%', format: function(v) { return v != null ? v.toFixed(1) + '%' : '—'; } },
@@ -267,6 +265,7 @@ var PlayerPage = {
     this._renderIdentity(data);
     this._heatMapHand = 'R';
     this._countHand = 'R';
+    this._platoonHand = 'all';
     this._gameDate = null; // null = all games
     this._playerGameType = DataStore.gameType || 'RS';
     this._currentData = data;
@@ -274,6 +273,7 @@ var PlayerPage = {
     this._renderGameLog(data);
     this._renderPitcherContent(data);
     this._bindHandToggles();
+    this._bindPlatoonToggle('pitcher');
     this._bindGameLog();
   },
 
@@ -297,6 +297,8 @@ var PlayerPage = {
 
   // Render game-date-sensitive sections (called on initial load and game date change)
   _renderPitcherContent: function (data) {
+    this._platoonHand = 'all';
+    this._resetPlatoonToggleUI('pitcher-platoon-toggle');
     document.getElementById('player-percentiles').innerHTML = '';
     // Clear all content sections
     var sections = ['player-pitch-usage-table', 'player-stats-table', 'player-expanded-pitch-table',
@@ -433,6 +435,7 @@ var PlayerPage = {
   _renderHitterPage: function (data) {
     this._showHitterLayout();
     this._renderHitterIdentity(data);
+    this._platoonHand = 'all';
     this._playerGameType = DataStore.gameType || 'RS';
     this._currentData = data;
     this._sprayMode = 'all';
@@ -441,9 +444,12 @@ var PlayerPage = {
     this._renderHitterContent(data);
     this._bindSprayToggle();
     this._bindSprayBatSideToggle(data);
+    this._bindPlatoonToggle('hitter');
   },
 
   _renderHitterContent: function (data) {
+    this._platoonHand = 'all';
+    this._resetPlatoonToggleUI('hitter-platoon-toggle');
     document.getElementById('player-percentiles').innerHTML = '';
     // Clear hitter content sections
     var sections = ['player-hitter-stats-table', 'player-hitter-batted-ball-table',
@@ -643,6 +649,7 @@ var PlayerPage = {
     this.destroyChart();
     this._unbindClickOutside();
     this._unbindHandToggles();
+    this._unbindPlatoonToggle();
     this._unbindGameLog();
     this._unbindPlayerGameTypeToggle();
 
@@ -2037,6 +2044,103 @@ var PlayerPage = {
       var el = document.getElementById('count-hand-toggle');
       if (el) el.removeEventListener('click', this._countToggleHandler);
       this._countToggleHandler = null;
+    }
+  },
+
+  // --- Platoon Split Toggle (vs L / vs R / All for stats tables) ---
+
+  _bindPlatoonToggle: function(type) {
+    var self = this;
+    var toggleId = type === 'pitcher' ? 'pitcher-platoon-toggle' : 'hitter-platoon-toggle';
+
+    this._platoonToggleHandler = function(e) {
+      var btn = e.target.closest('.hand-toggle-btn');
+      if (!btn) return;
+      var hand = btn.getAttribute('data-hand');
+      if (hand === self._platoonHand) return;
+      self._platoonHand = hand;
+      var btns = document.querySelectorAll('#' + toggleId + ' .hand-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      self._refreshPlatoonStats(type);
+    };
+    var toggle = document.getElementById(toggleId);
+    if (toggle) toggle.addEventListener('click', this._platoonToggleHandler);
+  },
+
+  _resetPlatoonToggleUI: function(toggleId) {
+    var btns = document.querySelectorAll('#' + toggleId + ' .hand-toggle-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-hand') === 'all');
+    }
+  },
+
+  _unbindPlatoonToggle: function() {
+    if (this._platoonToggleHandler) {
+      var el = document.getElementById('pitcher-platoon-toggle') || document.getElementById('hitter-platoon-toggle');
+      if (el) el.removeEventListener('click', this._platoonToggleHandler);
+      this._platoonToggleHandler = null;
+    }
+  },
+
+  _refreshPlatoonStats: function(type) {
+    var data = this._currentData;
+    if (!data) return;
+
+    var hand = this._platoonHand;
+    if (hand === 'all') {
+      // Use pre-computed data (no aggregation needed)
+      if (type === 'pitcher') {
+        var filteredData = this._getFilteredPlayerData(data, true) || data;
+        this._filteredData = filteredData;
+        this._renderStatsTable(filteredData);
+      } else {
+        var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+        var isROC = rocTeams.indexOf(data.team) !== -1;
+        this._renderHitterStatsFullTable(data, isROC);
+      }
+      return;
+    }
+
+    // Re-aggregate with hand filter
+    if (!Aggregator.loaded) return;
+
+    // Build filters with all required defaults so aggregator doesn't filter everything out
+    var baseFilters = { vsHand: hand, team: 'all', throws: 'all', search: '', role: 'all' };
+
+    if (type === 'pitcher') {
+      var rows = Aggregator.aggregate('pitcher', baseFilters);
+      var found = null;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].pitcher === data.pitcher && rows[i].team === data.team) {
+          found = rows[i];
+          break;
+        }
+      }
+      if (found) {
+        this._filteredData = found;
+        this._renderStatsTable(found);
+      } else {
+        var container = document.getElementById('player-stats-table');
+        if (container) container.innerHTML = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' + (hand === 'L' ? 'LHH' : 'RHH') + '</p>';
+      }
+    } else {
+      var rows = Aggregator.aggregate('hitter', baseFilters);
+      var found = null;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].hitter === data.hitter && rows[i].team === data.team) {
+          found = rows[i];
+          break;
+        }
+      }
+      if (found) {
+        var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+        var isROC = rocTeams.indexOf(data.team) !== -1;
+        this._renderHitterStatsFullTable(found, isROC);
+      } else {
+        var container = document.getElementById('player-hitter-stats-table');
+        if (container) container.innerHTML = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' + (hand === 'L' ? 'LHP' : 'RHP') + '</p>';
+      }
     }
   },
 

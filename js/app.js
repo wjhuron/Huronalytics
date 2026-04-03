@@ -1172,7 +1172,7 @@
       { key: 'count', label: '#', format: Utils.formatInt },
       { key: 'swingPct', label: 'Swing%', format: Utils.formatPct },
       { key: 'whiffPct', label: 'Whiff%', format: Utils.formatPct },
-      { key: 'medEV', label: 'Avg EV', format: Utils.formatDecimal(1) },
+      { key: 'medEV', label: 'Avg EV (LA>0)', format: Utils.formatDecimal(1) },
     ];
 
     // Group individual pitch rows by category
