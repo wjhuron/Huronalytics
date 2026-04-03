@@ -64,6 +64,8 @@ HITTER_STAT_KEYS = [
     'avgFbDist', 'avgHrDist',
     # Squared-Up Rate
     'squaredUpPct',
+    # Sprint Speed
+    'sprintSpeed',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
@@ -153,6 +155,41 @@ def fetch_guts_constants(year=2026):
                           f"League R/PA={guts_extra['lgRPA']}")
                     return weights, cfip, guts_extra
     raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
+
+
+def fetch_sprint_speed(year=2026):
+    """Fetch sprint speed leaderboard from Baseball Savant.
+    Returns dict mapping MLB player ID (int) → sprint speed (float, ft/s)."""
+    import csv
+    import io
+    url = (f'https://baseballsavant.mlb.com/leaderboard/sprint_speed'
+           f'?type=raw&year={year}&position=&team=&min=10&csv=true')
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+        'Accept': 'text/csv',
+    })
+    try:
+        resp = urllib.request.urlopen(req, timeout=30)
+        data = resp.read().decode('utf-8')
+        reader = csv.DictReader(io.StringIO(data))
+        result = {}
+        for row in reader:
+            try:
+                mlb_id = int(row.get('player_id') or row.get('mlb_id') or 0)
+                speed = float(row.get('hp_to_1b', 0) or row.get('sprint_speed', 0))
+                if mlb_id and speed > 0:
+                    result[mlb_id] = round(speed, 1)
+            except (ValueError, TypeError):
+                continue
+        print(f"  Sprint speed: fetched {len(result)} players from Savant ({year})")
+        return result
+    except Exception as e:
+        print(f"  WARNING: Could not fetch sprint speed data: {e}")
+        # Try previous year as fallback
+        if year > 2024:
+            print(f"  Trying {year - 1} as fallback...")
+            return fetch_sprint_speed(year - 1)
+        return {}
 
 
 def fetch_park_factors(year=2026):
@@ -2564,6 +2601,99 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
 
+    # --- Compute Pitch Tunneling Distances ---
+    # For each pitcher, find primary fastball (FF/SI/CF with most pitches),
+    # then compute tunnel distance (inches) from that fastball to each secondary pitch.
+    # Tunnel point is ~23.5 feet from plate.
+    FASTBALL_TYPES = {'FF', 'SI', 'CF'}
+    GRAVITY = 32.174  # ft/s²
+    TUNNEL_DIST_FROM_PLATE = 23.5  # feet — approximate tunnel point
+
+    # Group pitch leaderboard rows by pitcher
+    pitcher_pitch_map = defaultdict(list)
+    for row in pitch_leaderboard:
+        pk = row['pitcher'] + '|' + row['team']
+        pitcher_pitch_map[pk].append(row)
+
+    for pk, pt_rows in pitcher_pitch_map.items():
+        # Find primary fastball
+        fb_rows = [r for r in pt_rows if r['pitchType'] in FASTBALL_TYPES]
+        if not fb_rows:
+            for r in pt_rows:
+                r['tunnelDist'] = None
+            continue
+        fb_row = max(fb_rows, key=lambda r: r['count'])
+
+        fb_velo = fb_row.get('velocity')
+        fb_ext = fb_row.get('extension')
+        fb_relZ = fb_row.get('relPosZ')
+        fb_relX = fb_row.get('relPosX')
+        fb_ivb = fb_row.get('indVertBrk')
+        fb_hb = fb_row.get('horzBrk')
+
+        if fb_velo is None or fb_ext is None or fb_relZ is None or fb_relX is None:
+            for r in pt_rows:
+                r['tunnelDist'] = None
+            continue
+
+        # Estimate vertical/horizontal velocity components from movement
+        # Release distance from plate
+        fb_release_dist = 60.5 - fb_ext
+        fb_velo_fps = fb_velo * 1.467  # mph → ft/s
+        fb_flight_time = fb_release_dist / fb_velo_fps if fb_velo_fps > 0 else 0.4
+        # Approximate initial vertical velocity: solve for vz given that ball drops from relZ
+        # to ~2.5 ft (avg strike zone center) with IVB. IVB is total vertical break relative to gravity.
+        # Simplified: use IVB/HB as total deviation in inches over full flight, compute rate.
+        fb_ivb_ft = (fb_ivb or 0) / 12.0  # inches → feet
+        fb_hb_ft = (fb_hb or 0) / 12.0
+
+        # Time from release to tunnel point
+        tunnel_travel = fb_release_dist - TUNNEL_DIST_FROM_PLATE
+        fb_t_tunnel = tunnel_travel / fb_velo_fps if fb_velo_fps > 0 else 0.1
+        # Fraction of total flight at tunnel point
+        fb_frac = fb_t_tunnel / fb_flight_time if fb_flight_time > 0 else 0
+
+        # Position at tunnel point (linear interpolation of movement)
+        fb_z_tunnel = fb_relZ - (GRAVITY / 2) * fb_t_tunnel ** 2 + fb_ivb_ft * fb_frac
+        fb_x_tunnel = fb_relX + fb_hb_ft * fb_frac
+
+        # Mark fastball row
+        fb_row['tunnelDist'] = 0.0
+
+        # Compute for each secondary pitch
+        for r in pt_rows:
+            if r is fb_row:
+                continue
+            sec_velo = r.get('velocity')
+            sec_ext = r.get('extension')
+            sec_relZ = r.get('relPosZ')
+            sec_relX = r.get('relPosX')
+            sec_ivb = r.get('indVertBrk')
+            sec_hb = r.get('horzBrk')
+
+            if sec_velo is None or sec_ext is None or sec_relZ is None or sec_relX is None:
+                r['tunnelDist'] = None
+                continue
+
+            sec_release_dist = 60.5 - sec_ext
+            sec_velo_fps = sec_velo * 1.467
+            sec_flight_time = sec_release_dist / sec_velo_fps if sec_velo_fps > 0 else 0.4
+            sec_ivb_ft = (sec_ivb or 0) / 12.0
+            sec_hb_ft = (sec_hb or 0) / 12.0
+
+            sec_tunnel_travel = sec_release_dist - TUNNEL_DIST_FROM_PLATE
+            sec_t_tunnel = sec_tunnel_travel / sec_velo_fps if sec_velo_fps > 0 else 0.1
+            sec_frac = sec_t_tunnel / sec_flight_time if sec_flight_time > 0 else 0
+
+            sec_z_tunnel = sec_relZ - (GRAVITY / 2) * sec_t_tunnel ** 2 + sec_ivb_ft * sec_frac
+            sec_x_tunnel = sec_relX + sec_hb_ft * sec_frac
+
+            # Euclidean distance in inches
+            dist_ft = math.sqrt((fb_z_tunnel - sec_z_tunnel) ** 2 + (fb_x_tunnel - sec_x_tunnel) ** 2)
+            r['tunnelDist'] = round(dist_ft * 12, 1)  # convert feet → inches
+
+    print(f"  Computed tunnel distances for {len(pitcher_pitch_map)} pitchers")
+
     pitch_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitch leaderboard: {len(pitch_leaderboard)} rows")
 
@@ -2697,6 +2827,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 detail['sp'] = int(round(spin))
             if tilt and str(tilt).strip():
                 detail['tl'] = str(tilt).strip()
+            # Description (pitch outcome) — short codes for space efficiency
+            desc_raw = p.get('Description', '')
+            DESC_MAP = {
+                'Swinging Strike': 'SS', 'Called Strike': 'CS', 'Foul': 'F',
+                'In Play': 'IP', 'Ball': 'B', 'Hit By Pitch': 'HBP',
+                'Intent Ball': 'IB', 'Pitchout': 'PO',
+            }
+            desc_code = DESC_MAP.get(desc_raw, '')
+            if desc_code:
+                detail['d'] = desc_code
             if rel_x is not None:
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
@@ -2928,6 +3068,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 
         hitter_leaderboard.append(row)
+
+    # --- Merge Sprint Speed from Baseball Savant ---
+    sprint_speeds = fetch_sprint_speed()
+    sprint_merged = 0
+    for row in hitter_leaderboard:
+        mlb_id = row.get('mlbId')
+        if mlb_id and mlb_id in sprint_speeds:
+            row['sprintSpeed'] = sprint_speeds[mlb_id]
+            sprint_merged += 1
+        else:
+            row['sprintSpeed'] = None
+    print(f"  Sprint speed merged for {sprint_merged}/{len(hitter_leaderboard)} hitters")
 
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:

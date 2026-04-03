@@ -45,6 +45,7 @@ var PlayerPage = {
     { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true },
     { key: 'squaredUpPct',   label: 'Sq-Up%',          format: function(v) { return Utils.formatPct(v); }, rocHide: true },
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%',    format: function(v) { return Utils.formatPct(v); } },
+    { key: 'sprintSpeed',   label: 'Sprint',           format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true },
   ],
 
   // Hitter Stats table columns (single row)
@@ -153,6 +154,7 @@ var PlayerPage = {
     { key: 'nHAA', label: 'nHAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
     { key: 'vra', label: 'VRA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
     { key: 'hra', label: 'HRA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
+    { key: 'tunnelDist', label: 'Tunnel', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
 
   // Stats table (single row, pitcher-level) — matches leaderboard column order
@@ -272,6 +274,8 @@ var PlayerPage = {
     this._renderIdentity(data);
     this._heatMapHand = 'R';
     this._countHand = 'R';
+    this._zoneHand = 'R';
+    this._zoneMetric = 'usage';
     this._platoonHand = 'all';
     this._gameDate = null; // null = all games
     this._playerGameType = DataStore.gameType || 'RS';
@@ -310,7 +314,7 @@ var PlayerPage = {
     // Clear all content sections
     var sections = ['player-pitch-usage-table', 'player-stats-table', 'player-expanded-pitch-table',
                     'player-batted-ball-table', 'player-plate-discipline-table',
-                    'player-heat-maps', 'player-count-table'];
+                    'player-heat-maps', 'player-zone-profiles', 'player-count-table'];
     for (var i = 0; i < sections.length; i++) {
       var el = document.getElementById(sections[i]);
       if (el) el.innerHTML = '';
@@ -351,6 +355,7 @@ var PlayerPage = {
     this._renderPlateDisciplineTable(data); // will use _filteredPitchRows
     this._renderBattedBallTable(data); // will use _filteredPitchRows
     this._renderHeatMaps(data);
+    this._renderZoneProfiles(data);
     this._renderCountTable(data);
   },
 
@@ -675,7 +680,7 @@ var PlayerPage = {
     this._playerGameType = null;
 
     // Hide new sections
-    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
+    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-zone-profile-section', 'player-count-section',
       'player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
       'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var i = 0; i < sections.length; i++) {
@@ -1966,6 +1971,235 @@ var PlayerPage = {
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
 
+  // --- Render: Zone Profile (3×3 grid per pitch type) ---
+
+  _renderZoneProfiles: function(data) {
+    var section = document.getElementById('player-zone-profile-section');
+    var container = document.getElementById('player-zone-profiles');
+    if (!section || !container) return;
+    container.innerHTML = '';
+
+    var pitches = this._getFilteredDetails(data);
+    if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
+
+    section.style.display = '';
+    var hand = this._zoneHand || 'R';
+    var metric = this._zoneMetric || 'usage';
+
+    // Compute average strike zone
+    var szTopSum = 0, szBotSum = 0, szCount = 0;
+    for (var i = 0; i < pitches.length; i++) {
+      if (pitches[i].szt != null && pitches[i].szb != null) {
+        szTopSum += pitches[i].szt;
+        szBotSum += pitches[i].szb;
+        szCount++;
+      }
+    }
+    var szTop = szCount > 0 ? szTopSum / szCount : 3.5;
+    var szBot = szCount > 0 ? szBotSum / szCount : 1.5;
+    var szHeight = szTop - szBot;
+    var szThird = szHeight / 3;
+
+    // Zone boundaries (3×3): rows = high/mid/low, cols = in/mid/away (from hitter perspective)
+    // PlateX: negative = inside to RHH, positive = outside to RHH
+    // For "vs RHH": in = negative PlateX, away = positive PlateX
+    // For "vs LHH": flipped
+    var PX_EDGE = 0.83;  // ~10 inches, plate half-width
+    var pxThird = PX_EDGE * 2 / 3;
+    var pxBounds = [-PX_EDGE, -PX_EDGE + pxThird, -PX_EDGE + 2 * pxThird, PX_EDGE];
+
+    // Group by pitch type, filter by hand
+    var byType = {};
+    var totalByType = {};
+    for (var i = 0; i < pitches.length; i++) {
+      var p = pitches[i];
+      if (p.bh !== hand) continue;
+      var pt = p.pt;
+      if (!pt) continue;
+      if (!totalByType[pt]) totalByType[pt] = 0;
+      totalByType[pt]++;
+      if (p.px == null || p.pz == null) continue;
+      if (!byType[pt]) byType[pt] = [];
+      byType[pt].push(p);
+    }
+
+    // Sort by count descending
+    var ptOrder = Object.keys(totalByType).sort(function(a, b) { return totalByType[b] - totalByType[a]; });
+
+    // For each pitch type, compute 3×3 zone stats
+    for (var ti = 0; ti < ptOrder.length; ti++) {
+      var pt = ptOrder[ti];
+      var ptPitches = byType[pt] || [];
+      if (ptPitches.length < 5) continue;
+
+      // 3×3 grid: [row][col] where row 0=high, 2=low; col 0=in, 2=away
+      var zones = [];
+      for (var r = 0; r < 3; r++) {
+        zones[r] = [];
+        for (var c = 0; c < 3; c++) {
+          zones[r][c] = { n: 0, swings: 0, whiffs: 0, csw: 0, totalPitches: 0 };
+        }
+      }
+
+      for (var pi = 0; pi < ptPitches.length; pi++) {
+        var pp = ptPitches[pi];
+        var px = pp.px;
+        var pz = pp.pz;
+
+        // Determine column (in/mid/away)
+        var col;
+        if (px < pxBounds[1]) col = 0;
+        else if (px < pxBounds[2]) col = 1;
+        else col = 2;
+
+        // Determine row (high=0, mid=1, low=2)
+        var row;
+        if (pz > szTop - szThird) row = 0;
+        else if (pz > szBot + szThird) row = 1;
+        else row = 2;
+
+        // Clamp to grid
+        if (row < 0) row = 0;
+        if (row > 2) row = 2;
+        if (col < 0) col = 0;
+        if (col > 2) col = 2;
+
+        var z = zones[row][col];
+        z.n++;
+        z.totalPitches = ptPitches.length;
+        // Description-based stats from pitch detail
+        var desc = pp.d;  // description code
+        // In PITCH_DETAILS, descriptions are stored as codes
+        // Check if it's a swing (based on the original data structure)
+        // The pitch details use short codes: 'SS'=Swinging Strike, 'CS'=Called Strike, 'F'=Foul, 'IP'=In Play, 'B'=Ball
+        if (desc === 'SS' || desc === 'F' || desc === 'IP') {
+          z.swings++;
+          if (desc === 'SS') z.whiffs++;
+        }
+        if (desc === 'CS' || desc === 'SS') {
+          z.csw++;
+        }
+      }
+
+      // Create zone grid SVG
+      var wrapper = document.createElement('div');
+      wrapper.className = 'zone-profile-card';
+      var header = document.createElement('div');
+      header.className = 'zone-profile-header';
+      var badge = document.createElement('span');
+      badge.className = 'pitch-badge-sm';
+      var bc = Utils.getPitchColor(pt);
+      badge.style.backgroundColor = bc;
+      badge.style.color = Utils.badgeTextColor(bc);
+      badge.textContent = pt;
+      header.appendChild(badge);
+      var countSpan = document.createElement('span');
+      countSpan.className = 'zone-profile-count';
+      countSpan.textContent = ' ' + ptPitches.length;
+      header.appendChild(countSpan);
+      wrapper.appendChild(header);
+
+      var GRID = 120, CELL = GRID / 3, PAD = 4;
+      var ns = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('width', GRID + 2 * PAD);
+      svg.setAttribute('height', GRID + 2 * PAD);
+      svg.setAttribute('viewBox', '0 0 ' + (GRID + 2 * PAD) + ' ' + (GRID + 2 * PAD));
+
+      // Find max value for color scaling
+      var maxVal = 0;
+      for (var r = 0; r < 3; r++) {
+        for (var c = 0; c < 3; c++) {
+          var val;
+          if (metric === 'usage') {
+            val = zones[r][c].n / ptPitches.length;
+          } else if (metric === 'whiff') {
+            val = zones[r][c].swings > 0 ? zones[r][c].whiffs / zones[r][c].swings : 0;
+          } else {
+            val = ptPitches.length > 0 ? zones[r][c].csw / zones[r][c].n : 0;
+          }
+          if (val > maxVal) maxVal = val;
+        }
+      }
+
+      for (var r = 0; r < 3; r++) {
+        for (var c = 0; c < 3; c++) {
+          var z = zones[r][c];
+          var val, displayVal;
+          if (metric === 'usage') {
+            val = z.n / ptPitches.length;
+            displayVal = (val * 100).toFixed(0) + '%';
+          } else if (metric === 'whiff') {
+            val = z.swings > 0 ? z.whiffs / z.swings : 0;
+            displayVal = z.swings > 2 ? (val * 100).toFixed(0) + '%' : '—';
+          } else {
+            val = z.n > 0 ? z.csw / z.n : 0;
+            displayVal = z.n > 2 ? (val * 100).toFixed(0) + '%' : '—';
+          }
+
+          // Color intensity based on value relative to max
+          var intensity = maxVal > 0 ? val / maxVal : 0;
+          var r_col, g_col, b_col;
+          if (metric === 'usage') {
+            // Blue gradient for usage
+            r_col = Math.round(20 + (1 - intensity) * 20);
+            g_col = Math.round(20 + (1 - intensity) * 20);
+            b_col = Math.round(40 + intensity * 180);
+          } else {
+            // Red gradient for whiff/CSW (higher = more red = better for pitcher)
+            r_col = Math.round(40 + intensity * 180);
+            g_col = Math.round(40 + (1 - intensity) * 10);
+            b_col = Math.round(40 + (1 - intensity) * 10);
+          }
+          var fillColor = 'rgb(' + r_col + ',' + g_col + ',' + b_col + ')';
+
+          var rect = document.createElementNS(ns, 'rect');
+          rect.setAttribute('x', PAD + c * CELL);
+          rect.setAttribute('y', PAD + r * CELL);
+          rect.setAttribute('width', CELL);
+          rect.setAttribute('height', CELL);
+          rect.setAttribute('fill', fillColor);
+          rect.setAttribute('stroke', '#555');
+          rect.setAttribute('stroke-width', '0.5');
+          svg.appendChild(rect);
+
+          // Value text
+          var text = document.createElementNS(ns, 'text');
+          text.setAttribute('x', PAD + c * CELL + CELL / 2);
+          text.setAttribute('y', PAD + r * CELL + CELL / 2 + 4);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('fill', intensity > 0.3 ? '#fff' : '#aaa');
+          text.setAttribute('font-size', '11');
+          text.setAttribute('font-family', 'Barlow, sans-serif');
+          text.textContent = displayVal;
+          svg.appendChild(text);
+        }
+      }
+
+      // Strike zone border
+      var szRect = document.createElementNS(ns, 'rect');
+      szRect.setAttribute('x', PAD);
+      szRect.setAttribute('y', PAD);
+      szRect.setAttribute('width', GRID);
+      szRect.setAttribute('height', GRID);
+      szRect.setAttribute('fill', 'none');
+      szRect.setAttribute('stroke', '#888');
+      szRect.setAttribute('stroke-width', '1.5');
+      svg.appendChild(szRect);
+
+      wrapper.appendChild(svg);
+      container.appendChild(wrapper);
+    }
+
+    // Add zone labels (High/Mid/Low on left, In/Mid/Away on top)
+    if (ptOrder.length > 0) {
+      var labelDiv = document.createElement('div');
+      labelDiv.className = 'zone-profile-labels';
+      labelDiv.innerHTML = '<span class="zone-label-row">High</span><span class="zone-label-row">Mid</span><span class="zone-label-row">Low</span>';
+      container.insertBefore(labelDiv, container.firstChild);
+    }
+  },
+
   // --- Render: Count Table (pitch usage by count group) ---
 
   _renderCountTable: function(data) {
@@ -2112,6 +2346,36 @@ var PlayerPage = {
     };
     var countToggle = document.getElementById('count-hand-toggle');
     if (countToggle) countToggle.addEventListener('click', this._countToggleHandler);
+
+    // Zone profile hand toggle
+    this._zoneHandToggleHandler = function(e) {
+      var btn = e.target.closest('.hand-toggle-btn');
+      if (!btn) return;
+      var hand = btn.getAttribute('data-hand');
+      if (hand === self._zoneHand) return;
+      self._zoneHand = hand;
+      var btns = document.querySelectorAll('#zone-hand-toggle .hand-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      if (self._currentData) self._renderZoneProfiles(self._currentData);
+    };
+    var zoneHandToggle = document.getElementById('zone-hand-toggle');
+    if (zoneHandToggle) zoneHandToggle.addEventListener('click', this._zoneHandToggleHandler);
+
+    // Zone profile metric toggle
+    this._zoneMetricToggleHandler = function(e) {
+      var btn = e.target.closest('.hand-toggle-btn');
+      if (!btn) return;
+      var metric = btn.getAttribute('data-metric');
+      if (metric === self._zoneMetric) return;
+      self._zoneMetric = metric;
+      var btns = document.querySelectorAll('#zone-metric-toggle .hand-toggle-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      if (self._currentData) self._renderZoneProfiles(self._currentData);
+    };
+    var zoneMetricToggle = document.getElementById('zone-metric-toggle');
+    if (zoneMetricToggle) zoneMetricToggle.addEventListener('click', this._zoneMetricToggleHandler);
   },
 
   _unbindHandToggles: function() {
@@ -2124,6 +2388,16 @@ var PlayerPage = {
       var el = document.getElementById('count-hand-toggle');
       if (el) el.removeEventListener('click', this._countToggleHandler);
       this._countToggleHandler = null;
+    }
+    if (this._zoneHandToggleHandler) {
+      var el = document.getElementById('zone-hand-toggle');
+      if (el) el.removeEventListener('click', this._zoneHandToggleHandler);
+      this._zoneHandToggleHandler = null;
+    }
+    if (this._zoneMetricToggleHandler) {
+      var el = document.getElementById('zone-metric-toggle');
+      if (el) el.removeEventListener('click', this._zoneMetricToggleHandler);
+      this._zoneMetricToggleHandler = null;
     }
   },
 

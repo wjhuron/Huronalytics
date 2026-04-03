@@ -25,6 +25,7 @@ var COLUMNS = {
     { key: 'vra',         label: 'VRA',      format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, group: 'metrics' },
     { key: 'hra',         label: 'HRA',      format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, group: 'metrics' },
     { key: 'maxVelo',     label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'metrics' },
+    { key: 'tunnelDist', label: 'Tunnel',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Tunnel distance from primary FB (inches) — lower = better deception', group: 'metrics' },
     // Outcomes
     { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, group: 'outcomes' },
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', group: 'outcomes' },
@@ -144,6 +145,7 @@ var COLUMNS = {
     { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'baserunning' },
     { key: 'cs',          label: 'CS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
     { key: 'sbPct',       label: 'SB%',      format: function(v){ return v != null ? v.toFixed(1) + '%' : '—'; }, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
+    { key: 'sprintSpeed', label: 'Sprint',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Sprint speed (ft/s) from Baseball Savant', group: 'baserunning' },
   ],
   hitterBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },

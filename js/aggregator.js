@@ -1126,6 +1126,7 @@ var Aggregator = {
                       'firstPitchSwingPct', 'firstPitchSwingPct_pctl',
                       'avgFbDist', 'avgHrDist',
                       'squaredUpPct', 'squaredUpPct_pctl',
+                      'sprintSpeed', 'sprintSpeed_pctl',
                       'wRC', 'wRCplus', 'xWRCplus'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};

@@ -1788,3 +1788,41 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   border-radius: 50%;
   display: inline-block;
 }
+
+/* === Zone Profile Grid === */
+.zone-profiles-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.zone-profile-card {
+  text-align: center;
+}
+.zone-profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.zone-profile-count {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.zone-profile-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding-top: 22px;
+  height: 128px;
+  margin-right: -8px;
+}
+.zone-label-row {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: right;
+  line-height: 40px;
+}
