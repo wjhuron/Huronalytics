@@ -704,7 +704,7 @@ var Aggregator = {
 
       // IVBOE: IVB over expected (from arm angle regression, per pitch type)
       var ivbRegs = DataStore.metadata && DataStore.metadata.ivbRegressions;
-      var ivbReg = ivbRegs && ivbRegs[pitchType];
+      var ivbReg = ivbRegs && ivbRegs[obj.pitchType];
       if (ivbReg && obj.indVertBrk !== null && obj.armAngle !== null) {
         obj.ivbOE = Number((obj.indVertBrk - (ivbReg.slope * obj.armAngle + ivbReg.intercept)).toFixed(1));
       } else {
@@ -712,7 +712,7 @@ var Aggregator = {
       }
       // HBOE: HB over expected (handedness-keyed regression, e.g. "FF_R")
       var hbRegs = DataStore.metadata && DataStore.metadata.hbRegressions;
-      var hbReg = hbRegs && hbRegs[pitchType + '_' + obj.throws];
+      var hbReg = hbRegs && hbRegs[obj.pitchType + '_' + obj.throws];
       if (hbReg && obj.horzBrk !== null && obj.armAngle !== null) {
         obj.hbOE = Number((obj.horzBrk - (hbReg.slope * obj.armAngle + hbReg.intercept)).toFixed(1));
       } else {
