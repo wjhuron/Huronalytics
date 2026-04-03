@@ -1003,6 +1003,7 @@ var PlayerPage = {
           circle.style.backgroundColor = 'transparent';
           circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
           circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
+          circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
         circleWrap.appendChild(circle);
@@ -1101,6 +1102,7 @@ var PlayerPage = {
         } else {
           circle.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
           circle.style.color = isDark ? '#aaa' : '#666';
+          circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
         circleWrap.appendChild(circle);
@@ -1181,12 +1183,31 @@ var PlayerPage = {
     label.className = 'pctl-label';
     label.textContent = 'Overall';
     var barWrap = document.createElement('div');
-    barWrap.className = 'pctl-bar-wrap';
-    var bar = document.createElement('div');
-    bar.className = 'pctl-bar';
-    bar.style.width = '0%';
-    bar.style.backgroundColor = '#ccc';
-    barWrap.appendChild(bar);
+    barWrap.className = 'pctl-bar-track';
+    barWrap.style.position = 'relative';
+    // Center marker
+    var centerLine = document.createElement('div');
+    centerLine.style.cssText = 'position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.3);z-index:1;';
+    barWrap.appendChild(centerLine);
+    // Fill bar
+    if (rv != null && rv !== 0) {
+      var bar = document.createElement('div');
+      bar.style.position = 'absolute';
+      bar.style.top = '0';
+      bar.style.bottom = '0';
+      bar.style.borderRadius = '3px';
+      var pct = Math.min(Math.abs(rv) / 15, 1) * 50;
+      if (rv > 0) {
+        bar.style.left = '50%';
+        bar.style.width = pct + '%';
+        bar.style.backgroundColor = 'rgba(0, 180, 100, 0.6)';
+      } else {
+        bar.style.left = (50 - pct) + '%';
+        bar.style.width = pct + '%';
+        bar.style.backgroundColor = 'rgba(220, 60, 60, 0.6)';
+      }
+      barWrap.appendChild(bar);
+    }
     var valSpan = document.createElement('span');
     valSpan.className = 'pctl-value';
     valSpan.textContent = rv != null ? rv.toFixed(1) : '—';
@@ -1644,8 +1665,9 @@ var PlayerPage = {
     // Total row
     if (totalRow) {
       var totalTr = document.createElement('tr');
-      totalTr.style.fontWeight = 'bold';
-      totalTr.style.borderTop = '2px solid var(--border-color, #ccc)';
+      totalTr.style.fontWeight = '700';
+      totalTr.style.borderTop = '2px solid #333840';
+      totalTr.style.background = 'rgba(128,128,128,0.08)';
       for (var c2 = 0; c2 < cols.length; c2++) {
         var col2 = cols[c2];
         var td2 = document.createElement('td');
@@ -1662,6 +1684,19 @@ var PlayerPage = {
 
     table.appendChild(tbody);
     container.appendChild(table);
+
+    // Horizontal scroll fade indicator
+    container.style.position = 'relative';
+    var fadeDiv = document.createElement('div');
+    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, #1a1d21);pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
+    container.appendChild(fadeDiv);
+    container.addEventListener('scroll', function() {
+      var maxScroll = container.scrollWidth - container.clientWidth;
+      fadeDiv.style.opacity = (container.scrollLeft >= maxScroll - 2) ? '0' : '1';
+    });
+    setTimeout(function() {
+      if (container.scrollWidth > container.clientWidth) fadeDiv.style.opacity = '1';
+    }, 100);
   },
 
   // --- Render: Heat Maps (pitch location density) ---
@@ -1733,6 +1768,20 @@ var PlayerPage = {
       grid.appendChild(cell);
       this._renderSingleHeatMap(canvas, byType[pt], avgSzTop, avgSzBot, hand);
     }
+
+    // Color scale legend
+    var legendDiv = document.createElement('div');
+    legendDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;color:#999;';
+    var lowLabel = document.createElement('span');
+    lowLabel.textContent = 'Low';
+    var gradBar = document.createElement('div');
+    gradBar.style.cssText = 'width:100px;height:8px;border-radius:4px;background:linear-gradient(to right, rgb(8,48,107), rgb(255,255,255), rgb(215,48,39));';
+    var highLabel = document.createElement('span');
+    highLabel.textContent = 'High';
+    legendDiv.appendChild(lowLabel);
+    legendDiv.appendChild(gradBar);
+    legendDiv.appendChild(highLabel);
+    section.appendChild(legendDiv);
   },
 
   _renderSingleHeatMap: function(canvas, pitches, szTop, szBot, hand) {
@@ -2200,6 +2249,21 @@ var PlayerPage = {
     ctx.moveTo(canvasHPX, canvasHPY);
     ctx.lineTo(canvasHPX + maxRadius * 1.02 * Math.cos(foulAngleRight), canvasHPY + maxRadius * 1.02 * Math.sin(foulAngleRight));
     ctx.stroke();
+
+    // Distance markers (300ft, 350ft, 400ft arcs)
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '9px Barlow';
+    ctx.textAlign = 'center';
+    var distMarks = [300, 350, 400];
+    for (var di = 0; di < distMarks.length; di++) {
+      var distR = distMarks[di] * fenceScale;
+      ctx.beginPath();
+      ctx.arc(canvasHPX, canvasHPY, distR, foulAngleLeft, foulAngleRight, false);
+      ctx.stroke();
+      ctx.fillText(distMarks[di] + "'", canvasHPX, canvasHPY - distR - 3);
+    }
 
     // Draw infield diamond — 90ft between bases
     var baseDist = 90 * fenceScale;

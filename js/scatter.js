@@ -85,7 +85,17 @@ var ScatterChart = {
           var rpxY = Math.abs(yScale.getPixelForValue(e.ellipse.ry) - yScale.getPixelForValue(0));
           ctx.strokeStyle = e.color;
           ctx.lineWidth = 1.5;
-          ctx.setLineDash([5, 5]);
+          // Vary dash pattern by pitch category
+          var fastballs = { FF: 1, SI: 1, CF: 1 };
+          var breaking = { FC: 1, SL: 1, ST: 1, CU: 1, SV: 1 };
+          // offspeed: CH, FS, KN (default)
+          if (e.pitchType && fastballs[e.pitchType]) {
+            ctx.setLineDash([]);         // solid
+          } else if (e.pitchType && breaking[e.pitchType]) {
+            ctx.setLineDash([6, 4]);     // dashed
+          } else {
+            ctx.setLineDash([2, 4]);     // dotted (offspeed / unknown)
+          }
           ctx.beginPath();
           ctx.save();
           ctx.translate(cpx, cpy);
@@ -143,7 +153,7 @@ var ScatterChart = {
       });
 
       var ellipse = this.computeEllipse(pts);
-      ellipseMeta.push({ color: color.border, ellipse: ellipse });
+      ellipseMeta.push({ color: color.border, ellipse: ellipse, pitchType: pt });
     }
 
     this.destroyMain();
