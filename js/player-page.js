@@ -2535,7 +2535,13 @@ var PlayerPage = {
 
   _bindPlatoonToggle: function(type) {
     var self = this;
-    var toggleId = type === 'pitcher' ? 'pitcher-platoon-toggle' : 'hitter-platoon-toggle';
+    var mainToggleId = type === 'pitcher' ? 'pitcher-platoon-toggle' : 'hitter-platoon-toggle';
+    // All synced toggle IDs for pitchers
+    var syncedIds = type === 'pitcher'
+      ? ['pitcher-platoon-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
+      : ['hitter-platoon-toggle'];
+
+    this._platoonSyncedIds = syncedIds;
 
     this._platoonToggleHandler = function(e) {
       var btn = e.target.closest('.hand-toggle-btn');
@@ -2543,27 +2549,42 @@ var PlayerPage = {
       var hand = btn.getAttribute('data-hand');
       if (hand === self._platoonHand) return;
       self._platoonHand = hand;
-      var btns = document.querySelectorAll('#' + toggleId + ' .hand-toggle-btn');
-      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
-      btn.classList.add('active');
+      // Sync all toggles
+      for (var si = 0; si < syncedIds.length; si++) {
+        var btns = document.querySelectorAll('#' + syncedIds[si] + ' .hand-toggle-btn');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].classList.toggle('active', btns[i].getAttribute('data-hand') === hand);
+        }
+      }
       self._refreshPlatoonStats(type);
     };
-    var toggle = document.getElementById(toggleId);
-    if (toggle) toggle.addEventListener('click', this._platoonToggleHandler);
+
+    for (var ti = 0; ti < syncedIds.length; ti++) {
+      var toggle = document.getElementById(syncedIds[ti]);
+      if (toggle) toggle.addEventListener('click', this._platoonToggleHandler);
+    }
   },
 
   _resetPlatoonToggleUI: function(toggleId) {
-    var btns = document.querySelectorAll('#' + toggleId + ' .hand-toggle-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle('active', btns[i].getAttribute('data-hand') === 'all');
+    // Reset all synced toggles
+    var syncedIds = this._platoonSyncedIds || [toggleId];
+    for (var si = 0; si < syncedIds.length; si++) {
+      var btns = document.querySelectorAll('#' + syncedIds[si] + ' .hand-toggle-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].getAttribute('data-hand') === 'all');
+      }
     }
   },
 
   _unbindPlatoonToggle: function() {
     if (this._platoonToggleHandler) {
-      var el = document.getElementById('pitcher-platoon-toggle') || document.getElementById('hitter-platoon-toggle');
-      if (el) el.removeEventListener('click', this._platoonToggleHandler);
+      var syncedIds = this._platoonSyncedIds || ['pitcher-platoon-toggle', 'hitter-platoon-toggle'];
+      for (var si = 0; si < syncedIds.length; si++) {
+        var el = document.getElementById(syncedIds[si]);
+        if (el) el.removeEventListener('click', this._platoonToggleHandler);
+      }
       this._platoonToggleHandler = null;
+      this._platoonSyncedIds = null;
     }
   },
 

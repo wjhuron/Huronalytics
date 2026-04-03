@@ -103,22 +103,22 @@ var Utils = {
     return '#1a1a2e';
   },
 
-  // Dark mode: blue below 50, neutral gray at 50, red above 50
+  // Dark mode: vivid blue below 50, neutral gray at 50, vivid red above 50
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
     var r, g, b;
     if (pctl <= 50) {
       var t = pctl / 50;
-      // 0th = rgb(25,65,220) vivid blue, 50th = rgb(130,130,130) neutral gray
-      r = Math.round(25 + t * 105);
-      g = Math.round(65 + t * 65);
-      b = Math.round(220 - t * 90);
+      // 0th = rgb(20,80,255) vivid blue, 50th = rgb(160,160,160) neutral gray
+      r = Math.round(20 + t * 140);
+      g = Math.round(80 + t * 80);
+      b = Math.round(255 - t * 95);
     } else {
       var t = (pctl - 50) / 50;
-      // 50th = rgb(130,130,130) neutral gray, 100th = rgb(215,40,40) vivid red
-      r = Math.round(130 + t * 85);
-      g = Math.round(130 - t * 90);
-      b = Math.round(130 - t * 90);
+      // 50th = rgb(160,160,160) neutral gray, 100th = rgb(240,40,35) vivid red
+      r = Math.round(160 + t * 80);
+      g = Math.round(160 - t * 120);
+      b = Math.round(160 - t * 125);
     }
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },

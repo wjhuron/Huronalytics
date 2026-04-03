@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=116">
+  <link rel="stylesheet" href="css/styles.css?v=117">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -327,7 +327,14 @@
 
     <!-- Plate Discipline (per pitch type + total, full-width) -->
     <div class="player-full-width" id="player-plate-discipline-section" style="display:none;">
-      <h3 class="section-title">PLATE DISCIPLINE</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">PLATE DISCIPLINE</h3>
+        <div class="hand-toggle pitcher-hand-sync" id="pitcher-platedisc-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHH</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHH</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper">
         <div id="player-plate-discipline-table"></div>
       </div>
@@ -335,7 +342,14 @@
 
     <!-- Batted Ball (per pitch type + total, full-width) -->
     <div class="player-full-width" id="player-batted-ball-section" style="display:none;">
-      <h3 class="section-title">BATTED BALL</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">BATTED BALL</h3>
+        <div class="hand-toggle pitcher-hand-sync" id="pitcher-battedball-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHH</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHH</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper">
         <div id="player-batted-ball-table"></div>
       </div>
@@ -481,13 +495,13 @@
     <p>Data: MLB 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=116"></script>
-  <script src="js/utils.js?v=116"></script>
-  <script src="js/aggregator.js?v=116"></script>
-  <script src="js/data.js?v=116"></script>
-  <script src="js/leaderboard.js?v=116"></script>
-  <script src="js/scatter.js?v=116"></script>
-  <script src="js/player-page.js?v=116"></script>
-  <script src="js/app.js?v=116"></script>
+  <script src="data/data_embedded.js?v=117"></script>
+  <script src="js/utils.js?v=117"></script>
+  <script src="js/aggregator.js?v=117"></script>
+  <script src="js/data.js?v=117"></script>
+  <script src="js/leaderboard.js?v=117"></script>
+  <script src="js/scatter.js?v=117"></script>
+  <script src="js/player-page.js?v=117"></script>
+  <script src="js/app.js?v=117"></script>
 </body>
 </html>
