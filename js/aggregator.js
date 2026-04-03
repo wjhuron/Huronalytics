@@ -778,9 +778,9 @@ var Aggregator = {
       }
     });
 
-    // Invert VAA and nVAA percentiles for non-fastball pitch types
-    // FF/FC: closer to 0 (e.g. -3) = red (default: higher value = higher pctl) — no inversion
-    // All others: further from 0 (e.g. -10) = red (lower value = red) — invert
+    // Invert VAA/nVAA/nHAA percentiles for non-fastball pitch types
+    // FF/FC/CF: closer to 0 = red (default: higher value = higher pctl) — no inversion
+    // All others: further from 0 = red (lower value = red) — invert
     var VAA_NO_INVERT = { FF: true, FC: true, CF: true };
     for (var ptV in ptGroups) {
       if (!VAA_NO_INVERT[ptV]) {
@@ -790,6 +790,22 @@ var Aggregator = {
           }
           if (r.nVAA_pctl !== null && r.nVAA_pctl !== undefined) {
             r.nVAA_pctl = 100 - r.nVAA_pctl;
+          }
+          if (r.nHAA_pctl !== null && r.nHAA_pctl !== undefined) {
+            r.nHAA_pctl = 100 - r.nHAA_pctl;
+          }
+        });
+      }
+    }
+
+    // Invert HAA percentiles for fastball pitch types
+    // HAA uses absolute values (ABS_PCTL_KEYS), so further from 0 = higher pctl by default
+    // For FF/CF/FC: closer to 0 = better, so invert
+    for (var ptH in ptGroups) {
+      if (VAA_NO_INVERT[ptH]) {
+        ptGroups[ptH].forEach(function (r) {
+          if (r.haa_pctl !== null && r.haa_pctl !== undefined) {
+            r.haa_pctl = 100 - r.haa_pctl;
           }
         });
       }

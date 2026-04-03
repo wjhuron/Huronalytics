@@ -291,6 +291,8 @@
     selectedPitchTypes = [];
     if (currentTab === 'hitterPitch') {
       buildHitterPitchChips(false);
+    } else if (PITCH_TYPE_TABS[currentTab] && isHitterTab(currentTab)) {
+      buildHitterPitchChips(false);
     } else if (PITCH_TYPE_TABS[currentTab]) {
       buildPitchChipsWithAll();
     } else {
@@ -1148,6 +1150,12 @@
     container.appendChild(table);
   }
 
+  var PANEL_CATEGORY_COLORS = {
+    'Hard': '#d62728',
+    'Breaking': '#2ca02c',
+    'Offspeed': '#ff7f0e'
+  };
+
   function buildHitterPanelTable(hitterName, team) {
     var container = document.getElementById('panel-metrics-table');
     container.innerHTML = '';
@@ -1167,6 +1175,43 @@
       { key: 'medEV', label: 'Avg EV', format: Utils.formatDecimal(1) },
     ];
 
+    // Group individual pitch rows by category
+    var CATS = Aggregator.PITCH_CATEGORIES;
+    var CAT_ORDER = ['Hard', 'Breaking', 'Offspeed'];
+    var catGroups = {};
+    for (var ci = 0; ci < CAT_ORDER.length; ci++) catGroups[CAT_ORDER[ci]] = [];
+
+    ptData.forEach(function (row) {
+      for (var cat in CATS) {
+        if (CATS[cat].indexOf(row.pitchType) !== -1) {
+          catGroups[cat].push(row);
+          break;
+        }
+      }
+    });
+
+    // Compute weighted category summaries
+    function computeCategorySummary(catRows, catName) {
+      var totalCount = 0, sumSwings = 0, sumWhiffs = 0, sumEV = 0, nEV = 0;
+      catRows.forEach(function (r) {
+        var cnt = r.count || 0;
+        totalCount += cnt;
+        if (r.swingPct != null) sumSwings += (r.swingPct * cnt);
+        if (r.whiffPct != null) {
+          var swings = r.nSwings || (r.swingPct != null ? r.swingPct * cnt : 0);
+          sumWhiffs += (r.whiffPct * swings);
+        }
+        if (r.medEV != null && r.nBip) { sumEV += r.medEV * r.nBip; nEV += r.nBip; }
+      });
+      return {
+        pitchType: catName,
+        count: totalCount,
+        swingPct: totalCount > 0 ? sumSwings / totalCount : null,
+        whiffPct: sumSwings > 0 ? sumWhiffs / sumSwings : null,
+        medEV: nEV > 0 ? sumEV / nEV : null
+      };
+    }
+
     var table = document.createElement('table');
     var thead = document.createElement('thead');
     var headerTr = document.createElement('tr');
@@ -1180,26 +1225,82 @@
     table.appendChild(thead);
 
     var tbody = document.createElement('tbody');
-    ptData.forEach(function (row) {
+
+    // Render category rows with expand/collapse
+    CAT_ORDER.forEach(function (catName) {
+      var catRows = catGroups[catName];
+      if (catRows.length === 0) return;
+      catRows.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+
+      var summary = computeCategorySummary(catRows, catName);
+      var expanded = false;
+      var subRowEls = [];
+
+      // Category row
       var tr = document.createElement('tr');
+      tr.className = 'category-row';
+      tr.style.cursor = 'pointer';
       statCols.forEach(function (mc) {
         var td = document.createElement('td');
         if (mc.key === 'pitchType') {
+          var indicator = document.createElement('span');
+          indicator.className = 'expand-indicator';
+          indicator.textContent = '\u25B6';
+          td.appendChild(indicator);
           var badge = document.createElement('span');
           badge.className = 'pitch-badge';
-          badge.textContent = row[mc.key];
-          var _bc = Utils.getPitchColor(row[mc.key]);
-          badge.style.backgroundColor = _bc;
-          badge.style.color = Utils.badgeTextColor(_bc);
+          badge.textContent = catName;
+          var catColor = PANEL_CATEGORY_COLORS[catName] || '#888';
+          badge.style.backgroundColor = catColor;
+          badge.style.color = Utils.badgeTextColor(catColor);
           td.appendChild(badge);
           td.style.textAlign = 'left';
         } else {
-          td.textContent = mc.format(row[mc.key]);
+          td.textContent = mc.format(summary[mc.key]);
         }
         tr.appendChild(td);
       });
+
+      tr.addEventListener('click', function () {
+        expanded = !expanded;
+        var ind = tr.querySelector('.expand-indicator');
+        if (ind) ind.textContent = expanded ? '\u25BC' : '\u25B6';
+
+        if (expanded && subRowEls.length === 0) {
+          var nextSibling = tr.nextSibling;
+          catRows.forEach(function (row) {
+            var subTr = document.createElement('tr');
+            subTr.className = 'sub-row';
+            statCols.forEach(function (mc) {
+              var td = document.createElement('td');
+              if (mc.key === 'pitchType') {
+                td.style.paddingLeft = '24px';
+                var badge = document.createElement('span');
+                badge.className = 'pitch-badge';
+                badge.textContent = row[mc.key];
+                var _bc = Utils.getPitchColor(row[mc.key]);
+                badge.style.backgroundColor = _bc;
+                badge.style.color = Utils.badgeTextColor(_bc);
+                td.appendChild(badge);
+                td.style.textAlign = 'left';
+              } else {
+                td.textContent = mc.format(row[mc.key]);
+              }
+              subTr.appendChild(td);
+            });
+            tbody.insertBefore(subTr, nextSibling);
+            subRowEls.push(subTr);
+          });
+        } else {
+          for (var s = 0; s < subRowEls.length; s++) {
+            subRowEls[s].style.display = expanded ? '' : 'none';
+          }
+        }
+      });
+
       tbody.appendChild(tr);
     });
+
     table.appendChild(tbody);
     container.appendChild(table);
   }

@@ -717,10 +717,16 @@ var Leaderboard = {
         if (pctl !== null && pctl !== undefined) {
           // Determine qualifying status
           var isPitcherRow = !!row.pitcher;
+          var isSinglePitchType = self._lastRenderOpts &&
+              Array.isArray(self._lastRenderOpts.pitchTypes) &&
+              self._lastRenderOpts.pitchTypes.length === 1;
           var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
           var tg = teamGames[row.team] || 0;
           var rowQualified;
-          if (isPitcherRow) {
+          if (isPitcherRow && isSinglePitchType) {
+            // Pitch-type rows: qualify by pitch count (matches aggregator MIN_PITCH_TYPE_PCTL)
+            rowQualified = (row.count || 0) >= 50;
+          } else if (isPitcherRow) {
             var ipStr = row.ip;
             var ipFloat = 0;
             if (ipStr != null) {

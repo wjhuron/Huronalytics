@@ -2940,6 +2940,180 @@ var PlayerPage = {
     return rows;
   },
 
+  // --- Hitter: Get category-level rows (Hard, Breaking, Offspeed) ---
+  _getHitterCategoryRows: function (hitterName, team) {
+    var hpData = window.HITTER_PITCH_LB || [];
+    var CATEGORY_ORDER = ['Hard', 'Breaking', 'Offspeed'];
+    var rows = [];
+    for (var i = 0; i < hpData.length; i++) {
+      var r = hpData[i];
+      if (r.hitter === hitterName && r.team === team &&
+          CATEGORY_ORDER.indexOf(r.pitchType) !== -1) {
+        rows.push(r);
+      }
+    }
+    rows.sort(function (a, b) {
+      return CATEGORY_ORDER.indexOf(a.pitchType) - CATEGORY_ORDER.indexOf(b.pitchType);
+    });
+    return rows;
+  },
+
+  // --- Hitter: Get individual pitch rows for a category ---
+  _getHitterPitchRowsForCategory: function (hitterName, team, category) {
+    var CATS = Aggregator.PITCH_CATEGORIES;
+    var pitchTypes = CATS[category] || [];
+    var hpData = window.HITTER_PITCH_LB || [];
+    var rows = [];
+    for (var i = 0; i < hpData.length; i++) {
+      var r = hpData[i];
+      if (r.hitter === hitterName && r.team === team &&
+          pitchTypes.indexOf(r.pitchType) !== -1) {
+        rows.push(r);
+      }
+    }
+    rows.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    return rows;
+  },
+
+  // Category badge colors
+  CATEGORY_COLORS: {
+    'Hard': '#d62728',
+    'Breaking': '#2ca02c',
+    'Offspeed': '#ff7f0e'
+  },
+
+  // --- Hitter: Render grouped pitch table with expand/collapse ---
+  _renderGroupedPitchTable: function (container, cols, categoryRows, totalRow, hitterName, team) {
+    var self = this;
+    var table = document.createElement('table');
+    table.className = 'player-pitch-stats-table expanded-pitch-table';
+
+    // Header
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    for (var i = 0; i < cols.length; i++) {
+      var th = document.createElement('th');
+      th.textContent = cols[i].label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body
+    var tbody = document.createElement('tbody');
+
+    for (var r = 0; r < categoryRows.length; r++) {
+      (function (catRow) {
+        var tr = document.createElement('tr');
+        tr.className = 'category-row';
+        tr.style.cursor = 'pointer';
+        var expanded = false;
+        var subRowEls = [];
+
+        for (var c = 0; c < cols.length; c++) {
+          var col = cols[c];
+          var td = document.createElement('td');
+          if (col.key === 'pitchType') {
+            var indicator = document.createElement('span');
+            indicator.className = 'expand-indicator';
+            indicator.textContent = '\u25B6';
+            td.appendChild(indicator);
+            var badge = document.createElement('span');
+            badge.className = 'pitch-badge-sm';
+            var catColor = self.CATEGORY_COLORS[catRow.pitchType] || '#888';
+            badge.style.backgroundColor = catColor;
+            badge.style.color = Utils.badgeTextColor(catColor);
+            badge.textContent = catRow.pitchType;
+            td.appendChild(badge);
+          } else {
+            var val = catRow[col.key];
+            td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+          }
+          tr.appendChild(td);
+        }
+
+        tr.addEventListener('click', function () {
+          expanded = !expanded;
+          var indicator = tr.querySelector('.expand-indicator');
+          if (indicator) indicator.textContent = expanded ? '\u25BC' : '\u25B6';
+
+          if (expanded && subRowEls.length === 0) {
+            // First expand: create sub-rows
+            var pitchRows = self._getHitterPitchRowsForCategory(hitterName, team, catRow.pitchType);
+            var nextSibling = tr.nextSibling;
+            for (var p = 0; p < pitchRows.length; p++) {
+              var subTr = document.createElement('tr');
+              subTr.className = 'sub-row';
+              for (var sc = 0; sc < cols.length; sc++) {
+                var subCol = cols[sc];
+                var subTd = document.createElement('td');
+                if (subCol.key === 'pitchType') {
+                  subTd.style.paddingLeft = '28px';
+                  var subBadge = document.createElement('span');
+                  subBadge.className = 'pitch-badge-sm';
+                  var _bc = Utils.getPitchColor(pitchRows[p].pitchType);
+                  subBadge.style.backgroundColor = _bc;
+                  subBadge.style.color = Utils.badgeTextColor(_bc);
+                  subBadge.textContent = pitchRows[p].pitchType;
+                  subTd.appendChild(subBadge);
+                } else {
+                  var subVal = pitchRows[p][subCol.key];
+                  subTd.textContent = subCol.format ? subCol.format(subVal) : (subVal != null ? subVal : '—');
+                }
+                subTr.appendChild(subTd);
+              }
+              tbody.insertBefore(subTr, nextSibling);
+              subRowEls.push(subTr);
+            }
+          } else {
+            // Toggle visibility
+            for (var s = 0; s < subRowEls.length; s++) {
+              subRowEls[s].style.display = expanded ? '' : 'none';
+            }
+          }
+        });
+
+        tbody.appendChild(tr);
+      })(categoryRows[r]);
+    }
+
+    // Total row
+    if (totalRow) {
+      var totalTr = document.createElement('tr');
+      totalTr.style.fontWeight = '700';
+      totalTr.style.borderTop = '2px solid #333840';
+      totalTr.style.background = 'rgba(128,128,128,0.08)';
+      for (var c2 = 0; c2 < cols.length; c2++) {
+        var col2 = cols[c2];
+        var td2 = document.createElement('td');
+        if (col2.key === 'pitchType') {
+          td2.textContent = 'Total';
+        } else {
+          var val2 = totalRow[col2.key];
+          td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
+        }
+        totalTr.appendChild(td2);
+      }
+      tbody.appendChild(totalTr);
+    }
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+
+    // Horizontal scroll fade indicator
+    container.style.position = 'relative';
+    var fadeDiv = document.createElement('div');
+    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, #1a1d21);pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
+    container.appendChild(fadeDiv);
+    container.addEventListener('scroll', function() {
+      var maxScroll = container.scrollWidth - container.clientWidth;
+      fadeDiv.style.opacity = (container.scrollLeft >= maxScroll - 2) ? '0' : '1';
+    });
+    setTimeout(function() {
+      if (container.scrollWidth > container.clientWidth) fadeDiv.style.opacity = '1';
+    }, 100);
+  },
+
   // --- Hitter: Batted Ball Table ---
 
   _renderHitterBattedBallTable: function (data, isROC) {
@@ -2947,10 +3121,6 @@ var PlayerPage = {
     var container = document.getElementById('player-hitter-batted-ball-table');
     if (!container) return;
     container.innerHTML = '';
-
-    var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
-    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
-    section.style.display = '';
 
     // Filter out columns unavailable for ROC players
     var ROC_HIDE_BB = { xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
@@ -2965,7 +3135,17 @@ var PlayerPage = {
       if (key !== 'pitchType') totalRow[key] = data[key];
     }
 
-    this._renderPerPitchTable(container, cols, pitchRows, totalRow);
+    // Use grouped categories if available, otherwise fall back to individual pitch types
+    var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
+    if (categoryRows.length > 0) {
+      section.style.display = '';
+      this._renderGroupedPitchTable(container, cols, categoryRows, totalRow, data.hitter, data.team);
+    } else {
+      var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+      if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+      section.style.display = '';
+      this._renderPerPitchTable(container, cols, pitchRows, totalRow);
+    }
   },
 
   // --- Hitter: Plate Discipline Table ---
@@ -2976,17 +3156,23 @@ var PlayerPage = {
     if (!container) return;
     container.innerHTML = '';
 
-    var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
-    if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
-    section.style.display = '';
-
     var totalRow = { pitchType: 'Total' };
     for (var k = 0; k < this.HITTER_PLATE_DISCIPLINE_COLS.length; k++) {
       var key = this.HITTER_PLATE_DISCIPLINE_COLS[k].key;
       if (key !== 'pitchType') totalRow[key] = data[key];
     }
 
-    this._renderPerPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+    // Use grouped categories if available, otherwise fall back to individual pitch types
+    var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
+    if (categoryRows.length > 0) {
+      section.style.display = '';
+      this._renderGroupedPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, categoryRows, totalRow, data.hitter, data.team);
+    } else {
+      var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+      if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+      section.style.display = '';
+      this._renderPerPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+    }
   },
 
   // --- Hitter: Bat Tracking Table (placeholder) ---

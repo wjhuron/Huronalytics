@@ -1326,6 +1326,29 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   min-width: 28px;
 }
 
+/* Grouped pitch category expand/collapse */
+.category-row {
+  font-weight: 600;
+}
+.category-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+.expand-indicator {
+  display: inline-block;
+  width: 14px;
+  font-size: 9px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+  transition: transform 0.1s;
+}
+.sub-row {
+  background: rgba(255,255,255,0.02);
+}
+.sub-row td {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .usage-bar-track {
   height: 14px;
   background: rgba(255,255,255,0.08);
