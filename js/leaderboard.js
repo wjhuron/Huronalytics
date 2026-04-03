@@ -723,9 +723,14 @@ var Leaderboard = {
           var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
           var tg = teamGames[row.team] || 0;
           var rowQualified;
+          // Pitch shape metrics always show color on single-pitch-type views (no min count)
+          var PITCH_SHAPE_ALWAYS_COLOR = {
+            velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
+            vaa: true, haa: true, nVAA: true, nHAA: true
+          };
           if (isPitcherRow && isSinglePitchType) {
-            // Pitch-type rows: qualify by pitch count (matches aggregator MIN_PITCH_TYPE_PCTL)
-            rowQualified = (row.count || 0) >= 50;
+            // Pitch-type rows: shape metrics always qualify; outcome metrics need 50+ pitches
+            rowQualified = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= 50;
           } else if (isPitcherRow) {
             var ipStr = row.ip;
             var ipFloat = 0;
