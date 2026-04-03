@@ -1021,6 +1021,8 @@ var PlayerPage = {
           var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
+          var qualPool = isPitcher ? 'qualified pitchers' : 'qualified hitters';
+          circle.title = Utils.ordinal(Math.round(pctl)) + ' percentile among ' + qualPool;
         } else {
           // Unqualified: outline ring instead of filled circle
           circle.style.backgroundColor = 'transparent';
@@ -1520,10 +1522,13 @@ var PlayerPage = {
     var plotW = W - PAD_L - PAD_R;
     var plotH = H - PAD_TOP - PAD_BOT;
     var velos = points.map(function(p) { return p.avgVelo; });
-    var minV = Math.min.apply(null, velos);
-    var maxV = Math.max.apply(null, velos);
-    var range = maxV - minV || 1;
     var avgV = velos.reduce(function(a, b) { return a + b; }, 0) / velos.length;
+    var dataMin = Math.min.apply(null, velos);
+    var dataMax = Math.max.apply(null, velos);
+    // Use at least ±3 mph from mean for consistent scale across pitch types
+    var minV = Math.min(dataMin, avgV - 3);
+    var maxV = Math.max(dataMax, avgV + 3);
+    var range = maxV - minV || 1;
 
     var ns = 'http://www.w3.org/2000/svg';
 
@@ -1960,11 +1965,15 @@ var PlayerPage = {
 
     // Color scale legend
     var legendDiv = document.createElement('div');
-    legendDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;color:#999;';
+    legendDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;color:var(--text-secondary, #aaa);';
     var lowLabel = document.createElement('span');
     lowLabel.textContent = 'Low';
     var gradBar = document.createElement('div');
-    gradBar.style.cssText = 'width:100px;height:8px;border-radius:4px;background:linear-gradient(to right, rgb(8,48,107), rgb(255,255,255), rgb(215,48,39));';
+    var gradStops = [];
+    for (var gi = 0; gi <= 10; gi++) {
+      gradStops.push(this._heatColor(gi / 10) + ' ' + (gi * 10) + '%');
+    }
+    gradBar.style.cssText = 'width:100px;height:8px;border-radius:4px;background:linear-gradient(to right, ' + gradStops.join(', ') + ');';
     var highLabel = document.createElement('span');
     highLabel.textContent = 'High';
     legendDiv.appendChild(lowLabel);
@@ -2052,20 +2061,23 @@ var PlayerPage = {
 
 
   _heatColor: function(t) {
-    // Blue (cold) -> white (mid) -> red (hot), like Baseball Savant
-    var r, g, b;
+    // Blue (cold) → white (mid) → red (hot), like Baseball Savant
+    // Uses HSL interpolation for perceptually uniform gradients
+    var h, s, l;
     if (t < 0.5) {
-      var s = t / 0.5;
-      r = Math.round(8 + s * (255 - 8));
-      g = Math.round(48 + s * (255 - 48));
-      b = Math.round(107 + s * (255 - 107));
+      // Blue (h=220) → white: increase lightness, decrease saturation
+      var p = t / 0.5;
+      h = 220;
+      s = Math.round(80 - p * 80);
+      l = Math.round(35 + p * 65);
     } else {
-      var s = (t - 0.5) / 0.5;
-      r = Math.round(255 - s * (255 - 215));
-      g = Math.round(255 - s * (255 - 48));
-      b = Math.round(255 - s * (255 - 39));
+      // White → red (h=5): increase saturation, decrease lightness
+      var p = (t - 0.5) / 0.5;
+      h = 5;
+      s = Math.round(p * 85);
+      l = Math.round(100 - p * 55);
     }
-    return 'rgb(' + r + ',' + g + ',' + b + ')';
+    return 'hsl(' + h + ',' + s + '%,' + l + '%)';
   },
 
   // --- Render: Zone Profile (5×5 grid per pitch type: chase zones + strike zone) ---
@@ -2248,23 +2260,21 @@ var PlayerPage = {
           }
 
           var intensity = maxVal > 0 ? val / maxVal : 0;
-          var r_col, g_col, b_col;
+          var fillColor;
           if (metric === 'usage') {
-            r_col = Math.round(20 + (1 - intensity) * 20);
-            g_col = Math.round(20 + (1 - intensity) * 20);
-            b_col = Math.round(40 + intensity * 180);
+            // Dark blue intensity scale for usage
+            var h = 220, s = Math.round(60 + intensity * 30), l = Math.round(15 + intensity * 30);
+            fillColor = 'hsl(' + h + ',' + s + '%,' + l + '%)';
           } else {
-            r_col = Math.round(40 + intensity * 180);
-            g_col = Math.round(40 + (1 - intensity) * 10);
-            b_col = Math.round(40 + (1 - intensity) * 10);
+            // Blue-white-red diverging scale for rate metrics (whiff%, CSW%)
+            fillColor = this._heatColor(intensity);
           }
           // Dim chase zones slightly
           if (isChase) {
-            r_col = Math.round(r_col * 0.7);
-            g_col = Math.round(g_col * 0.7);
-            b_col = Math.round(b_col * 0.7);
+            fillColor = fillColor.replace(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/, function(m, h, s, l) {
+              return 'hsl(' + h + ',' + Math.round(s * 0.6) + '%,' + Math.round(l * 0.8) + '%)';
+            });
           }
-          var fillColor = 'rgb(' + r_col + ',' + g_col + ',' + b_col + ')';
 
           var rect = document.createElementNS(ns, 'rect');
           rect.setAttribute('x', colX[c]);
@@ -2845,27 +2855,25 @@ var PlayerPage = {
     ctx.fill();
     ctx.restore();
 
-    // Draw fence outline using average distances
-    // Convert feet to statcast-ish units (roughly 2.5 statcast units per foot)
-    var fenceDistances = [
-      { angle: foulAngleLeft, dist: 330 },      // LF
-      { angle: -Math.PI * 5 / 8, dist: 379 },   // LF gap
-      { angle: -Math.PI / 2, dist: 401 },        // CF
-      { angle: -Math.PI * 3 / 8, dist: 379 },    // RF gap
-      { angle: foulAngleRight, dist: 329 },       // RF
-    ];
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (var fi = 0; fi < fenceDistances.length; fi++) {
-      var fd = fenceDistances[fi];
-      var r = fd.dist * fenceScale;
-      var fx = canvasHPX + r * Math.cos(fd.angle);
-      var fy = canvasHPY + r * Math.sin(fd.angle);
-      if (fi === 0) ctx.moveTo(fx, fy);
-      else ctx.lineTo(fx, fy);
+    // Draw distance reference arcs (300, 350, 400 ft)
+    var distArcs = [300, 350, 400];
+    for (var ai = 0; ai < distArcs.length; ai++) {
+      var arcR = distArcs[ai] * fenceScale;
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(canvasHPX, canvasHPY, arcR, foulAngleLeft, foulAngleRight);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Label at top of arc
+      var labelX = canvasHPX + arcR * Math.cos(-Math.PI / 2);
+      var labelY = canvasHPY + arcR * Math.sin(-Math.PI / 2) - 3;
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)';
+      ctx.font = '10px Barlow, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(distArcs[ai] + 'ft', labelX, labelY);
     }
-    ctx.stroke();
 
     // Draw foul lines
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.8)';
