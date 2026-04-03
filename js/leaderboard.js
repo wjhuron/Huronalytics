@@ -617,10 +617,7 @@ var Leaderboard = {
         badge.textContent = row[col.key];
         var pitchColor = Utils.getPitchColor(row[col.key]);
         badge.style.backgroundColor = pitchColor;
-        // Ensure readability for light colors
-        if (row[col.key] === 'SI' || row[col.key] === 'SV') {
-          badge.style.color = '#1a1a2e';
-        }
+        badge.style.color = Utils.badgeTextColor(pitchColor);
         td.appendChild(badge);
         if (col.align) td.classList.add('align-' + col.align);
         tr.appendChild(td);

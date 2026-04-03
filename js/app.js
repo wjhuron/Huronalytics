@@ -1107,8 +1107,9 @@
           var badge = document.createElement('span');
           badge.className = 'pitch-badge';
           badge.textContent = row[mc.key];
-          badge.style.backgroundColor = Utils.getPitchColor(row[mc.key]);
-          if (row[mc.key] === 'SI' || row[mc.key] === 'SV') badge.style.color = '#1a1a2e';
+          var _bc = Utils.getPitchColor(row[mc.key]);
+          badge.style.backgroundColor = _bc;
+          badge.style.color = Utils.badgeTextColor(_bc);
           td.appendChild(badge);
           td.style.textAlign = 'left';
         } else {
@@ -1162,8 +1163,9 @@
           var badge = document.createElement('span');
           badge.className = 'pitch-badge';
           badge.textContent = row[mc.key];
-          badge.style.backgroundColor = Utils.getPitchColor(row[mc.key]);
-          if (row[mc.key] === 'SI' || row[mc.key] === 'SV') badge.style.color = '#1a1a2e';
+          var _bc = Utils.getPitchColor(row[mc.key]);
+          badge.style.backgroundColor = _bc;
+          badge.style.color = Utils.badgeTextColor(_bc);
           td.appendChild(badge);
           td.style.textAlign = 'left';
         } else {

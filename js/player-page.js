@@ -858,7 +858,9 @@ var PlayerPage = {
       label.className = 'usage-label';
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';
-      badge.style.backgroundColor = Utils.getPitchColor(e.pt);
+      var _bc = Utils.getPitchColor(e.pt);
+      badge.style.backgroundColor = _bc;
+      badge.style.color = Utils.badgeTextColor(_bc);
       badge.textContent = e.pt;
       label.appendChild(badge);
 
@@ -1143,7 +1145,9 @@ var PlayerPage = {
 
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';
-      badge.style.backgroundColor = Utils.getPitchColor(pitch.pitchType);
+      var _bc = Utils.getPitchColor(pitch.pitchType);
+      badge.style.backgroundColor = _bc;
+      badge.style.color = Utils.badgeTextColor(_bc);
       badge.textContent = pitch.pitchType;
 
       container.appendChild(buildPctlRow(badge, displayVal, pctl, pitch.count));
@@ -1439,7 +1443,9 @@ var PlayerPage = {
         if (col.key === 'pitchType') {
           var badge = document.createElement('span');
           badge.className = 'pitch-badge-sm';
-          badge.style.backgroundColor = Utils.getPitchColor(row.pitchType);
+          var _bc = Utils.getPitchColor(row.pitchType);
+          badge.style.backgroundColor = _bc;
+          badge.style.color = Utils.badgeTextColor(_bc);
           badge.textContent = row.pitchType;
           td.appendChild(badge);
         } else {
@@ -1491,7 +1497,9 @@ var PlayerPage = {
         if (col.key === 'pitchType') {
           var badge = document.createElement('span');
           badge.className = 'pitch-badge-sm';
-          badge.style.backgroundColor = Utils.getPitchColor(row.pitchType);
+          var _bc = Utils.getPitchColor(row.pitchType);
+          badge.style.backgroundColor = _bc;
+          badge.style.color = Utils.badgeTextColor(_bc);
           badge.textContent = row.pitchType;
           td.appendChild(badge);
         } else {
@@ -1615,7 +1623,9 @@ var PlayerPage = {
         if (col.key === 'pitchType') {
           var badge = document.createElement('span');
           badge.className = 'pitch-badge-sm';
-          badge.style.backgroundColor = Utils.getPitchColor(row.pitchType);
+          var _bc = Utils.getPitchColor(row.pitchType);
+          badge.style.backgroundColor = _bc;
+          badge.style.color = Utils.badgeTextColor(_bc);
           badge.textContent = row.pitchType;
           td.appendChild(badge);
         } else {
@@ -1704,7 +1714,9 @@ var PlayerPage = {
       label.className = 'heatmap-label';
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';
-      badge.style.backgroundColor = Utils.getPitchColor(pt);
+      var _bc = Utils.getPitchColor(pt);
+      badge.style.backgroundColor = _bc;
+      badge.style.color = Utils.badgeTextColor(_bc);
       badge.textContent = pt;
       label.appendChild(badge);
       cell.appendChild(label);
@@ -1902,7 +1914,9 @@ var PlayerPage = {
       tdLabel.style.textAlign = 'center';
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';
-      badge.style.backgroundColor = Utils.getPitchColor(pt);
+      var _bc = Utils.getPitchColor(pt);
+      badge.style.backgroundColor = _bc;
+      badge.style.color = Utils.badgeTextColor(_bc);
       badge.textContent = pt;
       tdLabel.appendChild(badge);
       tr.appendChild(tdLabel);
