@@ -191,7 +191,7 @@ var Aggregator = {
         if (mlbValues[m2] < rVal) rBelow++;
         if (mlbValues[m2] === rVal) rEqual++;
       }
-      var rPctl = (rBelow + 0.5 * (rEqual - 1)) / Math.max(1, n - 1) * 100;
+      var rPctl = (rBelow + 0.5 * rEqual) / n * 100;
       rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
 
@@ -210,7 +210,7 @@ var Aggregator = {
           if (mlbValues[sm] < sv) sBelow++;
           if (mlbValues[sm] === sv) sEqual++;
         }
-        var sPctl = (sBelow + 0.5 * (sEqual - 1)) / Math.max(1, n - 1) * 100;
+        var sPctl = (sBelow + 0.5 * sEqual) / n * 100;
         rows[s][pctlKey] = Math.max(0, Math.min(100, Math.round(sPctl)));
       }
     }
@@ -264,7 +264,7 @@ var Aggregator = {
         if (mlbValues[m2] < rVal) rBelow++;
         if (mlbValues[m2] === rVal) rEqual++;
       }
-      var rPctl = (rBelow + 0.5 * (rEqual - 1)) / Math.max(1, n - 1) * 100;
+      var rPctl = (rBelow + 0.5 * rEqual) / n * 100;
       rows[rocValid[r].idx][pctlKey] = Math.max(0, Math.min(100, Math.round(rPctl)));
     }
     for (var j2 = 0; j2 < rows.length; j2++) {
