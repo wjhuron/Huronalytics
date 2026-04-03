@@ -428,7 +428,6 @@ var Aggregator = {
                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
                      'xwOBAcon', 'xwOBAcon_pctl',
                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
-                     'pitchEntropy', 'pitchEntropy_pctl',
                      'armAngle'];
     var preAgg = window.PITCHER_DATA || [];
     var preAggMap = {};

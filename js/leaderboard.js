@@ -65,7 +65,6 @@ var COLUMNS = {
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
     // Count & Repertoire
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on pitches with 2 strikes', sectionStart: true, group: 'count_stats' },
-    { key: 'pitchEntropy', label: 'Entropy',  format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Shannon entropy of pitch mix — higher = more unpredictable', group: 'count_stats' },
   ],
   pitcherBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },

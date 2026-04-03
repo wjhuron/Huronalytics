@@ -1815,14 +1815,20 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 .zone-profile-labels {
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
+  justify-content: center;
   padding-top: 22px;
-  height: 128px;
-  margin-right: -8px;
+  height: 148px;
+  margin-right: -4px;
+  gap: 1px;
 }
 .zone-label-row {
   font-size: 10px;
   color: var(--text-secondary);
   text-align: right;
-  line-height: 40px;
+  line-height: 32px;
+}
+.zone-label-row.zone-label-chase {
+  line-height: 22px;
+  font-size: 9px;
+  opacity: 0.6;
 }

@@ -174,7 +174,6 @@ var PlayerPage = {
     { key: 'xFIP', label: 'xFIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'pitchEntropy', label: 'Entropy', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   ],
 
   // Batted Ball table (per pitch type + total)
@@ -359,7 +358,7 @@ var PlayerPage = {
     this._renderCountTable(data);
   },
 
-  // Get PITCH_DETAILS for this pitcher (already game-type-specific), optionally filtered by _gameDate
+  // Get PITCH_DETAILS for this pitcher (already game-type-specific), optionally filtered by _gameDate and _platoonDetailHand
   _getFilteredDetails: function (data) {
     var details = window.PITCH_DETAILS || {};
     var key = data.pitcher + '|' + data.team;
@@ -370,6 +369,11 @@ var PlayerPage = {
     if (this._gameDate) {
       var gd = this._gameDate;
       pitches = pitches.filter(function (p) { return p.gd === gd; });
+    }
+    // Filter by batter hand when platoon toggle is active
+    if (this._platoonDetailHand) {
+      var bh = this._platoonDetailHand;
+      pitches = pitches.filter(function (p) { return p.bh === bh; });
     }
     return pitches;
   },
@@ -1512,25 +1516,47 @@ var PlayerPage = {
    */
   _createVeloSparkline: function (points, color) {
     if (!points || points.length < 2) return null;
-    var W = 120, H = 28, PAD = 2;
+    var W = 160, H = 44, PAD_TOP = 4, PAD_BOT = 14, PAD_L = 4, PAD_R = 4;
+    var plotW = W - PAD_L - PAD_R;
+    var plotH = H - PAD_TOP - PAD_BOT;
     var velos = points.map(function(p) { return p.avgVelo; });
     var minV = Math.min.apply(null, velos);
     var maxV = Math.max.apply(null, velos);
     var range = maxV - minV || 1;
+    var avgV = velos.reduce(function(a, b) { return a + b; }, 0) / velos.length;
 
     var ns = 'http://www.w3.org/2000/svg';
+
+    // Wrapper div for sparkline + tooltip
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:inline-block;position:relative;vertical-align:middle;';
+
     var svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('width', W);
     svg.setAttribute('height', H);
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    svg.style.display = 'inline-block';
-    svg.style.verticalAlign = 'middle';
+    svg.style.display = 'block';
+    svg.style.cursor = 'crosshair';
 
-    // Build path
+    // Season average reference line (dashed)
+    var avgY = PAD_TOP + (1 - (avgV - minV) / range) * plotH;
+    var avgLine = document.createElementNS(ns, 'line');
+    avgLine.setAttribute('x1', PAD_L);
+    avgLine.setAttribute('y1', avgY.toFixed(1));
+    avgLine.setAttribute('x2', PAD_L + plotW);
+    avgLine.setAttribute('y2', avgY.toFixed(1));
+    avgLine.setAttribute('stroke', '#555');
+    avgLine.setAttribute('stroke-width', '0.75');
+    avgLine.setAttribute('stroke-dasharray', '3,2');
+    svg.appendChild(avgLine);
+
+    // Build path and compute coordinates
+    var coords = [];
     var pathParts = [];
     for (var i = 0; i < points.length; i++) {
-      var x = PAD + (i / (points.length - 1)) * (W - 2 * PAD);
-      var y = PAD + (1 - (points[i].avgVelo - minV) / range) * (H - 2 * PAD);
+      var x = PAD_L + (i / (points.length - 1)) * plotW;
+      var y = PAD_TOP + (1 - (points[i].avgVelo - minV) / range) * plotH;
+      coords.push({ x: x, y: y });
       pathParts.push((i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1));
     }
 
@@ -1544,19 +1570,90 @@ var PlayerPage = {
     svg.appendChild(path);
 
     // End dot
-    var lastX = PAD + (W - 2 * PAD);
-    var lastY = PAD + (1 - (velos[velos.length - 1] - minV) / range) * (H - 2 * PAD);
+    var lastCoord = coords[coords.length - 1];
     var dot = document.createElementNS(ns, 'circle');
-    dot.setAttribute('cx', lastX.toFixed(1));
-    dot.setAttribute('cy', lastY.toFixed(1));
-    dot.setAttribute('r', '2');
+    dot.setAttribute('cx', lastCoord.x.toFixed(1));
+    dot.setAttribute('cy', lastCoord.y.toFixed(1));
+    dot.setAttribute('r', '2.5');
     dot.setAttribute('fill', color || '#888');
     svg.appendChild(dot);
 
-    // Tooltip showing range
-    svg.setAttribute('title', minV.toFixed(1) + ' – ' + maxV.toFixed(1) + ' mph');
+    // Date axis labels (first and last date, formatted as M/D)
+    var formatDate = function(d) {
+      var parts = d.split('-');
+      return parseInt(parts[1]) + '/' + parseInt(parts[2]);
+    };
+    var startLabel = document.createElementNS(ns, 'text');
+    startLabel.setAttribute('x', PAD_L);
+    startLabel.setAttribute('y', H - 1);
+    startLabel.setAttribute('fill', '#666');
+    startLabel.setAttribute('font-size', '9');
+    startLabel.setAttribute('font-family', 'Barlow, sans-serif');
+    startLabel.textContent = formatDate(points[0].date);
+    svg.appendChild(startLabel);
 
-    return svg;
+    var endLabel = document.createElementNS(ns, 'text');
+    endLabel.setAttribute('x', PAD_L + plotW);
+    endLabel.setAttribute('y', H - 1);
+    endLabel.setAttribute('text-anchor', 'end');
+    endLabel.setAttribute('fill', '#666');
+    endLabel.setAttribute('font-size', '9');
+    endLabel.setAttribute('font-family', 'Barlow, sans-serif');
+    endLabel.textContent = formatDate(points[points.length - 1].date);
+    svg.appendChild(endLabel);
+
+    // Invisible hover rects for each data point (tooltip targets)
+    var tooltip = document.createElement('div');
+    tooltip.style.cssText = 'position:absolute;display:none;background:#1e2127;border:1px solid #444;border-radius:4px;padding:3px 7px;font-size:11px;color:#ddd;white-space:nowrap;pointer-events:none;z-index:10;font-family:JetBrains Mono,monospace;';
+    wrapper.appendChild(tooltip);
+
+    var segW = plotW / (points.length - 1 || 1);
+    for (var j = 0; j < points.length; j++) {
+      (function(idx) {
+        var hoverRect = document.createElementNS(ns, 'rect');
+        var rx = coords[idx].x - segW / 2;
+        hoverRect.setAttribute('x', Math.max(0, rx).toFixed(1));
+        hoverRect.setAttribute('y', '0');
+        hoverRect.setAttribute('width', segW.toFixed(1));
+        hoverRect.setAttribute('height', H);
+        hoverRect.setAttribute('fill', 'transparent');
+        hoverRect.style.cursor = 'crosshair';
+
+        // Visible hover dot
+        var hDot = document.createElementNS(ns, 'circle');
+        hDot.setAttribute('cx', coords[idx].x.toFixed(1));
+        hDot.setAttribute('cy', coords[idx].y.toFixed(1));
+        hDot.setAttribute('r', '3');
+        hDot.setAttribute('fill', color || '#888');
+        hDot.setAttribute('stroke', '#fff');
+        hDot.setAttribute('stroke-width', '1');
+        hDot.style.display = 'none';
+        svg.appendChild(hDot);
+
+        hoverRect.addEventListener('mouseenter', function() {
+          hDot.style.display = '';
+          tooltip.style.display = 'block';
+          tooltip.textContent = formatDate(points[idx].date) + '  ' + points[idx].avgVelo.toFixed(1) + ' mph';
+          // Position tooltip above the point
+          var tipX = coords[idx].x - 30;
+          if (tipX < 0) tipX = 0;
+          if (tipX > W - 80) tipX = W - 80;
+          tooltip.style.left = tipX + 'px';
+          tooltip.style.top = (coords[idx].y - 22) + 'px';
+        });
+        hoverRect.addEventListener('mouseleave', function() {
+          hDot.style.display = 'none';
+          tooltip.style.display = 'none';
+        });
+        svg.appendChild(hoverRect);
+      })(j);
+    }
+
+    // Overall tooltip on the SVG (range + avg)
+    svg.setAttribute('title', 'Range: ' + minV.toFixed(1) + '–' + maxV.toFixed(1) + ' mph | Avg: ' + avgV.toFixed(1) + ' mph');
+
+    wrapper.appendChild(svg);
+    return wrapper;
   },
 
   _renderExpandedPitchTable: function (data) {
@@ -1971,7 +2068,7 @@ var PlayerPage = {
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
 
-  // --- Render: Zone Profile (3×3 grid per pitch type) ---
+  // --- Render: Zone Profile (5×5 grid per pitch type: chase zones + strike zone) ---
 
   _renderZoneProfiles: function(data) {
     var section = document.getElementById('player-zone-profile-section');
@@ -2000,13 +2097,15 @@ var PlayerPage = {
     var szHeight = szTop - szBot;
     var szThird = szHeight / 3;
 
-    // Zone boundaries (3×3): rows = high/mid/low, cols = in/mid/away (from hitter perspective)
-    // PlateX: negative = inside to RHH, positive = outside to RHH
-    // For "vs RHH": in = negative PlateX, away = positive PlateX
-    // For "vs LHH": flipped
-    var PX_EDGE = 0.83;  // ~10 inches, plate half-width
+    // 5×5 grid: inner 3×3 = strike zone, outer ring = chase/waste zones
+    // Horizontal: plate half-width = 0.83 ft, chase zone extends another ~0.55 ft (one plate-third)
+    var PX_EDGE = 0.83;
+    var PX_CHASE = 1.38;  // chase zone outer edge (~16.5 inches from center)
     var pxThird = PX_EDGE * 2 / 3;
-    var pxBounds = [-PX_EDGE, -PX_EDGE + pxThird, -PX_EDGE + 2 * pxThird, PX_EDGE];
+
+    // Vertical chase zone extends one szThird above/below strike zone
+    var pzChaseTop = szTop + szThird;
+    var pzChaseBot = szBot - szThird;
 
     // Group by pitch type, filter by hand
     var byType = {};
@@ -2023,21 +2122,20 @@ var PlayerPage = {
       byType[pt].push(p);
     }
 
-    // Sort by count descending
     var ptOrder = Object.keys(totalByType).sort(function(a, b) { return totalByType[b] - totalByType[a]; });
 
-    // For each pitch type, compute 3×3 zone stats
     for (var ti = 0; ti < ptOrder.length; ti++) {
       var pt = ptOrder[ti];
       var ptPitches = byType[pt] || [];
       if (ptPitches.length < 5) continue;
 
-      // 3×3 grid: [row][col] where row 0=high, 2=low; col 0=in, 2=away
+      // 5×5 grid: [row][col], row 0=high chase, 1=high, 2=mid, 3=low, 4=low chase
+      //            col 0=in chase, 1=in, 2=mid, 3=away, 4=away chase
       var zones = [];
-      for (var r = 0; r < 3; r++) {
+      for (var r = 0; r < 5; r++) {
         zones[r] = [];
-        for (var c = 0; c < 3; c++) {
-          zones[r][c] = { n: 0, swings: 0, whiffs: 0, csw: 0, totalPitches: 0 };
+        for (var c = 0; c < 5; c++) {
+          zones[r][c] = { n: 0, swings: 0, whiffs: 0, csw: 0 };
         }
       }
 
@@ -2046,32 +2144,31 @@ var PlayerPage = {
         var px = pp.px;
         var pz = pp.pz;
 
-        // Determine column (in/mid/away)
+        // Determine column (0=chase-in, 1=in, 2=mid, 3=away, 4=chase-away)
         var col;
-        if (px < pxBounds[1]) col = 0;
-        else if (px < pxBounds[2]) col = 1;
-        else col = 2;
+        if (px < -PX_EDGE) col = 0;
+        else if (px < -PX_EDGE + pxThird) col = 1;
+        else if (px < PX_EDGE - pxThird) col = 2;
+        else if (px <= PX_EDGE) col = 3;
+        else col = 4;
 
-        // Determine row (high=0, mid=1, low=2)
+        // Determine row (0=chase-high, 1=high, 2=mid, 3=low, 4=chase-low)
         var row;
-        if (pz > szTop - szThird) row = 0;
-        else if (pz > szBot + szThird) row = 1;
-        else row = 2;
+        if (pz > szTop) row = 0;
+        else if (pz > szTop - szThird) row = 1;
+        else if (pz > szBot + szThird) row = 2;
+        else if (pz >= szBot) row = 3;
+        else row = 4;
 
-        // Clamp to grid
+        // Clamp extreme outliers to chase zones
         if (row < 0) row = 0;
-        if (row > 2) row = 2;
+        if (row > 4) row = 4;
         if (col < 0) col = 0;
-        if (col > 2) col = 2;
+        if (col > 4) col = 4;
 
         var z = zones[row][col];
         z.n++;
-        z.totalPitches = ptPitches.length;
-        // Description-based stats from pitch detail
-        var desc = pp.d;  // description code
-        // In PITCH_DETAILS, descriptions are stored as codes
-        // Check if it's a swing (based on the original data structure)
-        // The pitch details use short codes: 'SS'=Swinging Strike, 'CS'=Called Strike, 'F'=Foul, 'IP'=In Play, 'B'=Ball
+        var desc = pp.d;
         if (desc === 'SS' || desc === 'F' || desc === 'IP') {
           z.swings++;
           if (desc === 'SS') z.whiffs++;
@@ -2099,32 +2196,45 @@ var PlayerPage = {
       header.appendChild(countSpan);
       wrapper.appendChild(header);
 
-      var GRID = 120, CELL = GRID / 3, PAD = 4;
+      // SVG dimensions: inner cells = 32px, outer chase cells = 22px
+      var INNER = 32, OUTER = 22, GAP = 1;
+      var TOTAL_W = 2 * OUTER + 3 * INNER + 4 * GAP;
+      var TOTAL_H = TOTAL_W;
+      var SVG_PAD = 2;
       var ns = 'http://www.w3.org/2000/svg';
       var svg = document.createElementNS(ns, 'svg');
-      svg.setAttribute('width', GRID + 2 * PAD);
-      svg.setAttribute('height', GRID + 2 * PAD);
-      svg.setAttribute('viewBox', '0 0 ' + (GRID + 2 * PAD) + ' ' + (GRID + 2 * PAD));
+      svg.setAttribute('width', TOTAL_W + 2 * SVG_PAD);
+      svg.setAttribute('height', TOTAL_H + 2 * SVG_PAD);
+      svg.setAttribute('viewBox', '0 0 ' + (TOTAL_W + 2 * SVG_PAD) + ' ' + (TOTAL_H + 2 * SVG_PAD));
+
+      // Compute cell positions
+      var colWidths = [OUTER, INNER, INNER, INNER, OUTER];
+      var rowHeights = [OUTER, INNER, INNER, INNER, OUTER];
+      var colX = [SVG_PAD];
+      for (var ci = 1; ci <= 4; ci++) colX[ci] = colX[ci - 1] + colWidths[ci - 1] + GAP;
+      var rowY = [SVG_PAD];
+      for (var ri = 1; ri <= 4; ri++) rowY[ri] = rowY[ri - 1] + rowHeights[ri - 1] + GAP;
 
       // Find max value for color scaling
       var maxVal = 0;
-      for (var r = 0; r < 3; r++) {
-        for (var c = 0; c < 3; c++) {
+      for (var r = 0; r < 5; r++) {
+        for (var c = 0; c < 5; c++) {
           var val;
           if (metric === 'usage') {
             val = zones[r][c].n / ptPitches.length;
           } else if (metric === 'whiff') {
             val = zones[r][c].swings > 0 ? zones[r][c].whiffs / zones[r][c].swings : 0;
           } else {
-            val = ptPitches.length > 0 ? zones[r][c].csw / zones[r][c].n : 0;
+            val = zones[r][c].n > 0 ? zones[r][c].csw / zones[r][c].n : 0;
           }
           if (val > maxVal) maxVal = val;
         }
       }
 
-      for (var r = 0; r < 3; r++) {
-        for (var c = 0; c < 3; c++) {
+      for (var r = 0; r < 5; r++) {
+        for (var c = 0; c < 5; c++) {
           var z = zones[r][c];
+          var isChase = r === 0 || r === 4 || c === 0 || c === 4;
           var val, displayVal;
           if (metric === 'usage') {
             val = z.n / ptPitches.length;
@@ -2137,51 +2247,61 @@ var PlayerPage = {
             displayVal = z.n > 2 ? (val * 100).toFixed(0) + '%' : '—';
           }
 
-          // Color intensity based on value relative to max
           var intensity = maxVal > 0 ? val / maxVal : 0;
           var r_col, g_col, b_col;
           if (metric === 'usage') {
-            // Blue gradient for usage
             r_col = Math.round(20 + (1 - intensity) * 20);
             g_col = Math.round(20 + (1 - intensity) * 20);
             b_col = Math.round(40 + intensity * 180);
           } else {
-            // Red gradient for whiff/CSW (higher = more red = better for pitcher)
             r_col = Math.round(40 + intensity * 180);
             g_col = Math.round(40 + (1 - intensity) * 10);
             b_col = Math.round(40 + (1 - intensity) * 10);
           }
+          // Dim chase zones slightly
+          if (isChase) {
+            r_col = Math.round(r_col * 0.7);
+            g_col = Math.round(g_col * 0.7);
+            b_col = Math.round(b_col * 0.7);
+          }
           var fillColor = 'rgb(' + r_col + ',' + g_col + ',' + b_col + ')';
 
           var rect = document.createElementNS(ns, 'rect');
-          rect.setAttribute('x', PAD + c * CELL);
-          rect.setAttribute('y', PAD + r * CELL);
-          rect.setAttribute('width', CELL);
-          rect.setAttribute('height', CELL);
+          rect.setAttribute('x', colX[c]);
+          rect.setAttribute('y', rowY[r]);
+          rect.setAttribute('width', colWidths[c]);
+          rect.setAttribute('height', rowHeights[r]);
           rect.setAttribute('fill', fillColor);
-          rect.setAttribute('stroke', '#555');
-          rect.setAttribute('stroke-width', '0.5');
+          rect.setAttribute('rx', isChase ? '2' : '0');
           svg.appendChild(rect);
 
-          // Value text
-          var text = document.createElementNS(ns, 'text');
-          text.setAttribute('x', PAD + c * CELL + CELL / 2);
-          text.setAttribute('y', PAD + r * CELL + CELL / 2 + 4);
-          text.setAttribute('text-anchor', 'middle');
-          text.setAttribute('fill', intensity > 0.3 ? '#fff' : '#aaa');
-          text.setAttribute('font-size', '11');
-          text.setAttribute('font-family', 'Barlow, sans-serif');
-          text.textContent = displayVal;
-          svg.appendChild(text);
+          // Show text only if cell is large enough and has data
+          var cellW = colWidths[c];
+          var cellH = rowHeights[r];
+          if (z.n > 0 && (cellW >= 28 || !isChase)) {
+            var text = document.createElementNS(ns, 'text');
+            text.setAttribute('x', colX[c] + cellW / 2);
+            text.setAttribute('y', rowY[r] + cellH / 2 + (isChase ? 3 : 4));
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', intensity > 0.3 ? '#fff' : '#aaa');
+            text.setAttribute('font-size', isChase ? '9' : '11');
+            text.setAttribute('font-family', 'Barlow, sans-serif');
+            text.textContent = displayVal;
+            svg.appendChild(text);
+          }
         }
       }
 
-      // Strike zone border
+      // Strike zone border (around inner 3×3)
+      var szX = colX[1];
+      var szY = rowY[1];
+      var szW = colX[3] + colWidths[3] - colX[1];
+      var szH = rowY[3] + rowHeights[3] - rowY[1];
       var szRect = document.createElementNS(ns, 'rect');
-      szRect.setAttribute('x', PAD);
-      szRect.setAttribute('y', PAD);
-      szRect.setAttribute('width', GRID);
-      szRect.setAttribute('height', GRID);
+      szRect.setAttribute('x', szX);
+      szRect.setAttribute('y', szY);
+      szRect.setAttribute('width', szW);
+      szRect.setAttribute('height', szH);
       szRect.setAttribute('fill', 'none');
       szRect.setAttribute('stroke', '#888');
       szRect.setAttribute('stroke-width', '1.5');
@@ -2191,11 +2311,11 @@ var PlayerPage = {
       container.appendChild(wrapper);
     }
 
-    // Add zone labels (High/Mid/Low on left, In/Mid/Away on top)
+    // Add zone labels
     if (ptOrder.length > 0) {
       var labelDiv = document.createElement('div');
       labelDiv.className = 'zone-profile-labels';
-      labelDiv.innerHTML = '<span class="zone-label-row">High</span><span class="zone-label-row">Mid</span><span class="zone-label-row">Low</span>';
+      labelDiv.innerHTML = '<span class="zone-label-row zone-label-chase">Chase</span><span class="zone-label-row">High</span><span class="zone-label-row">Mid</span><span class="zone-label-row">Low</span><span class="zone-label-row zone-label-chase">Chase</span>';
       container.insertBefore(labelDiv, container.firstChild);
     }
   },
@@ -2442,16 +2562,28 @@ var PlayerPage = {
     if (!data) return;
 
     var hand = this._platoonHand;
+    var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+    var isROC = rocTeams.indexOf(data.team) !== -1;
+
     if (hand === 'all') {
       // Use pre-computed data (no aggregation needed)
       if (type === 'pitcher') {
         var filteredData = this._getFilteredPlayerData(data, true) || data;
+        var filteredPitchRows = this._getFilteredPitchRows(data);
         this._filteredData = filteredData;
+        this._filteredPitchRows = filteredPitchRows;
         this._renderStatsTable(filteredData);
+        this._renderExpandedPitchTable(data);
+        this._renderBattedBallTable(data);
+        this._renderPlateDisciplineTable(data);
+        this._renderHeatMaps(data);
+        this._renderZoneProfiles(data);
+        this._renderCountTable(data);
       } else {
-        var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
-        var isROC = rocTeams.indexOf(data.team) !== -1;
         this._renderHitterStatsFullTable(data, isROC);
+        this._renderHitterBattedBallTable(data, isROC);
+        this._renderHitterPlateDisciplineTable(data);
+        if (!isROC) this._renderHitterBatTrackingTable(data);
       }
       return;
     }
@@ -2459,10 +2591,12 @@ var PlayerPage = {
     // Re-aggregate with hand filter
     if (!Aggregator.loaded) return;
 
-    // Build filters with all required defaults so aggregator doesn't filter everything out
     var baseFilters = { vsHand: hand, team: 'all', throws: 'all', search: '', role: 'all' };
+    var noDataMsg = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' +
+      (type === 'pitcher' ? (hand === 'L' ? 'LHH' : 'RHH') : (hand === 'L' ? 'LHP' : 'RHP')) + '</p>';
 
     if (type === 'pitcher') {
+      // Re-aggregate pitcher-level stats
       var rows = Aggregator.aggregate('pitcher', baseFilters);
       var found = null;
       for (var i = 0; i < rows.length; i++) {
@@ -2471,14 +2605,37 @@ var PlayerPage = {
           break;
         }
       }
-      if (found) {
-        this._filteredData = found;
-        this._renderStatsTable(found);
-      } else {
+      if (!found) {
         var container = document.getElementById('player-stats-table');
-        if (container) container.innerHTML = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' + (hand === 'L' ? 'LHH' : 'RHH') + '</p>';
+        if (container) container.innerHTML = noDataMsg;
+        return;
       }
+      this._filteredData = found;
+      this._renderStatsTable(found);
+
+      // Re-aggregate pitch-type rows with hand filter
+      var pitchRows = Aggregator.aggregate('pitch', baseFilters);
+      var myPitchRows = [];
+      for (var i = 0; i < pitchRows.length; i++) {
+        if (pitchRows[i].pitcher === data.pitcher && pitchRows[i].team === data.team) {
+          myPitchRows.push(pitchRows[i]);
+        }
+      }
+      myPitchRows.sort(function(a, b) { return (b.usagePct || 0) - (a.usagePct || 0); });
+      this._filteredPitchRows = myPitchRows;
+      this._renderExpandedPitchTable(data);
+      this._renderBattedBallTable(data);
+      this._renderPlateDisciplineTable(data);
+
+      // Heat maps, zone profiles, count table use PITCH_DETAILS — filter by batter hand
+      this._platoonDetailHand = hand;
+      this._renderHeatMaps(data);
+      this._renderZoneProfiles(data);
+      this._renderCountTable(data);
+      this._platoonDetailHand = null;
+
     } else {
+      // Re-aggregate hitter-level stats
       var rows = Aggregator.aggregate('hitter', baseFilters);
       var found = null;
       for (var i = 0; i < rows.length; i++) {
@@ -2487,14 +2644,26 @@ var PlayerPage = {
           break;
         }
       }
-      if (found) {
-        var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
-        var isROC = rocTeams.indexOf(data.team) !== -1;
-        this._renderHitterStatsFullTable(found, isROC);
-      } else {
+      if (!found) {
         var container = document.getElementById('player-hitter-stats-table');
-        if (container) container.innerHTML = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' + (hand === 'L' ? 'LHP' : 'RHP') + '</p>';
+        if (container) container.innerHTML = noDataMsg;
+        return;
       }
+      this._renderHitterStatsFullTable(found, isROC);
+
+      // Re-aggregate hitter pitch-type rows with hand filter
+      var hpRows = Aggregator.aggregate('hitterPitch', baseFilters);
+      var myHPRows = [];
+      for (var i = 0; i < hpRows.length; i++) {
+        if (hpRows[i].hitter === data.hitter && hpRows[i].team === data.team) {
+          myHPRows.push(hpRows[i]);
+        }
+      }
+      this._filteredHitterPitchRows = myHPRows;
+      this._renderHitterBattedBallTable(found, isROC);
+      this._renderHitterPlateDisciplineTable(found);
+      if (!isROC) this._renderHitterBatTrackingTable(found);
+      this._filteredHitterPitchRows = null;
     }
   },
 
@@ -3593,16 +3762,23 @@ var PlayerPage = {
       if (key !== 'pitchType') totalRow[key] = data[key];
     }
 
-    // Use grouped categories if available, otherwise fall back to individual pitch types
-    var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
-    if (categoryRows.length > 0) {
-      section.style.display = '';
-      this._renderGroupedPitchTable(container, cols, categoryRows, totalRow, data.hitter, data.team);
-    } else {
-      var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+    // Use filtered platoon rows if available, otherwise grouped categories, otherwise individual pitch types
+    if (this._filteredHitterPitchRows) {
+      var pitchRows = this._filteredHitterPitchRows;
       if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
       section.style.display = '';
       this._renderPerPitchTable(container, cols, pitchRows, totalRow);
+    } else {
+      var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
+      if (categoryRows.length > 0) {
+        section.style.display = '';
+        this._renderGroupedPitchTable(container, cols, categoryRows, totalRow, data.hitter, data.team);
+      } else {
+        var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+        if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+        section.style.display = '';
+        this._renderPerPitchTable(container, cols, pitchRows, totalRow);
+      }
     }
   },
 
@@ -3620,16 +3796,23 @@ var PlayerPage = {
       if (key !== 'pitchType') totalRow[key] = data[key];
     }
 
-    // Use grouped categories if available, otherwise fall back to individual pitch types
-    var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
-    if (categoryRows.length > 0) {
-      section.style.display = '';
-      this._renderGroupedPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, categoryRows, totalRow, data.hitter, data.team);
-    } else {
-      var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+    // Use filtered platoon rows if available, otherwise grouped categories, otherwise individual pitch types
+    if (this._filteredHitterPitchRows) {
+      var pitchRows = this._filteredHitterPitchRows;
       if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
       section.style.display = '';
       this._renderPerPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+    } else {
+      var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
+      if (categoryRows.length > 0) {
+        section.style.display = '';
+        this._renderGroupedPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, categoryRows, totalRow, data.hitter, data.team);
+      } else {
+        var pitchRows = this._getHitterPitchRows(data.hitter, data.team);
+        if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+        section.style.display = '';
+        this._renderPerPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+      }
     }
   },
 
