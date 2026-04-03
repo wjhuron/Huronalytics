@@ -434,12 +434,28 @@ var Aggregator = {
     for (var bi = 0; bi < preAgg.length; bi++) {
       preAggMap[preAgg[bi].pitcher + '|' + preAgg[bi].team] = preAgg[bi];
     }
+    // Fields that have per-hand splits (stored as field_vsL / field_vsR in PITCHER_DATA)
+    var handSplitFields = ['twoStrikeWhiffPct', 'fpsPct',
+      'strikePct', 'izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct',
+      'kPct', 'bbPct', 'kbbPct', 'babip', 'gbPct',
+      'avgEV', 'maxEV', 'hardHitPct', 'barrelPct',
+      'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct', 'medEV',
+      'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'];
+    var handSuffix = vsHand !== 'all' ? '_vs' + vsHand : '';
     for (var mi = 0; mi < rows.length; mi++) {
       var key2 = rows[mi].pitcher + '|' + rows[mi].team;
       var pre = preAggMap[key2];
       if (pre) {
         for (var fi = 0; fi < boxFields.length; fi++) {
           var bf = boxFields[fi];
+          // If filtering by hand and this field has per-hand split, use it
+          if (handSuffix && handSplitFields.indexOf(bf) >= 0) {
+            var handKey = bf + handSuffix;
+            if (pre[handKey] !== undefined) {
+              rows[mi][bf] = pre[handKey];
+              continue;
+            }
+          }
           if (pre[bf] !== undefined) rows[mi][bf] = pre[bf];
         }
       }
@@ -724,7 +740,7 @@ var Aggregator = {
       var pmk = rows[pmi].pitcher + '|' + rows[pmi].team + '|' + rows[pmi].pitchType;
       var ppre = pitchPreMap[pmk];
       if (ppre) {
-        // Run value
+        // Run value (always merge — not hand-dependent at pitch level)
         if (ppre.runValue !== undefined) rows[pmi].runValue = ppre.runValue;
         if (ppre.runValue_pctl !== undefined) rows[pmi].runValue_pctl = ppre.runValue_pctl;
         if (ppre.rv100 !== undefined) rows[pmi].rv100 = ppre.rv100;
@@ -733,17 +749,21 @@ var Aggregator = {
         if (ppre.strikePct !== undefined) rows[pmi].strikePct = ppre.strikePct;
         if (ppre.strikePct_pctl !== undefined) rows[pmi].strikePct_pctl = ppre.strikePct_pctl;
         if (ppre.nSwings !== undefined) rows[pmi].nSwings = ppre.nSwings;
-        // Batted ball fields (don't overwrite babip/gbPct — computed from counters)
-        for (var bbfi = 0; bbfi < PITCH_BB_KEYS.length; bbfi++) {
-          var bbf = PITCH_BB_KEYS[bbfi];
-          if (ppre[bbf] !== undefined) rows[pmi][bbf] = ppre[bbf];
-        }
-        // Expected stats
-        var xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
-        for (var xi = 0; xi < xKeys.length; xi++) {
-          var xk = xKeys[xi];
-          if (ppre[xk] !== undefined) rows[pmi][xk] = ppre[xk];
-          if (ppre[xk + '_pctl'] !== undefined) rows[pmi][xk + '_pctl'] = ppre[xk + '_pctl'];
+        // Skip batted ball and expected stats merge when hand filter is active
+        // (micro-computed counters are already hand-filtered; pre-agg values are not)
+        if (vsHand === 'all') {
+          // Batted ball fields (don't overwrite babip/gbPct — computed from counters)
+          for (var bbfi = 0; bbfi < PITCH_BB_KEYS.length; bbfi++) {
+            var bbf = PITCH_BB_KEYS[bbfi];
+            if (ppre[bbf] !== undefined) rows[pmi][bbf] = ppre[bbf];
+          }
+          // Expected stats
+          var xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
+          for (var xi = 0; xi < xKeys.length; xi++) {
+            var xk = xKeys[xi];
+            if (ppre[xk] !== undefined) rows[pmi][xk] = ppre[xk];
+            if (ppre[xk + '_pctl'] !== undefined) rows[pmi][xk + '_pctl'] = ppre[xk + '_pctl'];
+          }
         }
         // Max velo and tunnel distance
         if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
