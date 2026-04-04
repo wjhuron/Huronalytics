@@ -86,7 +86,7 @@ var COLUMNS = {
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on balls in play only', group: 'batted_ball' },
     { key: 'avgEVAgainst', label: 'Avg EV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
     { key: 'maxEVAgainst', label: 'Max EV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
-    { key: 'hardHitPct',  label: 'HardHit%', format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
+    { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'barrelPctAgainst', label: 'Barrel%', format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, group: 'batted_ball' },
