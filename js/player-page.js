@@ -1493,7 +1493,9 @@ var PlayerPage = {
           break;
         }
       }
-      if (hit) {
+      // Hide ellipse tooltip if hovering over an actual data point
+      var nearPoint = chartRef.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+      if (hit && nearPoint.length === 0) {
         var isDk = document.body.classList.contains('dark');
         ellipseTooltip.style.background = isDk ? 'rgba(30,33,40,0.95)' : 'rgba(255,255,255,0.95)';
         ellipseTooltip.style.color = isDk ? '#eee' : '#333';
