@@ -10,7 +10,7 @@ var ScatterChart = {
     FC: { bg: '#FFA500', border: '#CC8400' },
     SL: { bg: '#99DD00', border: '#7AB300' },
     ST: { bg: '#FF1493', border: '#CC1076' },
-    SV: { bg: '#32CD32', border: '#28A428' },
+    SV: { bg: '#DDDDDD', border: '#BBBBBB' },
     CU: { bg: '#E03030', border: '#B32626' },
     CH: { bg: '#CC66EE', border: '#A352BE' },
     FS: { bg: '#40E0D0', border: '#33B3A6' },

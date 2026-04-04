@@ -63,7 +63,7 @@ var Utils = {
   // Pitch type colors (matches scatter.js)
   PITCH_COLORS: {
     FF: '#4488FF', SI: '#FFD700', CF: '#D2691E', FC: '#FFA500', SL: '#99DD00',
-    ST: '#FF1493', SV: '#32CD32', CU: '#E03030', CH: '#CC66EE',
+    ST: '#FF1493', SV: '#DDDDDD', CU: '#E03030', CH: '#CC66EE',
     FS: '#40E0D0', KN: '#AAAAAA', SC: '#999999', CS: '#666666',
   },
 
