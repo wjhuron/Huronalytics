@@ -1932,6 +1932,7 @@ var PlayerPage = {
   // --- Shared: Render per-pitch-type table with total row ---
 
   _renderPerPitchTable: function (container, cols, pitchRows, totalRow) {
+    var isDark = document.body.classList.contains('dark');
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
 
@@ -1965,6 +1966,15 @@ var PlayerPage = {
         } else {
           var val = row[col.key];
           td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+          // Apply percentile coloring if a _pctl value exists for this key
+          var pctl = row[col.key + '_pctl'];
+          if (pctl != null && val != null) {
+            var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+            var txtColor = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
+            td.style.backgroundColor = bgColor;
+            td.style.color = txtColor;
+            td.title = Math.round(pctl) + 'th percentile';
+          }
         }
         tr.appendChild(td);
       }
@@ -2490,6 +2500,10 @@ var PlayerPage = {
 
     if (types.length === 0) { section.style.display = 'none'; return; }
 
+    // Compute overall total pitches for usage% column
+    var overallTotal = 0;
+    for (var t = 0; t < types.length; t++) overallTotal += pitchTypes[types[t]].total;
+
     // Build HTML table
     var table = document.createElement('table');
     table.className = 'count-table';
@@ -2499,6 +2513,9 @@ var PlayerPage = {
     var th0 = document.createElement('th');
     th0.textContent = 'Pitch';
     headRow.appendChild(th0);
+    var thUsage = document.createElement('th');
+    thUsage.textContent = 'Usage%';
+    headRow.appendChild(thUsage);
     for (var g = 0; g < groupNames.length; g++) {
       var th = document.createElement('th');
       th.textContent = groupNames[g];
@@ -2522,6 +2539,16 @@ var PlayerPage = {
       badge.textContent = pt;
       tdLabel.appendChild(badge);
       tr.appendChild(tdLabel);
+
+      // Overall usage% column
+      var tdUsage = document.createElement('td');
+      if (overallTotal > 0) {
+        tdUsage.textContent = (pitchTypes[pt].total / overallTotal * 100).toFixed(1) + '%';
+      } else {
+        tdUsage.textContent = '—';
+      }
+      tdUsage.style.fontWeight = '600';
+      tr.appendChild(tdUsage);
 
       for (var g = 0; g < groupNames.length; g++) {
         var gn = groupNames[g];
