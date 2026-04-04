@@ -1339,8 +1339,7 @@ var PlayerPage = {
       data: { datasets: datasets },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 1,
+        maintainAspectRatio: false,
         animation: false,
         scales: {
           x: {
