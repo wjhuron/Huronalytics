@@ -2070,7 +2070,7 @@ def fetch_boxscore(game_pk):
         print(f"    Error fetching boxscore for game {game_pk}: {e}")
         return None
 
-    result = {'pitchers': [], 'hitters': []}
+    result = {'gamePk': game_pk, 'pitchers': [], 'hitters': []}
 
     for side in ['away', 'home']:
         team_data = box.get('teams', {}).get(side, {})
@@ -2208,11 +2208,17 @@ def fetch_and_aggregate_boxscores(game_dates):
     # MLB ID → name|team key (for fallback matching on compound last names)
     pitcher_id_map = {}  # mlbId -> "name|team"
     hitter_id_map = {}
+    seen_game_pks = set()  # Deduplicate games that appear under multiple dates
 
     for d in game_dates:
         if d not in cache:
             continue
         for box in cache[d]:
+            gpk = box.get('gamePk')
+            if gpk and gpk in seen_game_pks:
+                continue
+            if gpk:
+                seen_game_pks.add(gpk)
             for p in box.get('pitchers', []):
                 key = p['name'] + '|' + p['team']
                 if key not in pitcher_agg:
