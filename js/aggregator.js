@@ -608,6 +608,9 @@ var Aggregator = {
         groups[gk].metricSums.sumTiltSin = 0;
         groups[gk].metricSums.sumTiltCos = 0;
         groups[gk].metricSums.nTilt = 0;
+        groups[gk].metricSums.sumRTiltSin = 0;
+        groups[gk].metricSums.sumRTiltCos = 0;
+        groups[gk].metricSums.nRTilt = 0;
       }
 
       var g = groups[gk];
@@ -621,6 +624,9 @@ var Aggregator = {
       g.metricSums.sumTiltSin += row[ci.sumTiltSin];
       g.metricSums.sumTiltCos += row[ci.sumTiltCos];
       g.metricSums.nTilt += row[ci.nTilt];
+      g.metricSums.sumRTiltSin += row[ci.sumRTiltSin];
+      g.metricSums.sumRTiltCos += row[ci.sumRTiltCos];
+      g.metricSums.nRTilt += row[ci.nRTilt];
     }
 
     // Convert to row objects
@@ -705,22 +711,29 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB + IVBOE from arm angle regression (per pitch type)
-      var ivbRegs = DataStore.metadata && DataStore.metadata.ivbRegressions;
-      var ivbReg = ivbRegs && ivbRegs[obj.pitchType];
-      if (ivbReg && obj.armAngle !== null) {
-        var expIVB = ivbReg.slope * obj.armAngle + ivbReg.intercept;
+      // xIVB/xHB + IVBOE/HBOE from pitch-type-agnostic model (RTilt + Spin + Velo + RelPt)
+      var ivbReg2 = DataStore.metadata && DataStore.metadata.ivbRegression;
+      var hbReg2 = DataStore.metadata && DataStore.metadata.hbRegression;
+      // Compute average RTilt from sin/cos components
+      var avgRTiltSin = null, avgRTiltCos = null;
+      if (ms.nRTilt > 0) {
+        avgRTiltSin = ms.sumRTiltSin / ms.nRTilt;
+        avgRTiltCos = ms.sumRTiltCos / ms.nRTilt;
+      }
+      if (ivbReg2 && avgRTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null) {
+        var predictors = [avgRTiltSin, avgRTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
+        var expIVB = ivbReg2.intercept;
+        for (var pi = 0; pi < predictors.length; pi++) expIVB += ivbReg2.coeffs[pi] * predictors[pi];
         obj.xIVB = Number(expIVB.toFixed(1));
         obj.ivbOE = obj.indVertBrk !== null ? Number((obj.indVertBrk - expIVB).toFixed(1)) : null;
       } else {
         obj.xIVB = null;
         obj.ivbOE = null;
       }
-      // xHB + HBOE from ArmAngle + ArmAngle² regression (per pitch type + handedness)
-      var hbRegs = DataStore.metadata && DataStore.metadata.hbRegressions;
-      var hbReg = hbRegs && hbRegs[obj.pitchType + '_' + obj.throws];
-      if (hbReg && hbReg.coeffs && obj.armAngle !== null) {
-        var expHB = hbReg.coeffs[0] * obj.armAngle + hbReg.coeffs[1] * obj.armAngle * obj.armAngle + hbReg.intercept;
+      if (hbReg2 && avgRTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null) {
+        var predictors2 = [avgRTiltSin, avgRTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
+        var expHB = hbReg2.intercept;
+        for (var pi2 = 0; pi2 < predictors2.length; pi2++) expHB += hbReg2.coeffs[pi2] * predictors2[pi2];
         obj.xHB = Number(expHB.toFixed(1));
         obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - expHB).toFixed(1)) : null;
       } else {

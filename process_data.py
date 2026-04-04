@@ -1084,6 +1084,7 @@ def generate_micro_data(all_pitches):
     #  46:sumPlateZ 47:nPlateZ
     #  48:sumTiltSin 49:sumTiltCos 50:nTilt
     #  51:sumPlateX 52:nPlateX
+    #  53:sumRTiltSin 54:sumRTiltCos 55:nRTilt
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('IndVertBrk', 26),
@@ -1092,7 +1093,7 @@ def generate_micro_data(all_pitches):
         ('VRA', 42), ('HRA', 44), ('PlateZ', 46), ('PlateX', 51),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 53)
+    pitch_micro = defaultdict(lambda: [0.0] * 56)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -1171,6 +1172,14 @@ def generate_micro_data(all_pitches):
             c[49] += math.cos(angle)
             c[50] += 1
 
+        # Release Tilt (circular sin/cos components)
+        rtilt_min = break_tilt_to_minutes(p.get('RTilt'))
+        if rtilt_min is not None:
+            rangle = rtilt_min / 720.0 * 2 * math.pi
+            c[53] += math.sin(rangle)
+            c[54] += math.cos(rangle)
+            c[55] += 1
+
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
         row = [pi, ti, throws, pti, di, bh]
@@ -1185,6 +1194,10 @@ def generate_micro_data(all_pitches):
         row.append(round(c[48], 6))  # sumTiltSin
         row.append(round(c[49], 6))  # sumTiltCos
         row.append(int(c[50]))       # nTilt
+        # RTilt sin/cos
+        row.append(round(c[53], 6))  # sumRTiltSin
+        row.append(round(c[54], 6))  # sumRTiltCos
+        row.append(int(c[55]))       # nRTilt
         pitch_rows.append(row)
 
     # ==========================================================
@@ -1614,6 +1627,7 @@ def generate_micro_data(all_pitches):
             'sumPlateZ', 'nPlateZ',
             'sumPlateX', 'nPlateX',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
+            'sumRTiltSin', 'sumRTiltCos', 'nRTilt',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -2485,6 +2499,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row['breakTilt'] = minutes_to_tilt_display(avg_tilt)
         row['breakTiltMinutes'] = avg_tilt
 
+        # Release Tilt (circular mean)
+        rtilt_minutes = [break_tilt_to_minutes(p.get('RTilt')) for p in pitches]
+        rtilt_minutes = [m for m in rtilt_minutes if m is not None]
+        avg_rtilt = circular_mean_minutes(rtilt_minutes)
+        row['rTiltMinutes'] = avg_rtilt
+
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
         row.update(compute_expected_stats(pitches))
@@ -2665,65 +2685,72 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['nHAA'] = None
 
-    # --- Fit IVB ~ ArmAngle regression per pitch type (MLB only) ---
-    # --- Fit HB ~ ArmAngle + ArmAngle² regression per (pitch type, handedness) (MLB only) ---
-    ivb_reg_data = defaultdict(list)  # pitch_type -> [(armAngle, ivb)]
-    hb_reg_data = defaultdict(list)   # (pitch_type, throws) -> [(armAngle, hb)]
+    # --- Fit pitch-type-agnostic expected movement model (MLB only) ---
+    # Predictors: RTilt (sin/cos), Spin Rate, Velocity, Release Point (RelPosZ, RelPosX)
+    # Separate regressions for IVB and HB, but each is pitch-type-agnostic
+    ivb_reg_data = []  # [(predictors, ivb)]
+    hb_reg_data = []   # [(predictors, hb)]
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue
-        pt = p.get('Pitch Type') or p.get('TaggedPitchType')
-        if not pt:
-            continue
-        throws = p.get('Throws')
-        aa = safe_float(p.get('ArmAngle'))
+        rtilt_min = break_tilt_to_minutes(p.get('RTilt'))
+        spin = safe_float(p.get('Spin Rate'))
+        velo = safe_float(p.get('Velocity'))
+        rel_z = safe_float(p.get('RelPosZ'))
+        rel_x = safe_float(p.get('RelPosX'))
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
-        if aa is not None and ivb is not None:
-            ivb_reg_data[pt].append((aa, ivb))
-        if aa is not None and hb is not None and throws:
-            hb_reg_data[(pt, throws)].append((aa, hb))
+        if rtilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None:
+            continue
+        rangle = rtilt_min / 720.0 * 2 * math.pi
+        rtilt_sin = math.sin(rangle)
+        rtilt_cos = math.cos(rangle)
+        predictors = [rtilt_sin, rtilt_cos, spin, velo, rel_z, rel_x]
+        if ivb is not None:
+            ivb_reg_data.append((predictors, ivb))
+        if hb is not None:
+            hb_reg_data.append((predictors, hb))
 
-    print("\nIVB ~ ArmAngle regressions (per pitch type):")
-    ivb_regressions = {}
-    for pt in sorted(ivb_reg_data.keys()):
-        result = fit_linear_regression(ivb_reg_data[pt], pt)
-        if result:
-            ivb_regressions[pt] = result
+    print("\nPitch-type-agnostic IVB regression (RTilt + Spin + Velo + RelPt):")
+    ivb_regression = fit_multivar_regression(ivb_reg_data, "IVB_agnostic")
+    print("\nPitch-type-agnostic HB regression (RTilt + Spin + Velo + RelPt):")
+    hb_regression = fit_multivar_regression(hb_reg_data, "HB_agnostic")
 
-    print("\nHB ~ ArmAngle + ArmAngle² regressions (per pitch type + handedness):")
-    hb_regressions = {}
-    for key in sorted(hb_reg_data.keys()):
-        pt, throws = key
-        # Build predictor tuples: (armAngle, armAngle²)
-        reg_data = [([t[0], t[0]**2], t[1]) for t in hb_reg_data[key]]
-        result = fit_multivar_regression(reg_data, f"{pt}_{throws}")
-        if result:
-            hb_regressions[key] = result
+    def compute_expected_movement(rtilt_minutes, spin_rate, velocity, rel_z, rel_x):
+        """Compute xIVB and xHB from the pitch-type-agnostic model."""
+        if rtilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None:
+            return None, None
+        rangle = rtilt_minutes / 720.0 * 2 * math.pi
+        predictors = [math.sin(rangle), math.cos(rangle), spin_rate, velocity, rel_z, rel_x]
+        xivb = None
+        xhb = None
+        if ivb_regression:
+            coeffs = ivb_regression['coeffs']
+            xivb = sum(c * x for c, x in zip(coeffs, predictors)) + ivb_regression['intercept']
+        if hb_regression:
+            coeffs = hb_regression['coeffs']
+            xhb = sum(c * x for c, x in zip(coeffs, predictors)) + hb_regression['intercept']
+        return xivb, xhb
 
     # Compute xIVB/xHB (expected) and IVBOE/HBOE (residual) for each pitch leaderboard row
     for row in pitch_leaderboard:
-        # xIVB + IVBOE: keyed by pitch type only
-        ivb_reg = ivb_regressions.get(row['pitchType'])
-        if ivb_reg and row.get('armAngle') is not None:
-            expected_ivb = ivb_reg['slope'] * row['armAngle'] + ivb_reg['intercept']
-            row['xIVB'] = round(expected_ivb, 1)
+        xivb, xhb = compute_expected_movement(
+            row.get('rTiltMinutes'), row.get('spinRate'), row.get('velocity'),
+            row.get('relPosZ'), row.get('relPosX')
+        )
+        if xivb is not None:
+            row['xIVB'] = round(xivb, 1)
             if row.get('indVertBrk') is not None:
-                row['ivbOE'] = round(row['indVertBrk'] - expected_ivb, 1)
+                row['ivbOE'] = round(row['indVertBrk'] - xivb, 1)
             else:
                 row['ivbOE'] = None
         else:
             row['xIVB'] = None
             row['ivbOE'] = None
-        # xHB + HBOE: uses ArmAngle + ArmAngle² regression (per pitch type + handedness)
-        hb_reg = hb_regressions.get((row['pitchType'], row.get('throws')))
-        if hb_reg and row.get('armAngle') is not None:
-            coeffs = hb_reg['coeffs']
-            aa = row['armAngle']
-            expected_hb = coeffs[0] * aa + coeffs[1] * aa**2 + hb_reg['intercept']
-            row['xHB'] = round(expected_hb, 1)
+        if xhb is not None:
+            row['xHB'] = round(xhb, 1)
             if row.get('horzBrk') is not None:
-                row['hbOE'] = round(row['horzBrk'] - expected_hb, 1)
+                row['hbOE'] = round(row['horzBrk'] - xhb, 1)
             else:
                 row['hbOE'] = None
         else:
@@ -2990,6 +3017,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         velo = safe_float(p.get('Velocity'))
         spin = safe_float(p.get('Spin Rate'))
         tilt = p.get('OTilt') or p.get('Break Tilt')
+        rtilt = p.get('RTilt')
         rel_x = safe_float(p.get('RelPosX'))
         rel_z = safe_float(p.get('RelPosZ'))
         if pitcher and pt and ivb is not None and hb is not None:
@@ -3004,6 +3032,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 detail['sp'] = int(round(spin))
             if tilt and str(tilt).strip():
                 detail['tl'] = str(tilt).strip()
+            if rtilt and str(rtilt).strip():
+                detail['rtl'] = str(rtilt).strip()
             # Description (pitch outcome) — short codes for space efficiency
             desc_raw = p.get('Description', '')
             DESC_MAP = {
@@ -3042,15 +3072,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             aa_val = safe_float(p.get('ArmAngle'))
             if aa_val is not None:
                 detail['aa'] = round(aa_val, 1)
-                # Per-pitch expected movement from arm angle regressions
-                throws_val = p.get('Throws')
-                ivb_reg = ivb_regressions.get(pt)
-                if ivb_reg:
-                    detail['xivb'] = round(ivb_reg['slope'] * aa_val + ivb_reg['intercept'], 1)
-                hb_reg = hb_regressions.get((pt, throws_val))
-                if hb_reg:
-                    coeffs = hb_reg['coeffs']
-                    detail['xhb'] = round(coeffs[0] * aa_val + coeffs[1] * aa_val**2 + hb_reg['intercept'], 1)
+            # Per-pitch expected movement from pitch-type-agnostic model
+            rtilt_min_val = break_tilt_to_minutes(p.get('RTilt'))
+            spin_val = safe_float(p.get('Spin Rate'))
+            velo_val = safe_float(p.get('Velocity'))
+            xivb_val, xhb_val = compute_expected_movement(rtilt_min_val, spin_val, velo_val, rel_z, rel_x)
+            if xivb_val is not None:
+                detail['xivb'] = round(xivb_val, 1)
+            if xhb_val is not None:
+                detail['xhb'] = round(xhb_val, 1)
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
@@ -3465,10 +3495,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                                   'leagueAvgPlateX': round(r['leagueAvgPlateX'], 6)}
                            for pt, r in haa_regressions.items()},
         'sacqZones': sacq_zones_output,
-        'ivbRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6)}
-                           for pt, r in ivb_regressions.items()},
-        'hbRegressions': {f"{pt}_{throws}": {'coeffs': [round(c, 6) for c in r['coeffs']], 'intercept': round(r['intercept'], 6)}
-                          for (pt, throws), r in hb_regressions.items()},
+        'ivbRegression': {'coeffs': [round(c, 8) for c in ivb_regression['coeffs']], 'intercept': round(ivb_regression['intercept'], 8)} if ivb_regression else None,
+        'hbRegression': {'coeffs': [round(c, 8) for c in hb_regression['coeffs']], 'intercept': round(hb_regression['intercept'], 8)} if hb_regression else None,
     }
 
     # --- Generate micro-aggregate data ---

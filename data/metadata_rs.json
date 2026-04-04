@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-04 14:18",
+  "generatedAt": "2026-04-04 11:31",
   "totalPitches": 32023,
   "totalPitchers": 401,
   "totalHitters": 394,
@@ -84,7 +84,7 @@
     "SI": {
       "velocity": 93.93,
       "spinRate": 2194.17,
-      "indVertBrk": 7.52,
+      "indVertBrk": 7.53,
       "horzBrk": 5.69,
       "relPosZ": 5.52,
       "relPosX": -0.58,
@@ -93,7 +93,7 @@
       "vaa": -5.79,
       "haa": 0.07,
       "vra": -1.61,
-      "hra": 1.08,
+      "hra": 1.07,
       "strikePct": 0.661,
       "izPct": 0.549,
       "swStrRate": 0.0698,
@@ -114,7 +114,7 @@
       "velocity": 86.33,
       "spinRate": 2435.99,
       "indVertBrk": 0.85,
-      "horzBrk": -1.61,
+      "horzBrk": -1.6,
       "relPosZ": 5.8,
       "relPosX": -0.66,
       "extension": 6.38,
@@ -258,7 +258,7 @@
     "CH": {
       "velocity": 86.11,
       "spinRate": 1738.21,
-      "indVertBrk": 4.21,
+      "indVertBrk": 4.22,
       "horzBrk": 3.62,
       "relPosZ": 5.62,
       "relPosX": -0.39,
@@ -330,14 +330,14 @@
     "fpsPct": 0.5984,
     "twoStrikeWhiffPct": 0.2687,
     "relPosZ": 5.6629,
-    "relPosX": -0.6676,
+    "relPosX": -0.6674,
     "extension": 6.4503,
-    "armAngle": 37.6705,
+    "armAngle": 37.6703,
     "vaa": -6.4572,
     "haa": 0.6678,
     "vra": -1.5572,
-    "hra": 0.9486,
-    "avgEVAgainst": 88.9079,
+    "hra": 0.9487,
+    "avgEVAgainst": 88.9082,
     "maxEVAgainst": 107.223,
     "hardHitPct": 0.3971,
     "barrelPctAgainst": 0.084,
@@ -351,11 +351,11 @@
     "xwOBA": 0.3134,
     "xwOBAcon": 0.3696,
     "count": 401,
-    "era": 4.01,
-    "hr9": 1.05,
-    "fip": 3.97,
-    "xFIP": 4.0,
-    "siera": 4.0
+    "era": 4.03,
+    "hr9": 1.06,
+    "fip": 3.99,
+    "xFIP": 4.02,
+    "siera": 4.02
   },
   "hitterLeagueAverages": {
     "avg": 0.231,
@@ -373,8 +373,8 @@
     "xwOBAcon": 0.3707,
     "xwOBAsp": 0.3704,
     "avgEVAll": 88.9229,
-    "medEV": 90.735,
-    "ev75": 103.9961,
+    "medEV": 90.7336,
+    "ev75": 103.9958,
     "maxEV": 105.8932,
     "medLA": 14.2234,
     "hardHitPct": 0.3974,
@@ -397,11 +397,11 @@
     "contactPct": 0.7294,
     "izContactPct": 0.8213,
     "whiffPct": 0.2706,
-    "batSpeed": 71.0483,
-    "swingLength": 7.2992,
-    "attackAngle": 10.0572,
+    "batSpeed": 71.0482,
+    "swingLength": 7.3,
+    "attackAngle": 10.0578,
     "attackDirection": -1.6335,
-    "swingPathTilt": 32.1201,
+    "swingPathTilt": 32.1202,
     "twoStrikeWhiffPct": 0.2741,
     "firstPitchSwingPct": 0.3109,
     "avgFbDist": 308.8686,
@@ -846,170 +846,26 @@
       "count": 117
     }
   ],
-  "ivbRegressions": {
-    "CH": {
-      "slope": 0.247505,
-      "intercept": -5.003725
-    },
-    "CU": {
-      "slope": -0.12746,
-      "intercept": -5.918735
-    },
-    "FC": {
-      "slope": 0.042261,
-      "intercept": 7.057397
-    },
-    "FF": {
-      "slope": 0.131198,
-      "intercept": 11.124654
-    },
-    "FS": {
-      "slope": 0.146969,
-      "intercept": -3.029553
-    },
-    "SI": {
-      "slope": 0.234488,
-      "intercept": -0.095366
-    },
-    "SL": {
-      "slope": 0.017015,
-      "intercept": 0.174234
-    },
-    "ST": {
-      "slope": -0.06455,
-      "intercept": 3.299812
-    },
-    "SV": {
-      "slope": -0.038158,
-      "intercept": -5.248196
-    }
+  "ivbRegression": {
+    "coeffs": [
+      0.00032993,
+      9.08714256,
+      0.00281005,
+      0.47318128,
+      -0.18391853,
+      0.30187399
+    ],
+    "intercept": -44.47362814
   },
-  "hbRegressions": {
-    "CH_L": {
-      "coeffs": [
-        -0.142349,
-        0.003374
-      ],
-      "intercept": -14.274829
-    },
-    "CH_R": {
-      "coeffs": [
-        0.049805,
-        -0.001822
-      ],
-      "intercept": 15.612863
-    },
-    "CU_L": {
-      "coeffs": [
-        1.934946,
-        -0.021365
-      ],
-      "intercept": -34.786182
-    },
-    "CU_R": {
-      "coeffs": [
-        0.488191,
-        -0.003011
-      ],
-      "intercept": -24.059217
-    },
-    "FC_L": {
-      "coeffs": [
-        0.011612,
-        0.000561
-      ],
-      "intercept": 0.304368
-    },
-    "FC_R": {
-      "coeffs": [
-        -0.126995,
-        0.000613
-      ],
-      "intercept": 1.719653
-    },
-    "FF_L": {
-      "coeffs": [
-        0.234312,
-        -0.000612
-      ],
-      "intercept": -16.656563
-    },
-    "FF_R": {
-      "coeffs": [
-        -0.125798,
-        -0.000989
-      ],
-      "intercept": 14.384518
-    },
-    "FS_L": {
-      "coeffs": [
-        -0.890345,
-        0.016279
-      ],
-      "intercept": -0.19034
-    },
-    "FS_R": {
-      "coeffs": [
-        0.132883,
-        -0.00332
-      ],
-      "intercept": 12.180866
-    },
-    "SI_L": {
-      "coeffs": [
-        -0.025664,
-        0.002082
-      ],
-      "intercept": -17.773105
-    },
-    "SI_R": {
-      "coeffs": [
-        0.084839,
-        -0.002737
-      ],
-      "intercept": 16.518216
-    },
-    "SL_L": {
-      "coeffs": [
-        -0.247765,
-        0.003138
-      ],
-      "intercept": 8.403551
-    },
-    "SL_R": {
-      "coeffs": [
-        0.009176,
-        -0.000558
-      ],
-      "intercept": -3.032475
-    },
-    "ST_L": {
-      "coeffs": [
-        0.182691,
-        -0.003191
-      ],
-      "intercept": 11.358807
-    },
-    "ST_R": {
-      "coeffs": [
-        0.024198,
-        0.000489
-      ],
-      "intercept": -15.09317
-    },
-    "SV_L": {
-      "coeffs": [
-        0.006636,
-        -0.001695
-      ],
-      "intercept": 14.883215
-    },
-    "SV_R": {
-      "coeffs": [
-        0.586812,
-        -0.006715
-      ],
-      "intercept": -25.091238
-    }
+  "hbRegression": {
+    "coeffs": [
+      14.07821323,
+      0.08083769,
+      -0.00061434,
+      0.0509067,
+      0.32901481,
+      -0.58312478
+    ],
+    "intercept": -4.88606488
   }
 }
