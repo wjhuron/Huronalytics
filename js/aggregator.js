@@ -711,17 +711,17 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB/xHB + IVBOE/HBOE from pitch-type-agnostic model (RTilt + Spin + Velo + RelPt)
+      // xIVB/xHB + IVBOE/HBOE from pitch-type-agnostic model (OTilt + Spin + Velo + RelPt)
       var ivbReg2 = DataStore.metadata && DataStore.metadata.ivbRegression;
       var hbReg2 = DataStore.metadata && DataStore.metadata.hbRegression;
-      // Compute average RTilt from sin/cos components
-      var avgRTiltSin = null, avgRTiltCos = null;
-      if (ms.nRTilt > 0) {
-        avgRTiltSin = ms.sumRTiltSin / ms.nRTilt;
-        avgRTiltCos = ms.sumRTiltCos / ms.nRTilt;
+      // Compute average OTilt from sin/cos components (already in micro data as sumTiltSin/sumTiltCos)
+      var avgOTiltSin = null, avgOTiltCos = null;
+      if (ms.nTilt > 0) {
+        avgOTiltSin = ms.sumTiltSin / ms.nTilt;
+        avgOTiltCos = ms.sumTiltCos / ms.nTilt;
       }
-      if (ivbReg2 && avgRTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null) {
-        var predictors = [avgRTiltSin, avgRTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
+      if (ivbReg2 && avgOTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null) {
+        var predictors = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
         var expIVB = ivbReg2.intercept;
         for (var pi = 0; pi < predictors.length; pi++) expIVB += ivbReg2.coeffs[pi] * predictors[pi];
         obj.xIVB = Number(expIVB.toFixed(1));
@@ -730,8 +730,8 @@ var Aggregator = {
         obj.xIVB = null;
         obj.ivbOE = null;
       }
-      if (hbReg2 && avgRTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null) {
-        var predictors2 = [avgRTiltSin, avgRTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
+      if (hbReg2 && avgOTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null) {
+        var predictors2 = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
         var expHB = hbReg2.intercept;
         for (var pi2 = 0; pi2 < predictors2.length; pi2++) expHB += hbReg2.coeffs[pi2] * predictors2[pi2];
         obj.xHB = Number(expHB.toFixed(1));

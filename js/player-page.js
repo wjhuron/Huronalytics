@@ -1329,6 +1329,9 @@ var PlayerPage = {
           color: color.border,
           cx: expectedMovement[pt].xHB,
           cy: expectedMovement[pt].xIVB,
+          label: pt,
+          xIVB: expectedMovement[pt].xIVB,
+          xHB: expectedMovement[pt].xHB,
         });
       }
     }
@@ -1436,17 +1439,78 @@ var PlayerPage = {
           ctx.setLineDash([]);
           ctx.restore();
 
-          // Annotation: "Shaded = expected from spin axis"
+          // Annotation: "Shaded = expected movement"
           if (expectedMeta.length > 0) {
             ctx.save();
             ctx.font = '10px Barlow, sans-serif';
             ctx.fillStyle = crossColor;
             ctx.textAlign = 'left';
-            ctx.fillText('Shaded = expected from spin axis', xAxis.left + 6, yAxis.bottom - 6);
+            ctx.fillText('Shaded = expected movement', xAxis.left + 6, yAxis.bottom - 6);
             ctx.restore();
+          }
+
+          // Store pixel positions for ellipse hover detection
+          chart._ellipseHitAreas = [];
+          for (var hi = 0; hi < expectedMeta.length; hi++) {
+            var he = expectedMeta[hi];
+            chart._ellipseHitAreas.push({
+              px: xAxis.getPixelForValue(he.cx),
+              py: yAxis.getPixelForValue(he.cy),
+              rx: expRadiusX,
+              ry: expRadiusY,
+              label: he.label,
+              xIVB: he.xIVB,
+              xHB: he.xHB,
+              color: he.color,
+            });
           }
         },
       }],
+    });
+
+    // Ellipse hover tooltip
+    var ellipseTooltip = document.getElementById('ellipse-tooltip');
+    if (!ellipseTooltip) {
+      ellipseTooltip = document.createElement('div');
+      ellipseTooltip.id = 'ellipse-tooltip';
+      ellipseTooltip.style.cssText = 'position:absolute;pointer-events:none;display:none;padding:6px 10px;border-radius:4px;font:12px Barlow,sans-serif;z-index:1000;white-space:nowrap;';
+      document.body.appendChild(ellipseTooltip);
+    }
+    var chartRef = this.chart;
+    canvas.addEventListener('mousemove', function (e) {
+      var rect = canvas.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var my = e.clientY - rect.top;
+      var areas = chartRef._ellipseHitAreas;
+      if (!areas) return;
+      var hit = null;
+      for (var ai = 0; ai < areas.length; ai++) {
+        var a = areas[ai];
+        var dx = (mx - a.px) / a.rx;
+        var dy = (my - a.py) / a.ry;
+        if (dx * dx + dy * dy <= 1) {
+          hit = a;
+          break;
+        }
+      }
+      if (hit) {
+        var isDk = document.body.classList.contains('dark');
+        ellipseTooltip.style.background = isDk ? 'rgba(30,33,40,0.95)' : 'rgba(255,255,255,0.95)';
+        ellipseTooltip.style.color = isDk ? '#eee' : '#333';
+        ellipseTooltip.style.border = '1px solid ' + hit.color;
+        ellipseTooltip.innerHTML = '<b>' + hit.label + ' Expected</b><br>xIVB: ' + hit.xIVB.toFixed(1) + '"<br>xHB: ' + hit.xHB.toFixed(1) + '"';
+        ellipseTooltip.style.display = 'block';
+        ellipseTooltip.style.left = (e.pageX + 12) + 'px';
+        ellipseTooltip.style.top = (e.pageY - 10) + 'px';
+        canvas.style.cursor = 'pointer';
+      } else {
+        ellipseTooltip.style.display = 'none';
+        canvas.style.cursor = '';
+      }
+    });
+    canvas.addEventListener('mouseleave', function () {
+      ellipseTooltip.style.display = 'none';
+      canvas.style.cursor = '';
     });
   },
 

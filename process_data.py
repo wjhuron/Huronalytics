@@ -2686,42 +2686,42 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['nHAA'] = None
 
     # --- Fit pitch-type-agnostic expected movement model (MLB only) ---
-    # Predictors: RTilt (sin/cos), Spin Rate, Velocity, Release Point (RelPosZ, RelPosX)
+    # Predictors: OTilt (sin/cos), Spin Rate, Velocity, Release Point (RelPosZ, RelPosX)
     # Separate regressions for IVB and HB, but each is pitch-type-agnostic
     ivb_reg_data = []  # [(predictors, ivb)]
     hb_reg_data = []   # [(predictors, hb)]
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue
-        rtilt_min = break_tilt_to_minutes(p.get('RTilt'))
+        otilt_min = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
         spin = safe_float(p.get('Spin Rate'))
         velo = safe_float(p.get('Velocity'))
         rel_z = safe_float(p.get('RelPosZ'))
         rel_x = safe_float(p.get('RelPosX'))
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
-        if rtilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None:
+        if otilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None:
             continue
-        rangle = rtilt_min / 720.0 * 2 * math.pi
-        rtilt_sin = math.sin(rangle)
-        rtilt_cos = math.cos(rangle)
-        predictors = [rtilt_sin, rtilt_cos, spin, velo, rel_z, rel_x]
+        oangle = otilt_min / 720.0 * 2 * math.pi
+        otilt_sin = math.sin(oangle)
+        otilt_cos = math.cos(oangle)
+        predictors = [otilt_sin, otilt_cos, spin, velo, rel_z, rel_x]
         if ivb is not None:
             ivb_reg_data.append((predictors, ivb))
         if hb is not None:
             hb_reg_data.append((predictors, hb))
 
-    print("\nPitch-type-agnostic IVB regression (RTilt + Spin + Velo + RelPt):")
+    print("\nPitch-type-agnostic IVB regression (OTilt + Spin + Velo + RelPt):")
     ivb_regression = fit_multivar_regression(ivb_reg_data, "IVB_agnostic")
-    print("\nPitch-type-agnostic HB regression (RTilt + Spin + Velo + RelPt):")
+    print("\nPitch-type-agnostic HB regression (OTilt + Spin + Velo + RelPt):")
     hb_regression = fit_multivar_regression(hb_reg_data, "HB_agnostic")
 
-    def compute_expected_movement(rtilt_minutes, spin_rate, velocity, rel_z, rel_x):
+    def compute_expected_movement(otilt_minutes, spin_rate, velocity, rel_z, rel_x):
         """Compute xIVB and xHB from the pitch-type-agnostic model."""
-        if rtilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None:
+        if otilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None:
             return None, None
-        rangle = rtilt_minutes / 720.0 * 2 * math.pi
-        predictors = [math.sin(rangle), math.cos(rangle), spin_rate, velocity, rel_z, rel_x]
+        oangle = otilt_minutes / 720.0 * 2 * math.pi
+        predictors = [math.sin(oangle), math.cos(oangle), spin_rate, velocity, rel_z, rel_x]
         xivb = None
         xhb = None
         if ivb_regression:
@@ -2735,7 +2735,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Compute xIVB/xHB (expected) and IVBOE/HBOE (residual) for each pitch leaderboard row
     for row in pitch_leaderboard:
         xivb, xhb = compute_expected_movement(
-            row.get('rTiltMinutes'), row.get('spinRate'), row.get('velocity'),
+            row.get('breakTiltMinutes'), row.get('spinRate'), row.get('velocity'),
             row.get('relPosZ'), row.get('relPosX')
         )
         if xivb is not None:
@@ -3073,10 +3073,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if aa_val is not None:
                 detail['aa'] = round(aa_val, 1)
             # Per-pitch expected movement from pitch-type-agnostic model
-            rtilt_min_val = break_tilt_to_minutes(p.get('RTilt'))
+            otilt_min_val = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
             spin_val = safe_float(p.get('Spin Rate'))
             velo_val = safe_float(p.get('Velocity'))
-            xivb_val, xhb_val = compute_expected_movement(rtilt_min_val, spin_val, velo_val, rel_z, rel_x)
+            xivb_val, xhb_val = compute_expected_movement(otilt_min_val, spin_val, velo_val, rel_z, rel_x)
             if xivb_val is not None:
                 detail['xivb'] = round(xivb_val, 1)
             if xhb_val is not None:
