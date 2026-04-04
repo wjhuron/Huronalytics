@@ -840,7 +840,7 @@
   }
 
   // Columns hidden when viewing ROC (AAA) team data
-  var ROC_HIDDEN_PITCHER = ['armAngle', 'runValue', 'rv100', 'xwOBA'];
+  var ROC_HIDDEN_PITCHER = ['armAngle', 'xIVB', 'ivbOE', 'xHB', 'hbOE', 'xwOBAcon', 'runValue', 'rv100', 'xwOBA'];
   var ROC_HIDDEN_HITTER = ['xwOBA', 'xwOBAcon', 'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings'];
   var ALL_ROC_HIDDEN = ROC_HIDDEN_PITCHER.concat(ROC_HIDDEN_HITTER);
 
