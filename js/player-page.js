@@ -954,7 +954,7 @@ var PlayerPage = {
       var veloFormat = function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; };
       for (var vi = 0; vi < pitchRows.length; vi++) {
         var pr = pitchRows[vi];
-        if (pr.pitchType === 'FF' || pr.pitchType === 'CF') {
+        if (pr.pitchType === 'FF') {
           dynamicVeloStats.push({ key: 'ffVelo', label: 'Fastball Velo', format: veloFormat,
             _val: pr.velocity, _pctl: pr.velocity_pctl });
         }
@@ -1165,7 +1165,7 @@ var PlayerPage = {
     container.appendChild(buildPctlRow('Overall', overallRV100, data.rv100_pctl, null));
 
     // Per-pitch-type rows (fixed order)
-    var PITCH_ORDER = ['FF','SI','CF','FC','SL','ST','CU','SV','CH','FS','KN'];
+    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN'];
     var sortedPitchRows = pitchRows.slice().sort(function(a, b) {
       var ai = PITCH_ORDER.indexOf(a.pitchType);
       var bi = PITCH_ORDER.indexOf(b.pitchType);
@@ -1977,7 +1977,7 @@ var PlayerPage = {
     }
 
     // Sort pitch types by fixed order
-    var PITCH_ORDER = ['FF','SI','CF','FC','SL','ST','CU','SV','CH','FS','KN'];
+    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN'];
     var types = Object.keys(byType);
     types.sort(function(a, b) {
       var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;

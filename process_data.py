@@ -2352,6 +2352,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     if roc_pitcher_count or roc_hitter_count:
         print(f"  Tagged {roc_pitcher_count} ROC pitcher pitches, {roc_hitter_count} ROC hitter pitches")
 
+    # --- Reclassify CF (Cut-Fastball) → FF or FC ---
+    # CF is not a real Statcast classification. Remap to FF by default,
+    # except specific pitchers whose "CF" is really a cutter (FC).
+    CF_TO_FC_PITCHERS = {
+        'Ashcraft, Graham', 'Doval, Camilo', 'Fluharty, Mason',
+        'Funderburk, Kody', 'Jansen, Kenley', 'Maton, Phil',
+    }
+    cf_to_ff = 0
+    cf_to_fc = 0
+    for p in all_pitches:
+        if p.get('Pitch Type') == 'CF':
+            pitcher = p.get('Pitcher', '')
+            if pitcher in CF_TO_FC_PITCHERS:
+                p['Pitch Type'] = 'FC'
+                cf_to_fc += 1
+            else:
+                p['Pitch Type'] = 'FF'
+                cf_to_ff += 1
+    if cf_to_ff or cf_to_fc:
+        print(f"  Reclassified CF: {cf_to_ff} → FF, {cf_to_fc} → FC")
+
     # Collect unique teams (MLB + AAA) and pitch types
     all_teams = sorted(set(
         [p['PTeam'] for p in all_pitches if p.get('PTeam') and p['PTeam'] in ALL_TEAMS] +
@@ -2708,27 +2729,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in pitch_leaderboard:
         pt_groups[row['pitchType']].append(row)
 
-    # CF pairs with FF for velocity, spin rate, VAA, HAA percentiles
-    # For these metrics, CF and FF are computed together in a combined pool
-    CF_FF_PAIRED_METRICS = {'velocity', 'spinRate', 'vaa', 'haa', 'nVAA', 'nHAA'}
-
     for metric in PITCH_PCTL_KEYS:
-        if metric in CF_FF_PAIRED_METRICS:
-            # Combined FF+CF pool for this metric
-            ff_cf_rows = pt_groups.get('FF', []) + pt_groups.get('CF', [])
-            if ff_cf_rows:
-                compute_percentile_ranks_with_aaa(ff_cf_rows, metric, min_count=0)
-            # All other pitch types get their own pool
-            for pt, pt_rows in pt_groups.items():
-                if pt not in ('FF', 'CF'):
-                    compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
-        else:
-            for pt, pt_rows in pt_groups.items():
-                compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
+        for pt, pt_rows in pt_groups.items():
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
 
     # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
-    # CF is paired with FF for VAA, so no inversion needed for CF either
-    VAA_NO_INVERT_TYPES = {'FF', 'FC', 'CF'}
+    VAA_NO_INVERT_TYPES = {'FF', 'FC'}
     for pt, pt_rows in pt_groups.items():
         if pt not in VAA_NO_INVERT_TYPES:
             for row in pt_rows:
@@ -2745,10 +2751,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row[pctl_key] = 100 - row[pctl_key]
 
     # --- Compute Pitch Tunneling Distances ---
-    # For each pitcher, find primary fastball (FF/SI/CF with most pitches),
+    # For each pitcher, find primary fastball (FF/SI with most pitches),
     # then compute tunnel distance (inches) from that fastball to each secondary pitch.
     # Tunnel point is ~23.5 feet from plate.
-    FASTBALL_TYPES = {'FF', 'SI', 'CF'}
+    FASTBALL_TYPES = {'FF', 'SI'}
     GRAVITY = 32.174  # ft/s²
     TUNNEL_DIST_FROM_PLATE = 23.5  # feet — approximate tunnel point
 
@@ -2891,8 +2897,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     if suffix_key in hand_ex:
                         row[suffix_key + hand_label] = hand_ex[suffix_key]
 
-        # Fastball velo: average velo of most-used fastball (FF/SI/CF)
-        fb_types = {'FF', 'SI', 'CF'}
+        # Fastball velo: average velo of most-used fastball (FF/SI)
+        fb_types = {'FF', 'SI'}
         fb_pitches_by_type = defaultdict(list)
         for p in pitches:
             pt = p.get('Pitch Type')
@@ -3305,7 +3311,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
 
     PITCH_CATEGORIES = {
-        'Hard': ['FF', 'SI', 'CF'],
+        'Hard': ['FF', 'SI'],
         'Breaking': ['FC', 'SL', 'ST', 'CU', 'SV'],
         'Offspeed': ['CH', 'FS', 'KN'],
     }

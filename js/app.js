@@ -519,7 +519,7 @@
 
   // Standard pitch type ordering used across all tabs
   var PITCH_TYPE_ORDER = [
-    'FF', 'SI', 'CF', '|',
+    'FF', 'SI', '|',
     'FC', 'SL', 'ST', 'CU', 'SV', '|',
     'CH', 'FS', 'KN'
   ];

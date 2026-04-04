@@ -51,7 +51,7 @@ var Utils = {
   },
 
   PITCH_TYPE_LABELS: {
-    FF: 'Four-Seam', SI: 'Sinker', CF: 'Cut-Fastball', FC: 'Cutter', CH: 'Changeup',
+    FF: 'Four-Seam', SI: 'Sinker', FC: 'Cutter', CH: 'Changeup',
     CU: 'Curveball', SL: 'Slider', ST: 'Sweeper', FS: 'Splitter',
     SV: 'Slurve', KN: 'Knuckleball', SC: 'Screwball', CS: 'Slow Curve',
   },
@@ -62,7 +62,7 @@ var Utils = {
 
   // Pitch type colors (matches scatter.js)
   PITCH_COLORS: {
-    FF: '#4488FF', SI: '#FFD700', CF: '#D2691E', FC: '#FFA500', SL: '#DDDDDD',
+    FF: '#4488FF', SI: '#FFD700', FC: '#FFA500', SL: '#DDDDDD',
     ST: '#FF1493', SV: '#32CD32', CU: '#E03030', CH: '#CC66EE',
     FS: '#40E0D0', KN: '#AAAAAA', SC: '#999999', CS: '#666666',
   },

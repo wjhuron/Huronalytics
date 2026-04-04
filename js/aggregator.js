@@ -825,32 +825,16 @@ var Aggregator = {
     var ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
     var SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true };
-    // CF pairs with FF for velocity, spin rate, VAA, HAA percentiles
-    var CF_FF_PAIRED = { velocity: true, spinRate: true, vaa: true, haa: true, nVAA: true, nHAA: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
       var minPctl = SHAPE_METRICS[key] ? 0 : MIN_PITCH_TYPE_PCTL;
-      if (CF_FF_PAIRED[key]) {
-        // Combined FF+CF pool
-        var ffCfRows = (ptGroups['FF'] || []).concat(ptGroups['CF'] || []);
-        if (ffCfRows.length) {
-          self._computePercentiles(ffCfRows, key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
-        }
-        // All other pitch types in their own pool
-        for (var pt2 in ptGroups) {
-          if (pt2 !== 'FF' && pt2 !== 'CF') {
-            self._computePercentiles(ptGroups[pt2], key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
-          }
-        }
-      } else {
-        for (var pt in ptGroups) {
-          self._computePercentiles(ptGroups[pt], key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
-        }
+      for (var pt in ptGroups) {
+        self._computePercentiles(ptGroups[pt], key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
       }
     });
 
     // --- Pitch-type-specific percentile inversions ---
 
-    // IVB: FF/CF/FC = higher is better (default). SI/CU/CH/FS = lower is better (invert).
+    // IVB: FF/FC = higher is better (default). SI/CU/CH/FS = lower is better (invert).
     // SL/ST/SV = IVB not meaningful, suppress percentile.
     var IVB_INVERT = { SI: true, CU: true, CH: true, FS: true };
     var IVB_SUPPRESS = { SL: true, ST: true, SV: true };
@@ -880,9 +864,9 @@ var Aggregator = {
       }
     }
 
-    // VAA/nVAA: FF/FC/CF = closer to 0 is better (default higher = higher pctl, no inversion)
+    // VAA/nVAA: FF/FC = closer to 0 is better (default higher = higher pctl, no inversion)
     // All others: further from 0 = better (invert)
-    var VAA_NO_INVERT = { FF: true, FC: true, CF: true };
+    var VAA_NO_INVERT = { FF: true, FC: true };
     for (var ptV in ptGroups) {
       if (!VAA_NO_INVERT[ptV]) {
         ptGroups[ptV].forEach(function (r) {
@@ -897,7 +881,7 @@ var Aggregator = {
     }
 
     // HAA/nHAA: uses absolute values, so further from 0 = higher pctl by default
-    // FF/CF/FC: closer to 0 = better, so invert for fastballs
+    // FF/FC: closer to 0 = better, so invert for fastballs
     for (var ptH in ptGroups) {
       if (VAA_NO_INVERT[ptH]) {
         ptGroups[ptH].forEach(function (r) {
@@ -1260,7 +1244,7 @@ var Aggregator = {
 
   // Category definitions for hitter pitch type grouping
   PITCH_CATEGORIES: {
-    'Hard': ['FF', 'SI', 'CF'],
+    'Hard': ['FF', 'SI'],
     'Breaking': ['FC', 'SL', 'ST', 'CU', 'SV'],
     'Offspeed': ['CH', 'FS', 'KN']
   },

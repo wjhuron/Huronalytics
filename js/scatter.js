@@ -6,7 +6,7 @@ var ScatterChart = {
   COLORS: {
     FF: { bg: '#4488FF', border: '#3366CC' },
     SI: { bg: '#FFD700', border: '#CCB000' },
-    CF: { bg: '#D2691E', border: '#A85218' },
+
     FC: { bg: '#FFA500', border: '#CC8400' },
     SL: { bg: '#DDDDDD', border: '#BBBBBB' },
     ST: { bg: '#FF1493', border: '#CC1076' },
@@ -88,7 +88,7 @@ var ScatterChart = {
           ctx.strokeStyle = e.color;
           ctx.lineWidth = 1.5;
           // Vary dash pattern by pitch category
-          var fastballs = { FF: 1, SI: 1, CF: 1 };
+          var fastballs = { FF: 1, SI: 1 };
           var breaking = { FC: 1, SL: 1, ST: 1, CU: 1, SV: 1 };
           // offspeed: CH, FS, KN (default)
           if (e.pitchType && fastballs[e.pitchType]) {
