@@ -1286,8 +1286,19 @@ var PlayerPage = {
     }
     if (Object.keys(groups).length === 0) return;
 
+    // Build expected movement lookup from aggregated pitch rows (xIVB, xHB per pitch type)
+    var expectedMovement = {};
+    var pitchRows = this._filteredPitchRows || this._getPitchRows(pitcherName, team);
+    for (var ei = 0; ei < pitchRows.length; ei++) {
+      var pr = pitchRows[ei];
+      if (pr.xIVB != null && pr.xHB != null) {
+        expectedMovement[pr.pitchType] = { xHB: pr.xHB, xIVB: pr.xIVB };
+      }
+    }
+
     var datasets = [];
     var ellipseMeta = [];
+    var expectedMeta = [];
     var pitchTypes = Object.keys(groups).sort();
 
     for (var j = 0; j < pitchTypes.length; j++) {
@@ -1308,6 +1319,15 @@ var PlayerPage = {
 
       var ellipse = ScatterChart.computeEllipse(pts);
       ellipseMeta.push({ color: color.border, ellipse: ellipse });
+
+      // Expected movement ellipse (from xIVB/xHB regressions)
+      if (expectedMovement[pt]) {
+        expectedMeta.push({
+          color: color.border,
+          cx: expectedMovement[pt].xHB,
+          cy: expectedMovement[pt].xIVB,
+        });
+      }
     }
 
     var canvas = document.getElementById('player-pitch-chart');
@@ -1358,6 +1378,29 @@ var PlayerPage = {
           var xAxis = chart.scales.x;
           var yAxis = chart.scales.y;
 
+          // Expected movement zones (filled ellipses at xIVB/xHB, drawn first)
+          var expRadiusX = Math.abs(xAxis.getPixelForValue(3) - xAxis.getPixelForValue(0));
+          var expRadiusY = Math.abs(yAxis.getPixelForValue(0) - yAxis.getPixelForValue(3));
+          for (var ei = 0; ei < expectedMeta.length; ei++) {
+            var exp = expectedMeta[ei];
+            var expCx = xAxis.getPixelForValue(exp.cx);
+            var expCy = yAxis.getPixelForValue(exp.cy);
+            ctx.save();
+            ctx.fillStyle = exp.color;
+            ctx.globalAlpha = 0.12;
+            ctx.beginPath();
+            ctx.ellipse(expCx, expCy, expRadiusX, expRadiusY, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Subtle border
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = exp.color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+          }
+
           // Crosshairs
           ctx.save();
           ctx.strokeStyle = crossColor;
@@ -1374,7 +1417,7 @@ var PlayerPage = {
           ctx.setLineDash([]);
           ctx.restore();
 
-          // Ellipses
+          // Actual pitch ellipses (computed from real data)
           for (var i = 0; i < ellipseMeta.length; i++) {
             var em = ellipseMeta[i];
             if (!em.ellipse) continue;
