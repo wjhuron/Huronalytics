@@ -1207,7 +1207,12 @@ var PlayerPage = {
 
     var datasets = [];
     var expectedMeta = [];
-    var pitchTypes = Object.keys(groups).sort();
+    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
+    var pitchTypes = Object.keys(groups).sort(function(a, b) {
+      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+      return ai - bi;
+    });
 
     for (var j = 0; j < pitchTypes.length; j++) {
       var pt = pitchTypes[j];

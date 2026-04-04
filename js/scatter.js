@@ -136,7 +136,12 @@ var ScatterChart = {
 
     var datasets = [];
     var ellipseMeta = [];
-    var pitchTypes = Object.keys(groups).sort();
+    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
+    var pitchTypes = Object.keys(groups).sort(function(a, b) {
+      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+      return ai - bi;
+    });
 
     for (var j = 0; j < pitchTypes.length; j++) {
       var pt = pitchTypes[j];
@@ -226,7 +231,12 @@ var ScatterChart = {
         groups[p.pt].push({ x: p.hb, y: p.ivb });
       }
 
-      var pitchTypes = Object.keys(groups).sort();
+      var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
+    var pitchTypes = Object.keys(groups).sort(function(a, b) {
+      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+      return ai - bi;
+    });
       var markerStyle = this.MARKER_STYLES[pi % this.MARKER_STYLES.length];
 
       for (var j = 0; j < pitchTypes.length; j++) {
