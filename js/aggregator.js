@@ -880,7 +880,7 @@ var Aggregator = {
       }
     }
 
-    // VAA/nVAA/nHAA: FF/FC/CF = closer to 0 is better (default higher = higher pctl, no inversion)
+    // VAA/nVAA: FF/FC/CF = closer to 0 is better (default higher = higher pctl, no inversion)
     // All others: further from 0 = better (invert)
     var VAA_NO_INVERT = { FF: true, FC: true, CF: true };
     for (var ptV in ptGroups) {
@@ -891,9 +891,6 @@ var Aggregator = {
           }
           if (r.nVAA_pctl !== null && r.nVAA_pctl !== undefined) {
             r.nVAA_pctl = 100 - r.nVAA_pctl;
-          }
-          if (r.nHAA_pctl !== null && r.nHAA_pctl !== undefined) {
-            r.nHAA_pctl = 100 - r.nHAA_pctl;
           }
         });
       }

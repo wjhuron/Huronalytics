@@ -2793,10 +2793,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         # Time from release to tunnel point
         tunnel_travel = fb_release_dist - TUNNEL_DIST_FROM_PLATE
         fb_t_tunnel = tunnel_travel / fb_velo_fps if fb_velo_fps > 0 else 0.1
-        # Fraction of total flight at tunnel point
-        fb_frac = fb_t_tunnel / fb_flight_time if fb_flight_time > 0 else 0
+        # Fraction of total flight at tunnel point (squared: Magnus displacement grows as t²)
+        fb_frac = (fb_t_tunnel / fb_flight_time) ** 2 if fb_flight_time > 0 else 0
 
-        # Position at tunnel point (linear interpolation of movement)
+        # Position at tunnel point (quadratic interpolation of spin-induced movement)
         fb_z_tunnel = fb_relZ - (GRAVITY / 2) * fb_t_tunnel ** 2 + fb_ivb_ft * fb_frac
         fb_x_tunnel = fb_relX + fb_hb_ft * fb_frac
 
@@ -2826,7 +2826,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
             sec_tunnel_travel = sec_release_dist - TUNNEL_DIST_FROM_PLATE
             sec_t_tunnel = sec_tunnel_travel / sec_velo_fps if sec_velo_fps > 0 else 0.1
-            sec_frac = sec_t_tunnel / sec_flight_time if sec_flight_time > 0 else 0
+            sec_frac = (sec_t_tunnel / sec_flight_time) ** 2 if sec_flight_time > 0 else 0
 
             sec_z_tunnel = sec_relZ - (GRAVITY / 2) * sec_t_tunnel ** 2 + sec_ivb_ft * sec_frac
             sec_x_tunnel = sec_relX + sec_hb_ft * sec_frac
