@@ -10,22 +10,21 @@ var PlayerPage = {
     { key: 'xBA',               label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',              label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     // Stuff & command — velo rows injected dynamically before this point
     { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
-    { key: 'extension',         label: 'Extension',        format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
+    { key: 'strikePct',         label: 'Strike%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izWhiffPct',        label: 'IZ Whiff%',        format: function(v) { return Utils.formatPct(v); } },
     // Results
     { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
     // Contact quality
-    { key: 'avgEVAgainst',      label: 'Avg Exit Velo',    format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
-    { key: 'twoStrikeWhiffPct', label: '2K Whiff%',        format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Percentile stat definitions for the hitting section
@@ -847,7 +846,7 @@ var PlayerPage = {
     } else {
       isQualified = (data.pa || 0) >= tg * 3.1;
     }
-    var alwaysColorKeys = isPitcher ? { ffVelo: true, siVelo: true, extension: true } : { maxEV: true };
+    var alwaysColorKeys = isPitcher ? { ffVelo: true, siVelo: true } : { maxEV: true };
 
     // Build dynamic velo rows for pitchers from pitch data
     var dynamicVeloStats = [];
@@ -877,8 +876,8 @@ var PlayerPage = {
       babip: true, hrFbPct: true, airPullPct: true
     };
     var PITCHER_BIP_STATS = {
-      avgEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, gbPct: true,
-      xBA: true, xSLG: true, xwOBA: true
+      barrelPctAgainst: true, gbPct: true,
+      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true
     };
 
     // Build effective stats list, replacing _veloPlaceholder with dynamic velo rows
@@ -1031,8 +1030,9 @@ var PlayerPage = {
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
         } else {
-          circle.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
-          circle.style.color = isDark ? '#aaa' : '#666';
+          circle.style.backgroundColor = 'transparent';
+          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
+          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
           circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
@@ -1050,7 +1050,9 @@ var PlayerPage = {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
           barFill.style.backgroundColor = barColor;
         } else {
-          barFill.style.backgroundColor = isDark ? 'rgba(150,150,150,0.3)' : '#ccc';
+          var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
+          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+          barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
         }
       }
       barTrack.appendChild(barFill);
