@@ -2018,23 +2018,7 @@ var PlayerPage = {
       this._renderSingleHeatMap(canvas, byType[pt], avgSzTop, avgSzBot, hand);
     }
 
-    // Color scale legend
-    var legendDiv = document.createElement('div');
-    legendDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;color:var(--text-secondary, #aaa);';
-    var lowLabel = document.createElement('span');
-    lowLabel.textContent = 'Low';
-    var gradBar = document.createElement('div');
-    var gradStops = [];
-    for (var gi = 0; gi <= 10; gi++) {
-      gradStops.push(this._heatColor(gi / 10) + ' ' + (gi * 10) + '%');
-    }
-    gradBar.style.cssText = 'width:100px;height:8px;border-radius:4px;background:linear-gradient(to right, ' + gradStops.join(', ') + ');';
-    var highLabel = document.createElement('span');
-    highLabel.textContent = 'High';
-    legendDiv.appendChild(lowLabel);
-    legendDiv.appendChild(gradBar);
-    legendDiv.appendChild(highLabel);
-    section.appendChild(legendDiv);
+    // Legend removed — blue-to-red heat scale is intuitive
   },
 
   _renderSingleHeatMap: function(canvas, pitches, szTop, szBot, hand) {
@@ -2317,9 +2301,8 @@ var PlayerPage = {
           var intensity = maxVal > 0 ? val / maxVal : 0;
           var fillColor;
           if (metric === 'usage') {
-            // Dark blue intensity scale for usage
-            var h = 220, s = Math.round(60 + intensity * 30), l = Math.round(15 + intensity * 30);
-            fillColor = 'hsl(' + h + ',' + s + '%,' + l + '%)';
+            // Dark-to-red intensity scale for usage (matches heat map palette)
+            fillColor = this._heatColor(intensity);
           } else {
             // Blue-white-red diverging scale for rate metrics (whiff%, CSW%)
             fillColor = this._heatColor(intensity);
@@ -3725,6 +3708,8 @@ var PlayerPage = {
           var col = cols[c];
           var td = document.createElement('td');
           if (col.key === 'pitchType') {
+            td.style.textAlign = 'left';
+            td.style.paddingLeft = '8px';
             var indicator = document.createElement('span');
             indicator.className = 'expand-indicator';
             indicator.textContent = '\u25B6';
