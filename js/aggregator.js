@@ -713,11 +713,11 @@ var Aggregator = {
         obj.xIVB = null;
         obj.ivbOE = null;
       }
-      // xHB + HBOE from arm angle regression (handedness-keyed, e.g. "FF_R")
+      // xHB + HBOE from RelZ + RelX regression (per pitch type)
       var hbRegs = DataStore.metadata && DataStore.metadata.hbRegressions;
-      var hbReg = hbRegs && hbRegs[obj.pitchType + '_' + obj.throws];
-      if (hbReg && obj.armAngle !== null) {
-        var expHB = hbReg.slope * obj.armAngle + hbReg.intercept;
+      var hbReg = hbRegs && hbRegs[obj.pitchType];
+      if (hbReg && obj.relPosZ !== null && obj.relPosX !== null) {
+        var expHB = hbReg.relZ_coeff * obj.relPosZ + hbReg.relX_coeff * obj.relPosX + hbReg.intercept;
         obj.xHB = Number(expHB.toFixed(1));
         obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - expHB).toFixed(1)) : null;
       } else {
