@@ -1811,12 +1811,15 @@ var PlayerPage = {
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
     section.style.display = '';
 
-    // Compute total row from filtered pitcher-level data
+    // Compute total row from filtered pitcher-level data (include _pctl keys)
     var totalRow = { pitchType: 'Total' };
     var fd = this._filteredData || data;
     for (var k = 0; k < this.BATTED_BALL_COLS.length; k++) {
       var key = this.BATTED_BALL_COLS[k].key;
-      if (key !== 'pitchType') totalRow[key] = fd[key];
+      if (key !== 'pitchType') {
+        totalRow[key] = fd[key];
+        if (fd[key + '_pctl'] != null) totalRow[key + '_pctl'] = fd[key + '_pctl'];
+      }
     }
 
     this._renderPerPitchTable(container, this.BATTED_BALL_COLS, pitchRows, totalRow);
@@ -1833,12 +1836,15 @@ var PlayerPage = {
     if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
     section.style.display = '';
 
-    // Compute total row from filtered pitcher-level data
+    // Compute total row from filtered pitcher-level data (include _pctl keys)
     var totalRow = { pitchType: 'Total' };
     var fd = this._filteredData || data;
     for (var k = 0; k < this.PLATE_DISCIPLINE_COLS.length; k++) {
       var key = this.PLATE_DISCIPLINE_COLS[k].key;
-      if (key !== 'pitchType') totalRow[key] = fd[key];
+      if (key !== 'pitchType') {
+        totalRow[key] = fd[key];
+        if (fd[key + '_pctl'] != null) totalRow[key + '_pctl'] = fd[key + '_pctl'];
+      }
     }
 
     this._renderPerPitchTable(container, this.PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
@@ -1901,7 +1907,6 @@ var PlayerPage = {
       var totalTr = document.createElement('tr');
       totalTr.style.fontWeight = '700';
       totalTr.style.borderTop = '2px solid #333840';
-      totalTr.style.background = 'rgba(128,128,128,0.08)';
       for (var c2 = 0; c2 < cols.length; c2++) {
         var col2 = cols[c2];
         var td2 = document.createElement('td');
@@ -1910,6 +1915,15 @@ var PlayerPage = {
         } else {
           var val2 = totalRow[col2.key];
           td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
+          // Apply percentile coloring to total row (league-wide percentiles)
+          var pctl2 = totalRow[col2.key + '_pctl'];
+          if (pctl2 != null && val2 != null) {
+            var bgColor2 = isDark ? Utils.percentileColorDark(pctl2) : Utils.percentileColor(pctl2);
+            var txtColor2 = isDark ? Utils.percentileTextColorDark(pctl2) : Utils.percentileTextColor(pctl2);
+            td2.style.backgroundColor = bgColor2;
+            td2.style.color = txtColor2;
+            td2.title = Math.round(pctl2) + 'th percentile';
+          }
         }
         totalTr.appendChild(td2);
       }
@@ -3777,10 +3791,10 @@ var PlayerPage = {
 
     // Total row
     if (totalRow) {
+      var isDark = document.body.classList.contains('dark');
       var totalTr = document.createElement('tr');
       totalTr.style.fontWeight = '700';
       totalTr.style.borderTop = '2px solid #333840';
-      totalTr.style.background = 'rgba(128,128,128,0.08)';
       for (var c2 = 0; c2 < cols.length; c2++) {
         var col2 = cols[c2];
         var td2 = document.createElement('td');
@@ -3789,6 +3803,14 @@ var PlayerPage = {
         } else {
           var val2 = totalRow[col2.key];
           td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
+          var pctl2 = totalRow[col2.key + '_pctl'];
+          if (pctl2 != null && val2 != null) {
+            var bgColor2 = isDark ? Utils.percentileColorDark(pctl2) : Utils.percentileColor(pctl2);
+            var txtColor2 = isDark ? Utils.percentileTextColorDark(pctl2) : Utils.percentileTextColor(pctl2);
+            td2.style.backgroundColor = bgColor2;
+            td2.style.color = txtColor2;
+            td2.title = Math.round(pctl2) + 'th percentile';
+          }
         }
         totalTr.appendChild(td2);
       }
@@ -3830,7 +3852,10 @@ var PlayerPage = {
     var totalRow = { pitchType: 'Total' };
     for (var k = 0; k < cols.length; k++) {
       var key = cols[k].key;
-      if (key !== 'pitchType') totalRow[key] = data[key];
+      if (key !== 'pitchType') {
+        totalRow[key] = data[key];
+        if (data[key + '_pctl'] != null) totalRow[key + '_pctl'] = data[key + '_pctl'];
+      }
     }
 
     // Use filtered platoon rows if available, otherwise grouped categories, otherwise individual pitch types
@@ -3864,7 +3889,10 @@ var PlayerPage = {
     var totalRow = { pitchType: 'Total' };
     for (var k = 0; k < this.HITTER_PLATE_DISCIPLINE_COLS.length; k++) {
       var key = this.HITTER_PLATE_DISCIPLINE_COLS[k].key;
-      if (key !== 'pitchType') totalRow[key] = data[key];
+      if (key !== 'pitchType') {
+        totalRow[key] = data[key];
+        if (data[key + '_pctl'] != null) totalRow[key + '_pctl'] = data[key + '_pctl'];
+      }
     }
 
     // Use filtered platoon rows if available, otherwise grouped categories, otherwise individual pitch types
