@@ -2453,6 +2453,7 @@ var PlayerPage = {
     thead.appendChild(headRow);
     table.appendChild(thead);
 
+    var isDark = document.body.classList.contains('dark');
     var tbody = document.createElement('tbody');
     for (var t = 0; t < types.length; t++) {
       var pt = types[t];
@@ -2469,10 +2470,13 @@ var PlayerPage = {
       tdLabel.appendChild(badge);
       tr.appendChild(tdLabel);
 
-      // Overall usage% column
+      // Baseline usage for this pitch type
+      var baselinePct = overallTotal > 0 ? (pitchTypes[pt].total / overallTotal * 100) : 0;
+
+      // Overall usage% column (no coloring — this is the reference)
       var tdUsage = document.createElement('td');
       if (overallTotal > 0) {
-        tdUsage.textContent = (pitchTypes[pt].total / overallTotal * 100).toFixed(1) + '%';
+        tdUsage.textContent = baselinePct.toFixed(1) + '%';
       } else {
         tdUsage.textContent = '—';
       }
@@ -2486,6 +2490,16 @@ var PlayerPage = {
         if (total > 0) {
           var pct = (pitchTypes[pt][gn] / total * 100);
           td.textContent = pct.toFixed(1) + '%';
+          // Color based on deviation from pitcher's own baseline usage
+          if (baselinePct > 0) {
+            var ratio = pct / baselinePct;
+            // Map ratio to 0-100 scale: 0x=0, 1x=50, 2x=100
+            var devPctl = Math.max(0, Math.min(100, 50 + (ratio - 1) * 50));
+            var bgColor = isDark ? Utils.percentileColorDark(devPctl) : Utils.percentileColor(devPctl);
+            var txtColor = isDark ? Utils.percentileTextColorDark(devPctl) : Utils.percentileTextColor(devPctl);
+            td.style.backgroundColor = bgColor;
+            td.style.color = txtColor;
+          }
         } else {
           td.textContent = '—';
         }
