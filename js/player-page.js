@@ -71,7 +71,7 @@ var PlayerPage = {
     { key: 'cs', label: 'CS', format: function(v) { return v != null ? v : '—'; } },
     { key: 'sbPct', label: 'SB%', format: function(v) { return v != null ? v.toFixed(1) + '%' : '—'; } },
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'firstPitchSwingPct', label: '1st Sw%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'firstPitchSwingPct', label: 'FPSw%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Hitter Batted Ball table columns (per pitch type + total)

@@ -204,13 +204,13 @@ var COLUMNS = {
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
-    { key: 'izSwChase',   label: 'IZSw-Ch',  format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
+    { key: 'izSwChase',   label: 'IZSw-Ch%',  format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'contactPct',  label: 'Contact%', format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', group: 'discipline' },
     // Count-Leverage
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on pitches with 2 strikes', sectionStart: true, group: 'count_stats' },
-    { key: 'firstPitchSwingPct', label: '1st Sw%',  format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch swing rate (% of PAs swinging on 0-0)', group: 'count_stats' },
+    { key: 'firstPitchSwingPct', label: 'FPSw%',  format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch swing rate (% of PAs swinging on 0-0)', group: 'count_stats' },
   ],
   hitterBatTracking: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
