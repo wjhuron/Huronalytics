@@ -1378,26 +1378,43 @@ var PlayerPage = {
           var xAxis = chart.scales.x;
           var yAxis = chart.scales.y;
 
-          // Expected movement zones (filled ellipses at xIVB/xHB, drawn first)
-          var expRadiusX = Math.abs(xAxis.getPixelForValue(3) - xAxis.getPixelForValue(0));
-          var expRadiusY = Math.abs(yAxis.getPixelForValue(0) - yAxis.getPixelForValue(3));
+          // Expected movement zones (hatched ellipses at xIVB/xHB, drawn first)
+          var expRadiusX = Math.abs(xAxis.getPixelForValue(3.5) - xAxis.getPixelForValue(0));
+          var expRadiusY = Math.abs(yAxis.getPixelForValue(0) - yAxis.getPixelForValue(3.5));
           for (var ei = 0; ei < expectedMeta.length; ei++) {
             var exp = expectedMeta[ei];
             var expCx = xAxis.getPixelForValue(exp.cx);
             var expCy = yAxis.getPixelForValue(exp.cy);
+
+            // Create diagonal hatch pattern for this color
+            var patCanvas = document.createElement('canvas');
+            patCanvas.width = 8;
+            patCanvas.height = 8;
+            var patCtx = patCanvas.getContext('2d');
+            patCtx.strokeStyle = exp.color;
+            patCtx.lineWidth = 1.5;
+            patCtx.globalAlpha = 0.4;
+            patCtx.beginPath();
+            patCtx.moveTo(0, 8);
+            patCtx.lineTo(8, 0);
+            patCtx.moveTo(-2, 2);
+            patCtx.lineTo(2, -2);
+            patCtx.moveTo(6, 10);
+            patCtx.lineTo(10, 6);
+            patCtx.stroke();
+            var hatchPattern = ctx.createPattern(patCanvas, 'repeat');
+
             ctx.save();
-            ctx.fillStyle = exp.color;
-            ctx.globalAlpha = 0.12;
+            // Hatched fill
+            ctx.fillStyle = hatchPattern;
             ctx.beginPath();
             ctx.ellipse(expCx, expCy, expRadiusX, expRadiusY, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Subtle border
-            ctx.globalAlpha = 0.25;
+            // Solid border
             ctx.strokeStyle = exp.color;
+            ctx.globalAlpha = 0.4;
             ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 3]);
             ctx.stroke();
-            ctx.setLineDash([]);
             ctx.restore();
           }
 
