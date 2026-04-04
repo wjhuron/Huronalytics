@@ -2346,6 +2346,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for p in all_pitches:
         b_team = p.get('BTeam')
         if b_team and b_team not in MLB_TEAMS:
+            # Don't remap AAA-source pitches — these hitters are actually playing in AAA
+            if p.get('_source') == 'AAA':
+                continue
             batter = p.get('Batter')
             if batter and batter in mlb_hitter_teams:
                 p['BTeam'] = mlb_hitter_teams[batter]
