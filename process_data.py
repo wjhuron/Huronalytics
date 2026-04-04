@@ -2587,6 +2587,139 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['nHAA'] = None
 
+    # --- Fit IVB ~ ArmAngle regression per pitch type (MLB only) ---
+    # --- Fit HB ~ ArmAngle + ArmAngle² regression per (pitch type, handedness) (MLB only) ---
+    ivb_reg_data = defaultdict(list)  # pitch_type -> [(armAngle, ivb)]
+    hb_reg_data = defaultdict(list)   # (pitch_type, throws) -> [(armAngle, hb)]
+    for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue
+        pt = p.get('Pitch Type') or p.get('TaggedPitchType')
+        if not pt:
+            continue
+        throws = p.get('Throws')
+        aa = safe_float(p.get('ArmAngle'))
+        ivb = safe_float(p.get('IndVertBrk'))
+        hb = safe_float(p.get('HorzBrk'))
+        if aa is not None and ivb is not None:
+            ivb_reg_data[pt].append((aa, ivb))
+        if aa is not None and hb is not None and throws:
+            hb_reg_data[(pt, throws)].append((aa, hb))
+
+    def fit_linear_regression(pairs, label):
+        """Fit y = slope*x + intercept, return dict with coefficients or None."""
+        if len(pairs) < 30:
+            return None
+        n = len(pairs)
+        sum_x = sum(p[0] for p in pairs)
+        sum_y = sum(p[1] for p in pairs)
+        sum_xy = sum(p[0] * p[1] for p in pairs)
+        sum_x2 = sum(p[0] ** 2 for p in pairs)
+        mean_x = sum_x / n
+        mean_y = sum_y / n
+        denom = sum_x2 - n * mean_x ** 2
+        if abs(denom) < 1e-10:
+            return None
+        slope = (sum_xy - n * mean_x * mean_y) / denom
+        intercept = mean_y - slope * mean_x
+        ss_res = sum((p[1] - (slope * p[0] + intercept)) ** 2 for p in pairs)
+        ss_tot = sum((p[1] - mean_y) ** 2 for p in pairs)
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
+        print(f"  {label}: slope={slope:.4f}, intercept={intercept:.4f}, R²={r2:.4f} (n={n})")
+        return {'slope': slope, 'intercept': intercept, 'r2': r2, 'n': n}
+
+    def fit_multivar_regression(data, label):
+        """Fit y = b0*x0 + b1*x1 + ... + intercept via Gaussian elimination.
+        data: list of (xs_list, y) where xs_list is the predictor values."""
+        if len(data) < 30:
+            return None
+        n = len(data)
+        k = len(data[0][0])  # number of predictors
+        m = k + 1  # +1 for intercept
+        # Build normal equations matrix A*beta = rhs
+        A = [[0.0]*(m+1) for _ in range(m)]
+        for xs, y in data:
+            row = list(xs) + [1.0]  # append intercept term
+            for i in range(m):
+                for j in range(m):
+                    A[i][j] += row[i] * row[j]
+                A[i][m] += row[i] * y
+        # Gaussian elimination with partial pivoting
+        for col in range(m):
+            max_row = col
+            for r in range(col+1, m):
+                if abs(A[r][col]) > abs(A[max_row][col]):
+                    max_row = r
+            A[col], A[max_row] = A[max_row], A[col]
+            if abs(A[col][col]) < 1e-12:
+                return None
+            for r in range(col+1, m):
+                f = A[r][col] / A[col][col]
+                for c in range(col, m+1):
+                    A[r][c] -= f * A[col][c]
+        # Back substitution
+        beta = [0.0] * m
+        for i in range(m-1, -1, -1):
+            beta[i] = A[i][m]
+            for j in range(i+1, m):
+                beta[i] -= A[i][j] * beta[j]
+            beta[i] /= A[i][i]
+        # R²
+        mean_y = sum(d[1] for d in data) / n
+        ss_res = sum((d[1] - sum(beta[i] * (list(d[0]) + [1.0])[i] for i in range(m)))**2 for d in data)
+        ss_tot = sum((d[1] - mean_y)**2 for d in data)
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
+        coeffs = beta[:-1]  # all except intercept
+        intercept = beta[-1]
+        print(f"  {label}: coeffs={[round(c,4) for c in coeffs]}, intercept={intercept:.4f}, R²={r2:.4f} (n={n})")
+        return {'coeffs': [round(c, 8) for c in coeffs], 'intercept': round(intercept, 8), 'r2': r2, 'n': n}
+
+    print("\nIVB ~ ArmAngle regressions (per pitch type):")
+    ivb_regressions = {}
+    for pt in sorted(ivb_reg_data.keys()):
+        result = fit_linear_regression(ivb_reg_data[pt], pt)
+        if result:
+            ivb_regressions[pt] = result
+
+    print("\nHB ~ ArmAngle + ArmAngle² regressions (per pitch type + handedness):")
+    hb_regressions = {}
+    for key in sorted(hb_reg_data.keys()):
+        pt, throws = key
+        # Build predictor tuples: (armAngle, armAngle²)
+        reg_data = [([t[0], t[0]**2], t[1]) for t in hb_reg_data[key]]
+        result = fit_multivar_regression(reg_data, f"{pt}_{throws}")
+        if result:
+            hb_regressions[key] = result
+
+    # Compute xIVB/xHB (expected) and IVBOE/HBOE (residual) for each pitch leaderboard row
+    for row in pitch_leaderboard:
+        # xIVB + IVBOE: keyed by pitch type only
+        ivb_reg = ivb_regressions.get(row['pitchType'])
+        if ivb_reg and row.get('armAngle') is not None:
+            expected_ivb = ivb_reg['slope'] * row['armAngle'] + ivb_reg['intercept']
+            row['xIVB'] = round(expected_ivb, 1)
+            if row.get('indVertBrk') is not None:
+                row['ivbOE'] = round(row['indVertBrk'] - expected_ivb, 1)
+            else:
+                row['ivbOE'] = None
+        else:
+            row['xIVB'] = None
+            row['ivbOE'] = None
+        # xHB + HBOE: uses ArmAngle + ArmAngle² regression (per pitch type + handedness)
+        hb_reg = hb_regressions.get((row['pitchType'], row.get('throws')))
+        if hb_reg and row.get('armAngle') is not None:
+            coeffs = hb_reg['coeffs']
+            aa = row['armAngle']
+            expected_hb = coeffs[0] * aa + coeffs[1] * aa**2 + hb_reg['intercept']
+            row['xHB'] = round(expected_hb, 1)
+            if row.get('horzBrk') is not None:
+                row['hbOE'] = round(row['horzBrk'] - expected_hb, 1)
+            else:
+                row['hbOE'] = None
+        else:
+            row['xHB'] = None
+            row['hbOE'] = None
+
     # --- Compute percentiles per pitch type ---
     pt_groups = defaultdict(list)
     for row in pitch_leaderboard:
@@ -3332,6 +3465,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'leagueAvgPlateX': round(league_avg_plateX, 6),
         },
         'sacqZones': sacq_zones_output,
+        'ivbRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6)}
+                           for pt, r in ivb_regressions.items()},
+        'hbRegressions': {f"{pt}_{throws}": {'coeffs': [round(c, 6) for c in r['coeffs']], 'intercept': round(r['intercept'], 6)}
+                          for (pt, throws), r in hb_regressions.items()},
     }
 
     # --- Generate micro-aggregate data ---
