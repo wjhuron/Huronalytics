@@ -2292,8 +2292,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'leagueAverages': {},
                 'pitcherLeagueAverages': {},
                 'hitterLeagueAverages': {},
-                'vaaRegression': {'slope': 0, 'intercept': 0, 'leagueAvgPlateZ': 0},
-                'haaRegression': {'slope': 0, 'intercept': 0, 'leagueAvgPlateX': 0},
+                'vaaRegressions': {},
+                'haaRegressions': {},
                 'sacqZones': [],
             },
             'micro_data': {
@@ -2483,129 +2483,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         pitch_leaderboard.append(row)
 
-    # --- Fit VAA ~ PlateZ regression for normalized VAA (MLB only) ---
-    vaa_plateZ_pairs = []
-    for p in all_pitches:
-        if p.get('_source', 'MLB') != 'MLB':
-            continue  # Exclude ROC/AAA from regression
-        vaa_val = safe_float(p.get('VAA'))
-        pz_val = safe_float(p.get('PlateZ'))
-        if vaa_val is not None and pz_val is not None:
-            vaa_plateZ_pairs.append((pz_val, vaa_val))
-
-    if len(vaa_plateZ_pairs) > 10:
-        n_reg = len(vaa_plateZ_pairs)
-        sum_x = sum(pair[0] for pair in vaa_plateZ_pairs)
-        sum_y = sum(pair[1] for pair in vaa_plateZ_pairs)
-        sum_xy = sum(pair[0] * pair[1] for pair in vaa_plateZ_pairs)
-        sum_x2 = sum(pair[0] ** 2 for pair in vaa_plateZ_pairs)
-        mean_x = sum_x / n_reg
-        mean_y = sum_y / n_reg
-        denom = sum_x2 - n_reg * mean_x ** 2
-        if abs(denom) > 1e-10:
-            vaa_slope = (sum_xy - n_reg * mean_x * mean_y) / denom
-            vaa_intercept = mean_y - vaa_slope * mean_x
-        else:
-            vaa_slope = 0.0
-            vaa_intercept = mean_y
-        ss_res = sum((pair[1] - (vaa_slope * pair[0] + vaa_intercept)) ** 2 for pair in vaa_plateZ_pairs)
-        ss_tot = sum((pair[1] - mean_y) ** 2 for pair in vaa_plateZ_pairs)
-        r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-        league_avg_plateZ = mean_x
-        print(f"\nVAA ~ PlateZ regression: slope={vaa_slope:.4f}, intercept={vaa_intercept:.4f}, "
-              f"R²={r_squared:.4f}, league avg PlateZ={league_avg_plateZ:.4f} (n={n_reg})")
-    else:
-        vaa_slope = 0.0
-        vaa_intercept = 0.0
-        league_avg_plateZ = 0.0
-        print("\nWARNING: Not enough data for VAA ~ PlateZ regression")
-
-    # Compute nVAA for each pitch leaderboard row
-    for row in pitch_leaderboard:
-        if row.get('vaa') is not None:
-            key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
-            pitches_for_row = pitch_groups[key]
-            pz_vals = [safe_float(p.get('PlateZ')) for p in pitches_for_row]
-            pz_vals = [v for v in pz_vals if v is not None]
-            if pz_vals:
-                avg_pz = sum(pz_vals) / len(pz_vals)
-                row['nVAA'] = round(row['vaa'] - vaa_slope * (avg_pz - league_avg_plateZ), 2)
-            else:
-                row['nVAA'] = None
-        else:
-            row['nVAA'] = None
-
-    # --- Fit HAA ~ PlateX regression for normalized HAA (MLB only) ---
-    haa_plateX_pairs = []
-    for p in all_pitches:
-        if p.get('_source', 'MLB') != 'MLB':
-            continue  # Exclude ROC/AAA from regression
-        haa_val = safe_float(p.get('HAA'))
-        px_val = safe_float(p.get('PlateX'))
-        if haa_val is not None and px_val is not None:
-            haa_plateX_pairs.append((px_val, haa_val))
-
-    if len(haa_plateX_pairs) > 10:
-        n_reg_h = len(haa_plateX_pairs)
-        sum_x_h = sum(pair[0] for pair in haa_plateX_pairs)
-        sum_y_h = sum(pair[1] for pair in haa_plateX_pairs)
-        sum_xy_h = sum(pair[0] * pair[1] for pair in haa_plateX_pairs)
-        sum_x2_h = sum(pair[0] ** 2 for pair in haa_plateX_pairs)
-        mean_x_h = sum_x_h / n_reg_h
-        mean_y_h = sum_y_h / n_reg_h
-        denom_h = sum_x2_h - n_reg_h * mean_x_h ** 2
-        if abs(denom_h) > 1e-10:
-            haa_slope = (sum_xy_h - n_reg_h * mean_x_h * mean_y_h) / denom_h
-            haa_intercept = mean_y_h - haa_slope * mean_x_h
-        else:
-            haa_slope = 0.0
-            haa_intercept = mean_y_h
-        ss_res_h = sum((pair[1] - (haa_slope * pair[0] + haa_intercept)) ** 2 for pair in haa_plateX_pairs)
-        ss_tot_h = sum((pair[1] - mean_y_h) ** 2 for pair in haa_plateX_pairs)
-        r_squared_h = 1 - ss_res_h / ss_tot_h if ss_tot_h > 0 else 0
-        league_avg_plateX = mean_x_h
-        print(f"HAA ~ PlateX regression: slope={haa_slope:.4f}, intercept={haa_intercept:.4f}, "
-              f"R²={r_squared_h:.4f}, league avg PlateX={league_avg_plateX:.4f} (n={n_reg_h})")
-    else:
-        haa_slope = 0.0
-        haa_intercept = 0.0
-        league_avg_plateX = 0.0
-        print("\nWARNING: Not enough data for HAA ~ PlateX regression")
-
-    # Compute nHAA for each pitch leaderboard row
-    for row in pitch_leaderboard:
-        if row.get('haa') is not None:
-            key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
-            pitches_for_row = pitch_groups[key]
-            px_vals = [safe_float(p.get('PlateX')) for p in pitches_for_row]
-            px_vals = [v for v in px_vals if v is not None]
-            if px_vals:
-                avg_px = sum(px_vals) / len(px_vals)
-                row['nHAA'] = round(row['haa'] - haa_slope * (avg_px - league_avg_plateX), 2)
-            else:
-                row['nHAA'] = None
-        else:
-            row['nHAA'] = None
-
-    # --- Fit IVB ~ ArmAngle regression per pitch type (MLB only) ---
-    # --- Fit HB ~ ArmAngle + ArmAngle² regression per (pitch type, handedness) (MLB only) ---
-    ivb_reg_data = defaultdict(list)  # pitch_type -> [(armAngle, ivb)]
-    hb_reg_data = defaultdict(list)   # (pitch_type, throws) -> [(armAngle, hb)]
-    for p in all_pitches:
-        if p.get('_source', 'MLB') != 'MLB':
-            continue
-        pt = p.get('Pitch Type') or p.get('TaggedPitchType')
-        if not pt:
-            continue
-        throws = p.get('Throws')
-        aa = safe_float(p.get('ArmAngle'))
-        ivb = safe_float(p.get('IndVertBrk'))
-        hb = safe_float(p.get('HorzBrk'))
-        if aa is not None and ivb is not None:
-            ivb_reg_data[pt].append((aa, ivb))
-        if aa is not None and hb is not None and throws:
-            hb_reg_data[(pt, throws)].append((aa, hb))
-
+    # --- Regression helper functions ---
     def fit_linear_regression(pairs, label):
         """Fit y = slope*x + intercept, return dict with coefficients or None."""
         if len(pairs) < 30:
@@ -2634,17 +2512,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if len(data) < 30:
             return None
         n = len(data)
-        k = len(data[0][0])  # number of predictors
-        m = k + 1  # +1 for intercept
-        # Build normal equations matrix A*beta = rhs
+        k = len(data[0][0])
+        m = k + 1
         A = [[0.0]*(m+1) for _ in range(m)]
         for xs, y in data:
-            row = list(xs) + [1.0]  # append intercept term
+            row = list(xs) + [1.0]
             for i in range(m):
                 for j in range(m):
                     A[i][j] += row[i] * row[j]
                 A[i][m] += row[i] * y
-        # Gaussian elimination with partial pivoting
         for col in range(m):
             max_row = col
             for r in range(col+1, m):
@@ -2657,22 +2533,129 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 f = A[r][col] / A[col][col]
                 for c in range(col, m+1):
                     A[r][c] -= f * A[col][c]
-        # Back substitution
         beta = [0.0] * m
         for i in range(m-1, -1, -1):
             beta[i] = A[i][m]
             for j in range(i+1, m):
                 beta[i] -= A[i][j] * beta[j]
             beta[i] /= A[i][i]
-        # R²
         mean_y = sum(d[1] for d in data) / n
         ss_res = sum((d[1] - sum(beta[i] * (list(d[0]) + [1.0])[i] for i in range(m)))**2 for d in data)
         ss_tot = sum((d[1] - mean_y)**2 for d in data)
         r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-        coeffs = beta[:-1]  # all except intercept
+        coeffs = beta[:-1]
         intercept = beta[-1]
         print(f"  {label}: coeffs={[round(c,4) for c in coeffs]}, intercept={intercept:.4f}, R²={r2:.4f} (n={n})")
         return {'coeffs': [round(c, 8) for c in coeffs], 'intercept': round(intercept, 8), 'r2': r2, 'n': n}
+
+    # --- Fit VAA ~ PlateZ regressions per pitch type (MLB only) ---
+    # Per-pitch-type slopes capture that different pitches have different VAA~PlateZ relationships
+    vaa_reg_by_pt = defaultdict(list)  # pitch_type -> [(plateZ, vaa)]
+    for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue
+        pt = p.get('Pitch Type') or p.get('TaggedPitchType')
+        vaa_val = safe_float(p.get('VAA'))
+        pz_val = safe_float(p.get('PlateZ'))
+        if pt and vaa_val is not None and pz_val is not None:
+            vaa_reg_by_pt[pt].append((pz_val, vaa_val))
+
+    print("\nVAA ~ PlateZ regressions (per pitch type):")
+    vaa_regressions = {}  # pitch_type -> {slope, intercept, leagueAvgPlateZ}
+    for pt in sorted(vaa_reg_by_pt.keys()):
+        pairs = vaa_reg_by_pt[pt]
+        result = fit_linear_regression(pairs, f"VAA~PlateZ {pt}")
+        if result:
+            mean_pz = sum(p[0] for p in pairs) / len(pairs)
+            vaa_regressions[pt] = {
+                'slope': result['slope'],
+                'intercept': result['intercept'],
+                'leagueAvgPlateZ': mean_pz,
+            }
+
+    # Compute nVAA for each pitch leaderboard row using per-pitch-type slope
+    for row in pitch_leaderboard:
+        if row.get('vaa') is not None:
+            pt = row['pitchType']
+            reg = vaa_regressions.get(pt)
+            if reg:
+                key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
+                pitches_for_row = pitch_groups[key]
+                pz_vals = [safe_float(p.get('PlateZ')) for p in pitches_for_row]
+                pz_vals = [v for v in pz_vals if v is not None]
+                if pz_vals:
+                    avg_pz = sum(pz_vals) / len(pz_vals)
+                    row['nVAA'] = round(row['vaa'] - reg['slope'] * (avg_pz - reg['leagueAvgPlateZ']), 2)
+                else:
+                    row['nVAA'] = None
+            else:
+                row['nVAA'] = None
+        else:
+            row['nVAA'] = None
+
+    # --- Fit HAA ~ PlateX regressions per pitch type (MLB only) ---
+    # Per-pitch-type slopes are critical: breaking balls (SL slope ~3.6, ST ~4.9) vs fastballs (SI ~0.17)
+    haa_reg_by_pt = defaultdict(list)  # pitch_type -> [(plateX, haa)]
+    for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue
+        pt = p.get('Pitch Type') or p.get('TaggedPitchType')
+        haa_val = safe_float(p.get('HAA'))
+        px_val = safe_float(p.get('PlateX'))
+        if pt and haa_val is not None and px_val is not None:
+            haa_reg_by_pt[pt].append((px_val, haa_val))
+
+    print("\nHAA ~ PlateX regressions (per pitch type):")
+    haa_regressions = {}  # pitch_type -> {slope, intercept, leagueAvgPlateX}
+    for pt in sorted(haa_reg_by_pt.keys()):
+        pairs = haa_reg_by_pt[pt]
+        result = fit_linear_regression(pairs, f"HAA~PlateX {pt}")
+        if result:
+            mean_px = sum(p[0] for p in pairs) / len(pairs)
+            haa_regressions[pt] = {
+                'slope': result['slope'],
+                'intercept': result['intercept'],
+                'leagueAvgPlateX': mean_px,
+            }
+
+    # Compute nHAA for each pitch leaderboard row using per-pitch-type slope
+    for row in pitch_leaderboard:
+        if row.get('haa') is not None:
+            pt = row['pitchType']
+            reg = haa_regressions.get(pt)
+            if reg:
+                key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
+                pitches_for_row = pitch_groups[key]
+                px_vals = [safe_float(p.get('PlateX')) for p in pitches_for_row]
+                px_vals = [v for v in px_vals if v is not None]
+                if px_vals:
+                    avg_px = sum(px_vals) / len(px_vals)
+                    row['nHAA'] = round(row['haa'] - reg['slope'] * (avg_px - reg['leagueAvgPlateX']), 2)
+                else:
+                    row['nHAA'] = None
+            else:
+                row['nHAA'] = None
+        else:
+            row['nHAA'] = None
+
+    # --- Fit IVB ~ ArmAngle regression per pitch type (MLB only) ---
+    # --- Fit HB ~ ArmAngle + ArmAngle² regression per (pitch type, handedness) (MLB only) ---
+    ivb_reg_data = defaultdict(list)  # pitch_type -> [(armAngle, ivb)]
+    hb_reg_data = defaultdict(list)   # (pitch_type, throws) -> [(armAngle, hb)]
+    for p in all_pitches:
+        if p.get('_source', 'MLB') != 'MLB':
+            continue
+        pt = p.get('Pitch Type') or p.get('TaggedPitchType')
+        if not pt:
+            continue
+        throws = p.get('Throws')
+        aa = safe_float(p.get('ArmAngle'))
+        ivb = safe_float(p.get('IndVertBrk'))
+        hb = safe_float(p.get('HorzBrk'))
+        if aa is not None and ivb is not None:
+            ivb_reg_data[pt].append((aa, ivb))
+        if aa is not None and hb is not None and throws:
+            hb_reg_data[(pt, throws)].append((aa, hb))
 
     print("\nIVB ~ ArmAngle regressions (per pitch type):")
     ivb_regressions = {}
@@ -3454,16 +3437,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'leagueAverages': league_avgs,
         'pitcherLeagueAverages': pitcher_league_avgs,
         'hitterLeagueAverages': hitter_league_avgs,
-        'vaaRegression': {
-            'slope': round(vaa_slope, 6),
-            'intercept': round(vaa_intercept, 6),
-            'leagueAvgPlateZ': round(league_avg_plateZ, 6),
-        },
-        'haaRegression': {
-            'slope': round(haa_slope, 6),
-            'intercept': round(haa_intercept, 6),
-            'leagueAvgPlateX': round(league_avg_plateX, 6),
-        },
+        'vaaRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6),
+                                  'leagueAvgPlateZ': round(r['leagueAvgPlateZ'], 6)}
+                           for pt, r in vaa_regressions.items()},
+        'haaRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6),
+                                  'leagueAvgPlateX': round(r['leagueAvgPlateX'], 6)}
+                           for pt, r in haa_regressions.items()},
         'sacqZones': sacq_zones_output,
         'ivbRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6)}
                            for pt, r in ivb_regressions.items()},

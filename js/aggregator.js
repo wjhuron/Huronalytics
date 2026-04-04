@@ -682,18 +682,21 @@ var Aggregator = {
         }
       });
 
-      // Normalized VAA (location-independent):
+      // Normalized VAA (location-independent, per pitch type):
       // nVAA = VAA - slope * (pitcher_avgPlateZ - league_avgPlateZ)
-      // Adjusts VAA to what it would be at league-average pitch height
-      var vaaReg = DataStore.metadata && DataStore.metadata.vaaRegression;
+      // Per-pitch-type slopes capture different VAA~PlateZ relationships by pitch type
+      var vaaRegs = DataStore.metadata && DataStore.metadata.vaaRegressions;
+      var vaaReg = vaaRegs && vaaRegs[obj.pitchType];
       if (obj.vaa !== null && obj._plateZ !== null && vaaReg && vaaReg.leagueAvgPlateZ != null) {
         obj.nVAA = Number((obj.vaa - vaaReg.slope * (obj._plateZ - vaaReg.leagueAvgPlateZ)).toFixed(2));
       } else {
         obj.nVAA = null;
       }
-      // Normalized HAA (location-independent):
+      // Normalized HAA (location-independent, per pitch type):
       // nHAA = HAA - slope * (pitcher_avgPlateX - league_avgPlateX)
-      var haaReg = DataStore.metadata && DataStore.metadata.haaRegression;
+      // Per-pitch-type slopes are critical: breaking balls (SL ~3.6) vs fastballs (SI ~0.17)
+      var haaRegs = DataStore.metadata && DataStore.metadata.haaRegressions;
+      var haaReg = haaRegs && haaRegs[obj.pitchType];
       if (obj.haa !== null && obj._plateX !== null && haaReg && haaReg.leagueAvgPlateX != null) {
         obj.nHAA = Number((obj.haa - haaReg.slope * (obj._plateX - haaReg.leagueAvgPlateX)).toFixed(2));
       } else {
