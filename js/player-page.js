@@ -1436,13 +1436,13 @@ var PlayerPage = {
           ctx.setLineDash([]);
           ctx.restore();
 
-          // Annotation: "Shaded ellipses = expected movement"
+          // Annotation: "Shaded = expected from spin axis"
           if (expectedMeta.length > 0) {
             ctx.save();
             ctx.font = '10px Barlow, sans-serif';
             ctx.fillStyle = crossColor;
             ctx.textAlign = 'left';
-            ctx.fillText('Shaded ellipses = expected movement', xAxis.left + 6, yAxis.bottom - 6);
+            ctx.fillText('Shaded = expected from spin axis', xAxis.left + 6, yAxis.bottom - 6);
             ctx.restore();
           }
         },
