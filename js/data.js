@@ -1,30 +1,16 @@
 var DataStore = {
-  st: {},
   rs: {},
   gameType: 'RS',
 
   active: function () {
-    return this.gameType === 'ST' ? this.st : this.rs;
+    return this.rs;
   },
 
   getMetadata: function () {
-    return this.active().metadata;
+    return this.rs.metadata;
   },
 
   load: function () {
-    // Load from new dual-dataset structure
-    if (window.ST_DATA) {
-      this.st = {
-        pitcherData: window.ST_DATA.pitcherData || [],
-        pitchData: window.ST_DATA.pitchData || [],
-        hitterData: window.ST_DATA.hitterData || [],
-        hitterPitchData: window.ST_DATA.hitterPitchData || [],
-        metadata: window.ST_DATA.metadata || {},
-        microData: window.ST_DATA.microData || null,
-        pitchDetails: window.ST_DATA.pitchDetails || {},
-        hitterPitchDetails: window.ST_DATA.hitterPitchDetails || {},
-      };
-    }
     if (window.RS_DATA) {
       this.rs = {
         pitcherData: window.RS_DATA.pitcherData || [],
@@ -39,7 +25,7 @@ var DataStore = {
     }
 
     // Backwards compat: if old flat globals exist and new ones don't
-    if (!window.ST_DATA && !window.RS_DATA && window.PITCHER_DATA && window.METADATA) {
+    if (!window.RS_DATA && window.PITCHER_DATA && window.METADATA) {
       this.rs = {
         pitcherData: window.PITCHER_DATA || [],
         pitchData: window.PITCH_DATA || [],
@@ -55,18 +41,18 @@ var DataStore = {
     // Set flat globals for backwards compatibility
     this.updateGlobals();
 
-    // Expose convenience properties from active dataset
-    this.metadata = this.active().metadata;
-    this.pitcherData = this.active().pitcherData;
-    this.pitchData = this.active().pitchData;
-    this.hitterData = this.active().hitterData;
-    this.hitterPitchData = this.active().hitterPitchData;
+    // Expose convenience properties
+    this.metadata = this.rs.metadata;
+    this.pitcherData = this.rs.pitcherData;
+    this.pitchData = this.rs.pitchData;
+    this.hitterData = this.rs.hitterData;
+    this.hitterPitchData = this.rs.hitterPitchData;
 
     return Promise.resolve();
   },
 
   updateGlobals: function () {
-    var d = this.active();
+    var d = this.rs;
     window.PITCHER_DATA = d.pitcherData;
     window.PITCH_DATA = d.pitchData;
     window.HITTER_DATA = d.hitterData;
@@ -100,7 +86,7 @@ var DataStore = {
    * pitchTypes can be an array for multi-select: ['FF', 'SI'] or 'all'
    */
   getFilteredData: function (tab, filters) {
-    var d = this.active();
+    var d = this.rs;
     var source;
     if (tab === 'pitch') source = d.pitchData;
     else if (tab === 'pitcher') source = d.pitcherData;
@@ -132,7 +118,7 @@ var DataStore = {
         var g = row.g, gs = row.gs;
         // For pitch-level rows without G/GS, look up from pitcher data
         if (g == null && row.pitcher) {
-          var pitcherData = DataStore.active().pitcherData || [];
+          var pitcherData = DataStore.rs.pitcherData || [];
           for (var pi = 0; pi < pitcherData.length; pi++) {
             if (pitcherData[pi].pitcher === row.pitcher && pitcherData[pi].team === row.team) {
               g = pitcherData[pi].g; gs = pitcherData[pi].gs; break;

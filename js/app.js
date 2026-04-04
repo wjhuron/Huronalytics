@@ -64,7 +64,7 @@
   var teamSelect, throwsSelect, vsHandSelect, minCountInput, minSwingsInput, searchInput;
   var minIpInput, minTbfInput, minBipInput, minPitcherSwingsInput;
   var dateStartInput, dateEndInput;
-  var currentGameType = null; // 'ST' or 'RS'
+  var currentGameType = 'RS';
   var sidePanel, panelOverlay, panelClose;
 
   // ---- Init ----
@@ -381,7 +381,7 @@
     teamSelect.innerHTML = '<option value="all">All Teams</option>';
     var rocTeams = (DataStore.metadata.rocTeams || []);
     DataStore.metadata.teams.forEach(function(team) {
-      if (currentGameType === 'RS' && team === 'WBC') return;
+      if (team === 'WBC') return;
       // Hide ROC/AAA teams unless ?roc=1 URL parameter is present
       if (rocTeams.indexOf(team) !== -1 && !window._rocMode) return;
       var opt = document.createElement('option');
@@ -442,73 +442,6 @@
     document.getElementById('role-filter').addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
-
-    // Game Type toggle (ST / Regular Season)
-    function setGameType(type) {
-      currentGameType = type;
-      DataStore.gameType = type;
-      DataStore.updateGlobals();
-
-      // Reload aggregator with new micro data
-      var microData = DataStore.active().microData;
-      if (microData) {
-        Aggregator.load(microData);
-      } else {
-        Aggregator.loaded = false;
-      }
-
-      // Clear date inputs (user can set them manually within this game type)
-      dateStartInput.value = '';
-      dateEndInput.value = '';
-
-      // Update date range min/max from new micro data dates
-      if (Aggregator.loaded && Aggregator.data && Aggregator.data.lookups.dates.length > 0) {
-        var dates = Aggregator.data.lookups.dates;
-        dateStartInput.min = dates[0];
-        dateStartInput.max = dates[dates.length - 1];
-        dateEndInput.min = dates[0];
-        dateEndInput.max = dates[dates.length - 1];
-      }
-
-      // Rebuild team dropdown (WBC only in ST)
-      rebuildTeamDropdown();
-
-      // Update active button styling
-      var btns = document.querySelectorAll('#game-type-toggle .game-type-btn');
-      for (var i = 0; i < btns.length; i++) {
-        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
-      }
-
-      Leaderboard.currentPage = 1;
-      refresh();
-    }
-    var gameTypeToggle = document.getElementById('game-type-toggle');
-    if (gameTypeToggle) {
-      gameTypeToggle.addEventListener('click', function (e) {
-        var btn = e.target.closest('.game-type-btn');
-        if (!btn) return;
-        var type = btn.getAttribute('data-type');
-        if (type === currentGameType) return;
-        setGameType(type);
-      });
-      // Auto-default based on current date
-      var today = new Date().toISOString().slice(0, 10);
-      var defaultType = today >= '2026-03-25' ? 'RS' : 'ST';
-      currentGameType = defaultType;
-      DataStore.gameType = defaultType;
-      DataStore.updateGlobals();
-
-      // Reload aggregator with the correct micro data for default game type
-      var defaultMicroData = DataStore.active().microData;
-      if (defaultMicroData) {
-        Aggregator.load(defaultMicroData);
-      }
-
-      var btns = document.querySelectorAll('#game-type-toggle .game-type-btn');
-      for (var i = 0; i < btns.length; i++) {
-        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === defaultType);
-      }
-    }
 
     var searchTimer = null;
     searchInput.addEventListener('input', function () {

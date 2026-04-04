@@ -275,9 +275,8 @@ var PlayerPage = {
     this._zoneMetric = 'usage';
     this._platoonHand = 'all';
     this._gameDate = null; // null = all games
-    this._playerGameType = DataStore.gameType || 'RS';
+    this._playerGameType = 'RS';
     this._currentData = data;
-    this._renderPlayerGameTypeToggle();
     this._renderGameLog(data);
     this._renderPitcherContent(data);
     this._bindHandToggles();
@@ -450,11 +449,10 @@ var PlayerPage = {
     this._showHitterLayout();
     this._renderHitterIdentity(data);
     this._platoonHand = 'all';
-    this._playerGameType = DataStore.gameType || 'RS';
+    this._playerGameType = 'RS';
     this._currentData = data;
     this._sprayMode = 'all';
     this._sprayBatSide = (data.stands === 'S') ? 'L' : null; // null = not switch hitter
-    this._renderPlayerGameTypeToggle();
     this._renderHitterContent(data);
     this._bindSprayToggle();
     this._bindSprayBatSideToggle(data);
@@ -577,82 +575,6 @@ var PlayerPage = {
     if (spraySec) spraySec.style.display = 'none';
   },
 
-  // --- Render: Player Game Type Toggle ---
-  _renderPlayerGameTypeToggle: function () {
-    // Remove any existing toggle
-    var existing = document.querySelector('.player-game-type-toggle');
-    if (existing) existing.remove();
-
-    var self = this;
-    var gt = this._playerGameType || 'RS';
-
-    var toggleContainer = document.createElement('div');
-    toggleContainer.className = 'player-game-type-toggle game-type-toggle';
-    toggleContainer.innerHTML = '<button class="game-type-btn ' + (gt === 'ST' ? 'active' : '') + '" data-type="ST">Spring Training</button>' +
-      '<button class="game-type-btn ' + (gt === 'RS' ? 'active' : '') + '" data-type="RS">Regular Season</button>';
-
-    // Insert after the back button in the nav area
-    var nav = document.querySelector('.player-page-nav');
-    var backBtn = document.getElementById('player-back');
-    if (nav && backBtn) {
-      // Insert after back button but before game log
-      backBtn.parentNode.insertBefore(toggleContainer, backBtn.nextSibling);
-    }
-
-    this._playerGameTypeHandler = function (e) {
-      var btn = e.target.closest('.game-type-btn');
-      if (!btn) return;
-      var type = btn.getAttribute('data-type');
-      if (type === self._playerGameType) return;
-      self._playerGameType = type;
-      self._gameDate = null; // reset game date filter when switching
-
-      // Switch DataStore to new game type and reload globals + aggregator
-      DataStore.gameType = type;
-      DataStore.updateGlobals();
-      var microData = DataStore.active().microData;
-      if (microData) {
-        Aggregator.load(microData);
-      } else {
-        Aggregator.loaded = false;
-      }
-
-      // Update active state
-      var btns = toggleContainer.querySelectorAll('.game-type-btn');
-      for (var i = 0; i < btns.length; i++) {
-        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
-      }
-
-      // Re-find the player in the new dataset
-      var mlbId = self._currentData ? self._currentData.mlbId : null;
-      if (mlbId) {
-        var newData = self._playerType === 'pitcher'
-          ? self._findPitcherByMlbId(mlbId)
-          : self._findHitterByMlbId(mlbId);
-        if (newData) self._currentData = newData;
-      }
-
-      // Re-render content
-      if (self._currentData) {
-        if (self._playerType === 'pitcher') {
-          self._renderGameLog(self._currentData);
-          self._bindGameLog();
-          self._renderPitcherContent(self._currentData);
-        } else {
-          self._renderHitterContent(self._currentData);
-        }
-      }
-    };
-    toggleContainer.addEventListener('click', this._playerGameTypeHandler);
-  },
-
-  _unbindPlayerGameTypeToggle: function () {
-    var existing = document.querySelector('.player-game-type-toggle');
-    if (existing && this._playerGameTypeHandler) {
-      existing.removeEventListener('click', this._playerGameTypeHandler);
-      this._playerGameTypeHandler = null;
-    }
-  },
 
   close: function () {
     this.isOpen = false;
@@ -665,20 +587,6 @@ var PlayerPage = {
     this._unbindHandToggles();
     this._unbindPlatoonToggle();
     this._unbindGameLog();
-    this._unbindPlayerGameTypeToggle();
-
-    // Restore DataStore to the main leaderboard's game type
-    var mainGameType = (typeof window.getCurrentGameType === 'function' ? window.getCurrentGameType() : null) || 'RS';
-    if (DataStore.gameType !== mainGameType) {
-      DataStore.gameType = mainGameType;
-      DataStore.updateGlobals();
-      var microData = DataStore.active().microData;
-      if (microData) {
-        Aggregator.load(microData);
-      } else {
-        Aggregator.loaded = false;
-      }
-    }
     this._playerGameType = null;
 
     // Hide new sections
