@@ -1608,15 +1608,15 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   padding: 6px 10px;
   text-align: center;
   border-bottom: 1px solid var(--border-light);
-  color: var(--text-primary) !important;
-  background: var(--bg-card) !important;
+  color: var(--text-primary);
+  background: var(--bg-card);
 }
 .count-table td:first-child {
   text-align: left;
   font-weight: 600;
 }
 .count-table tbody tr:hover td {
-  background: var(--row-hover) !important;
+  filter: brightness(1.15);
 }
 
 /* --- Responsive --- */
