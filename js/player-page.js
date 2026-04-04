@@ -1297,7 +1297,6 @@ var PlayerPage = {
     }
 
     var datasets = [];
-    var ellipseMeta = [];
     var expectedMeta = [];
     var pitchTypes = Object.keys(groups).sort();
 
@@ -1316,9 +1315,6 @@ var PlayerPage = {
         pointRadius: 5,
         pointHoverRadius: 7,
       });
-
-      var ellipse = ScatterChart.computeEllipse(pts);
-      ellipseMeta.push({ color: color.border, ellipse: ellipse });
 
       // Expected movement ellipse (from xIVB/xHB regressions)
       if (expectedMovement[pt]) {
@@ -1434,24 +1430,13 @@ var PlayerPage = {
           ctx.setLineDash([]);
           ctx.restore();
 
-          // Actual pitch ellipses (computed from real data)
-          for (var i = 0; i < ellipseMeta.length; i++) {
-            var em = ellipseMeta[i];
-            if (!em.ellipse) continue;
-            var e = em.ellipse;
-            var ecx = xAxis.getPixelForValue(e.cx);
-            var ecy = yAxis.getPixelForValue(e.cy);
-            var rx = Math.abs(xAxis.getPixelForValue(e.rx) - xAxis.getPixelForValue(0));
-            var ry = Math.abs(yAxis.getPixelForValue(0) - yAxis.getPixelForValue(e.ry));
+          // Annotation: "Shaded ellipses = expected movement"
+          if (expectedMeta.length > 0) {
             ctx.save();
-            ctx.strokeStyle = em.color;
-            ctx.globalAlpha = 0.35;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.translate(ecx, ecy);
-            ctx.rotate(-e.angle);
-            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.font = '10px Barlow, sans-serif';
+            ctx.fillStyle = crossColor;
+            ctx.textAlign = 'left';
+            ctx.fillText('Shaded ellipses = expected movement', xAxis.left + 6, yAxis.bottom - 6);
             ctx.restore();
           }
         },
