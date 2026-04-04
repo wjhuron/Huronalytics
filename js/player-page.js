@@ -87,9 +87,9 @@ var PlayerPage = {
     { key: 'barrelPct', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'laSweetSpotPct', label: 'Sweet-Spot%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
+    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
+    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
     { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
     { key: 'pullPct', label: 'Pull%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'middlePct', label: 'Mid%', format: function(v) { return Utils.formatPct(v); } },
@@ -184,9 +184,9 @@ var PlayerPage = {
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
+    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
+    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
     { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
   ],
 
@@ -199,7 +199,6 @@ var PlayerPage = {
     { key: 'izPct', label: 'Zone%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'cswPct', label: 'CSW%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'swStrRate', label: 'SwStr%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izWhiffPct', label: 'IZ Whiff%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'fpsPct', label: 'FPS%', format: function(v) { return Utils.formatPct(v); } },
@@ -1888,7 +1887,7 @@ var PlayerPage = {
           var val = row[col.key];
           td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
           // Apply percentile coloring if a _pctl value exists for this key
-          var pctl = row[col.key + '_pctl'];
+          var pctl = col.noPctl ? null : row[col.key + '_pctl'];
           if (pctl != null && val != null) {
             var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
             var txtColor = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
@@ -1916,7 +1915,7 @@ var PlayerPage = {
           var val2 = totalRow[col2.key];
           td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
           // Apply percentile coloring to total row (league-wide percentiles)
-          var pctl2 = totalRow[col2.key + '_pctl'];
+          var pctl2 = col2.noPctl ? null : totalRow[col2.key + '_pctl'];
           if (pctl2 != null && val2 != null) {
             var bgColor2 = isDark ? Utils.percentileColorDark(pctl2) : Utils.percentileColor(pctl2);
             var txtColor2 = isDark ? Utils.percentileTextColorDark(pctl2) : Utils.percentileTextColor(pctl2);
@@ -3817,7 +3816,7 @@ var PlayerPage = {
         } else {
           var val2 = totalRow[col2.key];
           td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
-          var pctl2 = totalRow[col2.key + '_pctl'];
+          var pctl2 = col2.noPctl ? null : totalRow[col2.key + '_pctl'];
           if (pctl2 != null && val2 != null) {
             var bgColor2 = isDark ? Utils.percentileColorDark(pctl2) : Utils.percentileColor(pctl2);
             var txtColor2 = isDark ? Utils.percentileTextColorDark(pctl2) : Utils.percentileTextColor(pctl2);
