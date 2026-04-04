@@ -3036,6 +3036,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             aa_val = safe_float(p.get('ArmAngle'))
             if aa_val is not None:
                 detail['aa'] = round(aa_val, 1)
+                # Per-pitch expected movement from arm angle regressions
+                throws_val = p.get('Throws')
+                ivb_reg = ivb_regressions.get(pt)
+                if ivb_reg:
+                    detail['xivb'] = round(ivb_reg['slope'] * aa_val + ivb_reg['intercept'], 1)
+                hb_reg = hb_regressions.get((pt, throws_val))
+                if hb_reg:
+                    coeffs = hb_reg['coeffs']
+                    detail['xhb'] = round(coeffs[0] * aa_val + coeffs[1] * aa_val**2 + hb_reg['intercept'], 1)
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 

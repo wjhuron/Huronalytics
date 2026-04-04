@@ -1286,14 +1286,21 @@ var PlayerPage = {
     }
     if (Object.keys(groups).length === 0) return;
 
-    // Build expected movement lookup from aggregated pitch rows (xIVB, xHB per pitch type)
+    // Build expected movement from per-pitch xivb/xhb (dynamic by arm angle)
     var expectedMovement = {};
-    var pitchRows = this._filteredPitchRows || this._getPitchRows(pitcherName, team);
-    for (var ei = 0; ei < pitchRows.length; ei++) {
-      var pr = pitchRows[ei];
-      if (pr.xIVB != null && pr.xHB != null) {
-        expectedMovement[pr.pitchType] = { xHB: pr.xHB, xIVB: pr.xIVB };
+    var xAccum = {};  // { pitchType: { sumIVB, sumHB, n } }
+    for (var xi = 0; xi < filteredPitches.length; xi++) {
+      var xp = filteredPitches[xi];
+      if (xp.xivb != null && xp.xhb != null) {
+        if (!xAccum[xp.pt]) xAccum[xp.pt] = { sumIVB: 0, sumHB: 0, n: 0 };
+        xAccum[xp.pt].sumIVB += xp.xivb;
+        xAccum[xp.pt].sumHB += xp.xhb;
+        xAccum[xp.pt].n++;
       }
+    }
+    for (var xpt in xAccum) {
+      var xa = xAccum[xpt];
+      expectedMovement[xpt] = { xHB: xa.sumHB / xa.n, xIVB: xa.sumIVB / xa.n };
     }
 
     var datasets = [];
