@@ -2689,7 +2689,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['nHAA'] = None
 
     # --- Fit pitch-type-agnostic expected movement model (MLB only) ---
-    # Predictors: OTilt (sin/cos), Spin Rate, Velocity, Release Point (RelPosZ, RelPosX)
+    # Predictors (13): OTilt_sin, OTilt_cos, Spin, Velo, RelPosZ, RelPosX, Throws_R,
+    #   OTilt_sin×Spin, OTilt_cos×Spin, OTilt_sin×Velo, OTilt_cos×Velo, Velo², Spin×Velo
     # Separate regressions for IVB and HB, but each is pitch-type-agnostic
     ivb_reg_data = []  # [(predictors, ivb)]
     hb_reg_data = []   # [(predictors, hb)]
@@ -2701,30 +2702,49 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         velo = safe_float(p.get('Velocity'))
         rel_z = safe_float(p.get('RelPosZ'))
         rel_x = safe_float(p.get('RelPosX'))
+        throws = p.get('Throws')
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
-        if otilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None:
+        if otilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None or throws is None:
             continue
         oangle = otilt_min / 720.0 * 2 * math.pi
         otilt_sin = math.sin(oangle)
         otilt_cos = math.cos(oangle)
-        predictors = [otilt_sin, otilt_cos, spin, velo, rel_z, rel_x]
+        throws_r = 1.0 if throws == 'R' else 0.0
+        predictors = [
+            otilt_sin, otilt_cos, spin, velo, rel_z, rel_x,
+            throws_r,
+            otilt_sin * spin, otilt_cos * spin,
+            otilt_sin * velo, otilt_cos * velo,
+            velo * velo,
+            spin * velo
+        ]
         if ivb is not None:
             ivb_reg_data.append((predictors, ivb))
         if hb is not None:
             hb_reg_data.append((predictors, hb))
 
-    print("\nPitch-type-agnostic IVB regression (OTilt + Spin + Velo + RelPt):")
+    print("\nPitch-type-agnostic IVB regression (13 predictors: OTilt×Spin/Velo + Hand + Velo²):")
     ivb_regression = fit_multivar_regression(ivb_reg_data, "IVB_agnostic")
-    print("\nPitch-type-agnostic HB regression (OTilt + Spin + Velo + RelPt):")
+    print("\nPitch-type-agnostic HB regression (13 predictors: OTilt×Spin/Velo + Hand + Velo²):")
     hb_regression = fit_multivar_regression(hb_reg_data, "HB_agnostic")
 
-    def compute_expected_movement(otilt_minutes, spin_rate, velocity, rel_z, rel_x):
-        """Compute xIVB and xHB from the pitch-type-agnostic model."""
-        if otilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None:
+    def compute_expected_movement(otilt_minutes, spin_rate, velocity, rel_z, rel_x, throws=None):
+        """Compute xIVB and xHB from the pitch-type-agnostic model (13 predictors)."""
+        if otilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None or throws is None:
             return None, None
         oangle = otilt_minutes / 720.0 * 2 * math.pi
-        predictors = [math.sin(oangle), math.cos(oangle), spin_rate, velocity, rel_z, rel_x]
+        otilt_sin = math.sin(oangle)
+        otilt_cos = math.cos(oangle)
+        throws_r = 1.0 if throws == 'R' else 0.0
+        predictors = [
+            otilt_sin, otilt_cos, spin_rate, velocity, rel_z, rel_x,
+            throws_r,
+            otilt_sin * spin_rate, otilt_cos * spin_rate,
+            otilt_sin * velocity, otilt_cos * velocity,
+            velocity * velocity,
+            spin_rate * velocity
+        ]
         xivb = None
         xhb = None
         if ivb_regression:
@@ -2739,7 +2759,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in pitch_leaderboard:
         xivb, xhb = compute_expected_movement(
             row.get('breakTiltMinutes'), row.get('spinRate'), row.get('velocity'),
-            row.get('relPosZ'), row.get('relPosX')
+            row.get('relPosZ'), row.get('relPosX'), row.get('throws')
         )
         if xivb is not None:
             row['xIVB'] = round(xivb, 1)
