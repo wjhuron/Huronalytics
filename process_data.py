@@ -3099,7 +3099,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             otilt_min_val = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
             spin_val = safe_float(p.get('Spin Rate'))
             velo_val = safe_float(p.get('Velocity'))
-            xivb_val, xhb_val = compute_expected_movement(otilt_min_val, spin_val, velo_val, rel_z, rel_x)
+            throws_val = p.get('Throws')
+            xivb_val, xhb_val = compute_expected_movement(otilt_min_val, spin_val, velo_val, rel_z, rel_x, throws_val)
             if xivb_val is not None:
                 detail['xivb'] = round(xivb_val, 1)
             if xhb_val is not None:
