@@ -44,382 +44,382 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-04 21:44",
-  "totalPitches": 32644,
-  "totalPitchers": 402,
+  "generatedAt": "2026-04-05 00:15",
+  "totalPitches": 33948,
+  "totalPitchers": 403,
   "totalHitters": 394,
   "rocTeams": [
     "ROC"
   ],
   "leagueAverages": {
     "FF": {
-      "velocity": 94.66,
-      "spinRate": 2316.38,
-      "indVertBrk": 16.29,
-      "horzBrk": 3.31,
-      "relPosZ": 5.67,
+      "velocity": 94.68,
+      "spinRate": 2317.81,
+      "indVertBrk": 16.22,
+      "horzBrk": 3.4,
+      "relPosZ": 5.66,
       "relPosX": -0.7,
       "extension": 6.52,
-      "armAngle": 39.6,
+      "armAngle": 39.49,
       "vaa": -4.6,
       "haa": 0.51,
       "vra": -2.05,
-      "hra": 1.1,
-      "strikePct": 0.6601,
-      "izPct": 0.5243,
-      "swStrRate": 0.1103,
-      "swStrPct": 0.2225,
-      "cswPct": 0.2806,
-      "izWhiffPct": 0.1727,
-      "chasePct": 0.2868,
-      "gbPct": 0.3079,
-      "fpsPct": 0.6156,
+      "hra": 1.11,
+      "strikePct": 0.6588,
+      "izPct": 0.5246,
+      "swStrRate": 0.1095,
+      "swStrPct": 0.222,
+      "cswPct": 0.2809,
+      "izWhiffPct": 0.1722,
+      "chasePct": 0.2839,
+      "gbPct": 0.3106,
+      "fpsPct": 0.6131,
       "breakTiltMinutes": 23,
       "breakTilt": "12:23",
-      "xBA": 0.2443,
-      "xSLG": 0.4444,
-      "xwOBA": 0.355,
-      "count": 368
+      "xBA": 0.2347,
+      "xSLG": 0.4273,
+      "xwOBA": 0.3551,
+      "count": 369
     },
     "SI": {
-      "velocity": 93.95,
-      "spinRate": 2193.06,
-      "indVertBrk": 7.49,
-      "horzBrk": 5.64,
+      "velocity": 94.0,
+      "spinRate": 2198.35,
+      "indVertBrk": 7.58,
+      "horzBrk": 5.68,
       "relPosZ": 5.52,
       "relPosX": -0.57,
-      "extension": 6.43,
-      "armAngle": 32.79,
+      "extension": 6.44,
+      "armAngle": 32.96,
       "vaa": -5.79,
-      "haa": 0.06,
-      "vra": -1.61,
+      "haa": 0.05,
+      "vra": -1.63,
       "hra": 1.05,
-      "strikePct": 0.6609,
-      "izPct": 0.5487,
-      "swStrRate": 0.0688,
-      "swStrPct": 0.1511,
-      "cswPct": 0.2852,
-      "izWhiffPct": 0.1007,
-      "chasePct": 0.2527,
-      "gbPct": 0.5319,
-      "fpsPct": 0.6164,
+      "strikePct": 0.6607,
+      "izPct": 0.549,
+      "swStrRate": 0.068,
+      "swStrPct": 0.1488,
+      "cswPct": 0.2844,
+      "izWhiffPct": 0.0993,
+      "chasePct": 0.2519,
+      "gbPct": 0.5355,
+      "fpsPct": 0.613,
       "breakTiltMinutes": 70,
       "breakTilt": "1:10",
-      "xBA": 0.2726,
-      "xSLG": 0.3958,
-      "xwOBA": 0.353,
-      "count": 295
+      "xBA": 0.2623,
+      "xSLG": 0.3806,
+      "xwOBA": 0.352,
+      "count": 296
     },
     "SL": {
-      "velocity": 86.32,
-      "spinRate": 2433.39,
-      "indVertBrk": 0.87,
-      "horzBrk": -1.6,
+      "velocity": 86.33,
+      "spinRate": 2433.78,
+      "indVertBrk": 0.89,
+      "horzBrk": -1.53,
       "relPosZ": 5.79,
-      "relPosX": -0.67,
-      "extension": 6.38,
-      "armAngle": 41.17,
-      "vaa": -7.82,
+      "relPosX": -0.68,
+      "extension": 6.37,
+      "armAngle": 40.98,
+      "vaa": -7.79,
       "haa": 1.12,
-      "vra": -1.52,
-      "hra": 0.84,
-      "strikePct": 0.6328,
-      "izPct": 0.4598,
-      "swStrRate": 0.1762,
-      "swStrPct": 0.3633,
-      "cswPct": 0.3328,
-      "izWhiffPct": 0.2277,
-      "chasePct": 0.3265,
-      "gbPct": 0.4403,
-      "fpsPct": 0.6332,
+      "vra": -1.51,
+      "hra": 0.85,
+      "strikePct": 0.6322,
+      "izPct": 0.4572,
+      "swStrRate": 0.1766,
+      "swStrPct": 0.3656,
+      "cswPct": 0.3349,
+      "izWhiffPct": 0.2269,
+      "chasePct": 0.3283,
+      "gbPct": 0.4336,
+      "fpsPct": 0.6307,
       "breakTiltMinutes": 610,
       "breakTilt": "10:10",
-      "xBA": 0.2091,
-      "xSLG": 0.3429,
-      "xwOBA": 0.2785,
+      "xBA": 0.201,
+      "xSLG": 0.3301,
+      "xwOBA": 0.2775,
       "count": 241
     },
     "FS": {
-      "velocity": 86.97,
-      "spinRate": 1427.28,
-      "indVertBrk": 2.66,
-      "horzBrk": 9.82,
-      "relPosZ": 5.68,
-      "relPosX": -1.31,
+      "velocity": 86.95,
+      "spinRate": 1431.12,
+      "indVertBrk": 2.61,
+      "horzBrk": 9.74,
+      "relPosZ": 5.67,
+      "relPosX": -1.3,
       "extension": 6.6,
-      "armAngle": 38.57,
-      "vaa": -7.76,
+      "armAngle": 38.51,
+      "vaa": -7.74,
       "haa": 0.34,
-      "vra": -1.83,
-      "hra": 2.08,
-      "strikePct": 0.5774,
-      "izPct": 0.3622,
-      "swStrRate": 0.1981,
-      "swStrPct": 0.3905,
-      "cswPct": 0.2601,
-      "izWhiffPct": 0.268,
-      "chasePct": 0.3493,
-      "gbPct": 0.5898,
-      "fpsPct": 0.579,
+      "vra": -1.81,
+      "hra": 2.06,
+      "strikePct": 0.5776,
+      "izPct": 0.3652,
+      "swStrRate": 0.1965,
+      "swStrPct": 0.3885,
+      "cswPct": 0.2613,
+      "izWhiffPct": 0.2694,
+      "chasePct": 0.3431,
+      "gbPct": 0.5841,
+      "fpsPct": 0.5828,
       "breakTiltMinutes": 139,
       "breakTilt": "2:19",
-      "xBA": 0.1909,
-      "xSLG": 0.2667,
-      "xwOBA": 0.2334,
+      "xBA": 0.1876,
+      "xSLG": 0.2621,
+      "xwOBA": 0.2341,
       "count": 77
     },
     "ST": {
-      "velocity": 82.44,
-      "spinRate": 2567.96,
-      "indVertBrk": 1.29,
-      "horzBrk": -4.6,
+      "velocity": 82.48,
+      "spinRate": 2572.8,
+      "indVertBrk": 1.32,
+      "horzBrk": -4.78,
       "relPosZ": 5.45,
-      "relPosX": -0.52,
+      "relPosX": -0.54,
       "extension": 6.33,
-      "armAngle": 30.01,
+      "armAngle": 30.04,
       "vaa": -7.66,
-      "haa": 1.23,
-      "vra": -0.7,
-      "hra": 0.41,
-      "strikePct": 0.5926,
-      "izPct": 0.4424,
-      "swStrRate": 0.1499,
-      "swStrPct": 0.3354,
-      "cswPct": 0.3086,
-      "izWhiffPct": 0.2091,
-      "chasePct": 0.2806,
-      "gbPct": 0.3526,
-      "fpsPct": 0.5709,
+      "haa": 1.28,
+      "vra": -0.71,
+      "hra": 0.43,
+      "strikePct": 0.5916,
+      "izPct": 0.4409,
+      "swStrRate": 0.1494,
+      "swStrPct": 0.3338,
+      "cswPct": 0.3062,
+      "izWhiffPct": 0.2083,
+      "chasePct": 0.2799,
+      "gbPct": 0.3543,
+      "fpsPct": 0.5748,
       "breakTiltMinutes": 570,
       "breakTilt": "9:30",
-      "xBA": 0.176,
-      "xSLG": 0.2801,
-      "xwOBA": 0.2469,
-      "count": 190
+      "xBA": 0.1699,
+      "xSLG": 0.2708,
+      "xwOBA": 0.2485,
+      "count": 191
     },
     "SV": {
-      "velocity": 82.27,
-      "spinRate": 2583.28,
-      "indVertBrk": -6.65,
-      "horzBrk": -10.74,
+      "velocity": 82.15,
+      "spinRate": 2590.67,
+      "indVertBrk": -6.45,
+      "horzBrk": -10.88,
       "relPosZ": 5.7,
-      "relPosX": -1.59,
-      "extension": 6.42,
-      "armAngle": 35.23,
-      "vaa": -8.93,
-      "haa": 3.14,
-      "vra": -0.53,
-      "hra": 1.23,
-      "strikePct": 0.5918,
-      "izPct": 0.4172,
-      "swStrRate": 0.1633,
-      "swStrPct": 0.3898,
-      "cswPct": 0.3311,
-      "izWhiffPct": 0.115,
-      "chasePct": 0.3249,
-      "gbPct": 0.4532,
-      "fpsPct": 0.5607,
+      "relPosX": -1.61,
+      "extension": 6.44,
+      "armAngle": 34.93,
+      "vaa": -8.92,
+      "haa": 3.17,
+      "vra": -0.54,
+      "hra": 1.24,
+      "strikePct": 0.5884,
+      "izPct": 0.4159,
+      "swStrRate": 0.1638,
+      "swStrPct": 0.3913,
+      "cswPct": 0.3276,
+      "izWhiffPct": 0.1194,
+      "chasePct": 0.3194,
+      "gbPct": 0.4528,
+      "fpsPct": 0.5669,
       "breakTiltMinutes": 472,
       "breakTilt": "7:52",
-      "xBA": 0.1894,
-      "xSLG": 0.3044,
-      "xwOBA": 0.252,
+      "xBA": 0.1821,
+      "xSLG": 0.2927,
+      "xwOBA": 0.2423,
       "count": 28
     },
     "FC": {
-      "velocity": 89.93,
-      "spinRate": 2390.77,
-      "indVertBrk": 8.57,
-      "horzBrk": -1.02,
-      "relPosZ": 5.71,
-      "relPosX": -0.66,
+      "velocity": 89.94,
+      "spinRate": 2392.34,
+      "indVertBrk": 8.54,
+      "horzBrk": -1.08,
+      "relPosZ": 5.7,
+      "relPosX": -0.68,
       "extension": 6.43,
-      "armAngle": 38.01,
+      "armAngle": 37.88,
       "vaa": -6.02,
-      "haa": 1.03,
+      "haa": 1.06,
       "vra": -1.59,
-      "hra": 0.85,
-      "strikePct": 0.6539,
-      "izPct": 0.5204,
-      "swStrRate": 0.1215,
-      "swStrPct": 0.2488,
-      "cswPct": 0.2891,
-      "izWhiffPct": 0.1772,
-      "chasePct": 0.2671,
-      "gbPct": 0.3394,
-      "fpsPct": 0.6104,
-      "breakTiltMinutes": 706,
-      "breakTilt": "11:46",
-      "xBA": 0.2539,
-      "xSLG": 0.43,
-      "xwOBA": 0.3495,
-      "count": 163
+      "hra": 0.87,
+      "strikePct": 0.6558,
+      "izPct": 0.5241,
+      "swStrRate": 0.1213,
+      "swStrPct": 0.2461,
+      "cswPct": 0.2892,
+      "izWhiffPct": 0.1745,
+      "chasePct": 0.2676,
+      "gbPct": 0.3401,
+      "fpsPct": 0.616,
+      "breakTiltMinutes": 705,
+      "breakTilt": "11:45",
+      "xBA": 0.2435,
+      "xSLG": 0.412,
+      "xwOBA": 0.3441,
+      "count": 165
     },
     "CH": {
-      "velocity": 86.11,
-      "spinRate": 1735.85,
-      "indVertBrk": 4.18,
-      "horzBrk": 3.56,
-      "relPosZ": 5.62,
-      "relPosX": -0.38,
+      "velocity": 86.14,
+      "spinRate": 1732.92,
+      "indVertBrk": 4.13,
+      "horzBrk": 3.55,
+      "relPosZ": 5.61,
+      "relPosX": -0.36,
       "extension": 6.46,
-      "armAngle": 36.6,
+      "armAngle": 36.54,
       "vaa": -7.49,
-      "haa": 0.07,
+      "haa": 0.06,
       "vra": -1.68,
-      "hra": 0.7,
-      "strikePct": 0.5768,
-      "izPct": 0.4009,
-      "swStrRate": 0.1635,
-      "swStrPct": 0.3423,
-      "cswPct": 0.2573,
-      "izWhiffPct": 0.2415,
-      "chasePct": 0.3026,
-      "gbPct": 0.5159,
-      "fpsPct": 0.5313,
-      "breakTiltMinutes": 102,
-      "breakTilt": "1:42",
-      "xBA": 0.2112,
-      "xSLG": 0.3132,
-      "xwOBA": 0.2615,
+      "hra": 0.69,
+      "strikePct": 0.5769,
+      "izPct": 0.4001,
+      "swStrRate": 0.1641,
+      "swStrPct": 0.3428,
+      "cswPct": 0.2576,
+      "izWhiffPct": 0.2421,
+      "chasePct": 0.3041,
+      "gbPct": 0.5194,
+      "fpsPct": 0.5382,
+      "breakTiltMinutes": 101,
+      "breakTilt": "1:41",
+      "xBA": 0.2066,
+      "xSLG": 0.3064,
+      "xwOBA": 0.2614,
       "count": 239
     },
     "CU": {
-      "velocity": 80.58,
-      "spinRate": 2556.19,
-      "indVertBrk": -11.76,
-      "horzBrk": -4.11,
+      "velocity": 80.67,
+      "spinRate": 2560.76,
+      "indVertBrk": -11.78,
+      "horzBrk": -4.05,
       "relPosZ": 5.96,
-      "relPosX": -0.77,
-      "extension": 6.38,
-      "armAngle": 44.74,
-      "vaa": -9.86,
-      "haa": 1.34,
+      "relPosX": -0.75,
+      "extension": 6.39,
+      "armAngle": 44.8,
+      "vaa": -9.84,
+      "haa": 1.31,
       "vra": -0.26,
-      "hra": 0.61,
-      "strikePct": 0.5805,
-      "izPct": 0.4199,
-      "swStrRate": 0.1333,
-      "swStrPct": 0.3208,
-      "cswPct": 0.3054,
-      "izWhiffPct": 0.1748,
-      "chasePct": 0.2851,
-      "gbPct": 0.4801,
-      "fpsPct": 0.5313,
+      "hra": 0.6,
+      "strikePct": 0.5812,
+      "izPct": 0.4225,
+      "swStrRate": 0.1337,
+      "swStrPct": 0.3199,
+      "cswPct": 0.3045,
+      "izWhiffPct": 0.1761,
+      "chasePct": 0.2815,
+      "gbPct": 0.4803,
+      "fpsPct": 0.5341,
       "breakTiltMinutes": 392,
       "breakTilt": "6:32",
-      "xBA": 0.2176,
-      "xSLG": 0.3604,
-      "xwOBA": 0.2836,
-      "count": 174
+      "xBA": 0.2041,
+      "xSLG": 0.3384,
+      "xwOBA": 0.2837,
+      "count": 175
     }
   },
   "pitcherLeagueAverages": {
-    "strikePct": 0.6315,
-    "izPct": 0.4841,
-    "swStrRate": 0.1276,
-    "swStrPct": 0.2717,
+    "strikePct": 0.6311,
+    "izPct": 0.4844,
+    "swStrRate": 0.1272,
+    "swStrPct": 0.2712,
     "cswPct": 0.2905,
-    "izWhiffPct": 0.1804,
-    "chasePct": 0.2913,
-    "gbPct": 0.42,
-    "kPct": 0.2415,
-    "bbPct": 0.0938,
-    "kbbPct": 0.1477,
-    "babip": 0.2815,
-    "fpsPct": 0.5977,
-    "twoStrikeWhiffPct": 0.2658,
-    "relPosZ": 5.661,
-    "relPosX": -0.6609,
-    "extension": 6.4487,
-    "armAngle": 37.6011,
-    "vaa": -6.4577,
-    "haa": 0.6605,
-    "vra": -1.555,
-    "hra": 0.9402,
-    "avgEVAgainst": 88.9245,
-    "maxEVAgainst": 107.2749,
-    "hardHitPct": 0.3981,
-    "barrelPctAgainst": 0.0842,
-    "ldPct": 0.2301,
-    "fbPct": 0.2683,
-    "puPct": 0.0776,
-    "hrFbPct": 0.1237,
-    "wOBA": 0.3099,
-    "xBA": 0.2303,
-    "xSLG": 0.3768,
+    "izWhiffPct": 0.1801,
+    "chasePct": 0.2902,
+    "gbPct": 0.422,
+    "kPct": 0.2405,
+    "bbPct": 0.0948,
+    "kbbPct": 0.1457,
+    "babip": 0.284,
+    "fpsPct": 0.5974,
+    "twoStrikeWhiffPct": 0.2647,
+    "relPosZ": 5.6569,
+    "relPosX": -0.6644,
+    "extension": 6.4497,
+    "armAngle": 37.5724,
+    "vaa": -6.4532,
+    "haa": 0.6646,
+    "vra": -1.5521,
+    "hra": 0.9464,
+    "avgEVAgainst": 88.9196,
+    "maxEVAgainst": 107.3172,
+    "hardHitPct": 0.3993,
+    "barrelPctAgainst": 0.084,
+    "ldPct": 0.2298,
+    "fbPct": 0.2662,
+    "puPct": 0.0779,
+    "hrFbPct": 0.1206,
+    "wOBA": 0.3111,
+    "xBA": 0.2218,
+    "xSLG": 0.3631,
     "xwOBA": 0.3146,
-    "xwOBAcon": 0.3703,
-    "count": 402,
-    "era": 4.07,
-    "hr9": 1.07,
-    "fip": 4.03,
-    "xFIP": 4.07,
-    "siera": 4.06
+    "xwOBAcon": 0.3709,
+    "count": 403,
+    "era": 4.08,
+    "hr9": 1.05,
+    "fip": 4.02,
+    "xFIP": 4.06,
+    "siera": 4.07
   },
   "hitterLeagueAverages": {
-    "avg": 0.2317,
-    "obp": 0.3111,
-    "slg": 0.3807,
-    "ops": 0.6916,
-    "iso": 0.149,
-    "babip": 0.2834,
-    "kPct": 0.2407,
-    "bbPct": 0.0936,
-    "wOBA": 0.3108,
-    "xBA": 0.2315,
-    "xSLG": 0.3806,
-    "xwOBA": 0.3143,
-    "xwOBAcon": 0.3702,
+    "avg": 0.2334,
+    "obp": 0.3131,
+    "slg": 0.3813,
+    "ops": 0.6944,
+    "iso": 0.1479,
+    "babip": 0.2854,
+    "kPct": 0.2397,
+    "bbPct": 0.0946,
+    "wOBA": 0.312,
+    "xBA": 0.223,
+    "xSLG": 0.3668,
+    "xwOBA": 0.315,
+    "xwOBAcon": 0.3708,
     "xwOBAsp": 0.3707,
-    "avgEVAll": 88.9513,
-    "medEV": 90.7553,
-    "ev75": 104.0188,
-    "maxEV": 105.9191,
-    "medLA": 14.1768,
-    "hardHitPct": 0.3988,
-    "barrelPct": 0.0849,
+    "avgEVAll": 88.9447,
+    "medEV": 90.7682,
+    "ev75": 104.0004,
+    "maxEV": 106.0004,
+    "medLA": 14.1381,
+    "hardHitPct": 0.3999,
+    "barrelPct": 0.0847,
     "laSweetSpotPct": 0.3461,
-    "sacqPct": 0.2752,
-    "gbPct": 0.4228,
-    "ldPct": 0.2308,
-    "fbPct": 0.2689,
-    "puPct": 0.0774,
-    "hrFbPct": 0.1353,
-    "pullPct": 0.4502,
-    "middlePct": 0.2848,
-    "oppoPct": 0.265,
-    "airPullPct": 0.1919,
-    "swingPct": 0.4707,
-    "izSwingPct": 0.6551,
-    "chasePct": 0.2959,
-    "izSwChase": 0.3591,
-    "contactPct": 0.731,
-    "izContactPct": 0.8221,
-    "whiffPct": 0.269,
-    "batSpeed": 71.0599,
+    "sacqPct": 0.275,
+    "gbPct": 0.4251,
+    "ldPct": 0.2305,
+    "fbPct": 0.2667,
+    "puPct": 0.0777,
+    "hrFbPct": 0.1312,
+    "pullPct": 0.4508,
+    "middlePct": 0.2835,
+    "oppoPct": 0.2657,
+    "airPullPct": 0.1911,
+    "swingPct": 0.4696,
+    "izSwingPct": 0.6543,
+    "chasePct": 0.2942,
+    "izSwChase": 0.36,
+    "contactPct": 0.7312,
+    "izContactPct": 0.822,
+    "whiffPct": 0.2688,
+    "batSpeed": 71.0691,
     "swingLength": 7.3006,
-    "attackAngle": 10.0835,
-    "attackDirection": -1.6283,
-    "swingPathTilt": 32.1356,
-    "twoStrikeWhiffPct": 0.2716,
-    "firstPitchSwingPct": 0.3103,
-    "avgFbDist": 309.4224,
-    "avgHrDist": 392.7038,
-    "squaredUpPct": 0.6439,
-    "sprintSpeed": 26.6803,
+    "attackAngle": 10.079,
+    "attackDirection": -1.6111,
+    "swingPathTilt": 32.171,
+    "twoStrikeWhiffPct": 0.2711,
+    "firstPitchSwingPct": 0.3083,
+    "avgFbDist": 309.7105,
+    "avgHrDist": 392.7536,
+    "squaredUpPct": 0.6446,
+    "sprintSpeed": 26.6878,
     "count": 394
   },
   "vaaRegressions": {
     "CH": {
-      "slope": 1.076565,
-      "intercept": -9.441485,
-      "leagueAvgPlateZ": 1.816209
+      "slope": 1.08084,
+      "intercept": -9.449046,
+      "leagueAvgPlateZ": 1.812609
     },
     "CU": {
-      "slope": 0.964471,
-      "intercept": -11.616275,
-      "leagueAvgPlateZ": 1.825274
+      "slope": 0.966157,
+      "intercept": -11.602267,
+      "leagueAvgPlateZ": 1.825196
     },
     "EP": {
       "slope": 0.564985,
@@ -427,51 +427,51 @@
       "leagueAvgPlateZ": 2.786852
     },
     "FC": {
-      "slope": 1.120377,
-      "intercept": -8.874422,
-      "leagueAvgPlateZ": 2.546905
+      "slope": 1.115183,
+      "intercept": -8.855236,
+      "leagueAvgPlateZ": 2.542485
     },
     "FF": {
-      "slope": 1.058739,
-      "intercept": -7.659648,
-      "leagueAvgPlateZ": 2.889549
+      "slope": 1.059753,
+      "intercept": -7.65989,
+      "leagueAvgPlateZ": 2.887054
     },
     "FS": {
-      "slope": 1.058098,
-      "intercept": -9.557424,
-      "leagueAvgPlateZ": 1.701565
+      "slope": 1.059852,
+      "intercept": -9.553884,
+      "leagueAvgPlateZ": 1.707724
     },
     "SI": {
-      "slope": 1.095799,
-      "intercept": -8.481172,
-      "leagueAvgPlateZ": 2.45173
+      "slope": 1.093094,
+      "intercept": -8.463588,
+      "leagueAvgPlateZ": 2.446619
     },
     "SL": {
-      "slope": 1.063693,
-      "intercept": -9.861605,
-      "leagueAvgPlateZ": 1.92386
+      "slope": 1.0672,
+      "intercept": -9.854285,
+      "leagueAvgPlateZ": 1.930135
     },
     "ST": {
-      "slope": 1.151175,
-      "intercept": -9.985226,
-      "leagueAvgPlateZ": 2.018831
+      "slope": 1.147182,
+      "intercept": -9.972244,
+      "leagueAvgPlateZ": 2.019716
     },
     "SV": {
-      "slope": 1.087329,
-      "intercept": -10.921297,
-      "leagueAvgPlateZ": 1.835306
+      "slope": 1.087923,
+      "intercept": -10.90651,
+      "leagueAvgPlateZ": 1.828384
     }
   },
   "haaRegressions": {
     "CH": {
-      "slope": 0.757566,
-      "intercept": 0.09879,
-      "leagueAvgPlateX": -0.036463
+      "slope": 0.748542,
+      "intercept": 0.083665,
+      "leagueAvgPlateX": -0.03355
     },
     "CU": {
-      "slope": 1.218467,
-      "intercept": 1.289763,
-      "leagueAvgPlateX": 0.039816
+      "slope": 1.24143,
+      "intercept": 1.260006,
+      "leagueAvgPlateX": 0.044408
     },
     "EP": {
       "slope": 0.896294,
@@ -479,39 +479,39 @@
       "leagueAvgPlateX": -0.194259
     },
     "FC": {
-      "slope": 1.713876,
-      "intercept": 0.800358,
-      "leagueAvgPlateX": 0.134771
+      "slope": 1.704694,
+      "intercept": 0.830099,
+      "leagueAvgPlateX": 0.134464
     },
     "FF": {
-      "slope": 1.043757,
-      "intercept": 0.513326,
-      "leagueAvgPlateX": -0.001957
+      "slope": 1.05126,
+      "intercept": 0.509872,
+      "leagueAvgPlateX": -0.000509
     },
     "FS": {
-      "slope": 0.913655,
-      "intercept": 0.575386,
-      "leagueAvgPlateX": -0.254919
+      "slope": 0.910789,
+      "intercept": 0.57302,
+      "leagueAvgPlateX": -0.253353
     },
     "SI": {
-      "slope": 0.820443,
-      "intercept": 0.120615,
-      "leagueAvgPlateX": -0.079518
+      "slope": 0.83223,
+      "intercept": 0.11597,
+      "leagueAvgPlateX": -0.081014
     },
     "SL": {
-      "slope": 1.842806,
-      "intercept": 0.838075,
-      "leagueAvgPlateX": 0.152997
+      "slope": 1.828156,
+      "intercept": 0.84428,
+      "leagueAvgPlateX": 0.152281
     },
     "ST": {
-      "slope": 2.402102,
-      "intercept": 0.829486,
-      "leagueAvgPlateX": 0.167115
+      "slope": 2.364544,
+      "intercept": 0.871852,
+      "leagueAvgPlateX": 0.172114
     },
     "SV": {
-      "slope": 1.628357,
-      "intercept": 2.749761,
-      "leagueAvgPlateX": 0.239206
+      "slope": 1.573,
+      "intercept": 2.80974,
+      "leagueAvgPlateX": 0.228082
     }
   },
   "sacqZones": [
@@ -523,7 +523,7 @@
       "woba": 0.224,
       "xwobacon": 0.183,
       "quality": false,
-      "count": 342
+      "count": 358
     },
     {
       "spray": "center",
@@ -533,7 +533,7 @@
       "woba": 0.455,
       "xwobacon": 0.404,
       "quality": false,
-      "count": 90
+      "count": 94
     },
     {
       "spray": "center",
@@ -543,7 +543,7 @@
       "woba": 0.471,
       "xwobacon": 0.495,
       "quality": false,
-      "count": 119
+      "count": 123
     },
     {
       "spray": "center",
@@ -553,7 +553,7 @@
       "woba": 0.704,
       "xwobacon": 0.732,
       "quality": true,
-      "count": 124
+      "count": 128
     },
     {
       "spray": "center",
@@ -563,7 +563,7 @@
       "woba": 0.587,
       "xwobacon": 0.655,
       "quality": true,
-      "count": 143
+      "count": 146
     },
     {
       "spray": "center",
@@ -573,7 +573,7 @@
       "woba": 0.464,
       "xwobacon": 0.662,
       "quality": false,
-      "count": 123
+      "count": 125
     },
     {
       "spray": "center",
@@ -583,7 +583,7 @@
       "woba": 0.415,
       "xwobacon": 0.706,
       "quality": false,
-      "count": 124
+      "count": 130
     },
     {
       "spray": "center",
@@ -593,7 +593,7 @@
       "woba": 0.359,
       "xwobacon": 0.622,
       "quality": false,
-      "count": 108
+      "count": 111
     },
     {
       "spray": "center",
@@ -603,7 +603,7 @@
       "woba": 0.17,
       "xwobacon": 0.321,
       "quality": false,
-      "count": 85
+      "count": 89
     },
     {
       "spray": "center",
@@ -613,7 +613,7 @@
       "woba": 0.06,
       "xwobacon": 0.109,
       "quality": false,
-      "count": 129
+      "count": 133
     },
     {
       "spray": "center",
@@ -623,7 +623,7 @@
       "woba": 0.019,
       "xwobacon": 0.019,
       "quality": false,
-      "count": 116
+      "count": 119
     },
     {
       "spray": "oppo",
@@ -633,7 +633,7 @@
       "woba": 0.286,
       "xwobacon": 0.176,
       "quality": false,
-      "count": 215
+      "count": 225
     },
     {
       "spray": "oppo",
@@ -643,7 +643,7 @@
       "woba": 0.52,
       "xwobacon": 0.352,
       "quality": true,
-      "count": 65
+      "count": 70
     },
     {
       "spray": "oppo",
@@ -653,7 +653,7 @@
       "woba": 0.616,
       "xwobacon": 0.477,
       "quality": true,
-      "count": 83
+      "count": 87
     },
     {
       "spray": "oppo",
@@ -663,7 +663,7 @@
       "woba": 0.731,
       "xwobacon": 0.699,
       "quality": true,
-      "count": 89
+      "count": 90
     },
     {
       "spray": "oppo",
@@ -673,7 +673,7 @@
       "woba": 0.631,
       "xwobacon": 0.63,
       "quality": true,
-      "count": 76
+      "count": 79
     },
     {
       "spray": "oppo",
@@ -683,7 +683,7 @@
       "woba": 0.559,
       "xwobacon": 0.604,
       "quality": true,
-      "count": 117
+      "count": 121
     },
     {
       "spray": "oppo",
@@ -693,7 +693,7 @@
       "woba": 0.473,
       "xwobacon": 0.531,
       "quality": false,
-      "count": 102
+      "count": 108
     },
     {
       "spray": "oppo",
@@ -703,7 +703,7 @@
       "woba": 0.319,
       "xwobacon": 0.403,
       "quality": false,
-      "count": 103
+      "count": 111
     },
     {
       "spray": "oppo",
@@ -713,7 +713,7 @@
       "woba": 0.139,
       "xwobacon": 0.167,
       "quality": false,
-      "count": 85
+      "count": 89
     },
     {
       "spray": "oppo",
@@ -723,7 +723,7 @@
       "woba": 0.098,
       "xwobacon": 0.064,
       "quality": false,
-      "count": 155
+      "count": 158
     },
     {
       "spray": "oppo",
@@ -733,7 +733,7 @@
       "woba": 0.052,
       "xwobacon": 0.017,
       "quality": false,
-      "count": 312
+      "count": 323
     },
     {
       "spray": "pull",
@@ -743,7 +743,7 @@
       "woba": 0.149,
       "xwobacon": 0.154,
       "quality": false,
-      "count": 973
+      "count": 1022
     },
     {
       "spray": "pull",
@@ -753,7 +753,7 @@
       "woba": 0.276,
       "xwobacon": 0.369,
       "quality": false,
-      "count": 214
+      "count": 222
     },
     {
       "spray": "pull",
@@ -763,7 +763,7 @@
       "woba": 0.427,
       "xwobacon": 0.514,
       "quality": false,
-      "count": 216
+      "count": 220
     },
     {
       "spray": "pull",
@@ -773,7 +773,7 @@
       "woba": 0.774,
       "xwobacon": 0.762,
       "quality": true,
-      "count": 163
+      "count": 177
     },
     {
       "spray": "pull",
@@ -783,7 +783,7 @@
       "woba": 0.755,
       "xwobacon": 0.698,
       "quality": true,
-      "count": 158
+      "count": 161
     },
     {
       "spray": "pull",
@@ -793,7 +793,7 @@
       "woba": 0.948,
       "xwobacon": 0.82,
       "quality": true,
-      "count": 153
+      "count": 159
     },
     {
       "spray": "pull",
@@ -803,7 +803,7 @@
       "woba": 1.144,
       "xwobacon": 0.96,
       "quality": true,
-      "count": 114
+      "count": 116
     },
     {
       "spray": "pull",
@@ -813,7 +813,7 @@
       "woba": 1.062,
       "xwobacon": 0.756,
       "quality": true,
-      "count": 91
+      "count": 97
     },
     {
       "spray": "pull",
@@ -823,7 +823,7 @@
       "woba": 0.639,
       "xwobacon": 0.485,
       "quality": true,
-      "count": 76
+      "count": 78
     },
     {
       "spray": "pull",
@@ -833,7 +833,7 @@
       "woba": 0.269,
       "xwobacon": 0.152,
       "quality": false,
-      "count": 85
+      "count": 88
     },
     {
       "spray": "pull",
@@ -843,29 +843,29 @@
       "woba": 0.031,
       "xwobacon": 0.017,
       "quality": false,
-      "count": 121
+      "count": 122
     }
   ],
   "ivbRegression": {
     "coeffs": [
-      0.18440278,
-      11.70404289,
-      -0.00020574,
-      0.38734569,
-      0.12289896,
-      0.18448566
+      0.18873366,
+      11.6858646,
+      -0.00021805,
+      0.38910032,
+      0.12632767,
+      0.18781601
     ],
-    "intercept": -32.81676702
+    "intercept": -32.97733534
   },
   "hbRegression": {
     "coeffs": [
-      14.32277368,
-      -0.08077592,
-      0.00044945,
-      0.06829832,
-      0.10892865,
-      -0.85476018
+      14.28957118,
+      -0.08107813,
+      0.00042648,
+      0.07022126,
+      0.13065066,
+      -0.85831388
     ],
-    "intercept": -7.51513185
+    "intercept": -7.76553958
   }
 }
