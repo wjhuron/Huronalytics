@@ -711,21 +711,17 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB/xHB + IVBOE/HBOE from ArmAngle-based model (25 predictors)
+      // xIVB/xHB + IVBOE/HBOE from OTilt-based model (6 predictors)
       var ivbReg2 = DataStore.metadata && DataStore.metadata.ivbRegression;
       var hbReg2 = DataStore.metadata && DataStore.metadata.hbRegression;
-      var _canXmov = obj.armAngle !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null && obj.throws;
+      var avgOTiltSin = null, avgOTiltCos = null;
+      if (ms.nTilt > 0) {
+        avgOTiltSin = ms.sumTiltSin / ms.nTilt;
+        avgOTiltCos = ms.sumTiltCos / ms.nTilt;
+      }
+      var _canXmov = avgOTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null;
       if (ivbReg2 && _canXmov) {
-        var aaRad = obj.armAngle * Math.PI / 180;
-        var aaSin = Math.sin(aaRad), aaCos = Math.cos(aaRad);
-        var throwsR = obj.throws === 'R' ? 1 : 0;
-        var sp = obj.spinRate, ve = obj.velocity;
-        var predictors = [aaSin, aaCos, sp, ve, obj.relPosZ, obj.relPosX, throwsR,
-          aaSin * sp, aaCos * sp, aaSin * ve, aaCos * ve, ve * ve, sp * ve, sp * sp,
-          aaSin * throwsR, aaCos * throwsR, sp * throwsR, ve * throwsR,
-          obj.relPosZ * throwsR, obj.relPosX * throwsR,
-          aaSin * sp * throwsR, aaCos * sp * throwsR,
-          aaSin * ve * throwsR, aaCos * ve * throwsR, sp * ve * throwsR];
+        var predictors = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
         var expIVB = ivbReg2.intercept;
         for (var pi = 0; pi < predictors.length; pi++) expIVB += ivbReg2.coeffs[pi] * predictors[pi];
         obj.xIVB = Number(expIVB.toFixed(1));
@@ -735,16 +731,7 @@ var Aggregator = {
         obj.ivbOE = null;
       }
       if (hbReg2 && _canXmov) {
-        var aaRad2 = obj.armAngle * Math.PI / 180;
-        var aaSin2 = Math.sin(aaRad2), aaCos2 = Math.cos(aaRad2);
-        var throwsR2 = obj.throws === 'R' ? 1 : 0;
-        var sp2 = obj.spinRate, ve2 = obj.velocity;
-        var predictors2 = [aaSin2, aaCos2, sp2, ve2, obj.relPosZ, obj.relPosX, throwsR2,
-          aaSin2 * sp2, aaCos2 * sp2, aaSin2 * ve2, aaCos2 * ve2, ve2 * ve2, sp2 * ve2, sp2 * sp2,
-          aaSin2 * throwsR2, aaCos2 * throwsR2, sp2 * throwsR2, ve2 * throwsR2,
-          obj.relPosZ * throwsR2, obj.relPosX * throwsR2,
-          aaSin2 * sp2 * throwsR2, aaCos2 * sp2 * throwsR2,
-          aaSin2 * ve2 * throwsR2, aaCos2 * ve2 * throwsR2, sp2 * ve2 * throwsR2];
+        var predictors2 = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
         var expHB = hbReg2.intercept;
         for (var pi2 = 0; pi2 < predictors2.length; pi2++) expHB += hbReg2.coeffs[pi2] * predictors2[pi2];
         obj.xHB = Number(expHB.toFixed(1));

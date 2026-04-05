@@ -2689,73 +2689,42 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['nHAA'] = None
 
     # --- Fit pitch-type-agnostic expected movement model (MLB only) ---
-    # ArmAngle-based model (25 predictors): captures what movement is expected for a
-    # given arm slot, spin rate, and velocity — residual reveals grip/SSW/seam skill.
-    # Predictors: AA_sin, AA_cos, Spin, Velo, RelZ, RelX, Hand,
-    #   AA_sin×Spin, AA_cos×Spin, AA_sin×Velo, AA_cos×Velo, Velo², Spin×Velo, Spin²,
-    #   AA_sin×Hand, AA_cos×Hand, Spin×Hand, Velo×Hand, RelZ×Hand, RelX×Hand,
-    #   AA_sin×Spin×Hand, AA_cos×Spin×Hand, AA_sin×Velo×Hand, AA_cos×Velo×Hand, Spin×Velo×Hand
+    # Predictors (6): OTilt(sin/cos), Spin Rate, Velocity, RelPosZ, RelPosX
+    # Separate regressions for IVB and HB, both pitch-type-agnostic
     ivb_reg_data = []  # [(predictors, ivb)]
     hb_reg_data = []   # [(predictors, hb)]
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue
-        aa = safe_float(p.get('ArmAngle'))
+        otilt_min = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
         spin = safe_float(p.get('Spin Rate'))
         velo = safe_float(p.get('Velocity'))
         rel_z = safe_float(p.get('RelPosZ'))
         rel_x = safe_float(p.get('RelPosX'))
-        throws = p.get('Throws')
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
-        if aa is None or spin is None or velo is None or rel_z is None or rel_x is None or throws is None:
+        if otilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None:
             continue
-        aa_rad = math.radians(aa)
-        aa_sin = math.sin(aa_rad)
-        aa_cos = math.cos(aa_rad)
-        throws_r = 1.0 if throws == 'R' else 0.0
-        predictors = [
-            aa_sin, aa_cos, spin, velo, rel_z, rel_x, throws_r,
-            aa_sin * spin, aa_cos * spin,
-            aa_sin * velo, aa_cos * velo,
-            velo * velo, spin * velo, spin * spin,
-            aa_sin * throws_r, aa_cos * throws_r,
-            spin * throws_r, velo * throws_r,
-            rel_z * throws_r, rel_x * throws_r,
-            aa_sin * spin * throws_r, aa_cos * spin * throws_r,
-            aa_sin * velo * throws_r, aa_cos * velo * throws_r,
-            spin * velo * throws_r
-        ]
+        oangle = otilt_min / 720.0 * 2 * math.pi
+        otilt_sin = math.sin(oangle)
+        otilt_cos = math.cos(oangle)
+        predictors = [otilt_sin, otilt_cos, spin, velo, rel_z, rel_x]
         if ivb is not None:
             ivb_reg_data.append((predictors, ivb))
         if hb is not None:
             hb_reg_data.append((predictors, hb))
 
-    print("\nPitch-type-agnostic IVB regression (25 predictors: ArmAngle + interactions):")
+    print("\nPitch-type-agnostic IVB regression (OTilt + Spin + Velo + RelPt):")
     ivb_regression = fit_multivar_regression(ivb_reg_data, "IVB_agnostic")
-    print("\nPitch-type-agnostic HB regression (25 predictors: ArmAngle + interactions):")
+    print("\nPitch-type-agnostic HB regression (OTilt + Spin + Velo + RelPt):")
     hb_regression = fit_multivar_regression(hb_reg_data, "HB_agnostic")
 
-    def compute_expected_movement(arm_angle, spin_rate, velocity, rel_z, rel_x, throws=None):
-        """Compute xIVB and xHB from ArmAngle-based model (25 predictors)."""
-        if arm_angle is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None or throws is None:
+    def compute_expected_movement(otilt_minutes, spin_rate, velocity, rel_z, rel_x):
+        """Compute xIVB and xHB from the pitch-type-agnostic model (6 predictors)."""
+        if otilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None:
             return None, None
-        aa_rad = math.radians(arm_angle)
-        aa_sin = math.sin(aa_rad)
-        aa_cos = math.cos(aa_rad)
-        throws_r = 1.0 if throws == 'R' else 0.0
-        predictors = [
-            aa_sin, aa_cos, spin_rate, velocity, rel_z, rel_x, throws_r,
-            aa_sin * spin_rate, aa_cos * spin_rate,
-            aa_sin * velocity, aa_cos * velocity,
-            velocity * velocity, spin_rate * velocity, spin_rate * spin_rate,
-            aa_sin * throws_r, aa_cos * throws_r,
-            spin_rate * throws_r, velocity * throws_r,
-            rel_z * throws_r, rel_x * throws_r,
-            aa_sin * spin_rate * throws_r, aa_cos * spin_rate * throws_r,
-            aa_sin * velocity * throws_r, aa_cos * velocity * throws_r,
-            spin_rate * velocity * throws_r
-        ]
+        oangle = otilt_minutes / 720.0 * 2 * math.pi
+        predictors = [math.sin(oangle), math.cos(oangle), spin_rate, velocity, rel_z, rel_x]
         xivb = None
         xhb = None
         if ivb_regression:
@@ -2769,8 +2738,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Compute xIVB/xHB (expected) and IVBOE/HBOE (residual) for each pitch leaderboard row
     for row in pitch_leaderboard:
         xivb, xhb = compute_expected_movement(
-            row.get('armAngle'), row.get('spinRate'), row.get('velocity'),
-            row.get('relPosZ'), row.get('relPosX'), row.get('throws')
+            row.get('breakTiltMinutes'), row.get('spinRate'), row.get('velocity'),
+            row.get('relPosZ'), row.get('relPosX')
         )
         if xivb is not None:
             row['xIVB'] = round(xivb, 1)
@@ -3106,11 +3075,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             aa_val = safe_float(p.get('ArmAngle'))
             if aa_val is not None:
                 detail['aa'] = round(aa_val, 1)
-            # Per-pitch expected movement from ArmAngle-based model
+            # Per-pitch expected movement from OTilt-based model
+            otilt_min_val = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
             spin_val = safe_float(p.get('Spin Rate'))
             velo_val = safe_float(p.get('Velocity'))
-            throws_val = p.get('Throws')
-            xivb_val, xhb_val = compute_expected_movement(aa_val, spin_val, velo_val, rel_z, rel_x, throws_val)
+            xivb_val, xhb_val = compute_expected_movement(otilt_min_val, spin_val, velo_val, rel_z, rel_x)
             if xivb_val is not None:
                 detail['xivb'] = round(xivb_val, 1)
             if xhb_val is not None:
