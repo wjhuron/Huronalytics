@@ -2351,7 +2351,9 @@ def _mat_inv_general(M):
 
 
 def fit_mvn_model(all_pitches, mlb_teams):
-    """Fit per-pitch-type multivariate normal distributions.
+    """Fit per (pitch-type, throws) multivariate normal distributions.
+    Keyed by 'FF_R', 'FF_L', etc. — HB sign flips by handedness so models
+    MUST be separated to avoid corrupting the covariance structure.
     MLB: [IVB, HB, ArmAngle, Extension, Velocity]
     ROC: [IVB, HB, RelPosZ, RelPosX, Extension, Velocity]
     """
@@ -2359,31 +2361,33 @@ def fit_mvn_model(all_pitches, mlb_teams):
     roc_data = defaultdict(list)
     for p in all_pitches:
         pt = p.get('Pitch Type')
+        throws = p.get('Throws')
         ivb = safe_float(p.get('IndVertBrk'))
         hb = safe_float(p.get('HorzBrk'))
         ext = safe_float(p.get('Extension'))
         velo = safe_float(p.get('Velocity'))
-        if pt is None or ivb is None or hb is None or ext is None or velo is None:
+        if pt is None or throws is None or ivb is None or hb is None or ext is None or velo is None:
             continue
+        key = pt + '_' + throws  # e.g. 'FF_R', 'SI_L'
         team = p.get('PTeam', '')
         arm = safe_float(p.get('ArmAngle'))
         if arm is not None and team in mlb_teams:
-            mlb_data[pt].append([ivb, hb, arm, ext, velo])
+            mlb_data[key].append([ivb, hb, arm, ext, velo])
         rel_z = safe_float(p.get('RelPosZ'))
         rel_x = safe_float(p.get('RelPosX'))
         if rel_z is not None and rel_x is not None and team in mlb_teams:
-            roc_data[pt].append([ivb, hb, rel_z, rel_x, ext, velo])
+            roc_data[key].append([ivb, hb, rel_z, rel_x, ext, velo])
     models = {}
-    for pt in set(list(mlb_data.keys()) + list(roc_data.keys())):
-        models[pt] = {}
-        data = mlb_data.get(pt, [])
+    for key in set(list(mlb_data.keys()) + list(roc_data.keys())):
+        models[key] = {}
+        data = mlb_data.get(key, [])
         if len(data) >= 50:
-            models[pt]['mlb'] = _compute_mvn_params(data)
-            models[pt]['mlb']['n'] = len(data)
-        data = roc_data.get(pt, [])
+            models[key]['mlb'] = _compute_mvn_params(data)
+            models[key]['mlb']['n'] = len(data)
+        data = roc_data.get(key, [])
         if len(data) >= 50:
-            models[pt]['roc'] = _compute_mvn_params(data)
-            models[pt]['roc']['n'] = len(data)
+            models[key]['roc'] = _compute_mvn_params(data)
+            models[key]['roc']['n'] = len(data)
     return models
 
 
@@ -2940,18 +2944,20 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Fit MVN expected movement model (per pitch type) ---
     # MLB model: [IVB, HB, ArmAngle, Extension, Velocity] — conditions on last 3
     # ROC model: [IVB, HB, RelPosZ, RelPosX, Extension, Velocity] — conditions on last 4
-    print("\nFitting MVN expected movement models (per pitch type):")
+    print("\nFitting MVN expected movement models (per pitch type + handedness):")
     mvn_models = fit_mvn_model(all_pitches, MLB_TEAMS)
-    for pt in sorted(mvn_models.keys()):
+    for key in sorted(mvn_models.keys()):
         for variant in ['mlb', 'roc']:
-            m = mvn_models[pt].get(variant)
+            m = mvn_models[key].get(variant)
             if m:
-                print(f"  {pt} ({variant}): n={m['n']}, mu_ivb={m['mu'][0]:.1f}, mu_hb={m['mu'][1]:.1f}")
+                print(f"  {key} ({variant}): n={m['n']}, mu_ivb={m['mu'][0]:.1f}, mu_hb={m['mu'][1]:.1f}")
 
     # Compute xIVB/xHB (expected) and IVBOE/HBOE (residual) for each pitch leaderboard row
     for row in pitch_leaderboard:
         pt = row['pitchType']
-        model = mvn_models.get(pt, {})
+        throws = row.get('throws', '')
+        mvn_key = pt + '_' + throws
+        model = mvn_models.get(mvn_key, {})
         is_roc = row.get('_isROC', False)
         xivb = None
         xhb = None
@@ -3311,7 +3317,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 detail['aa'] = round(aa_val, 1)
             # Per-pitch expected movement from MVN model
             ext_val = safe_float(p.get('Extension'))
-            pt_model = mvn_models.get(pt, {})
+            p_throws = p.get('Throws', '')
+            pt_model = mvn_models.get(pt + '_' + p_throws, {})
             xivb_val = None
             xhb_val = None
             p_team = p.get('PTeam', '')

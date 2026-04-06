@@ -779,9 +779,10 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB/xHB + IVBOE/HBOE from MVN conditional model (per pitch type)
+      // xIVB/xHB + IVBOE/HBOE from MVN conditional model (per pitch type + handedness)
       var mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
-      var ptModel = mvnModels && mvnModels[obj.pitchType];
+      var mvnKey = obj.pitchType + '_' + obj.throws;
+      var ptModel = mvnModels && mvnModels[mvnKey];
       var xIVB_val = null, xHB_val = null;
       // Try MLB model first: condition on [ArmAngle, Extension, Velocity]
       if (ptModel && ptModel.mlb && obj.armAngle !== null && obj.extension !== null && obj.velocity !== null) {
