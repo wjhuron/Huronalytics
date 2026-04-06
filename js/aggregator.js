@@ -272,6 +272,40 @@ var Aggregator = {
     }
   },
 
+  // Matrix inversion via Gaussian elimination (for MVN conditional model)
+  _matInvGeneral: function (M) {
+    var n = M.length;
+    var aug = [];
+    for (var i = 0; i < n; i++) {
+      aug[i] = [];
+      for (var j = 0; j < n; j++) aug[i][j] = M[i][j];
+      for (var j2 = 0; j2 < n; j2++) aug[i][n + j2] = (i === j2) ? 1.0 : 0.0;
+    }
+    for (var col = 0; col < n; col++) {
+      var maxRow = col;
+      for (var r = col + 1; r < n; r++) {
+        if (Math.abs(aug[r][col]) > Math.abs(aug[maxRow][col])) maxRow = r;
+      }
+      var tmp = aug[col]; aug[col] = aug[maxRow]; aug[maxRow] = tmp;
+      if (Math.abs(aug[col][col]) < 1e-15) return null;
+      for (var r2 = col + 1; r2 < n; r2++) {
+        var f = aug[r2][col] / aug[col][col];
+        for (var c = 0; c < 2 * n; c++) aug[r2][c] -= f * aug[col][c];
+      }
+    }
+    for (var col2 = n - 1; col2 >= 0; col2--) {
+      var pivot = aug[col2][col2];
+      for (var c2 = 0; c2 < 2 * n; c2++) aug[col2][c2] /= pivot;
+      for (var r3 = 0; r3 < col2; r3++) {
+        var f2 = aug[r3][col2];
+        for (var c3 = 0; c3 < 2 * n; c3++) aug[r3][c3] -= f2 * aug[col2][c3];
+      }
+    }
+    var result = [];
+    for (var i2 = 0; i2 < n; i2++) result[i2] = aug[i2].slice(n);
+    return result;
+  },
+
   // ==================================================================
   //  Pitcher aggregation
   // ==================================================================
@@ -563,8 +597,10 @@ var Aggregator = {
       { key: 'relPosX', sum: 'sumRelX', cnt: 'nRelX', round: 1 },
       { key: 'extension', sum: 'sumExt', cnt: 'nExt', round: 1 },
       { key: 'armAngle', sum: 'sumArmAngle', cnt: 'nArmAngle', round: 1 },
+      { key: 'effectiveVelo', sum: 'sumEffVelo', cnt: 'nEffVelo', round: 1 },
       { key: 'vaa', sum: 'sumVAA', cnt: 'nVAA', round: 2 },
       { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
+      { key: 'plateTime', sum: 'sumPlateTime', cnt: 'nPlateTime', round: 3 },
       { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
       { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
     ];
@@ -576,7 +612,7 @@ var Aggregator = {
     var PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     var PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
     var PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
-    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -711,34 +747,81 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB/xHB + IVBOE/HBOE from OTilt-based model (6 predictors)
-      var ivbReg2 = DataStore.metadata && DataStore.metadata.ivbRegression;
-      var hbReg2 = DataStore.metadata && DataStore.metadata.hbRegression;
-      var avgOTiltSin = null, avgOTiltCos = null;
-      if (ms.nTilt > 0) {
-        avgOTiltSin = ms.sumTiltSin / ms.nTilt;
-        avgOTiltCos = ms.sumTiltCos / ms.nTilt;
+      // xIVB/xHB + IVBOE/HBOE from MVN conditional model (Dead Zone approach)
+      var mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
+      var ptModel = mvnModels && mvnModels[pitchType];
+      var rocTeams = DataStore.metadata && DataStore.metadata.rocTeams || [];
+      var isROC = rocTeams.indexOf(obj.team) >= 0;
+      var mvnVariant = null;
+      var relVals = null;
+
+      if (isROC && ptModel && ptModel.roc) {
+        mvnVariant = ptModel.roc;
+        if (obj.relPosZ !== null && obj.relPosX !== null && obj.extension !== null && obj.velocity !== null) {
+          relVals = [obj.relPosZ, obj.relPosX, obj.extension, obj.velocity];
+        }
+      } else if (ptModel && ptModel.mlb) {
+        mvnVariant = ptModel.mlb;
+        if (obj.armAngle !== null && obj.extension !== null && obj.velocity !== null) {
+          relVals = [obj.armAngle, obj.extension, obj.velocity];
+        }
       }
-      var _canXmov = avgOTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null;
-      if (ivbReg2 && _canXmov) {
-        var predictors = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
-        var expIVB = ivbReg2.intercept;
-        for (var pi = 0; pi < predictors.length; pi++) expIVB += ivbReg2.coeffs[pi] * predictors[pi];
-        obj.xIVB = Number(expIVB.toFixed(1));
-        obj.ivbOE = obj.indVertBrk !== null ? Number((obj.indVertBrk - expIVB).toFixed(1)) : null;
+
+      if (mvnVariant && relVals) {
+        var mu = mvnVariant.mu;
+        var cov = mvnVariant.cov;
+        var nAcc = 2; // IVB, HB
+        var nRel = mu.length - nAcc;
+
+        // Partition mu and cov
+        var muAcc = mu.slice(0, nAcc);
+        var muRel = mu.slice(nAcc);
+
+        // Extract sigma_cross (2 x nRel) and sigma_rel (nRel x nRel)
+        var sigCross = [];
+        for (var ci = 0; ci < nAcc; ci++) {
+          sigCross[ci] = [];
+          for (var cj = 0; cj < nRel; cj++) sigCross[ci][cj] = cov[ci][nAcc + cj];
+        }
+        var sigRel = [];
+        for (var ri = 0; ri < nRel; ri++) {
+          sigRel[ri] = [];
+          for (var rj = 0; rj < nRel; rj++) sigRel[ri][rj] = cov[nAcc + ri][nAcc + rj];
+        }
+
+        // Invert sigRel (Gaussian elimination)
+        var sigRelInv = this._matInvGeneral(sigRel);
+        if (sigRelInv) {
+          var rDiff = [];
+          for (var di = 0; di < nRel; di++) rDiff[di] = relVals[di] - muRel[di];
+
+          // sigRelInv @ rDiff
+          var sriRdiff = [];
+          for (var si = 0; si < nRel; si++) {
+            var s = 0;
+            for (var sj = 0; sj < nRel; sj++) s += sigRelInv[si][sj] * rDiff[sj];
+            sriRdiff[si] = s;
+          }
+
+          // sigCross @ sriRdiff
+          var adj = [];
+          for (var ai = 0; ai < nAcc; ai++) {
+            var a = 0;
+            for (var aj = 0; aj < nRel; aj++) a += sigCross[ai][aj] * sriRdiff[aj];
+            adj[ai] = a;
+          }
+
+          var expIVB = muAcc[0] + adj[0];
+          var expHB = muAcc[1] + adj[1];
+          obj.xIVB = Number(expIVB.toFixed(1));
+          obj.xHB = Number(expHB.toFixed(1));
+          obj.ivbOE = obj.indVertBrk !== null ? Number((obj.indVertBrk - expIVB).toFixed(1)) : null;
+          obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - expHB).toFixed(1)) : null;
+        } else {
+          obj.xIVB = null; obj.xHB = null; obj.ivbOE = null; obj.hbOE = null;
+        }
       } else {
-        obj.xIVB = null;
-        obj.ivbOE = null;
-      }
-      if (hbReg2 && _canXmov) {
-        var predictors2 = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
-        var expHB = hbReg2.intercept;
-        for (var pi2 = 0; pi2 < predictors2.length; pi2++) expHB += hbReg2.coeffs[pi2] * predictors2[pi2];
-        obj.xHB = Number(expHB.toFixed(1));
-        obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - expHB).toFixed(1)) : null;
-      } else {
-        obj.xHB = null;
-        obj.hbOE = null;
+        obj.xIVB = null; obj.xHB = null; obj.ivbOE = null; obj.hbOE = null;
       }
 
       // Break Tilt (circular mean)
