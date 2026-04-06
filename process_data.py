@@ -3330,15 +3330,24 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             aa_val = safe_float(p.get('ArmAngle'))
             if aa_val is not None:
                 detail['aa'] = round(aa_val, 1)
-            # Per-pitch expected movement from OTilt-based model
-            otilt_min_val = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
-            spin_val = safe_float(p.get('Spin Rate'))
-            velo_val = safe_float(p.get('Velocity'))
-            xivb_val, xhb_val = compute_expected_movement(otilt_min_val, spin_val, velo_val, rel_z, rel_x)
-            if xivb_val is not None:
-                detail['xivb'] = round(xivb_val, 1)
-            if xhb_val is not None:
-                detail['xhb'] = round(xhb_val, 1)
+            # Per-pitch expected movement from MVN conditional model
+            pt_val = p.get('Pitch Type')
+            mvn_pt_model = mvn_models.get(pt_val, {}) if pt_val else {}
+            p_team = p.get('PTeam', '')
+            p_is_roc = p_team not in MLB_TEAMS
+            mu_bar_detail = None
+            if p_is_roc and 'roc' in mvn_pt_model:
+                if all(v is not None for v in [rel_z, rel_x, safe_float(p.get('Extension')), velo_val]):
+                    mu_bar_detail, _ = mvn_conditional(mvn_pt_model['roc'],
+                        [rel_z, rel_x, safe_float(p.get('Extension')), safe_float(p.get('Velocity'))])
+            elif 'mlb' in mvn_pt_model:
+                ext_val = safe_float(p.get('Extension'))
+                velo_val = safe_float(p.get('Velocity'))
+                if aa_val is not None and ext_val is not None and velo_val is not None:
+                    mu_bar_detail, _ = mvn_conditional(mvn_pt_model['mlb'], [aa_val, ext_val, velo_val])
+            if mu_bar_detail is not None:
+                detail['xivb'] = round(mu_bar_detail[0], 1)
+                detail['xhb'] = round(mu_bar_detail[1], 1)
             pitch_details[pitcher + '|' + (team or '')].append(detail)
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
