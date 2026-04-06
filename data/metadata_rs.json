@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-06 14:13",
+  "generatedAt": "2026-04-06 17:25",
   "totalPitches": 41644,
   "totalPitchers": 415,
   "totalHitters": 399,
@@ -54,59 +54,59 @@
   "leagueAverages": {
     "FF": {
       "velocity": 94.61,
-      "spinRate": 2315.83,
-      "indVertBrk": 16.18,
-      "horzBrk": 3.35,
+      "spinRate": 2315.92,
+      "indVertBrk": 16.19,
+      "horzBrk": 3.37,
       "relPosZ": 5.66,
       "relPosX": -0.68,
       "extension": 6.51,
-      "armAngle": 39.54,
+      "armAngle": 39.56,
       "vaa": -4.61,
       "haa": 0.49,
       "vra": -2.04,
       "hra": 1.08,
-      "strikePct": 0.6553,
+      "strikePct": 0.6554,
       "izPct": 0.5236,
-      "swStrRate": 0.1097,
-      "swStrPct": 0.2242,
-      "cswPct": 0.281,
-      "izWhiffPct": 0.1747,
-      "chasePct": 0.2803,
-      "gbPct": 0.3093,
-      "fpsPct": 0.6076,
+      "swStrRate": 0.1098,
+      "swStrPct": 0.2244,
+      "cswPct": 0.2811,
+      "izWhiffPct": 0.1749,
+      "chasePct": 0.2806,
+      "gbPct": 0.3084,
+      "fpsPct": 0.6074,
       "breakTiltMinutes": 24,
       "breakTilt": "12:24",
       "xBA": 0.2471,
-      "xSLG": 0.4481,
+      "xSLG": 0.4483,
       "xwOBA": 0.3544,
       "count": 383
     },
     "SI": {
       "velocity": 93.96,
-      "spinRate": 2193.13,
+      "spinRate": 2193.09,
       "indVertBrk": 7.48,
-      "horzBrk": 5.72,
+      "horzBrk": 5.69,
       "relPosZ": 5.52,
-      "relPosX": -0.56,
+      "relPosX": -0.55,
       "extension": 6.41,
-      "armAngle": 33.01,
+      "armAngle": 32.99,
       "vaa": -5.81,
-      "haa": 0.05,
+      "haa": 0.04,
       "vra": -1.63,
-      "hra": 1.06,
-      "strikePct": 0.6584,
+      "hra": 1.05,
+      "strikePct": 0.6582,
       "izPct": 0.5481,
-      "swStrRate": 0.0667,
-      "swStrPct": 0.148,
-      "cswPct": 0.2815,
-      "izWhiffPct": 0.1017,
-      "chasePct": 0.245,
-      "gbPct": 0.5351,
-      "fpsPct": 0.6074,
+      "swStrRate": 0.0666,
+      "swStrPct": 0.1478,
+      "cswPct": 0.2814,
+      "izWhiffPct": 0.1015,
+      "chasePct": 0.2446,
+      "gbPct": 0.536,
+      "fpsPct": 0.6076,
       "breakTiltMinutes": 72,
       "breakTilt": "1:12",
-      "xBA": 0.2808,
-      "xSLG": 0.4057,
+      "xBA": 0.2807,
+      "xSLG": 0.4055,
       "xwOBA": 0.3533,
       "count": 307
     },
@@ -140,33 +140,33 @@
       "count": 253
     },
     "FS": {
-      "velocity": 86.74,
-      "spinRate": 1392.83,
-      "indVertBrk": 2.59,
-      "horzBrk": 8.74,
+      "velocity": 86.75,
+      "spinRate": 1394.16,
+      "indVertBrk": 2.6,
+      "horzBrk": 8.76,
       "relPosZ": 5.71,
       "relPosX": -1.19,
       "extension": 6.57,
       "armAngle": 39.1,
       "vaa": -7.79,
-      "haa": 0.36,
+      "haa": 0.35,
       "vra": -1.83,
       "hra": 1.9,
       "strikePct": 0.583,
-      "izPct": 0.3692,
+      "izPct": 0.3699,
       "swStrRate": 0.1927,
-      "swStrPct": 0.3807,
-      "cswPct": 0.261,
-      "izWhiffPct": 0.265,
-      "chasePct": 0.3485,
-      "gbPct": 0.5571,
+      "swStrPct": 0.3805,
+      "cswPct": 0.2608,
+      "izWhiffPct": 0.2652,
+      "chasePct": 0.3474,
+      "gbPct": 0.5569,
       "fpsPct": 0.5712,
-      "breakTiltMinutes": 136,
-      "breakTilt": "2:16",
-      "xBA": 0.1987,
-      "xSLG": 0.2911,
-      "xwOBA": 0.2429,
-      "count": 80
+      "breakTiltMinutes": 137,
+      "breakTilt": "2:17",
+      "xBA": 0.1976,
+      "xSLG": 0.2893,
+      "xwOBA": 0.2414,
+      "count": 81
     },
     "ST": {
       "velocity": 82.43,
@@ -256,10 +256,10 @@
       "count": 170
     },
     "CH": {
-      "velocity": 86.13,
-      "spinRate": 1746.33,
+      "velocity": 86.12,
+      "spinRate": 1746.24,
       "indVertBrk": 3.93,
-      "horzBrk": 3.9,
+      "horzBrk": 3.89,
       "relPosZ": 5.59,
       "relPosX": -0.39,
       "extension": 6.44,
@@ -269,20 +269,20 @@
       "vra": -1.64,
       "hra": 0.72,
       "strikePct": 0.5825,
-      "izPct": 0.4034,
-      "swStrRate": 0.1666,
+      "izPct": 0.4032,
+      "swStrRate": 0.1665,
       "swStrPct": 0.3436,
       "cswPct": 0.2608,
-      "izWhiffPct": 0.246,
-      "chasePct": 0.3126,
+      "izWhiffPct": 0.2459,
+      "chasePct": 0.3129,
       "gbPct": 0.5269,
       "fpsPct": 0.5479,
-      "breakTiltMinutes": 103,
-      "breakTilt": "1:43",
-      "xBA": 0.2177,
-      "xSLG": 0.32,
-      "xwOBA": 0.2641,
-      "count": 251
+      "breakTiltMinutes": 102,
+      "breakTilt": "1:42",
+      "xBA": 0.2182,
+      "xSLG": 0.3207,
+      "xwOBA": 0.2647,
+      "count": 250
     },
     "CU": {
       "velocity": 80.51,
@@ -345,7 +345,7 @@
     "fbPct": 0.2668,
     "puPct": 0.0779,
     "hrFbPct": 0.1138,
-    "wOBA": 0.3129,
+    "wOBA": 0.3046,
     "xBA": 0.2352,
     "xSLG": 0.3846,
     "xwOBA": 0.315,
@@ -353,8 +353,8 @@
     "count": 415,
     "era": 4.03,
     "hr9": 1.0,
-    "fip": 3.99,
-    "xFIP": 4.02,
+    "fip": 3.9,
+    "xFIP": 3.92,
     "siera": 4.02
   },
   "hitterLeagueAverages": {
@@ -366,7 +366,7 @@
     "babip": 0.2875,
     "kPct": 0.2378,
     "bbPct": 0.0964,
-    "wOBA": 0.3137,
+    "wOBA": 0.3054,
     "xBA": 0.2359,
     "xSLG": 0.3868,
     "xwOBA": 0.3157,
@@ -412,9 +412,9 @@
   },
   "vaaRegressions": {
     "CH": {
-      "slope": 1.085529,
-      "intercept": -9.454529,
-      "leagueAvgPlateZ": 1.811749
+      "slope": 1.085623,
+      "intercept": -9.454846,
+      "leagueAvgPlateZ": 1.811578
     },
     "CU": {
       "slope": 0.973398,
@@ -432,19 +432,19 @@
       "leagueAvgPlateZ": 2.517757
     },
     "FF": {
-      "slope": 1.062984,
-      "intercept": -7.671228,
-      "leagueAvgPlateZ": 2.881567
+      "slope": 1.062873,
+      "intercept": -7.670744,
+      "leagueAvgPlateZ": 2.881826
     },
     "FS": {
-      "slope": 1.065592,
-      "intercept": -9.612645,
-      "leagueAvgPlateZ": 1.708632
+      "slope": 1.065604,
+      "intercept": -9.611643,
+      "leagueAvgPlateZ": 1.709423
     },
     "SI": {
-      "slope": 1.08977,
-      "intercept": -8.462259,
-      "leagueAvgPlateZ": 2.43458
+      "slope": 1.090015,
+      "intercept": -8.462024,
+      "leagueAvgPlateZ": 2.434811
     },
     "SL": {
       "slope": 1.073959,
@@ -464,9 +464,9 @@
   },
   "haaRegressions": {
     "CH": {
-      "slope": 0.757511,
-      "intercept": 0.069125,
-      "leagueAvgPlateX": -0.051458
+      "slope": 0.757391,
+      "intercept": 0.069419,
+      "leagueAvgPlateX": -0.051178
     },
     "CU": {
       "slope": 1.251986,
@@ -484,19 +484,19 @@
       "leagueAvgPlateX": 0.137837
     },
     "FF": {
-      "slope": 1.032595,
-      "intercept": 0.487982,
-      "leagueAvgPlateX": -0.002014
+      "slope": 1.033123,
+      "intercept": 0.490071,
+      "leagueAvgPlateX": -0.002118
     },
     "FS": {
-      "slope": 0.855133,
-      "intercept": 0.537275,
-      "leagueAvgPlateX": -0.213445
+      "slope": 0.855303,
+      "intercept": 0.53512,
+      "leagueAvgPlateX": -0.21372
     },
     "SI": {
-      "slope": 0.82345,
-      "intercept": 0.102267,
-      "leagueAvgPlateX": -0.06934
+      "slope": 0.822916,
+      "intercept": 0.099102,
+      "leagueAvgPlateX": -0.069046
     },
     "SL": {
       "slope": 1.810998,
