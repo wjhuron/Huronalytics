@@ -9,6 +9,7 @@ import os
 import time as time_module
 import urllib.request
 import urllib.parse
+import requests
 from datetime import datetime, time
 from collections import defaultdict
 
@@ -38,7 +39,7 @@ PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izW
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
@@ -2282,6 +2283,190 @@ def outs_to_ip_float(outs):
     return outs / 3.0
 
 
+STANDARD_RHO = 1.195  # kg/m³ at sea level, ~70°F
+
+
+# --- Multivariate Normal Expected Movement Model (Dead Zone approach) ---
+def mat_mul(A, B):
+    rows_a, cols_a = len(A), len(A[0])
+    cols_b = len(B[0])
+    result = [[0.0] * cols_b for _ in range(rows_a)]
+    for i in range(rows_a):
+        for j in range(cols_b):
+            for k in range(cols_a):
+                result[i][j] += A[i][k] * B[k][j]
+    return result
+
+
+def mat_inv_2x2(M):
+    a, b = M[0][0], M[0][1]
+    c, d = M[1][0], M[1][1]
+    det = a * d - b * c
+    if abs(det) < 1e-15:
+        return None
+    return [[d / det, -b / det], [-c / det, a / det]]
+
+
+def mat_inv_3x3(M):
+    a = M[0][0]; b = M[0][1]; c = M[0][2]
+    d = M[1][0]; e = M[1][1]; f = M[1][2]
+    g = M[2][0]; h = M[2][1]; i = M[2][2]
+    det = a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g)
+    if abs(det) < 1e-15:
+        return None
+    return [
+        [(e*i - f*h)/det, (c*h - b*i)/det, (b*f - c*e)/det],
+        [(f*g - d*i)/det, (a*i - c*g)/det, (c*d - a*f)/det],
+        [(d*h - e*g)/det, (b*g - a*h)/det, (a*e - b*d)/det],
+    ]
+
+
+def mat_transpose(M):
+    rows, cols = len(M), len(M[0])
+    return [[M[j][i] for j in range(rows)] for i in range(cols)]
+
+
+def _mat_inv_general(M):
+    n = len(M)
+    aug = [row[:] + [1.0 if i == j else 0.0 for j in range(n)] for i, row in enumerate(M)]
+    for col in range(n):
+        max_row = col
+        for r in range(col + 1, n):
+            if abs(aug[r][col]) > abs(aug[max_row][col]):
+                max_row = r
+        aug[col], aug[max_row] = aug[max_row], aug[col]
+        if abs(aug[col][col]) < 1e-15:
+            return None
+        for r in range(col + 1, n):
+            f = aug[r][col] / aug[col][col]
+            for c in range(2 * n):
+                aug[r][c] -= f * aug[col][c]
+    for col in range(n - 1, -1, -1):
+        aug[col] = [x / aug[col][col] for x in aug[col]]
+        for r in range(col):
+            f = aug[r][col]
+            for c in range(2 * n):
+                aug[r][c] -= f * aug[col][c]
+    return [row[n:] for row in aug]
+
+
+def fit_mvn_model(all_pitches, mlb_teams):
+    """Fit per-pitch-type multivariate normal distributions.
+    MLB: [IVB, HB, ArmAngle, Extension, Velocity]
+    ROC: [IVB, HB, RelPosZ, RelPosX, Extension, Velocity]
+    """
+    mlb_data = defaultdict(list)
+    roc_data = defaultdict(list)
+    for p in all_pitches:
+        pt = p.get('Pitch Type')
+        ivb = safe_float(p.get('IndVertBrk'))
+        hb = safe_float(p.get('HorzBrk'))
+        ext = safe_float(p.get('Extension'))
+        velo = safe_float(p.get('Velocity'))
+        if pt is None or ivb is None or hb is None or ext is None or velo is None:
+            continue
+        team = p.get('PTeam', '')
+        arm = safe_float(p.get('ArmAngle'))
+        if arm is not None and team in mlb_teams:
+            mlb_data[pt].append([ivb, hb, arm, ext, velo])
+        rel_z = safe_float(p.get('RelPosZ'))
+        rel_x = safe_float(p.get('RelPosX'))
+        if rel_z is not None and rel_x is not None and team in mlb_teams:
+            roc_data[pt].append([ivb, hb, rel_z, rel_x, ext, velo])
+    models = {}
+    for pt in set(list(mlb_data.keys()) + list(roc_data.keys())):
+        models[pt] = {}
+        data = mlb_data.get(pt, [])
+        if len(data) >= 50:
+            models[pt]['mlb'] = _compute_mvn_params(data)
+            models[pt]['mlb']['n'] = len(data)
+        data = roc_data.get(pt, [])
+        if len(data) >= 50:
+            models[pt]['roc'] = _compute_mvn_params(data)
+            models[pt]['roc']['n'] = len(data)
+    return models
+
+
+def _compute_mvn_params(data):
+    n = len(data)
+    k = len(data[0])
+    mu = [sum(row[i] for row in data) / n for i in range(k)]
+    cov = [[0.0] * k for _ in range(k)]
+    for row in data:
+        for i in range(k):
+            for j in range(k):
+                cov[i][j] += (row[i] - mu[i]) * (row[j] - mu[j])
+    for i in range(k):
+        for j in range(k):
+            cov[i][j] /= (n - 1)
+    return {'mu': mu, 'cov': cov}
+
+
+def mvn_conditional(model_params, rel_values):
+    """Compute conditional expected movement [IVB, HB] and covariance."""
+    mu = model_params['mu']
+    cov = model_params['cov']
+    n_acc = 2
+    n_rel = len(mu) - n_acc
+    if len(rel_values) != n_rel:
+        return None, None
+    mu_acc = mu[:n_acc]
+    mu_rel = mu[n_acc:]
+    sigma_acc = [[cov[i][j] for j in range(n_acc)] for i in range(n_acc)]
+    sigma_cross = [[cov[i][j] for j in range(n_acc, n_acc + n_rel)] for i in range(n_acc)]
+    sigma_rel = [[cov[i][j] for j in range(n_acc, n_acc + n_rel)] for i in range(n_acc, n_acc + n_rel)]
+    if n_rel == 2:
+        sigma_rel_inv = mat_inv_2x2(sigma_rel)
+    elif n_rel == 3:
+        sigma_rel_inv = mat_inv_3x3(sigma_rel)
+    elif n_rel == 4:
+        sigma_rel_inv = _mat_inv_general(sigma_rel)
+    else:
+        return None, None
+    if sigma_rel_inv is None:
+        return None, None
+    r_diff = [rel_values[i] - mu_rel[i] for i in range(n_rel)]
+    sri_rdiff = [sum(sigma_rel_inv[i][j] * r_diff[j] for j in range(n_rel)) for i in range(n_rel)]
+    adjustment = [sum(sigma_cross[i][j] * sri_rdiff[j] for j in range(n_rel)) for i in range(n_acc)]
+    mu_bar = [mu_acc[i] + adjustment[i] for i in range(n_acc)]
+    sigma_cross_t = mat_transpose(sigma_cross)
+    temp = mat_mul(sigma_cross, mat_mul(sigma_rel_inv, sigma_cross_t))
+    sigma_bar = [[sigma_acc[i][j] - temp[i][j] for j in range(n_acc)] for i in range(n_acc)]
+    return mu_bar, sigma_bar
+
+
+def compute_air_density(elevation_ft, temp_f):
+    elevation_m = elevation_ft * 0.3048
+    P = 101325 * (1 - 2.2558e-5 * elevation_m) ** 5.2556
+    T = (temp_f - 32) * 5 / 9 + 273.15
+    return P / (287.05 * T)
+
+
+def fetch_game_air_density(game_pks):
+    game_rho = {}
+    total = len(game_pks)
+    for i, gp in enumerate(sorted(game_pks)):
+        if i > 0 and i % 50 == 0:
+            print(f"    Fetched {i}/{total} games...")
+        try:
+            url = f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live'
+            r = requests.get(url, timeout=10)
+            r.raise_for_status()
+            gd = r.json().get('gameData', {})
+            temp_str = gd.get('weather', {}).get('temp')
+            elev = gd.get('venue', {}).get('location', {}).get('elevation')
+            if temp_str is not None and elev is not None:
+                game_rho[gp] = compute_air_density(float(elev), float(temp_str))
+            else:
+                game_rho[gp] = STANDARD_RHO
+        except Exception:
+            game_rho[gp] = STANDARD_RHO
+        if i < total - 1:
+            time_module.sleep(0.15)
+    print(f"    Fetched {total}/{total} games")
+    return game_rho
+
+
 def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     """Process a set of pitches into all leaderboard outputs.
 
@@ -2333,6 +2518,29 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
     for p in all_pitches:
         p['InZone'] = compute_in_zone(p)
+
+    # --- Fetch per-game air density from MLB live feed ---
+    game_pks = set()
+    for p in all_pitches:
+        pid = p.get('PitchID')
+        if pid:
+            parts = str(pid).split('_')
+            if len(parts) == 3:
+                game_pks.add(parts[0])
+    print(f"Fetching air density for {len(game_pks)} unique games...")
+    game_rho = fetch_game_air_density(game_pks)
+
+    # Attach per-pitch air density
+    for p in all_pitches:
+        pid = p.get('PitchID')
+        if pid:
+            parts = str(pid).split('_')
+            if len(parts) == 3:
+                p['_rho'] = game_rho.get(parts[0], STANDARD_RHO)
+            else:
+                p['_rho'] = STANDARD_RHO
+        else:
+            p['_rho'] = STANDARD_RHO
 
     # --- Map non-MLB BTeams to MLB teams where possible ---
     mlb_hitter_teams = {}
@@ -2517,6 +2725,47 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['rv100'] = None
 
+        # --- Spin efficiency via Nathan's movement formula ---
+        # M = 0.96 * 2.58 * [1 - exp(-0.0857 * epsilon * R)]
+        # Per-pitch M and R computed with game-specific air density, then averaged, then solve for epsilon
+        se_M_vals = []
+        se_R_vals = []
+        for p in pitches:
+            ivb_p = safe_float(p.get('IndVertBrk'))
+            hb_p = safe_float(p.get('HorzBrk'))
+            spin_p = safe_float(p.get('Spin Rate'))
+            velo_p = safe_float(p.get('Velocity'))
+            if ivb_p is None or hb_p is None or spin_p is None or velo_p is None or spin_p < 100 or velo_p < 50:
+                continue
+            rho = p.get('_rho', STANDARD_RHO)
+            # Total movement in inches, convert to feet
+            total_mov_ft = math.sqrt(ivb_p ** 2 + hb_p ** 2) / 12.0
+            # Normalized movement: M = movement / (rho / STANDARD_RHO)
+            M = total_mov_ft / (rho / STANDARD_RHO) if rho > 0 else total_mov_ft
+            # Normalized rotations: R = spin * (plate_dist / velo) where plate_dist ≈ 55ft, velo in ft/s
+            velo_fps = velo_p * 5280 / 3600  # mph to ft/s
+            R = spin_p / 60.0 * (55.0 / velo_fps)  # rotations over plate distance
+            se_M_vals.append(M)
+            se_R_vals.append(R)
+        if se_M_vals and se_R_vals:
+            avg_M = sum(se_M_vals) / len(se_M_vals)
+            avg_R = sum(se_R_vals) / len(se_R_vals)
+            # Solve for epsilon: M = 0.96 * 2.58 * [1 - exp(-0.0857 * epsilon * R)]
+            # => 1 - M / (0.96 * 2.58) = exp(-0.0857 * epsilon * R)
+            # => epsilon = -ln(1 - M / 2.4768) / (0.0857 * R)
+            max_M = 0.96 * 2.58  # = 2.4768
+            if avg_M < max_M * 0.999 and avg_R > 0:
+                ratio = avg_M / max_M
+                if ratio > 0:
+                    epsilon = -math.log(1 - ratio) / (0.0857 * avg_R)
+                    row['spinEff'] = round(min(epsilon, 1.0) * 100, 1)  # as percentage
+                else:
+                    row['spinEff'] = None
+            else:
+                row['spinEff'] = None
+        else:
+            row['spinEff'] = None
+
         # Per-hand splits at pitch type level (for platoon toggle)
         for hand_label, hand_val in [('_vsL', 'L'), ('_vsR', 'R')]:
             hand_pitches = [p for p in pitches if p.get('Bats') == hand_val]
@@ -2688,59 +2937,44 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['nHAA'] = None
 
-    # --- Fit pitch-type-agnostic expected movement model (MLB only) ---
-    # Predictors (6): OTilt(sin/cos), Spin Rate, Velocity, RelPosZ, RelPosX
-    # Separate regressions for IVB and HB, both pitch-type-agnostic
-    ivb_reg_data = []  # [(predictors, ivb)]
-    hb_reg_data = []   # [(predictors, hb)]
-    for p in all_pitches:
-        if p.get('_source', 'MLB') != 'MLB':
-            continue
-        otilt_min = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
-        spin = safe_float(p.get('Spin Rate'))
-        velo = safe_float(p.get('Velocity'))
-        rel_z = safe_float(p.get('RelPosZ'))
-        rel_x = safe_float(p.get('RelPosX'))
-        ivb = safe_float(p.get('IndVertBrk'))
-        hb = safe_float(p.get('HorzBrk'))
-        if otilt_min is None or spin is None or velo is None or rel_z is None or rel_x is None:
-            continue
-        oangle = otilt_min / 720.0 * 2 * math.pi
-        otilt_sin = math.sin(oangle)
-        otilt_cos = math.cos(oangle)
-        predictors = [otilt_sin, otilt_cos, spin, velo, rel_z, rel_x]
-        if ivb is not None:
-            ivb_reg_data.append((predictors, ivb))
-        if hb is not None:
-            hb_reg_data.append((predictors, hb))
-
-    print("\nPitch-type-agnostic IVB regression (OTilt + Spin + Velo + RelPt):")
-    ivb_regression = fit_multivar_regression(ivb_reg_data, "IVB_agnostic")
-    print("\nPitch-type-agnostic HB regression (OTilt + Spin + Velo + RelPt):")
-    hb_regression = fit_multivar_regression(hb_reg_data, "HB_agnostic")
-
-    def compute_expected_movement(otilt_minutes, spin_rate, velocity, rel_z, rel_x):
-        """Compute xIVB and xHB from the pitch-type-agnostic model (6 predictors)."""
-        if otilt_minutes is None or spin_rate is None or velocity is None or rel_z is None or rel_x is None:
-            return None, None
-        oangle = otilt_minutes / 720.0 * 2 * math.pi
-        predictors = [math.sin(oangle), math.cos(oangle), spin_rate, velocity, rel_z, rel_x]
-        xivb = None
-        xhb = None
-        if ivb_regression:
-            coeffs = ivb_regression['coeffs']
-            xivb = sum(c * x for c, x in zip(coeffs, predictors)) + ivb_regression['intercept']
-        if hb_regression:
-            coeffs = hb_regression['coeffs']
-            xhb = sum(c * x for c, x in zip(coeffs, predictors)) + hb_regression['intercept']
-        return xivb, xhb
+    # --- Fit MVN expected movement model (per pitch type) ---
+    # MLB model: [IVB, HB, ArmAngle, Extension, Velocity] — conditions on last 3
+    # ROC model: [IVB, HB, RelPosZ, RelPosX, Extension, Velocity] — conditions on last 4
+    print("\nFitting MVN expected movement models (per pitch type):")
+    mvn_models = fit_mvn_model(all_pitches, MLB_TEAMS)
+    for pt in sorted(mvn_models.keys()):
+        for variant in ['mlb', 'roc']:
+            m = mvn_models[pt].get(variant)
+            if m:
+                print(f"  {pt} ({variant}): n={m['n']}, mu_ivb={m['mu'][0]:.1f}, mu_hb={m['mu'][1]:.1f}")
 
     # Compute xIVB/xHB (expected) and IVBOE/HBOE (residual) for each pitch leaderboard row
     for row in pitch_leaderboard:
-        xivb, xhb = compute_expected_movement(
-            row.get('breakTiltMinutes'), row.get('spinRate'), row.get('velocity'),
-            row.get('relPosZ'), row.get('relPosX')
-        )
+        pt = row['pitchType']
+        model = mvn_models.get(pt, {})
+        is_roc = row.get('_isROC', False)
+        xivb = None
+        xhb = None
+        if is_roc and 'roc' in model:
+            # ROC: condition on [RelPosZ, RelPosX, Extension, Velocity]
+            rel_z = row.get('relPosZ')
+            rel_x = row.get('relPosX')
+            ext = row.get('extension')
+            velo = row.get('velocity')
+            if rel_z is not None and rel_x is not None and ext is not None and velo is not None:
+                mu_bar, _ = mvn_conditional(model['roc'], [rel_z, rel_x, ext, velo])
+                if mu_bar:
+                    xivb, xhb = mu_bar[0], mu_bar[1]
+        if xivb is None and 'mlb' in model:
+            # MLB: condition on [ArmAngle, Extension, Velocity]
+            arm = row.get('armAngle')
+            ext = row.get('extension')
+            velo = row.get('velocity')
+            if arm is not None and ext is not None and velo is not None:
+                mu_bar, _ = mvn_conditional(model['mlb'], [arm, ext, velo])
+                if mu_bar:
+                    xivb, xhb = mu_bar[0], mu_bar[1]
+
         if xivb is not None:
             row['xIVB'] = round(xivb, 1)
             if row.get('indVertBrk') is not None:
@@ -3075,11 +3309,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             aa_val = safe_float(p.get('ArmAngle'))
             if aa_val is not None:
                 detail['aa'] = round(aa_val, 1)
-            # Per-pitch expected movement from OTilt-based model
-            otilt_min_val = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
-            spin_val = safe_float(p.get('Spin Rate'))
-            velo_val = safe_float(p.get('Velocity'))
-            xivb_val, xhb_val = compute_expected_movement(otilt_min_val, spin_val, velo_val, rel_z, rel_x)
+            # Per-pitch expected movement from MVN model
+            ext_val = safe_float(p.get('Extension'))
+            pt_model = mvn_models.get(pt, {})
+            xivb_val = None
+            xhb_val = None
+            p_team = p.get('PTeam', '')
+            is_roc_pitch = p_team in AAA_TEAMS
+            if is_roc_pitch and 'roc' in pt_model and rel_z is not None and rel_x is not None and ext_val is not None and velo is not None:
+                mu_bar, _ = mvn_conditional(pt_model['roc'], [rel_z, rel_x, ext_val, velo])
+                if mu_bar:
+                    xivb_val, xhb_val = mu_bar[0], mu_bar[1]
+            if xivb_val is None and 'mlb' in pt_model and aa_val is not None and ext_val is not None and velo is not None:
+                mu_bar, _ = mvn_conditional(pt_model['mlb'], [aa_val, ext_val, velo])
+                if mu_bar:
+                    xivb_val, xhb_val = mu_bar[0], mu_bar[1]
             if xivb_val is not None:
                 detail['xivb'] = round(xivb_val, 1)
             if xhb_val is not None:
@@ -3498,8 +3742,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                                   'leagueAvgPlateX': round(r['leagueAvgPlateX'], 6)}
                            for pt, r in haa_regressions.items()},
         'sacqZones': sacq_zones_output,
-        'ivbRegression': {'coeffs': [round(c, 8) for c in ivb_regression['coeffs']], 'intercept': round(ivb_regression['intercept'], 8)} if ivb_regression else None,
-        'hbRegression': {'coeffs': [round(c, 8) for c in hb_regression['coeffs']], 'intercept': round(hb_regression['intercept'], 8)} if hb_regression else None,
+        'mvnModels': {pt: {variant: {'mu': [round(v, 6) for v in m['mu']], 'cov': [[round(v, 8) for v in row] for row in m['cov']]}
+                           for variant, m in variants.items() if m}
+                      for pt, variants in mvn_models.items()},
     }
 
     # --- Generate micro-aggregate data ---

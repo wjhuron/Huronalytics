@@ -8,6 +8,73 @@ var Aggregator = {
   loaded: false,
   _colIdx: {},
 
+  // --- MVN conditional expected movement utilities ---
+  _matInvGeneral: function (M) {
+    var n = M.length;
+    var aug = [];
+    for (var i = 0; i < n; i++) {
+      aug[i] = [];
+      for (var j = 0; j < n; j++) aug[i][j] = M[i][j];
+      for (var j2 = 0; j2 < n; j2++) aug[i][n + j2] = (i === j2) ? 1.0 : 0.0;
+    }
+    for (var col = 0; col < n; col++) {
+      var maxRow = col;
+      for (var r = col + 1; r < n; r++) {
+        if (Math.abs(aug[r][col]) > Math.abs(aug[maxRow][col])) maxRow = r;
+      }
+      var tmp = aug[col]; aug[col] = aug[maxRow]; aug[maxRow] = tmp;
+      if (Math.abs(aug[col][col]) < 1e-15) return null;
+      for (var r2 = col + 1; r2 < n; r2++) {
+        var f = aug[r2][col] / aug[col][col];
+        for (var c = 0; c < 2 * n; c++) aug[r2][c] -= f * aug[col][c];
+      }
+    }
+    for (var col2 = n - 1; col2 >= 0; col2--) {
+      var piv = aug[col2][col2];
+      for (var c2 = 0; c2 < 2 * n; c2++) aug[col2][c2] /= piv;
+      for (var r3 = 0; r3 < col2; r3++) {
+        var f2 = aug[r3][col2];
+        for (var c3 = 0; c3 < 2 * n; c3++) aug[r3][c3] -= f2 * aug[col2][c3];
+      }
+    }
+    var inv = [];
+    for (var ii = 0; ii < n; ii++) inv[ii] = aug[ii].slice(n);
+    return inv;
+  },
+
+  _mvnConditional: function (modelParams, relValues) {
+    var mu = modelParams.mu;
+    var cov = modelParams.cov;
+    var nAcc = 2; // IVB, HB
+    var nRel = mu.length - nAcc;
+    if (relValues.length !== nRel) return null;
+    // Extract sub-matrices
+    var sigmaRel = [];
+    for (var i = 0; i < nRel; i++) {
+      sigmaRel[i] = [];
+      for (var j = 0; j < nRel; j++) sigmaRel[i][j] = cov[nAcc + i][nAcc + j];
+    }
+    var sigmaRel_inv = this._matInvGeneral(sigmaRel);
+    if (!sigmaRel_inv) return null;
+    var rDiff = [];
+    for (var k = 0; k < nRel; k++) rDiff[k] = relValues[k] - mu[nAcc + k];
+    // sigmaRel_inv * rDiff
+    var sriRdiff = [];
+    for (var ii = 0; ii < nRel; ii++) {
+      var s = 0;
+      for (var jj = 0; jj < nRel; jj++) s += sigmaRel_inv[ii][jj] * rDiff[jj];
+      sriRdiff[ii] = s;
+    }
+    // sigmaCross * sriRdiff => adjustment for each acc variable
+    var muBar = [];
+    for (var a = 0; a < nAcc; a++) {
+      var adj = 0;
+      for (var b = 0; b < nRel; b++) adj += cov[a][nAcc + b] * sriRdiff[b];
+      muBar[a] = mu[a] + adj;
+    }
+    return muBar;
+  },
+
   load: function (microData) {
     this._roleCache = null;  // Clear role cache on reload
     // Accept micro data directly (from DataStore)
@@ -546,6 +613,7 @@ var Aggregator = {
   //  Pitch aggregation
   // ==================================================================
   _aggregatePitch: function (filters) {
+    var self = this;
     var d = this.data;
     var ci = this._colIdx.pitchCols;
     var micro = d.pitchMicro;
@@ -576,7 +644,7 @@ var Aggregator = {
     var PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     var PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
     var PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
-    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    var PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     var groups = {};
@@ -711,35 +779,49 @@ var Aggregator = {
       delete obj._plateZ;  // internal, not displayed
       delete obj._plateX;  // internal, not displayed
 
-      // xIVB/xHB + IVBOE/HBOE from OTilt-based model (6 predictors)
-      var ivbReg2 = DataStore.metadata && DataStore.metadata.ivbRegression;
-      var hbReg2 = DataStore.metadata && DataStore.metadata.hbRegression;
-      var avgOTiltSin = null, avgOTiltCos = null;
-      if (ms.nTilt > 0) {
-        avgOTiltSin = ms.sumTiltSin / ms.nTilt;
-        avgOTiltCos = ms.sumTiltCos / ms.nTilt;
+      // xIVB/xHB + IVBOE/HBOE from MVN conditional model (per pitch type)
+      var mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
+      var ptModel = mvnModels && mvnModels[obj.pitchType];
+      var xIVB_val = null, xHB_val = null;
+      // Try MLB model first: condition on [ArmAngle, Extension, Velocity]
+      if (ptModel && ptModel.mlb && obj.armAngle !== null && obj.extension !== null && obj.velocity !== null) {
+        var muBar = self._mvnConditional(ptModel.mlb, [obj.armAngle, obj.extension, obj.velocity]);
+        if (muBar) { xIVB_val = muBar[0]; xHB_val = muBar[1]; }
       }
-      var _canXmov = avgOTiltSin !== null && obj.spinRate !== null && obj.velocity !== null && obj.relPosZ !== null && obj.relPosX !== null;
-      if (ivbReg2 && _canXmov) {
-        var predictors = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
-        var expIVB = ivbReg2.intercept;
-        for (var pi = 0; pi < predictors.length; pi++) expIVB += ivbReg2.coeffs[pi] * predictors[pi];
-        obj.xIVB = Number(expIVB.toFixed(1));
-        obj.ivbOE = obj.indVertBrk !== null ? Number((obj.indVertBrk - expIVB).toFixed(1)) : null;
+      // Fallback to ROC model if no MLB model or missing ArmAngle: [RelPosZ, RelPosX, Extension, Velocity]
+      if (xIVB_val === null && ptModel && ptModel.roc && obj.relPosZ !== null && obj.relPosX !== null && obj.extension !== null && obj.velocity !== null) {
+        var muBar2 = self._mvnConditional(ptModel.roc, [obj.relPosZ, obj.relPosX, obj.extension, obj.velocity]);
+        if (muBar2) { xIVB_val = muBar2[0]; xHB_val = muBar2[1]; }
+      }
+      if (xIVB_val !== null) {
+        obj.xIVB = Number(xIVB_val.toFixed(1));
+        obj.ivbOE = obj.indVertBrk !== null ? Number((obj.indVertBrk - xIVB_val).toFixed(1)) : null;
       } else {
         obj.xIVB = null;
         obj.ivbOE = null;
       }
-      if (hbReg2 && _canXmov) {
-        var predictors2 = [avgOTiltSin, avgOTiltCos, obj.spinRate, obj.velocity, obj.relPosZ, obj.relPosX];
-        var expHB = hbReg2.intercept;
-        for (var pi2 = 0; pi2 < predictors2.length; pi2++) expHB += hbReg2.coeffs[pi2] * predictors2[pi2];
-        obj.xHB = Number(expHB.toFixed(1));
-        obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - expHB).toFixed(1)) : null;
+      if (xHB_val !== null) {
+        obj.xHB = Number(xHB_val.toFixed(1));
+        obj.hbOE = obj.horzBrk !== null ? Number((obj.horzBrk - xHB_val).toFixed(1)) : null;
       } else {
         obj.xHB = null;
         obj.hbOE = null;
       }
+
+      // Spin efficiency (Nathan's formula, using standard air density)
+      if (obj.indVertBrk !== null && obj.horzBrk !== null && obj.spinRate !== null && obj.velocity !== null && obj.spinRate > 100 && obj.velocity > 50) {
+        var totalMovFt = Math.sqrt(obj.indVertBrk * obj.indVertBrk + obj.horzBrk * obj.horzBrk) / 12.0;
+        var veloFps = obj.velocity * 5280 / 3600;
+        var R = (obj.spinRate / 60.0) * (55.0 / veloFps);
+        var maxM = 0.96 * 2.58;
+        if (totalMovFt < maxM * 0.999 && R > 0) {
+          var ratio = totalMovFt / maxM;
+          if (ratio > 0) {
+            var eps = -Math.log(1 - ratio) / (0.0857 * R);
+            obj.spinEff = Number((Math.min(eps, 1.0) * 100).toFixed(1));
+          } else { obj.spinEff = null; }
+        } else { obj.spinEff = null; }
+      } else { obj.spinEff = null; }
 
       // Break Tilt (circular mean)
       if (ms.nTilt > 0) {
@@ -777,7 +859,7 @@ var Aggregator = {
         }
         if (this._roleCache[pitcherKey2] !== filters.role) continue;
       }
-      if (filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
+      if (filters.pitchTypes && filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
 
       rows.push(obj);
@@ -835,9 +917,9 @@ var Aggregator = {
 
     var self = this;
     var MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches for outcome metrics
-    var ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true };  // use |value| for RHP/LHP fairness
+    var ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true, hbOE: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
-    var SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true };
+    var SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, spinEff: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
       var minPctl = SHAPE_METRICS[key] ? 0 : MIN_PITCH_TYPE_PCTL;
       for (var pt in ptGroups) {
