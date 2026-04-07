@@ -66,6 +66,8 @@ HITTER_STAT_KEYS = [
     'squaredUpPct',
     # Sprint Speed
     'sprintSpeed',
+    # wRC+ / xWRC+
+    'wRCplus', 'xWRCplus',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
@@ -157,13 +159,14 @@ def fetch_guts_constants(year=2026):
     raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
 
 
-def fetch_sprint_speed(year=2026, _depth=0):
-    """Fetch sprint speed leaderboard from Baseball Savant.
-    Returns dict mapping MLB player ID (int) → sprint speed (float, ft/s)."""
+def fetch_sprint_speed(year=2026):
+    """Fetch sprint speed leaderboard from Baseball Savant for the current year only.
+    Returns dict mapping MLB player ID (int) → {speed, competitive_runs}.
+    Uses min=1 to get all players with any sprint data; qualification (≥10 runs) handled in UI."""
     import csv
     import io
     url = (f'https://baseballsavant.mlb.com/leaderboard/sprint_speed'
-           f'?type=raw&year={year}&position=&team=&min=10&csv=true')
+           f'?type=raw&year={year}&position=&team=&min=1&csv=true')
     req = urllib.request.Request(url, headers={
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
         'Accept': 'text/csv',
@@ -178,20 +181,16 @@ def fetch_sprint_speed(year=2026, _depth=0):
                 mlb_id = int(row.get('player_id') or 0)
                 speed_str = row.get('sprint_speed') or row.get('hp_to_1b') or ''
                 speed = float(speed_str) if speed_str else 0
+                comp_runs = int(row.get('competitive_runs') or 0)
                 if mlb_id and speed > 0:
-                    result[mlb_id] = round(speed, 1)
+                    result[mlb_id] = {'speed': round(speed, 1), 'competitive_runs': comp_runs}
             except (ValueError, TypeError):
                 continue
-        print(f"  Sprint speed: fetched {len(result)} players from Savant ({year})")
-        if _depth > 0:
-            print(f"  ⚠️  NOTE: Using {year} sprint speed data as fallback (not current season)")
+        qualified = sum(1 for v in result.values() if v['competitive_runs'] >= 10)
+        print(f"  Sprint speed: fetched {len(result)} players from Savant ({year}), {qualified} qualified (≥10 runs)")
         return result
     except Exception as e:
         print(f"  WARNING: Could not fetch sprint speed data: {e}")
-        # Try previous year as fallback (max 2 retries)
-        if year > 2024 and _depth < 2:
-            print(f"  Trying {year - 1} as fallback...")
-            return fetch_sprint_speed(year - 1, _depth + 1)
         return {}
 
 
@@ -3294,10 +3293,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in hitter_leaderboard:
         mlb_id = row.get('mlbId')
         if mlb_id and mlb_id in sprint_speeds:
-            row['sprintSpeed'] = sprint_speeds[mlb_id]
+            ss = sprint_speeds[mlb_id]
+            row['sprintSpeed'] = ss['speed']
+            row['sprintQual'] = ss['competitive_runs'] >= 10
             sprint_merged += 1
         else:
             row['sprintSpeed'] = None
+            row['sprintQual'] = False
     print(f"  Sprint speed merged for {sprint_merged}/{len(hitter_leaderboard)} hitters")
 
     # Flag hitters with sufficient BIP for batted ball percentile qualification
@@ -3311,6 +3313,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
         'babip', 'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
         'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
+        'xWRCplus',
     }
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
         if stat in HITTER_BIP_PCTL_STATS:
@@ -3675,6 +3678,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRC'] = None
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
+
+    # Compute percentiles for wRC+ and xWRC+ (computed after main percentile loop)
+    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'wRCplus', min_count=20, count_key='nBip')
+    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'xWRCplus', min_count=20, count_key='nBip')
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
