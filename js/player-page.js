@@ -32,6 +32,8 @@ var PlayerPage = {
     { key: 'xBA',             label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAsp',         label: 'xwOBASp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'ev75',            label: 'EV75',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'hardHitPct',      label: 'Hard-Hit%',       format: function(v) { return Utils.formatPct(v); } },
@@ -42,9 +44,7 @@ var PlayerPage = {
     { key: 'whiffPct',        label: 'Whiff%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',        label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true },
-    { key: 'squaredUpPct',   label: 'Sq-Up%',          format: function(v) { return Utils.formatPct(v); }, rocHide: true },
-    { key: 'twoStrikeWhiffPct', label: '2K Whiff%',    format: function(v) { return Utils.formatPct(v); } },
-    { key: 'sprintSpeed',   label: 'Sprint',           format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true },
+    { key: 'sprintSpeed',   label: 'Sprint',           format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
   ],
 
   // Hitter Stats table columns (single row)
@@ -56,21 +56,15 @@ var PlayerPage = {
     { key: 'obp', label: 'OBP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'slg', label: 'SLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'ops', label: 'OPS', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
-    { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
-    { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'iso', label: 'ISO', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
-    { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
+    { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'doubles', label: '2B', format: function(v) { return v != null ? v : '—'; } },
     { key: 'triples', label: '3B', format: function(v) { return v != null ? v : '—'; } },
     { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'sb', label: 'SB', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'cs', label: 'CS', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'sbPct', label: 'SB%', format: function(v) { return v != null ? v.toFixed(1) + '%' : '—'; } },
-    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'firstPitchSwingPct', label: 'FPSw%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Hitter Batted Ball table columns (per pitch type + total)
@@ -105,9 +99,11 @@ var PlayerPage = {
     { key: 'izSwingPct', label: 'IZ Swing%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izSwChase', label: 'IZ Sw-Chase%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'firstPitchSwingPct', label: 'FPSw%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'contactPct', label: 'Contact%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'whiffPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   // Hitter Bat Tracking table columns (placeholder)
@@ -870,7 +866,7 @@ var PlayerPage = {
     var HITTER_BIP_STATS = {
       avgEVAll: true, medEV: true, ev75: true, maxEV: true,
       hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
-      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
+      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true, xWRCplus: true,
       babip: true, hrFbPct: true, airPullPct: true
     };
     var PITCHER_BIP_STATS = {
@@ -897,7 +893,9 @@ var PlayerPage = {
       // BIP qualification: <20 BIP → show gray outline
       var bipStats = isPitcher ? PITCHER_BIP_STATS : HITTER_BIP_STATS;
       var bipUnqual = bipStats[stat.key] && data.bipQual === false;
-      var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual;
+      // Sprint speed: has its own qualification (10 competitive runs from Savant)
+      var sprintUnqual = stat.sprintQual && val == null;
+      var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual && !sprintUnqual;
 
       var row = document.createElement('div');
       row.className = 'pctl-row';
