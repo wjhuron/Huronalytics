@@ -503,9 +503,11 @@ def compute_stats(pitches):
 
     # Run Value (RunExp) — sum of delta_pitcher_run_exp
     # Positive = good for pitcher, negative = bad
+    # Store raw (unrounded) value — rounding happens at final output step
+    # to avoid rounding error accumulation when summing per-pitch-type values
     rv_values = [safe_float(p.get('RunExp')) for p in pitches]
     rv_values = [v for v in rv_values if v is not None]
-    run_value = round(sum(rv_values), 1) if rv_values else None
+    run_value = sum(rv_values) if rv_values else None
 
     # FPS% — first pitch strike rate (count == "0-0")
     # A strike = called strike, swinging strike, foul, or in play
@@ -699,25 +701,10 @@ def compute_hitter_stats(pitches):
     # AB = PA - all BB (including IBB) - HBP - SF - SH - CI
     n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci
 
-    # === Traditional batting stats ===
-    batting_avg = round(n_h / n_ab, 3) if n_ab > 0 else None
-    obp_denom = n_ab + n_bb_all + n_hbp + n_sf  # OBP uses all BB including IBB
-    obp = round((n_h + n_bb_all + n_hbp) / obp_denom, 3) if obp_denom > 0 else None
-    tb = n_1b + 2 * n_2b + 3 * n_3b + 4 * n_hr
-    slg = round(tb / n_ab, 3) if n_ab > 0 else None
-    ops = round(obp + slg, 3) if obp is not None and slg is not None else None
+    # Traditional batting stats (AVG, OBP, SLG, OPS, ISO, K%, BB%, BABIP, wOBA)
+    # are NOT computed here — boxscore merge overwrites them with official values.
+    # See boxscore merge section for authoritative computation.
     xbh = n_2b + n_3b + n_hr
-
-    # K% and BB% (per PA — BB% excludes IBB)
-    k_pct = n_k / n_pa if n_pa > 0 else None
-    bb_pct = n_bb / n_pa if n_pa > 0 else None  # excludes IBB
-
-    # ISO = SLG - AVG
-    iso = round(slg - batting_avg, 3) if slg is not None and batting_avg is not None else None
-
-    # BABIP = (H - HR) / (AB - K - HR + SF)
-    babip_denom = n_ab - n_k - n_hr + n_sf
-    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
     # === Swing metrics ===
     n_swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
@@ -877,19 +864,12 @@ def compute_hitter_stats(pitches):
         'ab': n_ab,
         'nSwings': n_swings,
         'nBip': n_bip,
-        # Hitter Stats tab
-        'avg': batting_avg,
-        'obp': obp,
-        'slg': slg,
-        'ops': ops,
+        # Hitter Stats tab — traditional stats (avg, obp, slg, ops, iso, kPct, bbPct, babip, wOBA)
+        # are set later by boxscore merge (authoritative source)
         'doubles': n_2b,
         'triples': n_3b,
         'hr': n_hr,
         'xbh': xbh,
-        'kPct': k_pct,
-        'bbPct': bb_pct,
-        'iso': iso,
-        'babip': babip,
         # Batted Ball tab
         'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
         # Note: key is 'medEV' for historical reasons but this is actually mean EV (LA > 0)
@@ -943,6 +923,16 @@ def generate_micro_data(all_pitches):
 
     Groups pitches by (person, date, opponent_hand) with summable counts.
     Returns a dict with compact arrays-of-arrays format for JSON serialization.
+
+    Filter-responsive stats (recomputed client-side when date/hand filters change):
+      Pitcher: velocity, spin, movement, nVAA/nHAA, whiff%, chase%, strike%, xIVB/xHB, etc.
+      Hitter: EV, barrel%, hard-hit%, GB%, swing%, chase%, contact%, bat speed, etc.
+
+    Season-level stats (NOT recomputed by filters — use pre-agg values):
+      medLA, ldPct/fbPct/puPct, pullPct/middlePct/oppoPct, izSwingPct, izSwChase,
+      contactPct, izContactPct, attackAngle/attackDirection/swingPathTilt,
+      twoStrikeWhiffPct, firstPitchSwingPct, sprintSpeed, nCompSwings,
+      runValue/rv100 (pitchers), xBA/xSLG/xwOBA/xwOBAcon (require Statcast model).
     """
     # --- Build lookup tables ---
     pitcher_set = set()
@@ -2501,18 +2491,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row['breakTilt'] = minutes_to_tilt_display(avg_tilt)
         row['breakTiltMinutes'] = avg_tilt
 
-        # Release Tilt (circular mean)
-        rtilt_minutes = [break_tilt_to_minutes(p.get('RTilt')) for p in pitches]
-        rtilt_minutes = [m for m in rtilt_minutes if m is not None]
-        avg_rtilt = circular_mean_minutes(rtilt_minutes)
-        row['rTiltMinutes'] = avg_rtilt
-
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
         row.update(compute_expected_stats(pitches))
-        # RV/100 for this pitch type
+        # RV/100 for this pitch type (raw value — rounded at final output step)
         if row.get('runValue') is not None and row.get('count', 0) > 0:
-            row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
+            row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
 
@@ -2799,7 +2783,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['xHB'] = None
             row['hbOE'] = None
 
-    # --- Compute percentiles per pitch type ---
+    # --- Percentile computation: pitch leaderboard per pitch type (Phase 1) ---
+    # Percentiles are computed in 4 phases across the pipeline:
+    #   Phase 1: Pitch-type percentiles (here) — pitch metrics grouped by pitch type
+    #   Phase 2: Pitcher-level percentiles — overall pitcher stats (before boxscore merge)
+    #   Phase 3: Hitter-level percentiles — hitter stats
+    #   Phase 4: Hitter pitch-type percentiles — hitter stats grouped by pitch type
+    # Phases 2-3 run before boxscore merge, but the stats they percentile (pitch metrics,
+    # run value) are NOT the ones changed by merge (ERA, FIP, etc.), so ordering is correct.
+    # Boxscore-derived stats (ERA, FIP, etc.) get percentiled in a separate pass after merge.
     pt_groups = defaultdict(list)
     for row in pitch_leaderboard:
         pt_groups[row['pitchType']].append(row)
@@ -2992,8 +2984,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         pitcher_leaderboard.append(row)
 
-    # Recompute pitcher runValue as sum of rounded per-pitch-type runValues
-    # so that the overall matches the sum of displayed per-pitch values
+    # Recompute pitcher runValue as sum of raw (unrounded) per-pitch-type runValues.
+    # Rounding only happens at the final step to avoid accumulation error.
     pitch_rv_by_pitcher = {}
     for pr in pitch_leaderboard:
         pk = pr['pitcher'] + '|' + pr['team']
@@ -3004,37 +2996,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in pitcher_leaderboard:
         pk = row['pitcher'] + '|' + row['team']
         if pk in pitch_rv_by_pitcher:
-            row['runValue'] = round(pitch_rv_by_pitcher[pk], 1)
+            row['runValue'] = pitch_rv_by_pitcher[pk]
 
-    # Compute RV/100 (run value per 100 pitches) for pitcher leaderboard
+    # Compute RV/100 (run value per 100 pitches) from raw values before rounding
     for row in pitcher_leaderboard:
         if row.get('runValue') is not None and row.get('count', 0) > 0:
-            row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
+            row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
 
-    # Compute pitch mix entropy: -Σ(p × log₂(p)) for each pitcher's pitch usage distribution
-    # Build usage fractions from pitch_leaderboard
-    pitcher_usage = defaultdict(list)
-    for pr in pitch_leaderboard:
-        pk = pr['pitcher'] + '|' + pr['team']
-        if pr.get('usagePct') is not None and pr['usagePct'] > 0:
-            pitcher_usage[pk].append(pr['usagePct'])
-    for row in pitcher_leaderboard:
-        pk = row['pitcher'] + '|' + row['team']
-        fracs = pitcher_usage.get(pk, [])
-        if len(fracs) >= 2:
-            entropy = -sum(p * math.log2(p) for p in fracs if p > 0)
-            row['pitchEntropy'] = round(entropy, 2)
-        else:
-            row['pitchEntropy'] = None
-
-    # Compute percentiles for pitcher leaderboard
-    # All pitchers get percentiles (frontend qualifying logic controls coloring)
+    # --- Percentile computation: pitcher leaderboard (Phase 2) ---
+    # Computed BEFORE boxscore merge. Stats percentiled here (pitch metrics, run value)
+    # are NOT the ones that change after merge (ERA, FIP, etc.), so ordering is correct.
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
     EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
     EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'}  # lower is better for pitchers
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'pitchEntropy']:
+    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100']:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 
     for row in pitcher_leaderboard:
@@ -3206,6 +3183,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         hc_x = safe_float(p.get('HC_X'))
         hc_y = safe_float(p.get('HC_Y'))
         la = safe_float(p.get('LaunchAngle'))
+        # wOBAval is Statcast's per-pitch wOBA weight (the run-value of each outcome).
+        # This is the correct source for zone-level wOBA — different from player-level
+        # wOBA which uses Guts-weighted formula from boxscore counts.
         woba_val = safe_float(p.get('wOBAval'))
         woba_dom = safe_float(p.get('wOBAdom'))
         xwoba_val = safe_float(p.get('xwOBA'))
@@ -3341,6 +3321,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['sprintQual'] = False
     print(f"  Sprint speed merged for {sprint_merged}/{len(hitter_leaderboard)} hitters")
 
+    # --- Percentile computation: hitter leaderboard (Phase 3) ---
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 20
@@ -3477,7 +3458,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             row['rv100'] = None
 
-    # Compute percentiles per pitch type for hitter pitch LB
+    # --- Percentile computation: hitter pitch-type leaderboard (Phase 4) ---
     hpt_groups = defaultdict(list)
     for row in hitter_pitch_leaderboard:
         hpt_groups[row['pitchType']].append(row)
@@ -3858,8 +3839,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.pop('_siera_raw', None)
         row.pop('_box', None)
 
-    # Compute percentiles for boxscore-derived stats (ERA, HR/9, FIP, xFIP, SIERA)
-    # These are set AFTER the initial percentile pass, so need a second pass
+    # --- Percentile computation: boxscore-derived pitcher stats (Phase 2b) ---
+    # ERA, FIP, etc. are set by boxscore merge AFTER the Phase 2 percentile pass,
+    # so they need a separate percentile pass here.
     BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
     BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
     for stat in BOXSCORE_PCTL_KEYS:
@@ -3889,6 +3871,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if pairs:
             total_w = sum(w for _, w in pairs)
             metadata['pitcherLeagueAverages'][stat] = round(sum(v * w for v, w in pairs) / total_w, 2) if total_w > 0 else None
+
+    # Final rounding step for runValue/rv100 — applied after percentiles so
+    # percentile ranks use exact values, but output uses display-friendly precision.
+    for row in pitch_leaderboard:
+        if row.get('runValue') is not None:
+            row['runValue'] = round(row['runValue'], 1)
+        if row.get('rv100') is not None:
+            row['rv100'] = round(row['rv100'], 2)
+    for row in pitcher_leaderboard:
+        if row.get('runValue') is not None:
+            row['runValue'] = round(row['runValue'], 1)
+        if row.get('rv100') is not None:
+            row['rv100'] = round(row['rv100'], 2)
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,
@@ -3921,8 +3916,8 @@ def write_json_outputs(result, suffix):
     print(f"  Wrote JSON files with suffix '{suffix}'")
 
 
-def write_embedded_js(st_result, rs_result):
-    """Write data_embedded.js with window.ST_DATA and window.RS_DATA."""
+def write_embedded_js(rs_result):
+    """Write data_embedded.js with window.RS_DATA."""
     def build_data_obj(result):
         # Strip internal _-prefixed keys from all leaderboard rows
         def strip_internal(rows):
@@ -3945,9 +3940,6 @@ def write_embedded_js(st_result, rs_result):
 
     with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'w') as f:
         f.write('// Auto-generated — do not edit\n')
-        f.write('window.ST_DATA = ')
-        json.dump(build_data_obj(st_result), f, separators=(',', ':'))
-        f.write(';\n')
         f.write('window.RS_DATA = ')
         json.dump(build_data_obj(rs_result), f, separators=(',', ':'))
         f.write(';\n')
@@ -3983,11 +3975,7 @@ def main():
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
 
-    # Read data separately
-    # Skip ST spreadsheet — ST data is already cached and won't change
-    print("\n=== Skipping Spring Training read (cached) ===")
-    st_pitches = []
-
+    # Read Regular Season data
     print("\n=== Reading Regular Season data ===")
     rs_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
     rs_pitches += read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'], extra_tabs={'ROC', 'AAA'})
@@ -3997,12 +3985,7 @@ def main():
     mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')
     mlb_id_cache = load_mlb_id_cache(mlb_id_cache_path)
 
-    # Process each game type independently
-    print("\n" + "=" * 60)
-    print("=== Processing Spring Training ===")
-    print("=" * 60)
-    st_result = process_game_type(st_pitches, 'ST', mlb_id_cache, mlb_id_cache_path)
-
+    # Process Regular Season
     print("\n" + "=" * 60)
     print("=== Processing Regular Season ===")
     print("=" * 60)
@@ -4011,18 +3994,12 @@ def main():
     # Save shared MLB ID cache
     save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
 
-    # Write separate output files
+    # Write output files
     print("\n--- Writing output files ---")
-    write_json_outputs(st_result, '_st')
     write_json_outputs(rs_result, '_rs')
-
-    # Write combined embedded JS
-    write_embedded_js(st_result, rs_result)
+    write_embedded_js(rs_result)
 
     print(f"\nOutput written to {DATA_DIR}/")
-    print(f"  ST: {len(st_result['pitcher_leaderboard'])} pitchers, "
-          f"{len(st_result['pitch_leaderboard'])} pitch rows, "
-          f"{len(st_result['hitter_leaderboard'])} hitters")
     print(f"  RS: {len(rs_result['pitcher_leaderboard'])} pitchers, "
           f"{len(rs_result['pitch_leaderboard'])} pitch rows, "
           f"{len(rs_result['hitter_leaderboard'])} hitters")
