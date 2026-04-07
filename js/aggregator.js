@@ -1643,7 +1643,7 @@ var Aggregator = {
       var hpk = hpPreAgg[hpi].hitter + '|' + hpPreAgg[hpi].team + '|' + hpPreAgg[hpi].pitchType;
       hpPreMap[hpk] = hpPreAgg[hpi];
     }
-    var hpXKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
+    var hpXKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'runValue', 'rv100'];
     for (var hpmi = 0; hpmi < rows.length; hpmi++) {
       var hpmk = rows[hpmi].hitter + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType;
       var hpPre = hpPreMap[hpmk];
@@ -1653,6 +1653,10 @@ var Aggregator = {
           if (hpPre[hpxk] !== undefined) rows[hpmi][hpxk] = hpPre[hpxk];
           if (hpPre[hpxk + '_pctl'] !== undefined) rows[hpmi][hpxk + '_pctl'] = hpPre[hpxk + '_pctl'];
         }
+      }
+      // Compute rv100 client-side if not in pre-agg data
+      if (rows[hpmi].runValue != null && rows[hpmi].rv100 == null && rows[hpmi].count > 0) {
+        rows[hpmi].rv100 = Math.round(rows[hpmi].runValue / rows[hpmi].count * 10000) / 100;
       }
     }
 

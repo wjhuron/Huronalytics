@@ -3431,6 +3431,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row_cat.update(compute_expected_stats(cat_pitches))
                 hitter_pitch_leaderboard.append(row_cat)
 
+    # Compute rv100 for hitter pitch leaderboard rows
+    for row in hitter_pitch_leaderboard:
+        if row.get('runValue') is not None and row.get('count', 0) > 0:
+            row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
+        else:
+            row['rv100'] = None
+
     # Compute percentiles per pitch type for hitter pitch LB
     hpt_groups = defaultdict(list)
     for row in hitter_pitch_leaderboard:
