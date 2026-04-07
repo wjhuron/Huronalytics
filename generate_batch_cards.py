@@ -183,12 +183,12 @@ def badge_text_color(hc):
     return 'black' if luminance(hc) > 0.25 else 'white'
 
 def is_barrel(ev, la):
-    """Statcast barrel definition from baseballr code_barrel (EV >= 98 per MLB glossary)."""
+    """Statcast barrel definition (LA in [8,50], EV>=98, EV*1.5-LA>=117, EV+LA>=124)."""
     if ev is None or la is None:
         return False
-    return (la <= 50 and ev >= 98 and
+    return (la >= 8 and la <= 50 and ev >= 98 and
             ev * 1.5 - la >= 117 and
-            ev + la >= 123)
+            ev + la >= 124)
 
 def outs_to_ip_str(outs):
     return f"{outs//3}.{outs%3}"
