@@ -33,7 +33,7 @@ var PlayerPage = {
     { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBAsp',         label: 'xwOBASp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true, noPercentile: true },
     { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'ev75',            label: 'EV75',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'hardHitPct',      label: 'Hard-Hit%',       format: function(v) { return Utils.formatPct(v); } },
@@ -44,7 +44,7 @@ var PlayerPage = {
     { key: 'whiffPct',        label: 'Whiff%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',        label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true },
-    { key: 'sprintSpeed',   label: 'Sprint',           format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
+    { key: 'sprintSpeed',   label: 'Sprint Speed',     format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
   ],
 
   // Hitter Stats table columns (single row)
@@ -895,7 +895,9 @@ var PlayerPage = {
       var bipUnqual = bipStats[stat.key] && data.bipQual === false;
       // Sprint speed: has its own qualification (10 competitive runs from Savant)
       var sprintUnqual = stat.sprintQual && val == null;
-      var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual && !sprintUnqual;
+      // noPercentile stats: show gray-hatched bar with value, no colored bar or circle
+      var noPercentile = stat.noPercentile === true;
+      var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual && !sprintUnqual && !noPercentile;
 
       var row = document.createElement('div');
       row.className = 'pctl-row';
@@ -914,7 +916,7 @@ var PlayerPage = {
       var circleWrap = document.createElement('div');
       circleWrap.className = 'pctl-circle-wrap';
 
-      if (pctl != null) {
+      if (pctl != null && !noPercentile) {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
         if (showColor) {
@@ -940,13 +942,13 @@ var PlayerPage = {
       barTrack.className = 'pctl-bar-track';
       var barFill = document.createElement('div');
       barFill.className = 'pctl-bar-fill';
-      if (pctl != null) {
-        barFill.style.width = Math.round(pctl) + '%';
+      if (pctl != null || sprintUnqual || noPercentile) {
+        barFill.style.width = pctl != null ? Math.round(pctl) + '%' : '100%';
         if (showColor) {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
           barFill.style.backgroundColor = barColor;
         } else {
-          // Unqualified: gray bar with white diagonal hatching
+          // Unqualified / no percentile: gray bar with white diagonal hatching
           var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
           var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
           barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
