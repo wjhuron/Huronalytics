@@ -68,6 +68,8 @@ HITTER_STAT_KEYS = [
     'sprintSpeed',
     # wRC+ / xWRC+
     'wRCplus', 'xWRCplus',
+    # Run Value
+    'runValue',
 ]
 # Hitter stats where lower is better (invert percentile so low value = red/high pctl)
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}

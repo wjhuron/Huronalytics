@@ -1260,7 +1260,7 @@ var Aggregator = {
 
     // Merge boxscore stats from pre-aggregated HITTER_DATA
     // Includes batting stats recomputed from boxscore (fixes IBB not in pitch data)
-    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
+    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue', 'runValue_pctl',
                       'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
                       'doubles', 'triples', 'hr', 'xbh',
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
