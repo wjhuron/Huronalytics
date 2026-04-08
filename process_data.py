@@ -3703,10 +3703,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
-    # Compute percentiles for wRC+ and xWRC+ (computed after main percentile loop)
-    # These use PA-based qualification (via isQualified on frontend), not BIP — every player with a value gets a percentile
-    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'wRCplus')
-    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'xWRCplus')
+    # Compute percentiles for stats set by boxscore merge (after merge so values are present)
+    # Traditional batting stats (avg, obp, slg, ops, iso, babip, kPct, bbPct, wOBA) are set by
+    # boxscore merge and were None during Phase 3 percentile pass. Compute their percentiles now.
+    # wRC+ and xWRC+ also depend on boxscore wOBA, so they go here too.
+    BOXSCORE_PCTL_STATS = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'wOBA',
+                           'wRCplus', 'xWRCplus']
+    for stat in BOXSCORE_PCTL_STATS:
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+    # Apply inversions for boxscore stats where lower is better
+    for row in hitter_leaderboard:
+        for stat in BOXSCORE_PCTL_STATS:
+            if stat in HITTER_INVERT_PCTL:
+                pctl_key = stat + '_pctl'
+                if row.get(pctl_key) is not None:
+                    row[pctl_key] = 100 - row[pctl_key]
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
