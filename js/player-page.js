@@ -945,7 +945,7 @@ var PlayerPage = {
         barFill.style.width = Math.round(pctl) + '%';
         if (showColor) {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-          barFill.style.backgroundColor = barColor;
+          barFill.style.background = barColor;
         } else {
           // Unqualified: gray bar with white diagonal hatching
           var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';

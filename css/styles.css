@@ -1408,9 +1408,9 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
 
 .pctl-bar-fill {
   height: 100%;
+  width: 0;
   border-radius: 5px;
   transition: width 0.3s ease;
-  background: var(--accent);
 }
 
 .pctl-circle-wrap {
