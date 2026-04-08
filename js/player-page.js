@@ -78,7 +78,6 @@ var PlayerPage = {
     { key: 'maxEV', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPct', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'laSweetSpotPct', label: 'Sweet-Spot%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
     { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
@@ -864,7 +863,7 @@ var PlayerPage = {
     // BIP-dependent stats that show gray when bipQual is false
     var HITTER_BIP_STATS = {
       avgEVAll: true, ev50: true, maxEV: true,
-      hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
+      hardHitPct: true, barrelPct: true, sacqPct: true,
       xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
       babip: true, hrFbPct: true, airPullPct: true
     };

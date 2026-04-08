@@ -13,7 +13,6 @@ from datetime import datetime, time
 from collections import defaultdict
 
 SPREADSHEET_IDS = {
-    'ST': '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo',   # ST 2026 (all 30 teams + WBC)
     'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',   # AL 2026 (15 AL teams)
     'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',   # NL 2026 (15 NL teams)
 }
@@ -22,7 +21,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
 METRIC_COLS = [
     'Velocity', 'Spin Rate', 'IndVertBrk', 'HorzBrk',
-    'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA', 'VRA', 'HRA'
+    'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA'
 ]
 
 METRIC_KEYS = {
@@ -31,7 +30,6 @@ METRIC_KEYS = {
     'RelPosZ': 'relPosZ', 'RelPosX': 'relPosX',
     'Extension': 'extension', 'ArmAngle': 'armAngle',
     'VAA': 'vaa', 'HAA': 'haa',
-    'VRA': 'vra', 'HRA': 'hra',
 }
 
 PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
@@ -51,7 +49,7 @@ HITTER_STAT_KEYS = [
     # Expected Stats
     'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
     # Batted Ball tab
-    'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
+    'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'sacqPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
@@ -62,8 +60,6 @@ HITTER_STAT_KEYS = [
     'twoStrikeWhiffPct', 'firstPitchSwingPct',
     # Batted ball distance
     'avgFbDist', 'avgHrDist',
-    # Squared-Up Rate
-    'squaredUpPct',
     # Sprint Speed
     'sprintSpeed',
     # wRC+ / xWRC+
@@ -552,7 +548,7 @@ def round_metric(key, value):
         return None
     if key == 'Spin Rate':
         return round(value)
-    if key in ('VAA', 'HAA', 'VRA', 'HRA'):
+    if key in ('VAA', 'HAA'):
         return round(value, 2)
     return round(value, 1)
 
@@ -797,10 +793,6 @@ def compute_hitter_stats(pitches):
     hard_hit = sum(1 for v in ev_valid if v >= 95)
     hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
 
-    # LA Sweet-Spot%: launch angle between 8° and 32°
-    sweet_spot = sum(1 for la in all_la if 8 <= la <= 32)
-    la_sweet_spot_pct = sweet_spot / len(all_la) if all_la else None
-
     # HR/FB ratio for hitters — denominator = fly balls + popups + line drive HRs
     n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
     ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
@@ -830,33 +822,6 @@ def compute_hitter_stats(pitches):
     hr_distances = [d for d in hr_distances if d is not None]
     avg_hr_dist = round(sum(hr_distances) / len(hr_distances), 0) if hr_distances else None
 
-    # === Squared-Up Rate ===
-    # Statcast definition: actual EV >= 80% of maximum possible EV for that swing.
-    # Max possible EV is derived from bat-ball collision physics:
-    #   max_EV = 1.23 × bat_speed + 0.23 × pitch_speed_at_contact
-    #   pitch_speed_at_contact ≈ release_speed × 0.92 (deceleration from mound to plate)
-    # Source: Alan Nathan bat-ball collision model, validated against Statcast examples
-    # (e.g., De La Cruz: 77.3mph bat, 93.6mph pitch → max EV 114.8 → model gives 114.9)
-    squared_up = 0
-    squared_eligible = 0
-    for p in bip:
-        bs = safe_float(p.get('BatSpeed'))
-        ev_sq = safe_float(p.get('ExitVelo'))
-        pitch_velo = safe_float(p.get('Velocity'))
-        if bs is not None and bs >= 50 and ev_sq is not None:
-            squared_eligible += 1
-            # Use pitch speed if available, otherwise estimate from bat speed alone
-            if pitch_velo is not None:
-                pitch_at_contact = pitch_velo * 0.92
-                max_ev = 1.23 * bs + 0.23 * pitch_at_contact
-            else:
-                # Fallback: assume ~92mph avg pitch speed at contact (85mph)
-                max_ev = 1.23 * bs + 0.23 * 85
-            threshold = 0.80 * max_ev
-            if ev_sq >= threshold:
-                squared_up += 1
-    squared_up_pct = squared_up / squared_eligible if squared_eligible > 0 else None
-
     # Bat Tracking — only competitive swings (BatSpeed >= 50)
     bs_vals = [safe_float(p.get('BatSpeed')) for p in pitches if safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
     sl_vals = [safe_float(p.get('SwingLength')) for p in pitches if safe_float(p.get('SwingLength')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
@@ -883,7 +848,6 @@ def compute_hitter_stats(pitches):
         'medLA': round(median(all_la), 1) if all_la else None,
         'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
         'barrelPct': barrels / n_bip if n_bip > 0 else None,
-        'laSweetSpotPct': round(la_sweet_spot_pct, 4) if la_sweet_spot_pct is not None else None,
         'gbPct': gb / n_bip if n_bip > 0 else None,
         'ldPct': ld / n_bip if n_bip > 0 else None,
         'fbPct': fb / n_bip if n_bip > 0 else None,
@@ -903,7 +867,7 @@ def compute_hitter_stats(pitches):
         'whiffPct': whiffs / n_swings if n_swings > 0 else None,
         'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
         # Run Value — negate pitcher RunExp so positive = good for hitter
-        'runValue': (lambda vals: round(-sum(vals), 1) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
+        'runValue': (lambda vals: -sum(vals) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
         # Bat Tracking — averages of competitive swings (BatSpeed >= 50)
         'batSpeed': round(sum(bs_vals) / len(bs_vals), 1) if bs_vals else None,
         'swingLength': round(sum(sl_vals) / len(sl_vals), 1) if sl_vals else None,
@@ -917,8 +881,6 @@ def compute_hitter_stats(pitches):
         # Batted ball distance
         'avgFbDist': avg_fb_dist,
         'avgHrDist': avg_hr_dist,
-        # Squared-Up Rate
-        'squaredUpPct': squared_up_pct,
     }
 
 
@@ -1064,7 +1026,7 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitch micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, pitchTypeIdx, dateIdx, batterHand)
-    #  Values: 22 count fields + 29 metric fields = 51 fields
+    #  Values: 22 count fields + 27 metric fields = 49 fields
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
     #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
@@ -1073,20 +1035,18 @@ def generate_micro_data(all_pitches):
     #  28:sumHB 29:nHB  30:sumRelZ 31:nRelZ  32:sumRelX 33:nRelX
     #  34:sumExt 35:nExt  36:sumArmAngle 37:nArmAngle
     #  38:sumVAA 39:nVAA  40:sumHAA 41:nHAA
-    #  42:sumVRA 43:nVRA  44:sumHRA 45:nHRA
-    #  46:sumPlateZ 47:nPlateZ
-    #  48:sumTiltSin 49:sumTiltCos 50:nTilt
-    #  51:sumPlateX 52:nPlateX
-    #  53:sumRTiltSin 54:sumRTiltCos 55:nRTilt
+    #  42:sumPlateZ 43:nPlateZ
+    #  44:sumTiltSin 45:sumTiltCos 46:nTilt
+    #  47:sumPlateX 48:nPlateX
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('IndVertBrk', 26),
         ('HorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
         ('Extension', 34), ('ArmAngle', 36), ('VAA', 38), ('HAA', 40),
-        ('VRA', 42), ('HRA', 44), ('PlateZ', 46), ('PlateX', 51),
+        ('PlateZ', 42), ('PlateX', 47),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 56)
+    pitch_micro = defaultdict(lambda: [0.0] * 49)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -1161,17 +1121,9 @@ def generate_micro_data(all_pitches):
         tilt_min = break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt'))
         if tilt_min is not None:
             angle = tilt_min / 720.0 * 2 * math.pi
-            c[48] += math.sin(angle)
-            c[49] += math.cos(angle)
-            c[50] += 1
-
-        # Release Tilt (circular sin/cos components)
-        rtilt_min = break_tilt_to_minutes(p.get('RTilt'))
-        if rtilt_min is not None:
-            rangle = rtilt_min / 720.0 * 2 * math.pi
-            c[53] += math.sin(rangle)
-            c[54] += math.cos(rangle)
-            c[55] += 1
+            c[44] += math.sin(angle)
+            c[45] += math.cos(angle)
+            c[46] += 1
 
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
@@ -1179,18 +1131,14 @@ def generate_micro_data(all_pitches):
         # 22 integer/float counts (0-21)
         for i in range(22):
             row.append(int(c[i]))
-        # 13 metric sum/count pairs (including PlateZ and ArmAngle)
+        # 10 metric sum/count pairs
         for col_name, offset in METRIC_OFFSETS:
             row.append(round(c[offset], 2))       # metric sum
             row.append(int(c[offset + 1]))         # metric count
         # Tilt sin/cos
-        row.append(round(c[48], 6))  # sumTiltSin
-        row.append(round(c[49], 6))  # sumTiltCos
-        row.append(int(c[50]))       # nTilt
-        # RTilt sin/cos
-        row.append(round(c[53], 6))  # sumRTiltSin
-        row.append(round(c[54], 6))  # sumRTiltCos
-        row.append(int(c[55]))       # nRTilt
+        row.append(round(c[44], 6))  # sumTiltSin
+        row.append(round(c[45], 6))  # sumTiltCos
+        row.append(int(c[46]))       # nTilt
         pitch_rows.append(row)
 
     # ==========================================================
@@ -1239,16 +1187,20 @@ def generate_micro_data(all_pitches):
     #  Hitter micro-aggs
     #  Key: (hitterIdx, teamIdx, bats, dateIdx, pitcherHand)
     #  bats = actual batting side for these pitches (R/L)
-    #  Values: 36 count fields
+    #  Values: 47 count fields
     #  0:n  1:pa  2:h  3:db  4:tp  5:hr  6:bb  7:hbp  8:sf  9:sh  10:ci  11:k
     #  12:swings  13:whiffs  14:izPitches  15:oozPitches
     #  16:izSwings  17:oozSwings  18:contact
     #  19:izSwNonBunt  20:izContact
     #  21:bip  22:gb  23:ld  24:fb  25:pu
     #  26:barrels  27:nSpray  28:pull  29:center  30:oppo  31:airPull
-    #  32:hardHit  33:laSweetSpot  34:nLaValid  35:nHrBip  36:ldHr
+    #  32:hardHit  33:nHrBip  34:ldHr
+    #  35:twoStrikeSwings  36:twoStrikeWhiffs
+    #  37:firstPitchAppearances  38:firstPitchSwings
+    #  39:xBA_sum  40:xBA_count  41:xSLG_sum  42:xSLG_count
+    #  43:xwOBA_sum  44:xwOBA_count  45:xwOBAcon_sum  46:xwOBAcon_count
     # ==========================================================
-    hitter_micro = defaultdict(lambda: [0.0] * 37)
+    hitter_micro = defaultdict(lambda: [0.0] * 47)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -1321,7 +1273,7 @@ def generate_micro_data(all_pitches):
             if bb_type == 'fly_ball':     c[24] += 1  # fb
             if bb_type == 'popup':        c[25] += 1  # pu
 
-            # Barrel, hard-hit, LA sweet-spot, HR on BIP
+            # Barrel, hard-hit, HR on BIP
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
             barrel_val = str(p.get('Barrel', '')).strip()
@@ -1329,14 +1281,10 @@ def generate_micro_data(all_pitches):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
-            if la is not None:
-                c[34] += 1  # nLaValid
-                if 8 <= la <= 32:
-                    c[33] += 1  # laSweetSpot
             if event == 'Home Run':
-                c[35] += 1  # nHrBip
+                c[33] += 1  # nHrBip
                 if bb_type == 'line_drive':
-                    c[36] += 1  # ldHr (line-drive HRs)
+                    c[34] += 1  # ldHr (line-drive HRs)
 
             # Spray direction
             hc_x = safe_float(p.get('HC_X'))
@@ -1351,11 +1299,41 @@ def generate_micro_data(all_pitches):
                 if sd == 'pull' and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1  # airPull
 
+            # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)
+            xba_val = safe_float(p.get('xBA'))
+            xslg_val = safe_float(p.get('xSLG'))
+            xwobacon_val = safe_float(p.get('xwOBA'))
+            if xba_val is not None:
+                c[39] += xba_val; c[40] += 1
+            if xslg_val is not None:
+                c[41] += xslg_val; c[42] += 1
+            if xwobacon_val is not None:
+                c[45] += xwobacon_val; c[46] += 1
+
+        # xwOBA: assigned to ALL PA events (K, BB, HBP, BIP), not just BIPs
+        if event and event not in NON_PA_EVENTS and event != 'Intent Walk':
+            xwoba_val = safe_float(p.get('xwOBA'))
+            if xwoba_val is not None:
+                c[43] += xwoba_val; c[44] += 1
+
+        # Count-leverage stats (outside BIP block — applies to all pitches)
+        count_str = p.get('Count', '')
+        if count_str:
+            strikes = count_str.split('-')[1] if '-' in count_str else ''
+            if strikes == '2':
+                if desc in SWING_DESCRIPTIONS:
+                    c[35] += 1  # twoStrikeSwings
+                if desc == 'Swinging Strike':
+                    c[36] += 1  # twoStrikeWhiffs
+            if count_str == '0-0':
+                c[37] += 1  # firstPitchAppearances
+                if desc in SWING_DESCRIPTIONS:
+                    c[38] += 1  # firstPitchSwings
 
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
         row = [hi, ti, bats, di, ph]
-        for i in range(37):
+        for i in range(47):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_rows.append(row)
@@ -1418,9 +1396,9 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Hitter-Pitch micro-aggs (same counts as hitter micro, but keyed with pitch type)
     #  Key: (hitterIdx, teamIdx, bats, pitchTypeIdx, dateIdx, pitcherHand)
-    #  Same 36 count fields as hitter micro
+    #  Same 47 count fields as hitter micro
     # ==========================================================
-    hitter_pitch_micro = defaultdict(lambda: [0.0] * 37)
+    hitter_pitch_micro = defaultdict(lambda: [0.0] * 47)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -1495,14 +1473,10 @@ def generate_micro_data(all_pitches):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
-            if la is not None:
-                c[34] += 1  # nLaValid
-                if 8 <= la <= 32:
-                    c[33] += 1  # laSweetSpot
             if event == 'Home Run':
-                c[35] += 1  # nHrBip
+                c[33] += 1  # nHrBip
                 if bb_type == 'line_drive':
-                    c[36] += 1  # ldHr (line-drive HRs)
+                    c[34] += 1  # ldHr
 
             hc_x = safe_float(p.get('HC_X'))
             hc_y = safe_float(p.get('HC_Y'))
@@ -1516,10 +1490,41 @@ def generate_micro_data(all_pitches):
                 if sd == 'pull' and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1
 
+            # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)
+            xba_val = safe_float(p.get('xBA'))
+            xslg_val = safe_float(p.get('xSLG'))
+            xwobacon_val = safe_float(p.get('xwOBA'))
+            if xba_val is not None:
+                c[39] += xba_val; c[40] += 1
+            if xslg_val is not None:
+                c[41] += xslg_val; c[42] += 1
+            if xwobacon_val is not None:
+                c[45] += xwobacon_val; c[46] += 1
+
+        # xwOBA: assigned to ALL PA events (K, BB, HBP, BIP), not just BIPs
+        if event and event not in NON_PA_EVENTS and event != 'Intent Walk':
+            xwoba_val = safe_float(p.get('xwOBA'))
+            if xwoba_val is not None:
+                c[43] += xwoba_val; c[44] += 1
+
+        # Count-leverage stats
+        count_str = p.get('Count', '')
+        if count_str:
+            strikes = count_str.split('-')[1] if '-' in count_str else ''
+            if strikes == '2':
+                if desc in SWING_DESCRIPTIONS:
+                    c[35] += 1  # twoStrikeSwings
+                if desc == 'Swinging Strike':
+                    c[36] += 1  # twoStrikeWhiffs
+            if count_str == '0-0':
+                c[37] += 1  # firstPitchAppearances
+                if desc in SWING_DESCRIPTIONS:
+                    c[38] += 1  # firstPitchSwings
+
     hitter_pitch_rows = []
     for (hi, ti, bats, pti, di, ph), c in hitter_pitch_micro.items():
         row = [hi, ti, bats, pti, di, ph]
-        for i in range(37):
+        for i in range(47):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_pitch_rows.append(row)
@@ -1616,11 +1621,9 @@ def generate_micro_data(all_pitches):
             'sumHB', 'nHB', 'sumRelZ', 'nRelZ', 'sumRelX', 'nRelX',
             'sumExt', 'nExt', 'sumArmAngle', 'nArmAngle',
             'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
-            'sumVRA', 'nVRA', 'sumHRA', 'nHRA',
             'sumPlateZ', 'nPlateZ',
-            'sumPlateX', 'nPlateX',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
-            'sumRTiltSin', 'sumRTiltCos', 'nRTilt',
+            'sumPlateX', 'nPlateX',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -1630,7 +1633,11 @@ def generate_micro_data(all_pitches):
             'contact', 'izSwNonBunt', 'izContact',
             'bip', 'gb', 'ld', 'fb', 'pu',
             'barrels', 'nSpray', 'pull', 'center', 'oppo', 'airPull',
-            'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip', 'ldHr',
+            'hardHit', 'nHrBip', 'ldHr',
+            'twoStrikeSwings', 'twoStrikeWhiffs',
+            'firstPitchAppearances', 'firstPitchSwings',
+            'xBA_sum', 'xBA_count', 'xSLG_sum', 'xSLG_count',
+            'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
         ],
         'hitterMicro': hitter_rows,
         'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
@@ -1642,7 +1649,11 @@ def generate_micro_data(all_pitches):
             'contact', 'izSwNonBunt', 'izContact',
             'bip', 'gb', 'ld', 'fb', 'pu',
             'barrels', 'nSpray', 'pull', 'center', 'oppo', 'airPull',
-            'hardHit', 'laSweetSpot', 'nLaValid', 'nHrBip', 'ldHr',
+            'hardHit', 'nHrBip', 'ldHr',
+            'twoStrikeSwings', 'twoStrikeWhiffs',
+            'firstPitchAppearances', 'firstPitchSwings',
+            'xBA_sum', 'xBA_count', 'xSLG_sum', 'xSLG_count',
+            'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
         ],
         'hitterPitchMicro': hitter_pitch_rows,
         'hitterPitchBipCols': ['hitterIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
@@ -2787,40 +2798,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['xHB'] = None
             row['hbOE'] = None
 
-    # --- Percentile computation: pitch leaderboard per pitch type (Phase 1) ---
-    # Percentiles are computed in 4 phases across the pipeline:
-    #   Phase 1: Pitch-type percentiles (here) — pitch metrics grouped by pitch type
-    #   Phase 2: Pitcher-level percentiles — overall pitcher stats (before boxscore merge)
-    #   Phase 3: Hitter-level percentiles — hitter stats
-    #   Phase 4: Hitter pitch-type percentiles — hitter stats grouped by pitch type
-    # Phases 2-3 run before boxscore merge, but the stats they percentile (pitch metrics,
-    # run value) are NOT the ones changed by merge (ERA, FIP, etc.), so ordering is correct.
-    # Boxscore-derived stats (ERA, FIP, etc.) get percentiled in a separate pass after merge.
-    pt_groups = defaultdict(list)
-    for row in pitch_leaderboard:
-        pt_groups[row['pitchType']].append(row)
-
-    for metric in PITCH_PCTL_KEYS:
-        for pt, pt_rows in pt_groups.items():
-            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
-
-    # --- Invert VAA and nVAA percentiles for non-fastball pitch types ---
-    VAA_NO_INVERT_TYPES = {'FF', 'FC'}
-    for pt, pt_rows in pt_groups.items():
-        if pt not in VAA_NO_INVERT_TYPES:
-            for row in pt_rows:
-                if row.get('vaa_pctl') is not None:
-                    row['vaa_pctl'] = 100 - row['vaa_pctl']
-                if row.get('nVAA_pctl') is not None:
-                    row['nVAA_pctl'] = 100 - row['nVAA_pctl']
-
-    # Invert wOBA/xBA/xSLG/xwOBA percentiles (lower is better for pitchers)
-    for row in pitch_leaderboard:
-        for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA'):
-            pctl_key = stat + '_pctl'
-            if row.get(pctl_key) is not None:
-                row[pctl_key] = 100 - row[pctl_key]
-
     # --- Compute Pitch Tunneling Distances ---
     # For each pitcher, find primary fastball (FF/SI with most pitches),
     # then compute tunnel distance (inches) from that fastball to each secondary pitch.
@@ -2927,7 +2904,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
-    PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA', 'VRA', 'HRA']
+    PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA']
+    PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
+    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
+    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'}
     pitcher_leaderboard = []
     for (pitcher, team, throws), pitches in pitcher_groups.items():
         row = {
@@ -3007,21 +2987,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
-
-    # --- Percentile computation: pitcher leaderboard (Phase 2) ---
-    # Computed BEFORE boxscore merge. Stats percentiled here (pitch metrics, run value)
-    # are NOT the ones that change after merge (ERA, FIP, etc.), so ordering is correct.
-    PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
-    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'}  # lower is better for pitchers
-    for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100']:
-        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
-
-    for row in pitcher_leaderboard:
-        for stat in PITCHER_INVERT_PCTL | PITCHER_BB_INVERT | EXPECTED_PITCHER_INVERT:
-            pctl_key = stat + '_pctl'
-            if row.get(pctl_key) is not None:
-                row[pctl_key] = 100 - row[pctl_key]
 
     pitcher_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitcher leaderboard: {len(pitcher_leaderboard)} rows")
@@ -3106,6 +3071,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
     # --- League Averages per pitch type (weighted by pitch count, MLB only) ---
+    pt_groups = defaultdict(list)
+    for row in pitch_leaderboard:
+        pt_groups[row['pitchType']].append(row)
+
     league_avgs = {}
     for pt, pt_rows_all in pt_groups.items():
         pt_rows = [r for r in pt_rows_all if not r.get('_isROC')]  # Exclude ROC from league averages
@@ -3326,21 +3295,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['sprintQual'] = False
     print(f"  Sprint speed merged for {sprint_merged}/{len(hitter_leaderboard)} hitters")
 
-    # --- Percentile computation: hitter leaderboard (Phase 3) ---
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 20
-
-    # Percentile pool includes ALL players with a value (no min_count gating).
-    # Qualification for display coloring is handled entirely on the frontend.
-    for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
-
-    for row in hitter_leaderboard:
-        for stat in HITTER_INVERT_PCTL:
-            pctl_key = stat + '_pctl'
-            if row.get(pctl_key) is not None:
-                row[pctl_key] = 100 - row[pctl_key]
 
     hitter_leaderboard.sort(key=lambda r: r.get('pa', 0), reverse=True)
     print(f"Hitter leaderboard: {len(hitter_leaderboard)} rows")
@@ -3369,7 +3326,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
         'wOBA', 'xBA', 'xSLG', 'xwOBA',
-        'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+        'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
         'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
@@ -3449,26 +3406,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Compute rv100 for hitter pitch leaderboard rows
     for row in hitter_pitch_leaderboard:
         if row.get('runValue') is not None and row.get('count', 0) > 0:
-            row['rv100'] = round(row['runValue'] / row['count'] * 100, 2)
+            row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
-
-    # --- Percentile computation: hitter pitch-type leaderboard (Phase 4) ---
-    hpt_groups = defaultdict(list)
-    for row in hitter_pitch_leaderboard:
-        hpt_groups[row['pitchType']].append(row)
-
-    # Percentile pool includes ALL players (no min_count gating).
-    # Qualification for display coloring is handled on the frontend (≥25 pitches seen).
-    for pt, pt_rows in hpt_groups.items():
-        for stat in HITTER_PITCH_PCTL_KEYS:
-            compute_percentile_ranks_with_aaa(pt_rows, stat)
-
-    for row in hitter_pitch_leaderboard:
-        for stat in HITTER_PITCH_INVERT_PCTL:
-            pctl_key = stat + '_pctl'
-            if row.get(pctl_key) is not None:
-                row[pctl_key] = 100 - row[pctl_key]
 
     hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
     print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
@@ -3482,7 +3422,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
-                 'laSweetSpotPct', 'sacqPct', 'xwOBAcon', 'xwOBAsp',
+                 'sacqPct', 'xwOBAcon', 'xwOBAsp',
                  'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     for stat in HITTER_STAT_KEYS:
@@ -3703,22 +3643,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
-    # Compute percentiles for stats set by boxscore merge (after merge so values are present)
-    # Traditional batting stats (avg, obp, slg, ops, iso, babip, kPct, bbPct, wOBA) are set by
-    # boxscore merge and were None during Phase 3 percentile pass. Compute their percentiles now.
-    # wRC+ and xWRC+ also depend on boxscore wOBA, so they go here too.
-    BOXSCORE_PCTL_STATS = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'wOBA',
-                           'wRCplus', 'xWRCplus']
-    for stat in BOXSCORE_PCTL_STATS:
-        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
-    # Apply inversions for boxscore stats where lower is better
-    for row in hitter_leaderboard:
-        for stat in BOXSCORE_PCTL_STATS:
-            if stat in HITTER_INVERT_PCTL:
-                pctl_key = stat + '_pctl'
-                if row.get(pctl_key) is not None:
-                    row[pctl_key] = 100 - row[pctl_key]
-
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
     # Exclude MiLB teams from league-wide calculations
@@ -3839,19 +3763,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.pop('_siera_raw', None)
         row.pop('_box', None)
 
-    # --- Percentile computation: boxscore-derived pitcher stats (Phase 2b) ---
-    # ERA, FIP, etc. are set by boxscore merge AFTER the Phase 2 percentile pass,
-    # so they need a separate percentile pass here.
-    BOXSCORE_PCTL_KEYS = ['era', 'hr9', 'fip', 'xFIP', 'siera']
-    BOXSCORE_INVERT = {'era', 'hr9', 'fip', 'xFIP', 'siera'}
-    for stat in BOXSCORE_PCTL_KEYS:
-        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
-    for row in pitcher_leaderboard:
-        for stat in BOXSCORE_INVERT:
-            pctl_key = stat + '_pctl'
-            if row.get(pctl_key) is not None:
-                row[pctl_key] = 100 - row[pctl_key]
-
     # Compute ERA league average (total_outs and total_er computed above)
     if total_outs > 0:
         total_ip = total_outs / 3.0
@@ -3872,6 +3783,82 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             total_w = sum(w for _, w in pairs)
             metadata['pitcherLeagueAverages'][stat] = round(sum(v * w for v, w in pairs) / total_w, 2) if total_w > 0 else None
 
+    # ==========================================================
+    # CONSOLIDATED PERCENTILE COMPUTATION
+    # All stats are now computed, all boxscore merges done, all derived stats (FIP, wRC+, etc.) set.
+    # Compute all percentiles in a single pass, then apply all inversions.
+    # ==========================================================
+    print("\n--- Computing percentiles (single pass) ---")
+
+    # 1. Pitch-type percentiles (grouped by pitch type)
+    pt_groups = defaultdict(list)
+    for row in pitch_leaderboard:
+        pt_groups[row['pitchType']].append(row)
+    for metric in PITCH_PCTL_KEYS:
+        for pt, pt_rows in pt_groups.items():
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
+
+    # 2. Pitcher percentiles (all stats including boxscore-derived)
+    PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
+                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'era', 'hr9', 'fip', 'xFIP', 'siera'])
+    for stat in PITCHER_ALL_PCTL:
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
+
+    # 3. Hitter percentiles (all stats including boxscore-derived)
+    for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+
+    # 4. Hitter pitch-type percentiles (grouped by pitch type)
+    hpt_groups = defaultdict(list)
+    for row in hitter_pitch_leaderboard:
+        hpt_groups[row['pitchType']].append(row)
+    for pt, pt_rows in hpt_groups.items():
+        for stat in HITTER_PITCH_PCTL_KEYS:
+            compute_percentile_ranks_with_aaa(pt_rows, stat)
+
+    # ==========================================================
+    # CONSOLIDATED INVERSIONS
+    # ==========================================================
+
+    # Pitch inversions: VAA/nVAA for non-fastball, expected stats for all
+    VAA_NO_INVERT_TYPES = {'FF', 'FC'}
+    for pt, pt_rows in pt_groups.items():
+        if pt not in VAA_NO_INVERT_TYPES:
+            for row in pt_rows:
+                if row.get('vaa_pctl') is not None:
+                    row['vaa_pctl'] = 100 - row['vaa_pctl']
+                if row.get('nVAA_pctl') is not None:
+                    row['nVAA_pctl'] = 100 - row['nVAA_pctl']
+    for row in pitch_leaderboard:
+        for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA'):
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
+    # Pitcher inversions
+    PITCHER_ALL_INVERT = PITCHER_INVERT_PCTL | PITCHER_BB_INVERT | EXPECTED_PITCHER_INVERT | {'era', 'hr9', 'fip', 'xFIP', 'siera'}
+    for row in pitcher_leaderboard:
+        for stat in PITCHER_ALL_INVERT:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
+    # Hitter inversions
+    for row in hitter_leaderboard:
+        for stat in HITTER_INVERT_PCTL:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
+    # Hitter pitch-type inversions
+    for row in hitter_pitch_leaderboard:
+        for stat in HITTER_PITCH_INVERT_PCTL:
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+
+    print("  Percentiles computed and inversions applied.")
+
     # Final rounding step for runValue/rv100 — applied after percentiles so
     # percentile ranks use exact values, but output uses display-friendly precision.
     for row in pitch_leaderboard:
@@ -3880,6 +3867,14 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if row.get('rv100') is not None:
             row['rv100'] = round(row['rv100'], 2)
     for row in pitcher_leaderboard:
+        if row.get('runValue') is not None:
+            row['runValue'] = round(row['runValue'], 1)
+        if row.get('rv100') is not None:
+            row['rv100'] = round(row['rv100'], 2)
+    for row in hitter_leaderboard:
+        if row.get('runValue') is not None:
+            row['runValue'] = round(row['runValue'], 1)
+    for row in hitter_pitch_leaderboard:
         if row.get('runValue') is not None:
             row['runValue'] = round(row['runValue'], 1)
         if row.get('rv100') is not None:

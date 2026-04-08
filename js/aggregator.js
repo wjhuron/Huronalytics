@@ -676,9 +676,6 @@ var Aggregator = {
         groups[gk].metricSums.sumTiltSin = 0;
         groups[gk].metricSums.sumTiltCos = 0;
         groups[gk].metricSums.nTilt = 0;
-        groups[gk].metricSums.sumRTiltSin = 0;
-        groups[gk].metricSums.sumRTiltCos = 0;
-        groups[gk].metricSums.nRTilt = 0;
       }
 
       var g = groups[gk];
@@ -692,9 +689,6 @@ var Aggregator = {
       g.metricSums.sumTiltSin += row[ci.sumTiltSin];
       g.metricSums.sumTiltCos += row[ci.sumTiltCos];
       g.metricSums.nTilt += row[ci.nTilt];
-      g.metricSums.sumRTiltSin += row[ci.sumRTiltSin];
-      g.metricSums.sumRTiltCos += row[ci.sumRTiltCos];
-      g.metricSums.nRTilt += row[ci.nRTilt];
     }
 
     // Convert to row objects
@@ -1050,15 +1044,15 @@ var Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           batsSet: {},
-          counts: new Array(37)
+          counts: new Array(47)
         };
-        for (var z = 0; z < 37; z++) groups[gk].counts[z] = 0;
+        for (var z = 0; z < 47; z++) groups[gk].counts[z] = 0;
       }
 
       var g = groups[gk];
       g.batsSet[row[ci.bats]] = true;
 
-      for (var f = 0; f < 37; f++) {
+      for (var f = 0; f < 47; f++) {
         g.counts[f] += row[5 + f];
       }
     }
@@ -1085,11 +1079,14 @@ var Aggregator = {
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
-      'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
-      'gbPct', 'hrFbPct',
-      'airPullPct',
+      'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'sacqPct',
+      'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
+      'pullPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
       'batSpeed', 'swingLength',
+      'twoStrikeWhiffPct', 'firstPitchSwingPct',
+      'avgFbDist', 'avgHrDist',
+      'sprintSpeed', 'runValue',
       'wRCplus', 'xWRCplus',
     ];
     var HITTER_INVERT = {
@@ -1111,7 +1108,11 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
-      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35], ldHr = c[36];
+      var hardHit = c[32], nHrBip = c[33], ldHr = c[34];
+      var twoStrikeSwings = c[35], twoStrikeWhiffs = c[36];
+      var firstPitchAppearances = c[37], firstPitchSwings = c[38];
+      var xBA_sum = c[39], xBA_count = c[40], xSLG_sum = c[41], xSLG_count = c[42];
+      var xwOBA_sum = c[43], xwOBA_count = c[44], xwOBAcon_sum = c[45], xwOBAcon_count = c[46];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -1136,7 +1137,6 @@ var Aggregator = {
       var contactPct = swings > 0 ? contact / swings : null;
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
       var hardHitPct = bip > 0 ? hardHit / bip : null;
-      var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
       var fb_for_hrfb = fb + pu + ldHr;
       var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
@@ -1227,7 +1227,6 @@ var Aggregator = {
         medLA: medLA,
         hardHitPct: hardHitPct,
         barrelPct: bip > 0 ? barrels / bip : null,
-        laSweetSpotPct: laSweetSpotPct,
         sacqPct: sacqPct_val,
         xwOBAsp: xwOBAsp_val,
         gbPct: bip > 0 ? gb_c / bip : null,
@@ -1246,7 +1245,27 @@ var Aggregator = {
         contactPct: contactPct,
         izContactPct: izContactPct,
         whiffPct: swings > 0 ? whiffs / swings : null,
+        twoStrikeWhiffPct: twoStrikeSwings > 0 ? twoStrikeWhiffs / twoStrikeSwings : null,
+        firstPitchSwingPct: firstPitchAppearances > 0 ? firstPitchSwings / firstPitchAppearances : null,
+        xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
+        xSLG: ab > 0 && xSLG_count > 0 ? xSLG_sum / ab : null,
+        xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
+        xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
       };
+
+      // Compute avgFbDist and avgHrDist from BIP records
+      if (bipRecords.length > 0 && bci.distance !== undefined) {
+        var fbDists = [], hrDists = [];
+        for (var dri = 0; dri < bipRecords.length; dri++) {
+          var dr = bipRecords[dri];
+          var dist = dr[bci.distance];
+          if (dist == null) continue;
+          if (dr[bci.bbType] === 2) fbDists.push(dist); // fly_ball = 2
+          if (dr[bci.event] === 4) hrDists.push(dist);   // HR = 4
+        }
+        obj.avgFbDist = fbDists.length > 0 ? Math.round(fbDists.reduce(function(a,b){return a+b;},0) / fbDists.length) : null;
+        obj.avgHrDist = hrDists.length > 0 ? Math.round(hrDists.reduce(function(a,b){return a+b;},0) / hrDists.length) : null;
+      }
 
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
@@ -1258,19 +1277,14 @@ var Aggregator = {
     }
 
     // Merge boxscore stats from pre-aggregated HITTER_DATA
-    // Includes batting stats recomputed from boxscore (fixes IBB not in pitch data)
-    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue', 'runValue_pctl',
+    // Stats now computed from micro data (filter-responsive) are no longer merged here.
+    var hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
                       'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
                       'doubles', 'triples', 'hr', 'xbh',
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
-                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
-                      'xwOBAcon', 'xwOBAcon_pctl', 'xwOBAsp', 'xwOBAsp_pctl',
-                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
-                      'firstPitchSwingPct', 'firstPitchSwingPct_pctl',
-                      'avgFbDist', 'avgHrDist',
-                      'squaredUpPct', 'squaredUpPct_pctl',
-                      'sprintSpeed', 'sprintSpeed_pctl', 'nCompRuns', 'sprintQual',
-                      'wRC', 'wRCplus', 'wRCplus_pctl', 'xWRCplus', 'xWRCplus_pctl'];
+                      'wOBA',
+                      'sprintSpeed', 'nCompRuns', 'sprintQual',
+                      'wRC', 'wRCplus', 'xWRCplus'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
     for (var hbi = 0; hbi < hPreAgg.length; hbi++) {
@@ -1405,11 +1419,11 @@ var Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          counts: new Array(37)
+          counts: new Array(47)
         };
-        for (var z = 0; z < 37; z++) perPT[gk].counts[z] = 0;
+        for (var z = 0; z < 47; z++) perPT[gk].counts[z] = 0;
       }
-      for (var f = 0; f < 37; f++) {
+      for (var f = 0; f < 47; f++) {
         perPT[gk].counts[f] += row[6 + f];
       }
     }
@@ -1467,13 +1481,13 @@ var Aggregator = {
               hitterIdx: entry.hitterIdx,
               teamIdx: entry.teamIdx,
               outputName: og.name,
-              counts: new Array(37),
+              counts: new Array(47),
               bipPtIdxs: []
             };
-            for (var z2 = 0; z2 < 37; z2++) groups[outKey].counts[z2] = 0;
+            for (var z2 = 0; z2 < 47; z2++) groups[outKey].counts[z2] = 0;
           }
           var gg = groups[outKey];
-          for (var f2 = 0; f2 < 37; f2++) {
+          for (var f2 = 0; f2 < 47; f2++) {
             gg.counts[f2] += entry.counts[f2];
           }
           if (gg.bipPtIdxs.indexOf(ptIdx) === -1) gg.bipPtIdxs.push(ptIdx);
@@ -1488,12 +1502,12 @@ var Aggregator = {
             hitterIdx: entry.hitterIdx,
             teamIdx: entry.teamIdx,
             outputName: ptName,
-            counts: new Array(37),
+            counts: new Array(47),
             bipPtIdxs: [ptIdx]
           };
-          for (var z3 = 0; z3 < 37; z3++) groups[outKey2].counts[z3] = 0;
+          for (var z3 = 0; z3 < 47; z3++) groups[outKey2].counts[z3] = 0;
         }
-        for (var f3 = 0; f3 < 37; f3++) {
+        for (var f3 = 0; f3 < 47; f3++) {
           groups[outKey2].counts[f3] += entry.counts[f3];
         }
       }
@@ -1502,13 +1516,13 @@ var Aggregator = {
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso', 'wOBA',
       'xBA', 'xSLG', 'xwOBA',
-      'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
-      'hrFbPct',
-      'airPullPct',
+      'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
+      'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
+      'pullPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
     ];
     var HITTER_PITCH_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true
     };
 
     var rows = [];
@@ -1530,7 +1544,11 @@ var Aggregator = {
       var izSwNonBunt = c[19], izContact = c[20];
       var bip = c[21], gb_c = c[22], ld = c[23], fb = c[24], pu = c[25];
       var barrels = c[26], nSpray = c[27], pull = c[28], center = c[29], oppo = c[30], airPull = c[31];
-      var hardHit = c[32], laSweetSpot = c[33], nLaValid = c[34], nHrBip = c[35], ldHr = c[36];
+      var hardHit = c[32], nHrBip = c[33], ldHr = c[34];
+      var twoStrikeSwings = c[35], twoStrikeWhiffs = c[36];
+      var firstPitchAppearances = c[37], firstPitchSwings = c[38];
+      var xBA_sum = c[39], xBA_count = c[40], xSLG_sum = c[41], xSLG_count = c[42];
+      var xwOBA_sum = c[43], xwOBA_count = c[44], xwOBAcon_sum = c[45], xwOBAcon_count = c[46];
 
       var ab = pa - bb - hbp - sf - sh - ci_v;
       var singles = h - db - tp - hr;
@@ -1545,7 +1563,6 @@ var Aggregator = {
       var contactPct = swings > 0 ? contact / swings : null;
       var izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
       var hardHitPct = bip > 0 ? hardHit / bip : null;
-      var laSweetSpotPct = nLaValid > 0 ? laSweetSpot / nLaValid : null;
       var fb_for_hrfb = fb + pu + ldHr;
       var hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
@@ -1597,7 +1614,6 @@ var Aggregator = {
         medLA: medLA,
         hardHitPct: hardHitPct,
         barrelPct: bip > 0 ? barrels / bip : null,
-        laSweetSpotPct: laSweetSpotPct,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,
@@ -1613,6 +1629,9 @@ var Aggregator = {
         contactPct: contactPct,
         izContactPct: izContactPct,
         whiffPct: swings > 0 ? whiffs / swings : null,
+        xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
+        xSLG: ab > 0 && xSLG_count > 0 ? xSLG_sum / ab : null,
+        xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
       };
 
       // Apply baseball-context filters (comparison group — affects percentiles)
@@ -1629,7 +1648,7 @@ var Aggregator = {
       var hpk = hpPreAgg[hpi].hitter + '|' + hpPreAgg[hpi].team + '|' + hpPreAgg[hpi].pitchType;
       hpPreMap[hpk] = hpPreAgg[hpi];
     }
-    var hpXKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'runValue', 'rv100'];
+    var hpXKeys = ['wOBA', 'runValue', 'rv100'];
     for (var hpmi = 0; hpmi < rows.length; hpmi++) {
       var hpmk = rows[hpmi].hitter + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType;
       var hpPre = hpPreMap[hpmk];

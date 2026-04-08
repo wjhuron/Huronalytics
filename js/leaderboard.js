@@ -164,7 +164,6 @@ var COLUMNS = {
     { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'quality' },
     { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
-    { key: 'laSweetSpotPct', label: 'Sweet-Spot%', format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
     { key: 'sacqPct', label: 'SACQ%', format: Utils.formatPct, sortType: 'numeric', desc: 'Spray-Adjusted Contact Quality — % of BIPs in high-value LA×spray zones', group: 'quality' },
     // Expected Stats
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'expected' },
@@ -337,7 +336,7 @@ var Leaderboard = {
     }
 
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
-    var ABS_AVG_KEYS = { horzBrk: true, haa: true, hra: true, relPosX: true };
+    var ABS_AVG_KEYS = { horzBrk: true, haa: true, relPosX: true };
     var numericKeys = [];
     for (var i = 0; i < columns.length; i++) {
       if (columns[i].sortType === 'numeric' && !columns[i].noPercentile && columns[i].key !== '_rank') {
@@ -744,14 +743,14 @@ var Leaderboard = {
           // Hitter stats that require ≥20 BIP
           var HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
-            hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
+            hardHitPct: true, barrelPct: true, sacqPct: true,
             xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
             babip: true, hrFbPct: true, airPullPct: true,
             gbPct: true, ldPct: true, fbPct: true, puPct: true,
             pullPct: true, middlePct: true, oppoPct: true
           };
           // Hitter stats that require ≥10 competitive swings
-          var HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, squaredUpPct: true };
+          var HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true };
 
           if (isPitcherRow && isSinglePitchType) {
             // Pitcher pitch-type: shape metrics always qualify; outcome metrics need ≥50 pitches
