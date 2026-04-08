@@ -1085,7 +1085,7 @@ var Aggregator = {
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
-      'avgEVAll', 'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
+      'avgEVAll', 'medEV', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
       'gbPct', 'hrFbPct',
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
@@ -1156,12 +1156,13 @@ var Aggregator = {
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
-      // EV75: average of top 25% hardest-hit balls
-      var ev75 = null;
-      if (evsPos.length > 0) {
-        var sorted = evsPos.slice().sort(function (a, b) { return b - a; });
-        var topQuarter = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 4)));
-        ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
+      // EV50: average of top 50% hardest-hit balls across ALL BIP (no LA filter)
+      // Matches Savant's "Best Speed" / EV50 — weak contact is noise
+      var ev50 = null;
+      if (evsAll.length > 0) {
+        var sorted = evsAll.slice().sort(function (a, b) { return b - a; });
+        var topHalf = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 2)));
+        ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
       }
 
       // SACQ% — compute from BIP records using zone table
@@ -1223,7 +1224,7 @@ var Aggregator = {
         babip: babip_val,
         avgEVAll: avgEVAll,
         medEV: medEV,
-        ev75: ev75,
+        ev50: ev50,
         maxEV: maxEV,
         medLA: medLA,
         hardHitPct: hardHitPct,
@@ -1296,7 +1297,7 @@ var Aggregator = {
     var HITTER_BIP_PCTL = {
       avg: true, obp: true, slg: true, ops: true, iso: true, wOBA: true, babip: true,
       xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
-      avgEVAll: true, medEV: true, ev75: true, maxEV: true,
+      avgEVAll: true, medEV: true, ev50: true, maxEV: true,
       hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
       hrFbPct: true, airPullPct: true
     };
@@ -1514,7 +1515,7 @@ var Aggregator = {
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso', 'wOBA',
       'xBA', 'xSLG', 'xwOBA',
-      'medEV', 'ev75', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'medEV', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
       'hrFbPct',
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
@@ -1580,12 +1581,12 @@ var Aggregator = {
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
-      // EV75: average of top 25% hardest-hit balls
-      var ev75 = null;
-      if (evsPos.length > 0) {
-        var sorted = evsPos.slice().sort(function (a, b) { return b - a; });
-        var topQuarter = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 4)));
-        ev75 = Math.round(topQuarter.reduce(function (s, v) { return s + v; }, 0) / topQuarter.length * 10) / 10;
+      // EV50: average of top 50% hardest-hit balls across ALL BIP (no LA filter)
+      var ev50 = null;
+      if (evsAll2.length > 0) {
+        var sorted = evsAll2.slice().sort(function (a, b) { return b - a; });
+        var topHalf = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 2)));
+        ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
       }
 
       var hpName = lookups.hitters[gg2.hitterIdx];
@@ -1606,7 +1607,7 @@ var Aggregator = {
         iso: iso_val,
         avgEVAll: avgEVAll2,
         medEV: medEV,
-        ev75: ev75,
+        ev50: ev50,
         maxEV: maxEV,
         medLA: medLA,
         hardHitPct: hardHitPct,
@@ -1674,7 +1675,7 @@ var Aggregator = {
       var HP_BIP_PCTL = {
         avg: true, slg: true, iso: true, wOBA: true,
         xBA: true, xSLG: true, xwOBA: true,
-        medEV: true, ev75: true, maxEV: true, hardHitPct: true, barrelPct: true,
+        medEV: true, ev50: true, maxEV: true, hardHitPct: true, barrelPct: true,
         laSweetSpotPct: true, hrFbPct: true, airPullPct: true
       };
       HITTER_PITCH_PCTL_KEYS.forEach(function (key) {
