@@ -1090,7 +1090,7 @@ var Aggregator = {
       'wRCplus', 'xWRCplus',
     ];
     var HITTER_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true, firstPitchSwingPct: true
     };
 
     var rows = [];
