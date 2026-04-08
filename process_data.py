@@ -398,7 +398,11 @@ def compute_expected_stats(pitches):
             continue
         elif event in SF_EVENTS:
             sf += 1
-            # Sac flies are NOT included in xwOBAcon (contact-only = BIPs excluding SF)
+            # SF are BIPs — include in xwOBAcon but not in AB-based stats (xBA, xSLG)
+            xwobacon_val = safe_float(p.get('xwOBA'))
+            if xwobacon_val is not None:
+                xwobacon_sum += xwobacon_val
+                xwobacon_denom += 1
             continue
         elif event in SH_EVENTS or event in CI_EVENTS:
             continue
@@ -421,7 +425,7 @@ def compute_expected_stats(pitches):
         if xslg_val is not None:
             xslg_sum += xslg_val
 
-        # xwOBAcon: only BIPs (exclude strikeouts from AB outcomes)
+        # xwOBAcon: BIPs from AB outcomes (exclude strikeouts)
         if event not in K_EVENTS:
             xwobacon_val = safe_float(p.get('xwOBA'))
             if xwobacon_val is not None:
