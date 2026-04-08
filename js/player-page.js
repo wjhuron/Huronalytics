@@ -865,7 +865,7 @@ var PlayerPage = {
     var HITTER_BIP_STATS = {
       avgEVAll: true, ev50: true, maxEV: true,
       hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
-      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true, xWRCplus: true,
+      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
       babip: true, hrFbPct: true, airPullPct: true
     };
     var PITCHER_BIP_STATS = {
