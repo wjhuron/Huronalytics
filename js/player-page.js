@@ -892,8 +892,8 @@ var PlayerPage = {
       // BIP qualification: <20 BIP → show gray outline
       var bipStats = isPitcher ? PITCHER_BIP_STATS : HITTER_BIP_STATS;
       var bipUnqual = bipStats[stat.key] && data.bipQual === false;
-      // Sprint speed: qualified with ≥10 competitive runs (from pipeline sprintQual flag)
-      var sprintUnqual = stat.sprintQual && data.sprintQual === false;
+      // Sprint speed: qualified with ≥10 competitive runs
+      var sprintUnqual = stat.sprintQual && (data.nCompRuns || 0) < 10;
       // Bat speed: qualified with ≥10 competitive swings
       var batSpeedUnqual = stat.batSpeedQual && (data.nCompSwings || 0) < 10;
       var showColor = (isQualified || alwaysColorKeys[stat.key]) && !bipUnqual && !sprintUnqual && !batSpeedUnqual;

@@ -782,7 +782,7 @@ var Leaderboard = {
             } else if (HITTER_BAT_TRACKING[col.key]) {
               showColor = (row.nCompSwings || 0) >= 10;
             } else if (col.key === 'sprintSpeed') {
-              showColor = row.sprintQual === true;
+              showColor = (row.nCompRuns || 0) >= 10;
             } else {
               showColor = paQual;
             }

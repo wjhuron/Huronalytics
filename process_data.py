@@ -3317,10 +3317,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if mlb_id and mlb_id in sprint_speeds:
             ss = sprint_speeds[mlb_id]
             row['sprintSpeed'] = ss['speed']
+            row['nCompRuns'] = ss['competitive_runs']
             row['sprintQual'] = ss['competitive_runs'] >= 10
             sprint_merged += 1
         else:
             row['sprintSpeed'] = None
+            row['nCompRuns'] = 0
             row['sprintQual'] = False
     print(f"  Sprint speed merged for {sprint_merged}/{len(hitter_leaderboard)} hitters")
 
