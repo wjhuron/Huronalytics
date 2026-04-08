@@ -3329,20 +3329,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 20
 
-    # BIP-dependent stats require min 20 BIP for percentile pool
-    HITTER_BIP_PCTL_STATS = {
-        'avgEVAll', 'ev50', 'maxEV', 'medLA',
-        'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
-        'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
-        'babip', 'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
-        'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
-        'xWRCplus',
-    }
+    # Percentile pool includes ALL players with a value (no min_count gating).
+    # Qualification for display coloring is handled entirely on the frontend.
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        if stat in HITTER_BIP_PCTL_STATS:
-            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat, min_count=20, count_key='nBip')
-        else:
-            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
 
     for row in hitter_leaderboard:
         for stat in HITTER_INVERT_PCTL:
@@ -3466,18 +3456,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in hitter_pitch_leaderboard:
         hpt_groups[row['pitchType']].append(row)
 
-    HITTER_PITCH_BIP_PCTL_STATS = {
-        'avg', 'slg', 'iso',
-        'wOBA', 'xBA', 'xSLG', 'xwOBA',
-        'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
-        'gbPct', 'ldPct', 'fbPct', 'hrFbPct', 'pullPct', 'oppoPct',
-    }
+    # Percentile pool includes ALL players (no min_count gating).
+    # Qualification for display coloring is handled on the frontend (≥25 pitches seen).
     for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
-            if stat in HITTER_PITCH_BIP_PCTL_STATS:
-                compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=20, count_key='nBip')
-            else:
-                compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=0)
+            compute_percentile_ranks_with_aaa(pt_rows, stat)
 
     for row in hitter_pitch_leaderboard:
         for stat in HITTER_PITCH_INVERT_PCTL:
@@ -3719,8 +3702,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['xWRCplus'] = None
 
     # Compute percentiles for wRC+ and xWRC+ (computed after main percentile loop)
-    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'wRCplus', min_count=20, count_key='nBip')
-    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'xWRCplus', min_count=20, count_key='nBip')
+    # These use PA-based qualification (via isQualified on frontend), not BIP — every player with a value gets a percentile
+    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'wRCplus')
+    compute_percentile_ranks_with_aaa(hitter_leaderboard, 'xWRCplus')
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)

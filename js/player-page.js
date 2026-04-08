@@ -1045,7 +1045,7 @@ var PlayerPage = {
         barFill.style.width = Math.round(pctl) + '%';
         if (rvQualified) {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-          barFill.style.backgroundColor = barColor;
+          barFill.style.background = barColor;
         } else {
           var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
           var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';

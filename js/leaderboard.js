@@ -728,21 +728,36 @@ var Leaderboard = {
         if (pctl !== null && pctl !== undefined) {
           // Determine qualifying status
           var isPitcherRow = !!row.pitcher;
+          var isHitterRow = !!row.hitter;
           var isSinglePitchType = self._lastRenderOpts &&
               Array.isArray(self._lastRenderOpts.pitchTypes) &&
               self._lastRenderOpts.pitchTypes.length === 1;
+          var isHitterPitchType = isHitterRow && row.pitchType != null;
           var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
           var tg = teamGames[row.team] || 0;
-          var rowQualified;
+          var showColor;
           // Pitch shape metrics always show color on single-pitch-type views (no min count)
           var PITCH_SHAPE_ALWAYS_COLOR = {
             velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
             vaa: true, haa: true, nVAA: true, nHAA: true
           };
+          // Hitter stats that require ≥20 BIP
+          var HITTER_BIP_STATS = {
+            avgEVAll: true, ev50: true, maxEV: true, medLA: true,
+            hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
+            xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
+            babip: true, hrFbPct: true, airPullPct: true,
+            gbPct: true, ldPct: true, fbPct: true, puPct: true,
+            pullPct: true, middlePct: true, oppoPct: true
+          };
+          // Hitter stats that require ≥10 competitive swings
+          var HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, squaredUpPct: true };
+
           if (isPitcherRow && isSinglePitchType) {
-            // Pitch-type rows: shape metrics always qualify; outcome metrics need 50+ pitches
-            rowQualified = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= 50;
+            // Pitcher pitch-type: shape metrics always qualify; outcome metrics need ≥50 pitches
+            showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= 50;
           } else if (isPitcherRow) {
+            // Pitcher overall: IP-based qualification
             var ipStr = row.ip;
             var ipFloat = 0;
             if (ipStr != null) {
@@ -753,13 +768,27 @@ var Leaderboard = {
             var rgs = row.gs || 0;
             var isStarter = rg > 0 && (rgs / rg) > 0.5;
             var ipThresh = isStarter ? tg * 1.0 : tg * 0.1;
-            rowQualified = ipFloat >= ipThresh;
+            showColor = ipFloat >= ipThresh;
+            // Pitcher always-color: FB velo, extension
+            if (!showColor) showColor = col.key === 'fbVelo' || col.key === 'extension';
+          } else if (isHitterPitchType) {
+            // Hitter pitch-type: ≥25 pitches of that type seen
+            showColor = (row.count || 0) >= 25;
           } else {
-            rowQualified = (row.pa || 0) >= tg * 3.1;
+            // Hitter overall: per-stat qualification gates
+            var paQual = (row.pa || 0) >= tg * 3.1;
+            if (HITTER_BIP_STATS[col.key]) {
+              showColor = (row.nBip || 0) >= 20;
+            } else if (HITTER_BAT_TRACKING[col.key]) {
+              showColor = (row.nCompSwings || 0) >= 10;
+            } else if (col.key === 'sprintSpeed') {
+              showColor = row.sprintQual === true;
+            } else {
+              showColor = paQual;
+            }
+            // Hitter always-color: maxEV
+            if (!showColor && col.key === 'maxEV') showColor = true;
           }
-          // Always-color exceptions
-          var alwaysColor = isPitcherRow ? { fbVelo: true, extension: true } : { maxEV: true };
-          var showColor = rowQualified || alwaysColor[col.key];
 
           if (showColor) {
             if (isDark) {
