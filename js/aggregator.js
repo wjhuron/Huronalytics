@@ -1264,13 +1264,13 @@ var Aggregator = {
                       'doubles', 'triples', 'hr', 'xbh',
                       'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
                       'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
-                      'xwOBAcon', 'xwOBAcon_pctl',
+                      'xwOBAcon', 'xwOBAcon_pctl', 'xwOBAsp', 'xwOBAsp_pctl',
                       'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
                       'firstPitchSwingPct', 'firstPitchSwingPct_pctl',
                       'avgFbDist', 'avgHrDist',
                       'squaredUpPct', 'squaredUpPct_pctl',
-                      'sprintSpeed', 'sprintSpeed_pctl',
-                      'wRC', 'wRCplus', 'xWRCplus'];
+                      'sprintSpeed', 'sprintSpeed_pctl', 'nCompRuns', 'sprintQual',
+                      'wRC', 'wRCplus', 'wRCplus_pctl', 'xWRCplus', 'xWRCplus_pctl'];
     var hPreAgg = window.HITTER_DATA || [];
     var hPreAggMap = {};
     for (var hbi = 0; hbi < hPreAgg.length; hbi++) {
@@ -1290,21 +1290,10 @@ var Aggregator = {
       }
     }
 
-    // Compute percentiles — BIP-dependent stats require min 20 BIP
+    // Compute percentiles — all players in pool, qualification handled by frontend
     var self = this;
-    var HITTER_BIP_PCTL = {
-      avg: true, obp: true, slg: true, ops: true, iso: true, wOBA: true, babip: true,
-      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
-      avgEVAll: true, ev50: true, maxEV: true,
-      hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
-      hrFbPct: true, airPullPct: true
-    };
     HITTER_STAT_KEYS.forEach(function (key) {
-      if (HITTER_BIP_PCTL[key]) {
-        self._computePercentiles(rows, key, 20, 'nBip');
-      } else {
-        self._computePercentiles(rows, key);
-      }
+      self._computePercentiles(rows, key);
     });
 
     // Set bipQual flag for each hitter
@@ -1668,18 +1657,8 @@ var Aggregator = {
     var self = this;
     for (var ptKey in ptGroups) {
       var ptRows = ptGroups[ptKey];
-      var HP_BIP_PCTL = {
-        avg: true, slg: true, iso: true, wOBA: true,
-        xBA: true, xSLG: true, xwOBA: true,
-        ev50: true, maxEV: true, hardHitPct: true, barrelPct: true,
-        laSweetSpotPct: true, hrFbPct: true, airPullPct: true
-      };
       HITTER_PITCH_PCTL_KEYS.forEach(function (key) {
-        if (HP_BIP_PCTL[key]) {
-          self._computePercentiles(ptRows, key, 20, 'nBip');
-        } else {
-          self._computePercentiles(ptRows, key);
-        }
+        self._computePercentiles(ptRows, key);
       });
     }
 
