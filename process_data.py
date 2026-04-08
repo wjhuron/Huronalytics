@@ -51,7 +51,7 @@ HITTER_STAT_KEYS = [
     # Expected Stats
     'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
     # Batted Ball tab
-    'avgEVAll', 'medEV', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
+    'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
@@ -878,8 +878,6 @@ def compute_hitter_stats(pitches):
         'xbh': xbh,
         # Batted Ball tab
         'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
-        # Note: key is 'medEV' for historical reasons but this is actually mean EV (LA > 0)
-        'medEV': round(sum(evs_pos) / len(evs_pos), 1) if evs_pos else None,
         'ev50': ev50,
         'maxEV': round(max(evs_pos), 1) if evs_pos else None,
         'medLA': round(median(all_la), 1) if all_la else None,
@@ -2962,8 +2960,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     if suffix_key in hand_stats:
                         row[suffix_key + hand_label] = hand_stats[suffix_key]
                 for suffix_key in ['avgEV', 'maxEV', 'hardHitPct', 'barrelPct',
-                                   'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
-                                   'medEV']:
+                                   'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct']:
                     if suffix_key in hand_bb:
                         row[suffix_key + hand_label] = hand_bb[suffix_key]
                 for suffix_key in ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']:
@@ -3334,7 +3331,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # BIP-dependent stats require min 20 BIP for percentile pool
     HITTER_BIP_PCTL_STATS = {
-        'avgEVAll', 'medEV', 'ev50', 'maxEV', 'medLA',
+        'avgEVAll', 'ev50', 'maxEV', 'medLA',
         'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
         'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
         'babip', 'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -3380,7 +3377,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
         'wOBA', 'xBA', 'xSLG', 'xwOBA',
-        'medEV', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+        'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
         'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
@@ -3472,7 +3469,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PITCH_BIP_PCTL_STATS = {
         'avg', 'slg', 'iso',
         'wOBA', 'xBA', 'xSLG', 'xwOBA',
-        'medEV', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+        'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct', 'pullPct', 'oppoPct',
     }
     for pt, pt_rows in hpt_groups.items():
@@ -3499,7 +3496,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'wOBA', 'xBA', 'xSLG', 'xwOBA',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
-    bip_stats = {'avgEVAll', 'medEV', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
+    bip_stats = {'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
                  'laSweetSpotPct', 'sacqPct', 'xwOBAcon', 'xwOBAsp',
                  'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}

@@ -74,7 +74,6 @@ var PlayerPage = {
     { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
     { key: 'avgEVAll', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
-    { key: 'medEV', label: 'Avg EV (LA>0)', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'ev50', label: 'EV50', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'maxEV', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
@@ -864,7 +863,7 @@ var PlayerPage = {
 
     // BIP-dependent stats that show gray when bipQual is false
     var HITTER_BIP_STATS = {
-      avgEVAll: true, medEV: true, ev75: true, maxEV: true,
+      avgEVAll: true, ev50: true, maxEV: true,
       hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
       xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true, xWRCplus: true,
       babip: true, hrFbPct: true, airPullPct: true

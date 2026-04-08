@@ -506,7 +506,7 @@ var Aggregator = {
       'strikePct', 'izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct',
       'kPct', 'bbPct', 'kbbPct', 'babip', 'gbPct',
       'avgEV', 'maxEV', 'hardHitPct', 'barrelPct',
-      'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct', 'medEV',
+      'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'];
     var handSuffix = vsHand !== 'all' ? '_vs' + vsHand : '';
     for (var mi = 0; mi < rows.length; mi++) {
@@ -1085,7 +1085,7 @@ var Aggregator = {
     var HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
-      'avgEVAll', 'medEV', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
+      'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct', 'sacqPct',
       'gbPct', 'hrFbPct',
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
@@ -1152,7 +1152,6 @@ var Aggregator = {
       }
 
       var avgEVAll = evsAll.length > 0 ? Math.round(evsAll.reduce(function(a,b){return a+b;},0) / evsAll.length * 10) / 10 : null;
-      var medEV = evsPos.length > 0 ? Math.round(evsPos.reduce(function(a,b){return a+b;},0) / evsPos.length * 10) / 10 : null;
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
@@ -1223,7 +1222,6 @@ var Aggregator = {
         iso: iso_val,
         babip: babip_val,
         avgEVAll: avgEVAll,
-        medEV: medEV,
         ev50: ev50,
         maxEV: maxEV,
         medLA: medLA,
@@ -1297,7 +1295,7 @@ var Aggregator = {
     var HITTER_BIP_PCTL = {
       avg: true, obp: true, slg: true, ops: true, iso: true, wOBA: true, babip: true,
       xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
-      avgEVAll: true, medEV: true, ev50: true, maxEV: true,
+      avgEVAll: true, ev50: true, maxEV: true,
       hardHitPct: true, barrelPct: true, laSweetSpotPct: true, sacqPct: true,
       hrFbPct: true, airPullPct: true
     };
@@ -1515,7 +1513,7 @@ var Aggregator = {
     var HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso', 'wOBA',
       'xBA', 'xSLG', 'xwOBA',
-      'medEV', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
+      'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'laSweetSpotPct',
       'hrFbPct',
       'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
@@ -1577,7 +1575,6 @@ var Aggregator = {
       }
 
       var avgEVAll2 = evsAll2.length > 0 ? Math.round(evsAll2.reduce(function(a,b){return a+b;},0) / evsAll2.length * 10) / 10 : null;
-      var medEV = evsPos.length > 0 ? Math.round(evsPos.reduce(function(a,b){return a+b;},0) / evsPos.length * 10) / 10 : null;
       var maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
       var medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
@@ -1606,7 +1603,6 @@ var Aggregator = {
         slg: slg_val,
         iso: iso_val,
         avgEVAll: avgEVAll2,
-        medEV: medEV,
         ev50: ev50,
         maxEV: maxEV,
         medLA: medLA,
@@ -1675,7 +1671,7 @@ var Aggregator = {
       var HP_BIP_PCTL = {
         avg: true, slg: true, iso: true, wOBA: true,
         xBA: true, xSLG: true, xwOBA: true,
-        medEV: true, ev50: true, maxEV: true, hardHitPct: true, barrelPct: true,
+        ev50: true, maxEV: true, hardHitPct: true, barrelPct: true,
         laSweetSpotPct: true, hrFbPct: true, airPullPct: true
       };
       HITTER_PITCH_PCTL_KEYS.forEach(function (key) {

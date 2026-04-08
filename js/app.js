@@ -1105,7 +1105,7 @@
       { key: 'count', label: '#', format: Utils.formatInt },
       { key: 'swingPct', label: 'Swing%', format: Utils.formatPct },
       { key: 'whiffPct', label: 'Whiff%', format: Utils.formatPct },
-      { key: 'medEV', label: 'Avg EV (LA>0)', format: Utils.formatDecimal(1) },
+      { key: 'avgEVAll', label: 'Avg EV', format: Utils.formatDecimal(1) },
     ];
 
     // Group individual pitch rows by category
@@ -1134,14 +1134,14 @@
           var swings = r.nSwings || (r.swingPct != null ? r.swingPct * cnt : 0);
           sumWhiffs += (r.whiffPct * swings);
         }
-        if (r.medEV != null && r.nBip) { sumEV += r.medEV * r.nBip; nEV += r.nBip; }
+        if (r.avgEVAll != null && r.nBip) { sumEV += r.avgEVAll * r.nBip; nEV += r.nBip; }
       });
       return {
         pitchType: catName,
         count: totalCount,
         swingPct: totalCount > 0 ? sumSwings / totalCount : null,
         whiffPct: sumSwings > 0 ? sumWhiffs / sumSwings : null,
-        medEV: nEV > 0 ? sumEV / nEV : null
+        avgEVAll: nEV > 0 ? sumEV / nEV : null
       };
     }
 
