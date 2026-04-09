@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=152">
+  <link rel="stylesheet" href="css/styles.css?v=153">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -45,25 +45,25 @@
     </div>
   </section>
 
-  <nav class="tab-bar" id="main-nav">
-    <div class="nav-sections">
-      <button class="section-tab" data-section="home" title="Home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
-      <button class="section-tab active" data-section="pitchers">Pitchers</button>
-      <button class="section-tab" data-section="hitters">Hitters</button>
+  <nav class="tab-bar" id="main-nav" aria-label="Main navigation">
+    <div class="nav-sections" role="tablist" aria-label="Sections">
+      <button class="section-tab" data-section="home" title="Home" role="tab" aria-selected="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
+      <button class="section-tab active" data-section="pitchers" role="tab" aria-selected="true">Pitchers</button>
+      <button class="section-tab" data-section="hitters" role="tab" aria-selected="false">Hitters</button>
     </div>
-    <div class="nav-subtabs" id="pitcher-subtabs">
-      <button class="tab active" data-tab="pitcherStats">Stats</button>
-      <button class="tab" data-tab="pitchMetrics">Pitch Metrics</button>
-      <button class="tab" data-tab="pitcherSwingDecisions">Plate Discipline</button>
-      <button class="tab" data-tab="pitcherBattedBall">Batted Ball</button>
+    <div class="nav-subtabs" id="pitcher-subtabs" role="tablist" aria-label="Pitcher views">
+      <button class="tab active" data-tab="pitcherStats" role="tab" aria-selected="true">Stats</button>
+      <button class="tab" data-tab="pitchMetrics" role="tab" aria-selected="false">Pitch Metrics</button>
+      <button class="tab" data-tab="pitcherSwingDecisions" role="tab" aria-selected="false">Plate Discipline</button>
+      <button class="tab" data-tab="pitcherBattedBall" role="tab" aria-selected="false">Batted Ball</button>
     </div>
-    <div class="nav-subtabs" id="hitter-subtabs" style="display:none;">
-      <button class="tab" data-tab="hitterStats">Stats</button>
-      <button class="tab" data-tab="hitterSwingDecisions">Plate Discipline</button>
-      <button class="tab" data-tab="hitterBattedBall">Batted Ball</button>
-      <button class="tab" data-tab="hitterBatTracking">Bat Tracking</button>
+    <div class="nav-subtabs" id="hitter-subtabs" style="display:none;" role="tablist" aria-label="Hitter views">
+      <button class="tab" data-tab="hitterStats" role="tab" aria-selected="false">Stats</button>
+      <button class="tab" data-tab="hitterSwingDecisions" role="tab" aria-selected="false">Plate Discipline</button>
+      <button class="tab" data-tab="hitterBattedBall" role="tab" aria-selected="false">Batted Ball</button>
+      <button class="tab" data-tab="hitterBatTracking" role="tab" aria-selected="false">Bat Tracking</button>
       <span class="tab-divider"></span>
-      <button class="tab" data-tab="hitterPitch">Pitch Type</button>
+      <button class="tab" data-tab="hitterPitch" role="tab" aria-selected="false">Pitch Type</button>
     </div>
   </nav>
 
@@ -201,7 +201,7 @@
   <div id="tab-banner" class="tab-banner" style="display:none;"></div>
   <section class="table-wrapper">
     <div class="table-container" id="table-container">
-      <table id="leaderboard-table">
+      <table id="leaderboard-table" aria-label="Leaderboard data">
         <thead><tr id="table-header"></tr></thead>
         <tbody id="table-pinned-body"></tbody>
         <tbody id="table-body"></tbody>
@@ -222,7 +222,7 @@
     </select>
   </section>
 
-  <aside id="side-panel" class="side-panel">
+  <aside id="side-panel" class="side-panel" role="dialog" aria-modal="false" aria-label="Player details">
     <div class="side-panel-header">
       <div>
         <h2 id="panel-pitcher-name"></h2>

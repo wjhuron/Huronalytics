@@ -1,4 +1,4 @@
-var DataStore = {
+const DataStore = {
   rs: {},
   gameType: 'RS',
 
@@ -52,7 +52,7 @@ var DataStore = {
   },
 
   updateGlobals: function () {
-    var d = this.rs;
+    const d = this.rs;
     window.PITCHER_DATA = d.pitcherData;
     window.PITCH_DATA = d.pitchData;
     window.HITTER_DATA = d.hitterData;
@@ -86,19 +86,19 @@ var DataStore = {
    * pitchTypes can be an array for multi-select: ['FF', 'SI'] or 'all'
    */
   getFilteredData: function (tab, filters) {
-    var d = this.rs;
-    var source;
+    const d = this.rs;
+    let source;
     if (tab === 'pitch') source = d.pitchData;
     else if (tab === 'pitcher') source = d.pitcherData;
     else if (tab === 'hitter') source = d.hitterData;
     else if (tab === 'hitterPitch') source = d.hitterPitchData;
     if (!source) return [];
 
-    var isHitter = (tab === 'hitter' || tab === 'hitterPitch');
-    var hasPitchType = (tab === 'pitch' || tab === 'hitterPitch');
-    var selectedPitchTypes = filters.pitchTypes; // array or 'all'
+    const isHitter = (tab === 'hitter' || tab === 'hitterPitch');
+    const hasPitchType = (tab === 'pitch' || tab === 'hitterPitch');
+    const selectedPitchTypes = filters.pitchTypes; // array or 'all'
 
-    var rocTeams = (this.metadata && this.metadata.rocTeams) || [];
+    const rocTeams = (this.metadata && this.metadata.rocTeams) || [];
     return source.filter(function (row) {
       // Hide ROC players unless user explicitly selected their team
       if (rocTeams.indexOf(row.team) !== -1 && filters.team !== row.team) return false;
@@ -115,18 +115,22 @@ var DataStore = {
 
       // SP/RP role filter (pitcher tabs only)
       if (filters.role && filters.role !== 'all' && !isHitter) {
-        var g = row.g, gs = row.gs;
-        // For pitch-level rows without G/GS, look up from pitcher data
+        let g = row.g, gs = row.gs;
+        // For pitch-level rows without G/GS, look up from pitcher role cache
         if (g == null && row.pitcher) {
-          var pitcherData = DataStore.rs.pitcherData || [];
-          for (var pi = 0; pi < pitcherData.length; pi++) {
-            if (pitcherData[pi].pitcher === row.pitcher && pitcherData[pi].team === row.team) {
-              g = pitcherData[pi].g; gs = pitcherData[pi].gs; break;
+          if (!DataStore._roleCache) {
+            DataStore._roleCache = {};
+            const pData = DataStore.rs.pitcherData || [];
+            for (let pi = 0; pi < pData.length; pi++) {
+              const rk = pData[pi].pitcher + '|' + pData[pi].team;
+              DataStore._roleCache[rk] = { g: pData[pi].g, gs: pData[pi].gs };
             }
           }
+          const cached = DataStore._roleCache[row.pitcher + '|' + row.team];
+          if (cached) { g = cached.g; gs = cached.gs; }
         }
         g = g || 0; gs = gs || 0;
-        var isStarter = g > 0 && (gs / g) > 0.5;
+        const isStarter = g > 0 && (gs / g) > 0.5;
         if (filters.role === 'SP' && !isStarter) return false;
         if (filters.role === 'RP' && isStarter) return false;
       }
@@ -146,7 +150,7 @@ var DataStore = {
       if ((tab === 'pitcher' || tab === 'hitter') && filters.minBip && row.nBip != null && row.nBip < filters.minBip) return false;
       if (tab === 'pitcher' && filters.minPitcherSwings && row.nSwings != null && row.nSwings < filters.minPitcherSwings) return false;
       if (filters.search) {
-        var name = (row.pitcher || row.hitter || '').toLowerCase();
+        const name = (row.pitcher || row.hitter || '').toLowerCase();
         if (name.indexOf(filters.search.toLowerCase()) === -1) return false;
       }
       return true;

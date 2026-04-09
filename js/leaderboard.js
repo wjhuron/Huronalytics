@@ -1,4 +1,4 @@
-var COLUMNS = {
+const COLUMNS = {
   pitchMetrics: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
     { key: '_compare',    label: '',         format: function(){ return ''; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, isCompare: true, group: 'info', width: '32px' },
@@ -257,7 +257,7 @@ var COLUMNS = {
   ],
 };
 
-var Leaderboard = {
+const Leaderboard = {
   currentSort: { key: null, dir: 'desc' },
   hiddenColumns: {},  // key -> true if hidden
   showLeagueAvg: true,
@@ -274,20 +274,20 @@ var Leaderboard = {
   },
 
   getVisibleColumns: function (columns) {
-    var self = this;
+    const self = this;
     return columns.filter(function (col) {
       return !self.hiddenColumns[col.key];
     });
   },
 
   sortData: function (data, columnKey, columns) {
-    var col = null;
-    for (var i = 0; i < columns.length; i++) {
+    let col = null;
+    for (let i = 0; i < columns.length; i++) {
       if (columns[i].key === columnKey) { col = columns[i]; break; }
     }
     if (!col || col.sortType === null) return data;
 
-    var sortKey = col.sortKey || col.key;
+    const sortKey = col.sortKey || col.key;
 
     if (this.currentSort.key === columnKey) {
       this.currentSort.dir = this.currentSort.dir === 'desc' ? 'asc' : 'desc';
@@ -296,11 +296,11 @@ var Leaderboard = {
       this.currentSort.dir = col.sortType === 'string' ? 'asc' : 'desc';
     }
 
-    var dir = this.currentSort.dir === 'asc' ? 1 : -1;
+    const dir = this.currentSort.dir === 'asc' ? 1 : -1;
 
     data.sort(function (a, b) {
-      var va = a[sortKey];
-      var vb = b[sortKey];
+      const va = a[sortKey];
+      const vb = b[sortKey];
       if (va === null || va === undefined) {
         if (vb === null || vb === undefined) return 0;
         return 1;
@@ -314,16 +314,16 @@ var Leaderboard = {
   },
 
   computeLeagueAvgRow: function (data, columns, opts) {
-    var avg = {};
+    const avg = {};
     // Use pre-computed weighted league averages from metadata when available
-    var meta = DataStore.metadata || {};
-    var isPitcher = data.length > 0 && data[0].pitcher;
-    var overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
-    var pitchTypeAvgs = meta.leagueAverages || {};
+    const meta = DataStore.metadata || {};
+    const isPitcher = data.length > 0 && data[0].pitcher;
+    const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
+    const pitchTypeAvgs = meta.leagueAverages || {};
 
     // Determine which precomputed averages to use based on pitch type filter
-    var pitchTypes = (opts && opts.pitchTypes) || 'all';
-    var precomputed;
+    const pitchTypes = (opts && opts.pitchTypes) || 'all';
+    let precomputed;
     if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
       // Single pitch type selected — use per-pitch-type averages
       precomputed = pitchTypeAvgs[pitchTypes[0]];
@@ -336,9 +336,9 @@ var Leaderboard = {
     }
 
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
-    var ABS_AVG_KEYS = { horzBrk: true, haa: true, relPosX: true };
-    var numericKeys = [];
-    for (var i = 0; i < columns.length; i++) {
+    const ABS_AVG_KEYS = { horzBrk: true, haa: true, relPosX: true };
+    const numericKeys = [];
+    for (let i = 0; i < columns.length; i++) {
       if (columns[i].sortType === 'numeric' && !columns[i].noPercentile && columns[i].key !== '_rank') {
         numericKeys.push(columns[i].key);
       }
@@ -350,10 +350,10 @@ var Leaderboard = {
         return;
       }
       // Fallback: simple average (for stats not in metadata)
-      var sum = 0, count = 0;
-      var useAbs = ABS_AVG_KEYS[key] || false;
-      for (var j = 0; j < data.length; j++) {
-        var v = data[j][key];
+      let sum = 0, count = 0;
+      const useAbs = ABS_AVG_KEYS[key] || false;
+      for (let j = 0; j < data.length; j++) {
+        const v = data[j][key];
         if (v !== null && v !== undefined) {
           sum += useAbs ? Math.abs(v) : v;
           count++;
@@ -373,47 +373,47 @@ var Leaderboard = {
 
   render: function (data, columns, opts) {
     opts = opts || {};
-    var self = this;
-    var visCols = this.getVisibleColumns(columns);
-    var headerRow = document.getElementById('table-header');
-    var tbody = document.getElementById('table-body');
-    var pinnedBody = document.getElementById('table-pinned-body');
-    var noResults = document.getElementById('no-results');
-    var isDark = document.body.classList.contains('dark');
+    const self = this;
+    const visCols = this.getVisibleColumns(columns);
+    let headerRow = document.getElementById('table-header');
+    const tbody = document.getElementById('table-body');
+    const pinnedBody = document.getElementById('table-pinned-body');
+    const noResults = document.getElementById('no-results');
+    const isDark = document.body.classList.contains('dark');
 
     this.lastRenderedData = data;
     this.lastRenderedColumns = columns;
     this._lastRenderOpts = opts;
 
     // Pagination
-    var totalRows = data.length;
-    var pageSize = this.pageSize;
-    var totalPages = pageSize > 0 ? Math.max(1, Math.ceil(totalRows / pageSize)) : 1;
+    const totalRows = data.length;
+    const pageSize = this.pageSize;
+    const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(totalRows / pageSize)) : 1;
     if (this.currentPage > totalPages) this.currentPage = totalPages;
-    var startIdx = pageSize > 0 ? (this.currentPage - 1) * pageSize : 0;
-    var endIdx = pageSize > 0 ? Math.min(startIdx + pageSize, totalRows) : totalRows;
-    var pageData = data.slice(startIdx, endIdx);
+    const startIdx = pageSize > 0 ? (this.currentPage - 1) * pageSize : 0;
+    const endIdx = pageSize > 0 ? Math.min(startIdx + pageSize, totalRows) : totalRows;
+    const pageData = data.slice(startIdx, endIdx);
 
     // Update pagination UI
-    var pageInfo = document.getElementById('page-info');
-    var pagePrev = document.getElementById('page-prev');
-    var pageNext = document.getElementById('page-next');
+    const pageInfo = document.getElementById('page-info');
+    const pagePrev = document.getElementById('page-prev');
+    const pageNext = document.getElementById('page-next');
     if (pageInfo) pageInfo.textContent = 'Page ' + this.currentPage + ' of ' + totalPages;
     if (pagePrev) pagePrev.disabled = this.currentPage <= 1;
     if (pageNext) pageNext.disabled = this.currentPage >= totalPages;
 
     // Build header - group row + column row
-    var thead = document.querySelector('#leaderboard-table thead');
+    let thead = document.querySelector('#leaderboard-table thead');
     thead.innerHTML = '';
 
     // Group header row
-    var groupRow = document.createElement('tr');
+    const groupRow = document.createElement('tr');
     groupRow.id = 'table-group-header';
-    var groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', advanced: 'Advanced', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking' };
-    var prevGroup = null;
-    var groupSpans = [];
+    const groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', advanced: 'Advanced', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking' };
+    let prevGroup = null;
+    const groupSpans = [];
     visCols.forEach(function (col) {
-      var g = col.group || 'info';
+      const g = col.group || 'info';
       if (g === prevGroup) {
         groupSpans[groupSpans.length - 1].span++;
       } else {
@@ -421,11 +421,11 @@ var Leaderboard = {
         prevGroup = g;
       }
     });
-    var hasGroups = groupSpans.some(function (gs) { return groupLabels[gs.group]; });
+    const hasGroups = groupSpans.some(function (gs) { return groupLabels[gs.group]; });
     if (hasGroups) {
-      var colIdx = 0;
+      let colIdx = 0;
       groupSpans.forEach(function (gs) {
-        var th = document.createElement('th');
+        const th = document.createElement('th');
         th.setAttribute('colspan', gs.span);
         th.textContent = groupLabels[gs.group] || '';
         th.classList.add('group-header-cell');
@@ -443,17 +443,17 @@ var Leaderboard = {
     headerRow = document.createElement('tr');
     headerRow.id = 'table-header';
     visCols.forEach(function (col) {
-      var th = document.createElement('th');
+      const th = document.createElement('th');
       if (col.isCompare) {
         th.classList.add('col-compare');
         th.style.width = col.width || 'auto';
       } else {
-        var labelSpan = document.createElement('span');
+        const labelSpan = document.createElement('span');
         labelSpan.textContent = col.label;
         th.appendChild(labelSpan);
         // Fixed-width sort indicator to prevent layout shift
         if (col.sortType !== null) {
-          var sortSpan = document.createElement('span');
+          const sortSpan = document.createElement('span');
           sortSpan.className = 'sort-indicator';
           sortSpan.style.display = 'inline-block';
           sortSpan.style.width = '12px';
@@ -477,6 +477,7 @@ var Leaderboard = {
 
       if (self.currentSort.key === col.key) {
         th.classList.add('sorted', self.currentSort.dir);
+        th.setAttribute('aria-sort', self.currentSort.dir === 'asc' ? 'ascending' : 'descending');
       }
 
       if (col.sortType !== null) {
@@ -493,24 +494,24 @@ var Leaderboard = {
 
     // Set column header sticky top below group header
     if (hasGroups) {
-      var groupRowHeight = groupRow.offsetHeight || 25;
-      for (var hi = 0; hi < headerRow.cells.length; hi++) {
+      const groupRowHeight = groupRow.offsetHeight || 25;
+      for (let hi = 0; hi < headerRow.cells.length; hi++) {
         headerRow.cells[hi].style.top = groupRowHeight + 'px';
       }
     }
 
     // Calculate sticky column offsets (for frozen Team column)
     this._stickyLeftOffsets = {};
-    var firstStickyTh = null;
-    for (var si = 0; si < visCols.length; si++) {
+    let firstStickyTh = null;
+    for (let si = 0; si < visCols.length; si++) {
       if (visCols[si].sticky && !visCols[si].stickyIdx) {
         firstStickyTh = headerRow.cells[si];
         break;
       }
     }
     if (firstStickyTh) {
-      var firstStickyWidth = firstStickyTh.offsetWidth;
-      for (var si2 = 0; si2 < visCols.length; si2++) {
+      const firstStickyWidth = firstStickyTh.offsetWidth;
+      for (let si2 = 0; si2 < visCols.length; si2++) {
         if (visCols[si2].stickyIdx === 1) {
           headerRow.cells[si2].style.left = firstStickyWidth + 'px';
           this._stickyLeftOffsets[visCols[si2].key] = firstStickyWidth;
@@ -537,20 +538,20 @@ var Leaderboard = {
 
     // Pinned average rows
     if (pinnedBody && this.showLeagueAvg && data.length > 0) {
-      var thead = document.querySelector('#leaderboard-table thead');
-      var thHeight = thead ? thead.offsetHeight : 36;
+      const thead2 = document.querySelector('#leaderboard-table thead');
+      const thHeight = thead2 ? thead2.offsetHeight : 36;
 
       // League Average: computed from all-teams data (ignores team filter)
-      var leagueAvgData = opts.leagueData || data;
-      var leagueAvgRow = this.computeLeagueAvgRow(leagueAvgData, visCols, opts);
+      const leagueAvgData = opts.leagueData || data;
+      const leagueAvgRow = this.computeLeagueAvgRow(leagueAvgData, visCols, opts);
       leagueAvgRow.pitcher = 'League Avg';
       leagueAvgRow.hitter = 'League Avg';
-      var leagueTr = this._createRow(leagueAvgRow, visCols, -1, isDark, true);
+      const leagueTr = this._createRow(leagueAvgRow, visCols, -1, isDark, true);
       leagueTr.classList.add('league-avg-row');
       pinnedBody.appendChild(leagueTr);
 
       // Make league avg row cells sticky
-      for (var ci = 0; ci < leagueTr.cells.length; ci++) {
+      for (let ci = 0; ci < leagueTr.cells.length; ci++) {
         leagueTr.cells[ci].style.position = 'sticky';
         leagueTr.cells[ci].style.top = thHeight + 'px';
         leagueTr.cells[ci].style.zIndex = leagueTr.cells[ci].classList.contains('sticky-col') ? '5' : '3';
@@ -558,37 +559,17 @@ var Leaderboard = {
 
     }
 
-    var fragment = document.createDocumentFragment();
+    const fragment = document.createDocumentFragment();
 
     // Data rows
-    for (var ri = 0; ri < pageData.length; ri++) {
-      var row = pageData[ri];
-      var globalRank = startIdx + ri + 1;
-      var tr = this._createRow(row, visCols, globalRank, isDark, false);
+    for (let ri = 0; ri < pageData.length; ri++) {
+      const row = pageData[ri];
+      const globalRank = startIdx + ri + 1;
+      const tr = this._createRow(row, visCols, globalRank, isDark, false);
       tr.classList.add('clickable-row');
-      tr._pitcherName = row.pitcher || row.hitter;
+      tr._playerName = row.pitcher || row.hitter;
+      tr._rowData = row;
       tr._rowIndex = ri;
-
-      // Click handler
-      (function (r, idx) {
-        tr.addEventListener('click', function (e) {
-          // Don't trigger on compare checkbox clicks
-          if (e.target.type === 'checkbox') return;
-          // Remove active from all rows
-          var prev = tbody.querySelectorAll('.active-row');
-          for (var k = 0; k < prev.length; k++) prev[k].classList.remove('active-row');
-          // Highlight all rows for this person
-          var personName = r.pitcher || r.hitter;
-          var allRows = tbody.querySelectorAll('tr');
-          allRows.forEach(function (row) {
-            if (row._pitcherName === personName) row.classList.add('active-row');
-          });
-          self.keyboardFocusIndex = idx;
-          if (typeof App !== 'undefined' && App.openSidePanel) {
-            App.openSidePanel(personName, r.team, r.throws || r.stands, r);
-          }
-        });
-      })(row, ri);
 
       if (this.keyboardFocusIndex === ri) {
         tr.classList.add('keyboard-focus');
@@ -598,15 +579,39 @@ var Leaderboard = {
     }
 
     tbody.appendChild(fragment);
+
+    // Event delegation: single click handler on tbody instead of per-row listeners
+    if (!tbody._delegatedClick) {
+      tbody.addEventListener('click', function (e) {
+        if (e.target.type === 'checkbox') return;
+        const tr = e.target.closest('tr.clickable-row');
+        if (!tr || !tr._rowData) return;
+        // Remove active from all rows
+        const prev = tbody.querySelectorAll('.active-row');
+        for (let k = 0; k < prev.length; k++) prev[k].classList.remove('active-row');
+        // Highlight all rows for this person
+        const personName = tr._playerName;
+        const allRows = tbody.querySelectorAll('tr');
+        allRows.forEach(function (row) {
+          if (row._playerName === personName) row.classList.add('active-row');
+        });
+        self.keyboardFocusIndex = tr._rowIndex;
+        const r = tr._rowData;
+        if (typeof App !== 'undefined' && App.openSidePanel) {
+          App.openSidePanel(personName, r.team, r.throws || r.stands, r);
+        }
+      });
+      tbody._delegatedClick = true;
+    }
     document.getElementById('row-count').textContent = totalRows;
   },
 
   _createRow: function (row, visCols, rank, isDark, isAvgRow) {
-    var self = this;
-    var tr = document.createElement('tr');
+    const self = this;
+    const tr = document.createElement('tr');
 
     visCols.forEach(function (col) {
-      var td = document.createElement('td');
+      const td = document.createElement('td');
 
       // Special: rank column
       if (col.key === '_rank') {
@@ -621,9 +626,9 @@ var Leaderboard = {
       if (col.isCompare) {
         td.classList.add('col-compare');
         if (!isAvgRow) {
-          var cb = document.createElement('input');
+          const cb = document.createElement('input');
           cb.type = 'checkbox';
-          var compareKey = (row.pitcher || '') + '|' + (row.team || '');
+          const compareKey = (row.pitcher || '') + '|' + (row.team || '');
           cb.checked = !!self.selectedForCompare[compareKey];
           cb.addEventListener('change', function () {
             if (cb.checked) {
@@ -643,10 +648,10 @@ var Leaderboard = {
 
       // Special: pitch type badge
       if (col.isPitchType && row[col.key] && !isAvgRow) {
-        var badge = document.createElement('span');
+        const badge = document.createElement('span');
         badge.className = 'pitch-badge';
         badge.textContent = row[col.key];
-        var pitchColor = Utils.getPitchColor(row[col.key]);
+        const pitchColor = Utils.getPitchColor(row[col.key]);
         badge.style.backgroundColor = pitchColor;
         badge.style.color = Utils.badgeTextColor(pitchColor);
         td.appendChild(badge);
@@ -655,43 +660,18 @@ var Leaderboard = {
         return;
       }
 
-      // Pitcher name as clickable link to player page
-      if (col.key === 'pitcher' && !isAvgRow && row.mlbId) {
-        var link = document.createElement('a');
-        link.href = '#player=' + row.mlbId;
-        link.className = 'pitcher-name-link';
-        link.textContent = col.format(row[col.key]);
-        link.addEventListener('click', function (e) {
+      // Player name as clickable link to player page (pitcher or hitter)
+      if ((col.key === 'pitcher' || col.key === 'hitter') && !isAvgRow && row.mlbId) {
+        const nameLink = document.createElement('a');
+        nameLink.href = '#player=' + row.mlbId;
+        nameLink.className = 'pitcher-name-link';
+        nameLink.textContent = col.format(row[col.key]);
+        nameLink.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
           PlayerPage.open(row.mlbId);
         });
-        td.appendChild(link);
-        if (col.align) td.classList.add('align-' + col.align);
-        if (col.sticky) {
-          td.classList.add('sticky-col');
-          if (col.stickyIdx === 1) { td.classList.add('sticky-col-last'); }
-          if (col.stickyIdx === 1 && self._stickyLeftOffsets[col.key]) {
-            td.style.left = self._stickyLeftOffsets[col.key] + 'px';
-          }
-        }
-        if (col.cls) td.classList.add(col.cls);
-        tr.appendChild(td);
-        return;
-      }
-
-      // Hitter name as clickable link to player page
-      if (col.key === 'hitter' && !isAvgRow && row.mlbId) {
-        var hLink = document.createElement('a');
-        hLink.href = '#player=' + row.mlbId;
-        hLink.className = 'pitcher-name-link';
-        hLink.textContent = col.format(row[col.key]);
-        hLink.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          PlayerPage.open(row.mlbId);
-        });
-        td.appendChild(hLink);
+        td.appendChild(nameLink);
         if (col.align) td.classList.add('align-' + col.align);
         if (col.sticky) {
           td.classList.add('sticky-col');
@@ -706,7 +686,7 @@ var Leaderboard = {
       }
 
       // Regular cell
-      var val = row[col.key];
+      const val = row[col.key];
       td.textContent = col.format(val);
       if (col.align) td.classList.add('align-' + col.align);
       if (col.sticky) {
@@ -722,26 +702,26 @@ var Leaderboard = {
 
       // Percentile coloring (only for qualified players, with exceptions)
       if (!col.noPercentile && !isAvgRow) {
-        var pctlKey = col.key + '_pctl';
-        var pctl = row[pctlKey];
+        const pctlKey = col.key + '_pctl';
+        const pctl = row[pctlKey];
         if (pctl !== null && pctl !== undefined) {
           // Determine qualifying status
-          var isPitcherRow = !!row.pitcher;
-          var isHitterRow = !!row.hitter;
-          var isSinglePitchType = self._lastRenderOpts &&
+          const isPitcherRow = !!row.pitcher;
+          const isHitterRow = !!row.hitter;
+          const isSinglePitchType = self._lastRenderOpts &&
               Array.isArray(self._lastRenderOpts.pitchTypes) &&
               self._lastRenderOpts.pitchTypes.length === 1;
-          var isHitterPitchType = isHitterRow && row.pitchType != null;
-          var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
-          var tg = teamGames[row.team] || 0;
-          var showColor;
+          const isHitterPitchType = isHitterRow && row.pitchType != null;
+          const teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
+          const tg = teamGames[row.team] || 0;
+          let showColor;
           // Pitch shape metrics always show color on single-pitch-type views (no min count)
-          var PITCH_SHAPE_ALWAYS_COLOR = {
+          const PITCH_SHAPE_ALWAYS_COLOR = {
             velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
             vaa: true, haa: true, nVAA: true, nHAA: true
           };
           // Hitter stats that require ≥20 BIP
-          var HITTER_BIP_STATS = {
+          const HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
             hardHitPct: true, barrelPct: true, sacqPct: true,
             xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
@@ -750,23 +730,23 @@ var Leaderboard = {
             pullPct: true, middlePct: true, oppoPct: true
           };
           // Hitter stats that require ≥10 competitive swings
-          var HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true };
+          const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true };
 
           if (isPitcherRow && isSinglePitchType) {
             // Pitcher pitch-type: shape metrics always qualify; outcome metrics need ≥50 pitches
             showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= 50;
           } else if (isPitcherRow) {
             // Pitcher overall: IP-based qualification
-            var ipStr = row.ip;
-            var ipFloat = 0;
+            const ipStr = row.ip;
+            let ipFloat = 0;
             if (ipStr != null) {
-              var ipParts = String(ipStr).split('.');
+              const ipParts = String(ipStr).split('.');
               ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
             }
-            var rg = row.g || 0;
-            var rgs = row.gs || 0;
-            var isStarter = rg > 0 && (rgs / rg) > 0.5;
-            var ipThresh = isStarter ? tg * 1.0 : tg * 0.1;
+            const rg = row.g || 0;
+            const rgs = row.gs || 0;
+            const isStarter = rg > 0 && (rgs / rg) > 0.5;
+            const ipThresh = isStarter ? tg * 1.0 : tg * 0.1;
             showColor = ipFloat >= ipThresh;
             // Pitcher always-color: FB velo, extension
             if (!showColor) showColor = col.key === 'fbVelo' || col.key === 'extension';
@@ -775,7 +755,7 @@ var Leaderboard = {
             showColor = (row.count || 0) >= 25;
           } else {
             // Hitter overall: per-stat qualification gates
-            var paQual = (row.pa || 0) >= tg * 3.1;
+            const paQual = (row.pa || 0) >= tg * 3.1;
             if (HITTER_BIP_STATS[col.key]) {
               showColor = (row.nBip || 0) >= 20;
             } else if (HITTER_BAT_TRACKING[col.key]) {

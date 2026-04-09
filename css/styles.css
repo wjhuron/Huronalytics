@@ -64,8 +64,8 @@ header {
 
 .icon-btn {
   background: none;
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #8d99ae;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   font-size: 20px;
   cursor: pointer;
   padding: 6px 10px;
@@ -75,9 +75,9 @@ header {
 }
 
 .icon-btn:hover {
-  color: white;
-  border-color: rgba(255,255,255,0.4);
-  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: var(--accent-light);
 }
 
 /* === Tab Bar === */
@@ -175,7 +175,7 @@ header {
   text-transform: uppercase;
   letter-spacing: 1px;
 }
-.section-tab:hover { color: #a0d8e8; }
+.section-tab:hover { color: var(--accent); }
 .section-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(0, 212, 255, 0.04); }
 .nav-subtabs {
   display: flex;
@@ -204,7 +204,7 @@ header {
   letter-spacing: 1px;
 }
 
-.tab:hover { color: #a0d8e8; }
+.tab:hover { color: var(--accent); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 /* === Player Game Log Filter === */
@@ -374,7 +374,7 @@ header {
 .pitch-chip:active { transform: scale(0.95); }
 
 .pitch-chip.selected {
-  color: white !important;
+  color: white;
   border-color: transparent;
   /* background set inline via JS */
 }

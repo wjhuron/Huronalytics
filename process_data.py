@@ -11,6 +11,21 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, time
 from collections import defaultdict
+from guts import scrape_guts
+
+
+def _fetch_with_retry(url, headers=None, timeout=15, retries=3):
+    """Fetch URL with retry logic and exponential backoff."""
+    last_err = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=headers or {})
+            return urllib.request.urlopen(req, timeout=timeout).read()
+        except Exception as e:
+            last_err = e
+            if attempt < retries - 1:
+                time_module.sleep(2 ** attempt)  # exponential backoff
+    raise last_err
 
 SPREADSHEET_IDS = {
     'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',   # AL 2026 (15 AL teams)
@@ -116,45 +131,29 @@ GUTS_EXTRA = None    # wOBAScale, lgWOBA, lgRPA — set at runtime
 
 
 def fetch_guts_constants(year=2026):
-    """Scrape wOBA weights and cFIP from FanGraphs Guts page."""
-    import re as _re
-    url = 'https://www.fangraphs.com/tools/guts'
-    req = urllib.request.Request(url, headers={
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
-        'Accept': 'text/html',
-    })
-    html = urllib.request.urlopen(req, timeout=15).read().decode('utf-8')
-    match = _re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, _re.DOTALL)
-    if not match:
-        raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs Guts page')
-    data = json.loads(match.group(1))
-    queries = data['props']['pageProps']['dehydratedState']['queries']
-    for q in queries:
-        rows = q.get('state', {}).get('data', [])
-        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'Season' in rows[0]:
-            for row in rows:
-                if row.get('Season') == year:
-                    weights = {
-                        'BB': round(row['wBB'], 3),
-                        'HBP': round(row['wHBP'], 3),
-                        '1B': round(row['w1B'], 3),
-                        '2B': round(row['w2B'], 3),
-                        '3B': round(row['w3B'], 3),
-                        'HR': round(row['wHR'], 3),
-                    }
-                    cfip = round(row['cFIP'], 3)
-                    guts_extra = {
-                        'wOBAScale': round(row['wOBAScale'], 4),
-                        'lgWOBA': round(row['wOBA'], 4),
-                        'lgRPA': round(row['R/PA'], 4),
-                    }
-                    print(f"  FanGraphs Guts {year}: wBB={weights['BB']}, wHBP={weights['HBP']}, "
-                          f"w1B={weights['1B']}, w2B={weights['2B']}, w3B={weights['3B']}, "
-                          f"wHR={weights['HR']}, cFIP={cfip}")
-                    print(f"  wOBA Scale={guts_extra['wOBAScale']}, League wOBA={guts_extra['lgWOBA']}, "
-                          f"League R/PA={guts_extra['lgRPA']}")
-                    return weights, cfip, guts_extra
-    raise RuntimeError(f'Could not find {year} row in FanGraphs Guts data')
+    """Scrape wOBA weights and cFIP from FanGraphs Guts page.
+    Delegates to guts.scrape_guts() to avoid duplicating scraping logic."""
+    row = scrape_guts(year)
+    weights = {
+        'BB': round(row['wBB'], 3),
+        'HBP': round(row['wHBP'], 3),
+        '1B': round(row['w1B'], 3),
+        '2B': round(row['w2B'], 3),
+        '3B': round(row['w3B'], 3),
+        'HR': round(row['wHR'], 3),
+    }
+    cfip = round(row['cFIP'], 3)
+    guts_extra = {
+        'wOBAScale': round(row['wOBAScale'], 4),
+        'lgWOBA': round(row['wOBA'], 4),
+        'lgRPA': round(row['R/PA'], 4),
+    }
+    print(f"  FanGraphs Guts {year}: wBB={weights['BB']}, wHBP={weights['HBP']}, "
+          f"w1B={weights['1B']}, w2B={weights['2B']}, w3B={weights['3B']}, "
+          f"wHR={weights['HR']}, cFIP={cfip}")
+    print(f"  wOBA Scale={guts_extra['wOBAScale']}, League wOBA={guts_extra['lgWOBA']}, "
+          f"League R/PA={guts_extra['lgRPA']}")
+    return weights, cfip, guts_extra
 
 
 def fetch_sprint_speed(year=2026):
@@ -165,13 +164,12 @@ def fetch_sprint_speed(year=2026):
     import io
     url = (f'https://baseballsavant.mlb.com/leaderboard/sprint_speed'
            f'?type=raw&year={year}&position=&team=&min=1&csv=true')
-    req = urllib.request.Request(url, headers={
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
-        'Accept': 'text/csv',
-    })
     try:
-        resp = urllib.request.urlopen(req, timeout=30)
-        data = resp.read().decode('utf-8-sig')  # Handle BOM
+        raw = _fetch_with_retry(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+            'Accept': 'text/csv',
+        }, timeout=30)
+        data = raw.decode('utf-8-sig')  # Handle BOM
         reader = csv.DictReader(io.StringIO(data))
         result = {}
         for row in reader:
@@ -196,11 +194,10 @@ def fetch_park_factors(year=2026):
     """Scrape park factors from FanGraphs, return dict of team abbrev → factor (divided by 100)."""
     import re as _re
     url = f'https://www.fangraphs.com/guts.aspx?type=pf&teamid=0&season={year}'
-    req = urllib.request.Request(url, headers={
+    html = _fetch_with_retry(url, headers={
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
         'Accept': 'text/html',
-    })
-    html = urllib.request.urlopen(req, timeout=15).read().decode('utf-8')
+    }, timeout=15).decode('utf-8')
     match = _re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, _re.DOTALL)
     if not match:
         raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs park factors page')
@@ -519,7 +516,7 @@ def compute_stats(pitches):
     fps_pct = fps_strikes / len(first_pitches) if first_pitches else None
 
     # 2-Strike Whiff% — whiff rate on pitches with 2 strikes
-    two_strike_pitches = [p for p in pitches if p.get('Count') and p['Count'].split('-')[1] == '2']
+    two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
     two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
     two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
@@ -818,7 +815,7 @@ def compute_hitter_stats(pitches):
 
     # === Count-leverage stats ===
     # 2-Strike Whiff%: whiff rate when hitter has 2 strikes
-    two_strike_pitches = [p for p in pitches if p.get('Count') and p['Count'].split('-')[1] == '2']
+    two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
     two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
     two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
@@ -3711,7 +3708,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         tbf = box['tbf']
 
         # FIP = ((13*HR)+(3*(BB+HBP))-(2*K))/IP + constant
-        if ip_float > 0:
+        if ip_float > 0 and FIP_CONSTANT is not None:
             row['fip'] = round(((13 * hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
         else:
             row['fip'] = None
@@ -3721,7 +3718,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         fb_pct = row.get('fbPct') or 0
         pu_pct = row.get('puPct') or 0
         fb_count = round((fb_pct + pu_pct) * n_bip)  # fly balls + popups
-        if ip_float > 0:
+        if ip_float > 0 and FIP_CONSTANT is not None:
             expected_hr = fb_count * lg_hr_fb
             row['xFIP'] = round(((13 * expected_hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
         else:

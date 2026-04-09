@@ -1,7 +1,7 @@
-var Utils = {
+const Utils = {
   ordinal: function (n) {
-    var s = ['th', 'st', 'nd', 'rd'];
-    var v = n % 100;
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   },
 
@@ -42,10 +42,10 @@ var Utils = {
   // Convert decimal feet to feet'inches format (e.g., 5.86 → "5'10", -1.8 → "-1'10")
   formatFeetInches: function (value) {
     if (value === null || value === undefined) return '--';
-    var sign = value < 0 ? '-' : '';
-    var abs = Math.abs(value);
-    var ft = Math.floor(abs);
-    var inches = Math.round((abs - ft) * 12);
+    const sign = value < 0 ? '-' : '';
+    const abs = Math.abs(value);
+    let ft = Math.floor(abs);
+    let inches = Math.round((abs - ft) * 12);
     if (inches === 12) { ft++; inches = 0; }
     return sign + ft + "'" + inches + '"';
   },
@@ -72,29 +72,29 @@ var Utils = {
   },
 
   badgeTextColor: function (hexColor) {
-    var hex = hexColor.replace('#', '');
-    var r = parseInt(hex.substring(0, 2), 16) / 255;
-    var g = parseInt(hex.substring(2, 4), 16) / 255;
-    var b = parseInt(hex.substring(4, 6), 16) / 255;
+    const hex = hexColor.replace('#', '');
+    let r = parseInt(hex.substring(0, 2), 16) / 255;
+    let g = parseInt(hex.substring(2, 4), 16) / 255;
+    let b = parseInt(hex.substring(4, 6), 16) / 255;
     r = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
     g = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
     b = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
-    var lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     return lum > 0.25 ? 'black' : 'white';
   },
 
   // Percentile color: blue below 50, neutral gray at 50, red above 50
   percentileColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
-    var r, g, b;
+    let r, g, b;
     if (pctl <= 50) {
-      var t = pctl / 50;
+      const t = pctl / 50;
       // 0th = rgb(30,80,200) vivid blue, 50th = rgb(180,180,180) neutral gray
       r = Math.round(30 + t * 150);
       g = Math.round(80 + t * 100);
       b = Math.round(200 - t * 20);
     } else {
-      var t = (pctl - 50) / 50;
+      const t = (pctl - 50) / 50;
       // 50th = rgb(180,180,180) neutral gray, 100th = rgb(200,45,40) vivid red
       r = Math.round(180 + t * 20);
       g = Math.round(180 - t * 135);
@@ -113,15 +113,15 @@ var Utils = {
   // Dark mode: vivid blue below 50, neutral gray at 50, vivid red above 50
   percentileColorDark: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
-    var r, g, b;
+    let r, g, b;
     if (pctl <= 50) {
-      var t = pctl / 50;
+      const t = pctl / 50;
       // 0th = rgb(0,100,255) pure blue, 50th = rgb(140,140,140) neutral gray
       r = Math.round(0 + t * 140);
       g = Math.round(100 + t * 40);
       b = Math.round(255 - t * 115);
     } else {
-      var t = (pctl - 50) / 50;
+      const t = (pctl - 50) / 50;
       // 50th = rgb(140,140,140) neutral gray, 100th = rgb(255,20,20) pure red
       r = Math.round(140 + t * 115);
       g = Math.round(140 - t * 120);
@@ -185,24 +185,24 @@ var Utils = {
 
   // URL state helpers
   readHash: function () {
-    var hash = window.location.hash.replace(/^#/, '');
+    const hash = window.location.hash.replace(/^#/, '');
     if (!hash) return {};
-    var params = {};
+    const params = {};
     hash.split('&').forEach(function (part) {
-      var kv = part.split('=');
+      const kv = part.split('=');
       if (kv.length === 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
     });
     return params;
   },
 
   writeHash: function (params) {
-    var parts = [];
+    const parts = [];
     Object.keys(params).forEach(function (k) {
       if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
         parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
       }
     });
-    var newHash = parts.join('&');
+    const newHash = parts.join('&');
     if (window.location.hash.replace(/^#/, '') !== newHash) {
       history.replaceState(null, '', '#' + newHash);
     }
@@ -210,15 +210,15 @@ var Utils = {
 
   // Export data as CSV string
   toCSV: function (data, columns) {
-    var lines = [];
+    const lines = [];
     // Header
     lines.push(columns.map(function (c) { return '"' + c.label + '"'; }).join(','));
     // Rows
     data.forEach(function (row) {
-      var cells = columns.map(function (c) {
-        var v = row[c.key];
+      const cells = columns.map(function (c) {
+        const v = row[c.key];
         if (v === null || v === undefined) return '';
-        var formatted = c.format(v);
+        const formatted = c.format(v);
         return '"' + String(formatted).replace(/"/g, '""') + '"';
       });
       lines.push(cells.join(','));
@@ -228,8 +228,8 @@ var Utils = {
 
   // Download text as file
   downloadFile: function (content, filename, mimeType) {
-    var blob = new Blob([content], { type: mimeType || 'text/csv;charset=utf-8;' });
-    var link = document.createElement('a');
+    const blob = new Blob([content], { type: mimeType || 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
@@ -248,7 +248,7 @@ var Utils = {
   },
 
   _fallbackCopy: function (text) {
-    var ta = document.createElement('textarea');
+    const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
     ta.style.opacity = '0';
@@ -260,11 +260,11 @@ var Utils = {
 
   // Tab-separated for clipboard (pastes into Excel/Sheets nicely)
   toTSV: function (data, columns) {
-    var lines = [];
+    const lines = [];
     lines.push(columns.map(function (c) { return c.label; }).join('\t'));
     data.forEach(function (row) {
-      var cells = columns.map(function (c) {
-        var v = row[c.key];
+      const cells = columns.map(function (c) {
+        const v = row[c.key];
         if (v === null || v === undefined) return '';
         return String(c.format(v));
       });

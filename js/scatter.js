@@ -1,4 +1,4 @@
-var ScatterChart = {
+const ScatterChart = {
   chart: null,
   compareChart: null,
   currentPitcher: null,
@@ -27,26 +27,26 @@ var ScatterChart = {
 
   computeEllipse: function (points) {
     if (points.length < 3) return null;
-    var n = points.length;
-    var mx = 0, my = 0;
-    for (var i = 0; i < n; i++) { mx += points[i].x; my += points[i].y; }
+    const n = points.length;
+    let mx = 0, my = 0;
+    for (let i = 0; i < n; i++) { mx += points[i].x; my += points[i].y; }
     mx /= n; my /= n;
-    var cxx = 0, cxy = 0, cyy = 0;
-    for (var i = 0; i < n; i++) {
-      var dx = points[i].x - mx, dy = points[i].y - my;
+    let cxx = 0, cxy = 0, cyy = 0;
+    for (let i = 0; i < n; i++) {
+      const dx = points[i].x - mx, dy = points[i].y - my;
       cxx += dx * dx; cxy += dx * dy; cyy += dy * dy;
     }
     cxx /= n; cxy /= n; cyy /= n;
-    var trace = cxx + cyy;
-    var det = cxx * cyy - cxy * cxy;
-    var disc = Math.sqrt(Math.max(0, trace * trace / 4 - det));
-    var l1 = trace / 2 + disc;
-    var l2 = trace / 2 - disc;
-    var angle = 0;
+    const trace = cxx + cyy;
+    const det = cxx * cyy - cxy * cxy;
+    const disc = Math.sqrt(Math.max(0, trace * trace / 4 - det));
+    const l1 = trace / 2 + disc;
+    const l2 = trace / 2 - disc;
+    let angle = 0;
     if (cxy !== 0) angle = Math.atan2(l1 - cxx, cxy);
     else if (cxx < cyy) angle = Math.PI / 2;
-    var rx = 1.5 * Math.sqrt(Math.max(0, l1));
-    var ry = 1.5 * Math.sqrt(Math.max(0, l2));
+    const rx = 1.5 * Math.sqrt(Math.max(0, l1));
+    const ry = 1.5 * Math.sqrt(Math.max(0, l2));
     return { cx: mx, cy: my, rx: rx, ry: ry, angle: angle };
   },
 
@@ -54,15 +54,15 @@ var ScatterChart = {
   ellipsePlugin: {
     id: 'ellipsePlugin',
     afterDatasetsDraw: function (chart) {
-      var ctx = chart.ctx;
-      var xScale = chart.scales.x;
-      var yScale = chart.scales.y;
+      const ctx = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
 
       ctx.save();
 
       // Draw dashed crosshairs at (0, 0)
-      var zeroX = xScale.getPixelForValue(0);
-      var zeroY = yScale.getPixelForValue(0);
+      const zeroX = xScale.getPixelForValue(0);
+      const zeroY = yScale.getPixelForValue(0);
       ctx.strokeStyle = '#999';
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
@@ -76,20 +76,20 @@ var ScatterChart = {
       ctx.stroke();
 
       // Draw ellipses
-      var meta = chart._ellipseMeta;
+      const meta = chart._ellipseMeta;
       if (meta) {
-        for (var i = 0; i < meta.length; i++) {
-          var e = meta[i];
+        for (let i = 0; i < meta.length; i++) {
+          const e = meta[i];
           if (!e.ellipse) continue;
-          var cpx = xScale.getPixelForValue(e.ellipse.cx);
-          var cpy = yScale.getPixelForValue(e.ellipse.cy);
-          var rpxX = Math.abs(xScale.getPixelForValue(e.ellipse.rx) - xScale.getPixelForValue(0));
-          var rpxY = Math.abs(yScale.getPixelForValue(e.ellipse.ry) - yScale.getPixelForValue(0));
+          const cpx = xScale.getPixelForValue(e.ellipse.cx);
+          const cpy = yScale.getPixelForValue(e.ellipse.cy);
+          const rpxX = Math.abs(xScale.getPixelForValue(e.ellipse.rx) - xScale.getPixelForValue(0));
+          const rpxY = Math.abs(yScale.getPixelForValue(e.ellipse.ry) - yScale.getPixelForValue(0));
           ctx.strokeStyle = e.color;
           ctx.lineWidth = 1.5;
           // Vary dash pattern by pitch category
-          var fastballs = { FF: 1, SI: 1 };
-          var breaking = { FC: 1, SL: 1, ST: 1, CU: 1, SV: 1 };
+          const fastballs = { FF: 1, SI: 1 };
+          const breaking = { FC: 1, SL: 1, ST: 1, CU: 1, SV: 1 };
           // offspeed: CH, FS, KN (default)
           if (e.pitchType && fastballs[e.pitchType]) {
             ctx.setLineDash([]);         // solid
@@ -113,15 +113,15 @@ var ScatterChart = {
   },
 
   _buildMovementData: function (pitcherName, team) {
-    var details = window.PITCH_DETAILS;
+    const details = window.PITCH_DETAILS;
     if (!details) return null;
-    var key = pitcherName + '|' + (team || '');
-    var pitches = details[key];
+    const key = pitcherName + '|' + (team || '');
+    const pitches = details[key];
     if (!pitches || pitches.length === 0) return null;
 
-    var groups = {};
-    for (var i = 0; i < pitches.length; i++) {
-      var p = pitches[i];
+    const groups = {};
+    for (let i = 0; i < pitches.length; i++) {
+      const p = pitches[i];
       if (!groups[p.pt]) groups[p.pt] = [];
       groups[p.pt].push({ x: p.hb, y: p.ivb });
     }
@@ -131,23 +131,23 @@ var ScatterChart = {
   render: function (pitcherName, team) {
     this.currentPitcher = pitcherName;
 
-    var groups = this._buildMovementData(pitcherName, team);
+    const groups = this._buildMovementData(pitcherName, team);
     if (!groups) return;
 
-    var datasets = [];
-    var ellipseMeta = [];
-    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
-    var pitchTypes = Object.keys(groups).sort(function(a, b) {
-      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
-      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+    const datasets = [];
+    const ellipseMeta = [];
+    const PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
+    const pitchTypes = Object.keys(groups).sort(function(a, b) {
+      let ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+      let bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
       return ai - bi;
     });
 
-    for (var j = 0; j < pitchTypes.length; j++) {
-      var pt = pitchTypes[j];
-      var pts = groups[pt];
-      var color = this.getColor(pt);
-      var label = pt + ' - ' + (Utils.pitchTypeLabel(pt) || pt);
+    for (let j = 0; j < pitchTypes.length; j++) {
+      const pt = pitchTypes[j];
+      const pts = groups[pt];
+      const color = this.getColor(pt);
+      const label = pt + ' - ' + (Utils.pitchTypeLabel(pt) || pt);
 
       datasets.push({
         label: label,
@@ -159,14 +159,14 @@ var ScatterChart = {
         pointHoverRadius: 8,
       });
 
-      var ellipse = this.computeEllipse(pts);
+      const ellipse = this.computeEllipse(pts);
       ellipseMeta.push({ color: color.border, ellipse: ellipse, pitchType: pt });
     }
 
     this.destroyMain();
 
-    var canvas = document.getElementById('pitch-chart');
-    var ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('pitch-chart');
+    const ctx = canvas.getContext('2d');
 
     this.chart = new Chart(ctx, {
       type: 'scatter',
@@ -214,34 +214,34 @@ var ScatterChart = {
   renderCompare: function (pitcherNames) {
     if (!pitcherNames || pitcherNames.length === 0) return;
 
-    var datasets = [];
-    var details = window.PITCH_DETAILS;
+    const datasets = [];
+    const details = window.PITCH_DETAILS;
     if (!details) return;
 
-    for (var pi = 0; pi < pitcherNames.length; pi++) {
-      var key = pitcherNames[pi]; // format: "name|team"
-      var pitches = details[key];
+    for (let pi = 0; pi < pitcherNames.length; pi++) {
+      const key = pitcherNames[pi]; // format: "name|team"
+      const pitches = details[key];
       if (!pitches) continue;
-      var name = key.split('|')[0];
+      const name = key.split('|')[0];
 
-      var groups = {};
-      for (var i = 0; i < pitches.length; i++) {
-        var p = pitches[i];
+      const groups = {};
+      for (let i = 0; i < pitches.length; i++) {
+        const p = pitches[i];
         if (!groups[p.pt]) groups[p.pt] = [];
         groups[p.pt].push({ x: p.hb, y: p.ivb });
       }
 
-      var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
-    var pitchTypes = Object.keys(groups).sort(function(a, b) {
-      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
-      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+      const PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
+    const pitchTypes = Object.keys(groups).sort(function(a, b) {
+      let ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+      let bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
       return ai - bi;
     });
-      var markerStyle = this.MARKER_STYLES[pi % this.MARKER_STYLES.length];
+      const markerStyle = this.MARKER_STYLES[pi % this.MARKER_STYLES.length];
 
-      for (var j = 0; j < pitchTypes.length; j++) {
-        var pt = pitchTypes[j];
-        var color = this.getColor(pt);
+      for (let j = 0; j < pitchTypes.length; j++) {
+        const pt = pitchTypes[j];
+        const color = this.getColor(pt);
         datasets.push({
           label: name + ' - ' + pt,
           data: groups[pt],
@@ -257,8 +257,8 @@ var ScatterChart = {
 
     this.destroyCompare();
 
-    var canvas = document.getElementById('compare-chart');
-    var ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('compare-chart');
+    const ctx = canvas.getContext('2d');
 
     this.compareChart = new Chart(ctx, {
       type: 'scatter',
