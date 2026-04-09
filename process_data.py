@@ -1641,8 +1641,8 @@ def generate_micro_data(all_pitches):
             'sumExt', 'nExt', 'sumArmAngle', 'nArmAngle',
             'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
             'sumPlateZ', 'nPlateZ',
-            'sumTiltSin', 'sumTiltCos', 'nTilt',
             'sumPlateX', 'nPlateX',
+            'sumTiltSin', 'sumTiltCos', 'nTilt',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
