@@ -798,7 +798,7 @@
     const leagueFilters = {};
     for (const fk in filters) leagueFilters[fk] = filters[fk];
     leagueFilters.team = 'all';
-    const leagueData = DataStore.getFilteredDataV2(dataTab, leagueFilters);
+    let leagueData = DataStore.getFilteredDataV2(dataTab, leagueFilters);
     leagueData = applyRangeFilters(leagueData, columns);
 
     Leaderboard.render(data, columns, {
