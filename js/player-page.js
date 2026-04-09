@@ -44,7 +44,7 @@ var PlayerPage = {
     { key: 'chasePct',        label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true, batSpeedQual: true },
     { key: 'blastPct',        label: 'Blast%',           format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
-    { key: 'idealAAPct',      label: 'IdealAA%',         format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
+    { key: 'idealAAPct',      label: 'IdealAtkAngle%',         format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
     { key: 'sprintSpeed',   label: 'Sprint Speed',     format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
   ],
 

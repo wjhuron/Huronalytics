@@ -219,7 +219,7 @@ const COLUMNS = {
     { key: 'attackDirection', label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'bat_tracking' },
     { key: 'swingPathTilt', label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'bat_tracking' },
     { key: 'blastPct', label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — fast swing + squared up', group: 'bat_tracking' },
-    { key: 'idealAAPct', label: 'IdealAA%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
+    { key: 'idealAAPct', label: 'IdealAtkAngle%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
   ],
   hitterPitch: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
