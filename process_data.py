@@ -652,21 +652,30 @@ def spray_angle(hc_x, hc_y):
 
 
 def spray_direction(angle, stands):
-    """Classify as 'pull', 'center', or 'oppo' based on spray angle and batter side."""
+    """Classify spray direction into 5 bins based on spray angle and batter side.
+    Returns: 'pull', 'pull_side', 'center', 'oppo_side', or 'oppo'."""
     if angle is None or not stands:
         return None
     if stands == 'R':
-        if angle < -15:
+        if angle < -25:
             return 'pull'
-        elif angle > 15:
+        elif angle < -10:
+            return 'pull_side'
+        elif angle > 25:
             return 'oppo'
+        elif angle > 10:
+            return 'oppo_side'
         else:
             return 'center'
     else:  # L
-        if angle > 15:
+        if angle > 25:
             return 'pull'
-        elif angle < -15:
+        elif angle > 10:
+            return 'pull_side'
+        elif angle < -25:
             return 'oppo'
+        elif angle < -10:
+            return 'oppo_side'
         else:
             return 'center'
 

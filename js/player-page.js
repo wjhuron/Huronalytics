@@ -3348,16 +3348,22 @@ var PlayerPage = {
     // Zone overlay plugin — wOBA/xwOBAcon heatmap gradient
     var SACQ_MIN_BIP = 20;
     var zoneMetric = this._laSprayZoneMetric || 'xwobacon';
+    var sprayBounds = {
+      pull: [-45, -25], pull_side: [-25, -10], center: [-10, 10],
+      oppo_side: [10, 25], oppo: [25, 45]
+    };
+    if (bats === 'L') {
+      sprayBounds = {
+        pull: [25, 45], pull_side: [10, 25], center: [-10, 10],
+        oppo_side: [-25, -10], oppo: [-45, -25]
+      };
+    }
     var zonePlugin = {
       id: 'sacqZones',
       beforeDatasetsDraw: function (chart) {
         var ctx2 = chart.ctx;
         var xScale = chart.scales.x;
         var yScale = chart.scales.y;
-        var sprayBounds = { pull: [-45, -15], center: [-15, 15], oppo: [15, 45] };
-        if (bats === 'L') {
-          sprayBounds = { pull: [15, 45], center: [-15, 15], oppo: [-45, -15] };
-        }
         // Color scale: blue (cold, low wOBA) → yellow (mid) → red (hot, high wOBA)
         // Range: 0.0 → 0.5 → 1.0+
         function wobaColorRGB(woba) {
@@ -3430,6 +3436,165 @@ var PlayerPage = {
     var leftLabel = bats === 'L' ? 'Oppo' : 'Pull';
     var rightLabel = bats === 'L' ? 'Pull' : 'Oppo';
 
+    // --- Compute hitter's per-zone BIP counts for zone hover ---
+    var hitterZoneCounts = {};
+    for (var hzi = 0; hzi < points.length; hzi++) {
+      var hzDir = Aggregator.sprayDirection(points[hzi].x, bats);
+      if (!hzDir) continue;
+      var hzLaBin = Aggregator.getLABinIdx(points[hzi].realLA != null ? points[hzi].realLA : points[hzi].y);
+      if (hzLaBin == null) continue;
+      var hzKey = hzDir + '|' + hzLaBin;
+      hitterZoneCounts[hzKey] = (hitterZoneCounts[hzKey] || 0) + 1;
+    }
+
+    // --- Compute xwOBAsp for annotation (from visible points, respects bat-side toggle) ---
+    var sacqZoneMap = {};
+    for (var smi = 0; smi < sacqZones.length; smi++) {
+      sacqZoneMap[sacqZones[smi].spray + '|' + sacqZones[smi].laBin] = sacqZones[smi];
+    }
+    var xwOBAsp_sum = 0, xwOBAsp_count = 0;
+    for (var xsi = 0; xsi < points.length; xsi++) {
+      var xsDir = Aggregator.sprayDirection(points[xsi].x, bats);
+      if (!xsDir) continue;
+      var xsLaBin = Aggregator.getLABinIdx(points[xsi].realLA != null ? points[xsi].realLA : points[xsi].y);
+      if (xsLaBin == null) continue;
+      var xsInfo = sacqZoneMap[xsDir + '|' + xsLaBin];
+      if (xsInfo && xsInfo.count >= 20 && xsInfo.woba != null) {
+        xwOBAsp_sum += xsInfo.woba;
+        xwOBAsp_count++;
+      }
+    }
+    var xwOBAsp_val = xwOBAsp_count > 0 ? (xwOBAsp_sum / xwOBAsp_count) : null;
+
+    // --- xwOBAsp annotation plugin ---
+    var annotationPlugin = {
+      id: 'xwOBAspAnnotation',
+      afterDraw: function (chart) {
+        if (xwOBAsp_val == null) return;
+        var ctx2 = chart.ctx;
+        var chartArea = chart.chartArea;
+        var px = chartArea.left + 8;
+        var py = chartArea.top + 8;
+        var valStr = xwOBAsp_val.toFixed(3);
+        var bipStr = xwOBAsp_count + ' qualifying BIP';
+        ctx2.save();
+        // Background box
+        ctx2.font = '600 13px Barlow';
+        var w1 = ctx2.measureText('xwOBAsp: ' + valStr).width;
+        ctx2.font = '400 11px Barlow';
+        var w2 = ctx2.measureText(bipStr).width;
+        var boxW = Math.max(w1, w2) + 16;
+        var boxH = 38;
+        ctx2.fillStyle = 'rgba(20,20,25,0.80)';
+        ctx2.beginPath();
+        ctx2.roundRect(px, py, boxW, boxH, 4);
+        ctx2.fill();
+        ctx2.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx2.lineWidth = 0.5;
+        ctx2.stroke();
+        // Text
+        ctx2.fillStyle = '#ccc';
+        ctx2.font = '600 13px Barlow';
+        ctx2.fillText('xwOBAsp: ' + valStr, px + 8, py + 16);
+        ctx2.fillStyle = '#888';
+        ctx2.font = '400 11px Barlow';
+        ctx2.fillText(bipStr, px + 8, py + 31);
+        ctx2.restore();
+      }
+    };
+
+    // --- Zone hover tooltip ---
+    var zoneTooltipEl = document.getElementById('la-spray-zone-tooltip');
+    if (!zoneTooltipEl) {
+      zoneTooltipEl = document.createElement('div');
+      zoneTooltipEl.id = 'la-spray-zone-tooltip';
+      zoneTooltipEl.style.cssText = 'position:absolute;display:none;pointer-events:none;' +
+        'background:rgba(20,20,25,0.92);color:#ccc;font-family:Barlow,sans-serif;' +
+        'font-size:12px;padding:8px 10px;border-radius:4px;z-index:100;' +
+        'border:1px solid rgba(255,255,255,0.15);line-height:1.5;white-space:nowrap;';
+      canvas.parentElement.style.position = 'relative';
+      canvas.parentElement.appendChild(zoneTooltipEl);
+    }
+    var zoneHoverSprayBounds = sprayBounds; // capture for closure
+    var zoneHoverSacqZones = sacqZones;
+    var zoneHoverHitterCounts = hitterZoneCounts;
+    var zoneHoverMetric = zoneMetric;
+    // LA bin label helper
+    var LA_BIN_LABELS = ['< 0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
+                         '25–30°', '30–35°', '35–40°', '40–50°', '50°+'];
+    var SPRAY_LABELS = { pull: 'Pull', pull_side: 'Pull-Side', center: 'Center',
+                         oppo_side: 'Oppo-Side', oppo: 'Oppo' };
+
+    // Remove previous handler if any
+    if (this._laSprayZoneHoverHandler) {
+      canvas.removeEventListener('mousemove', this._laSprayZoneHoverHandler);
+      canvas.removeEventListener('mouseleave', this._laSprayZoneLeaveHandler);
+    }
+    this._laSprayZoneHoverHandler = function (e) {
+      var chart = self._laSprayChart;
+      if (!chart) { zoneTooltipEl.style.display = 'none'; return; }
+      // If Chart.js is showing a point tooltip, hide zone tooltip
+      if (chart.tooltip && chart.tooltip.opacity > 0) {
+        zoneTooltipEl.style.display = 'none';
+        return;
+      }
+      var rect = canvas.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var my = e.clientY - rect.top;
+      var xScale = chart.scales.x;
+      var yScale = chart.scales.y;
+      var dataX = xScale.getValueForPixel(mx);
+      var dataY = yScale.getValueForPixel(my);
+      // Check if inside chart area
+      if (mx < chart.chartArea.left || mx > chart.chartArea.right ||
+          my < chart.chartArea.top || my > chart.chartArea.bottom) {
+        zoneTooltipEl.style.display = 'none';
+        return;
+      }
+      // Find which zone the cursor is in
+      var foundZone = null;
+      for (var fzi = 0; fzi < zoneHoverSacqZones.length; fzi++) {
+        var fz = zoneHoverSacqZones[fzi];
+        var fb = zoneHoverSprayBounds[fz.spray];
+        if (!fb) continue;
+        var fxMin = Math.min(fb[0], fb[1]);
+        var fxMax = Math.max(fb[0], fb[1]);
+        var fyMin = fz.laMin != null ? fz.laMin : -20;
+        var fyMax = fz.laMax != null ? fz.laMax : 60;
+        if (dataX >= fxMin && dataX <= fxMax && dataY >= fyMin && dataY <= fyMax) {
+          foundZone = fz;
+          break;
+        }
+      }
+      if (!foundZone) { zoneTooltipEl.style.display = 'none'; return; }
+      var zKey = foundZone.spray + '|' + foundZone.laBin;
+      var hCount = zoneHoverHitterCounts[zKey] || 0;
+      var zVal = zoneHoverMetric === 'xwobacon' ? foundZone.xwobacon : foundZone.woba;
+      var sprayLabel = SPRAY_LABELS[foundZone.spray] || foundZone.spray;
+      var laLabel = LA_BIN_LABELS[foundZone.laBin] || '';
+      var html = '<strong>' + sprayLabel + ', LA ' + laLabel + '</strong><br>';
+      html += 'Lg wOBA: ' + (foundZone.woba != null ? foundZone.woba.toFixed(3) : '—');
+      html += ' · xwOBAcon: ' + (foundZone.xwobacon != null ? foundZone.xwobacon.toFixed(3) : '—') + '<br>';
+      html += 'Lg BIP: ' + foundZone.count;
+      html += ' · Hitter BIP: ' + hCount;
+      zoneTooltipEl.innerHTML = html;
+      zoneTooltipEl.style.display = 'block';
+      // Position near cursor but inside container
+      var ttW = zoneTooltipEl.offsetWidth;
+      var ttH = zoneTooltipEl.offsetHeight;
+      var tx = mx + 12;
+      var ty = my - ttH - 8;
+      if (tx + ttW > rect.width) tx = mx - ttW - 12;
+      if (ty < 0) ty = my + 16;
+      zoneTooltipEl.style.left = tx + 'px';
+      zoneTooltipEl.style.top = ty + 'px';
+    };
+    this._laSprayZoneLeaveHandler = function () {
+      zoneTooltipEl.style.display = 'none';
+    };
+    canvas.addEventListener('mousemove', this._laSprayZoneHoverHandler);
+    canvas.addEventListener('mouseleave', this._laSprayZoneLeaveHandler);
+
     // Destroy previous chart
     if (this._laSprayChart) {
       this._laSprayChart.destroy();
@@ -3439,7 +3604,7 @@ var PlayerPage = {
     this._laSprayChart = new Chart(canvas, {
       type: 'scatter',
       data: { datasets: datasets },
-      plugins: [zonePlugin],
+      plugins: [zonePlugin, annotationPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: true,
