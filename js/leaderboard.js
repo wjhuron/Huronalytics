@@ -82,7 +82,7 @@ const COLUMNS = {
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'batted_ball' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', group: 'batted_ball' },
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on balls in play only', group: 'batted_ball' },
-    { key: 'xwOBAsp',    label: 'xwOBASp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on swings + pitches taken (includes K looking)', group: 'batted_ball' },
+    { key: 'xwOBAsp',    label: 'xwOBASp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted — avg zone wOBA based on LA × spray direction of BIP against', group: 'batted_ball' },
     { key: 'avgEVAgainst', label: 'Avg EV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
     { key: 'maxEVAgainst', label: 'Max EV',  format: Utils.formatDecimal(1), sortType: 'numeric', group: 'batted_ball' },
     { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', group: 'batted_ball' },

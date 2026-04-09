@@ -632,8 +632,8 @@ def compute_pitcher_batted_ball(pitches):
     }
 
 
-PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct']
-PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct'}
+PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct', 'xwOBAsp']
+PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'xwOBAsp'}
 
 
 def spray_angle(hc_x, hc_y):
@@ -1187,6 +1187,8 @@ def generate_micro_data(all_pitches):
         if bb_code < 0:
             continue
 
+        hc_x = safe_float(p.get('HC_X'))
+        hc_y = safe_float(p.get('HC_Y'))
         pitcher_bip_rows.append([
             pi_idx[pitcher],
             dt_idx[date],
@@ -1194,6 +1196,9 @@ def generate_micro_data(all_pitches):
             round(ev, 1) if ev is not None else None,
             round(la, 1) if la is not None else None,
             bb_code,
+            round(hc_x, 2) if hc_x is not None else None,
+            round(hc_y, 2) if hc_y is not None else None,
+            batter_hand,
         ])
     print(f"  Pitcher BIP records: {len(pitcher_bip_rows)}")
 
@@ -1624,7 +1629,7 @@ def generate_micro_data(all_pitches):
             'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu', 'nStrikes',
         ],
         'pitcherMicro': pitcher_rows,
-        'pitcherBipCols': ['pitcherIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType'],
+        'pitcherBipCols': ['pitcherIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats'],
         'pitcherBip': pitcher_bip_rows,
         'pitchCols': [
             'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',
@@ -3230,6 +3235,43 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         })
     print(f"  SACQ zones: {len(sacq_zones_output)} bins, "
           f"{sum(1 for z in sacq_zones_output if z['quality'])} quality bins")
+
+    # --- Compute xwOBAsp for each pitcher (second pass, requires sacq_zone_table) ---
+    pitcher_pitch_lookup = {}
+    for (pitcher, team, throws), pitches in pitcher_groups.items():
+        pitcher_pitch_lookup[(pitcher, team)] = pitches
+
+    for row in pitcher_leaderboard:
+        pitches = pitcher_pitch_lookup.get((row['pitcher'], row['team']), [])
+        xwobasp_sum = 0.0
+        xwobasp_count = 0
+        for p in pitches:
+            bb_type = p.get('BBType')
+            if not bb_type or bb_type in BUNT_BB_TYPES:
+                continue
+            hc_x = safe_float(p.get('HC_X'))
+            hc_y = safe_float(p.get('HC_Y'))
+            la_val = safe_float(p.get('LaunchAngle'))
+            bats_val = p.get('Bats')
+            if la_val is None or hc_x is None or hc_y is None or not bats_val:
+                continue
+            angle = spray_angle(hc_x, hc_y)
+            direction = spray_direction(angle, bats_val)
+            if not direction:
+                continue
+            la_bin_idx = None
+            for bi, (lo, hi) in enumerate(LA_BINS):
+                if lo <= la_val < hi:
+                    la_bin_idx = bi
+                    break
+            if la_bin_idx is None:
+                continue
+            zone_key = (direction, la_bin_idx)
+            zone_info = sacq_zone_table.get(zone_key)
+            if zone_info and zone_info['count'] >= SACQ_MIN_BIP and zone_info['woba'] is not None:
+                xwobasp_sum += zone_info['woba']
+                xwobasp_count += 1
+        row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():

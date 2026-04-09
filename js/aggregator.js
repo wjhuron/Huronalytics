@@ -423,6 +423,37 @@ const Aggregator = {
       if (bbt === 2) n_fb_bb++;
       if (bbt === 3) n_pu_bb++;
     }
+
+    // xwOBAsp: average league zone wOBA for BIP against this pitcher
+    var xwOBAsp = null;
+    var sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
+    if (sacqZones.length > 0 && bipRecs.length > 0) {
+      var sacqZoneMap = {};
+      for (var szi = 0; szi < sacqZones.length; szi++) {
+        var sz = sacqZones[szi];
+        sacqZoneMap[sz.spray + '|' + sz.laBin] = sz;
+      }
+      var xsp_sum = 0, xsp_count = 0;
+      for (var sri = 0; sri < bipRecs.length; sri++) {
+        var sla = bipRecs[sri][pbci.launchAngle];
+        var shcX = bipRecs[sri][pbci.hcX];
+        var shcY = bipRecs[sri][pbci.hcY];
+        var sBats = bipRecs[sri][pbci.bats];
+        if (sla == null || shcX == null || shcY == null || !sBats) continue;
+        var sAngle = Aggregator.computeSprayAngle(shcX, shcY);
+        var sDir = Aggregator.sprayDirection(sAngle, sBats);
+        if (!sDir) continue;
+        var sLaBin = Aggregator.getLABinIdx(sla);
+        if (sLaBin == null) continue;
+        var szInfo = sacqZoneMap[sDir + '|' + sLaBin];
+        if (szInfo && szInfo.count >= 20 && szInfo.woba != null) {
+          xsp_sum += szInfo.woba;
+          xsp_count++;
+        }
+      }
+      xwOBAsp = xsp_count > 0 ? xsp_sum / xsp_count : null;
+    }
+
     return {
       avgEVAgainst: evs.length > 0 ? Math.round(evs.reduce(function(a,b){return a+b;},0) / evs.length * 10) / 10 : null,
       maxEVAgainst: evs.length > 0 ? Math.round(Math.max.apply(null, evs) * 10) / 10 : null,
@@ -430,7 +461,8 @@ const Aggregator = {
       barrelPctAgainst: n_bip_total > 0 ? n_barrel / n_bip_total : null,
       ldPct: n_bip_total > 0 ? n_ld / n_bip_total : null,
       fbPct: n_bip_total > 0 ? n_fb_bb / n_bip_total : null,
-      puPct: n_bip_total > 0 ? n_pu_bb / n_bip_total : null
+      puPct: n_bip_total > 0 ? n_pu_bb / n_bip_total : null,
+      xwOBAsp: xwOBAsp
     };
   },
 
@@ -490,6 +522,7 @@ const Aggregator = {
       ldPct: bipStats.ldPct,
       fbPct: bipStats.fbPct,
       puPct: bipStats.puPct,
+      xwOBAsp: bipStats.xwOBAsp,
     };
   },
 
@@ -511,8 +544,8 @@ const Aggregator = {
 
     // Convert to row objects
     const STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
-                     'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst'];
-    const INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
+                     'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'xwOBAsp'];
+    const INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
     let rows = [];
 
     for (let gk2 in groups) {
@@ -537,6 +570,7 @@ const Aggregator = {
                      'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
                      'xwOBAcon', 'xwOBAcon_pctl',
+                     'xwOBAsp', 'xwOBAsp_pctl',
                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
                      'armAngle'];
     const preAgg = window.PITCHER_DATA || [];
@@ -603,7 +637,7 @@ const Aggregator = {
       r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg * 0.1);
     }
     // Set bipQual flag BEFORE percentiles so BIP stats can use it
-    const BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true };
+    const BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
     for (let bqi = 0; bqi < rows.length; bqi++) {
       rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
     }
