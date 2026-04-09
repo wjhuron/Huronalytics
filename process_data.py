@@ -64,7 +64,7 @@ HITTER_STAT_KEYS = [
     # Expected Stats
     'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
     # Batted Ball tab
-    'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'sacqPct',
+    'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     # Swing Decisions tab
@@ -3294,9 +3294,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches))
 
-        # Compute SACQ% and xwOBAsp for this hitter
-        sacq_quality_bips = 0
-        sacq_eligible_bips = 0
+        # Compute xwOBAsp for this hitter
         xwobasp_sum = 0.0
         xwobasp_count = 0
         for p in pitches:
@@ -3323,13 +3321,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             zone_key = (direction, la_bin_idx)
             zone_info = sacq_zone_table.get(zone_key)
             if zone_info and zone_info['count'] >= SACQ_MIN_BIP and zone_info['woba'] is not None:
-                sacq_eligible_bips += 1
-                if zone_info['quality']:
-                    sacq_quality_bips += 1
-                # xwOBAsp: accumulate the zone's league-avg wOBA for this BIP
                 xwobasp_sum += zone_info['woba']
                 xwobasp_count += 1
-        row['sacqPct'] = round(sacq_quality_bips / sacq_eligible_bips, 4) if sacq_eligible_bips > 0 else None
         row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 
         hitter_leaderboard.append(row)
@@ -3478,7 +3471,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
-                 'sacqPct', 'xwOBAcon', 'xwOBAsp',
+                 'xwOBAcon', 'xwOBAsp',
                  'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     for stat in HITTER_STAT_KEYS:

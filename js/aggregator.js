@@ -1155,7 +1155,7 @@ const Aggregator = {
     const HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
       'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
-      'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct', 'sacqPct',
+      'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
@@ -1240,8 +1240,7 @@ const Aggregator = {
         ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
       }
 
-      // SACQ% — compute from BIP records using zone table
-      let sacqPct_val = null;
+      // xwOBAsp — compute from BIP records using zone table
       let xwOBAsp_val = null;
       const sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
       if (sacqZones.length > 0 && bipRecords.length > 0) {
@@ -1250,7 +1249,6 @@ const Aggregator = {
           const sz = sacqZones[szi];
           sacqZoneMap[sz.spray + '|' + sz.laBin] = sz;
         }
-        let sacqQuality = 0, sacqEligible = 0;
         let xwOBAsp_sum = 0, xwOBAsp_count = 0;
         for (let sri = 0; sri < bipRecords.length; sri++) {
           const sla = bipRecords[sri][bci.launchAngle];
@@ -1264,13 +1262,10 @@ const Aggregator = {
           if (sLaBin == null) continue;
           const szInfo = sacqZoneMap[sDir + '|' + sLaBin];
           if (szInfo && szInfo.count >= 20 && szInfo.woba != null) {
-            sacqEligible++;
-            if (szInfo.quality) sacqQuality++;
             xwOBAsp_sum += szInfo.woba;
             xwOBAsp_count++;
           }
         }
-        sacqPct_val = sacqEligible > 0 ? sacqQuality / sacqEligible : null;
         xwOBAsp_val = xwOBAsp_count > 0 ? xwOBAsp_sum / xwOBAsp_count : null;
       }
 
@@ -1304,7 +1299,6 @@ const Aggregator = {
         medLA: medLA,
         hardHitPct: hardHitPct,
         barrelPct: bip > 0 ? barrels / bip : null,
-        sacqPct: sacqPct_val,
         xwOBAsp: xwOBAsp_val,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,

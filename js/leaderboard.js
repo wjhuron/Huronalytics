@@ -164,7 +164,6 @@ const COLUMNS = {
     { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'quality' },
     { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', group: 'quality' },
-    { key: 'sacqPct', label: 'SACQ%', format: Utils.formatPct, sortType: 'numeric', desc: 'Spray-Adjusted Contact Quality — % of BIPs in high-value LA×spray zones', group: 'quality' },
     // Expected Stats
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', group: 'expected' },
@@ -723,7 +722,7 @@ const Leaderboard = {
           // Hitter stats that require ≥20 BIP
           const HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
-            hardHitPct: true, barrelPct: true, sacqPct: true,
+            hardHitPct: true, barrelPct: true,
             xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
             babip: true, hrFbPct: true, airPullPct: true,
             gbPct: true, ldPct: true, fbPct: true, puPct: true,
