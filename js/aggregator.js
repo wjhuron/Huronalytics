@@ -143,17 +143,19 @@ var Aggregator = {
   sprayDirection: function (angle, bats) {
     if (angle == null || !bats) return null;
     if (bats === 'R') {
-      if (angle < -25) return 'pull';
-      if (angle < -10) return 'pull_side';
-      if (angle > 25) return 'oppo';
-      if (angle > 10) return 'oppo_side';
-      return 'center';
+      if (angle < -30) return 'pull';
+      if (angle < -15) return 'pull_side';
+      if (angle < 0) return 'center_pull';
+      if (angle < 15) return 'center_oppo';
+      if (angle < 30) return 'oppo_side';
+      return 'oppo';
     } else {
-      if (angle > 25) return 'pull';
-      if (angle > 10) return 'pull_side';
-      if (angle < -25) return 'oppo';
-      if (angle < -10) return 'oppo_side';
-      return 'center';
+      if (angle > 30) return 'pull';
+      if (angle > 15) return 'pull_side';
+      if (angle > 0) return 'center_pull';
+      if (angle > -15) return 'center_oppo';
+      if (angle > -30) return 'oppo_side';
+      return 'oppo';
     }
   },
 

@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-08 20:10",
+  "generatedAt": "2026-04-08 20:20",
   "totalPitches": 53187,
   "totalPitchers": 428,
   "totalHitters": 409,
@@ -343,22 +343,22 @@
     "xSLG": 0.3652,
     "xwOBA": 0.3168,
     "xwOBAcon": 0.3673,
-    "xwOBAsp": 0.364,
+    "xwOBAsp": 0.3639,
     "avgEVAll": 88.8741,
     "ev50": 99.6924,
     "maxEV": 107.0227,
     "hardHitPct": 0.3999,
     "barrelPct": 0.0833,
-    "sacqPct": 0.279,
+    "sacqPct": 0.3045,
     "gbPct": 0.4308,
     "ldPct": 0.2258,
     "fbPct": 0.2664,
     "puPct": 0.077,
     "hrFbPct": 0.1113,
-    "pullPct": 0.3168,
-    "middlePct": 0.1877,
-    "oppoPct": 0.1762,
-    "airPullPct": 0.1294,
+    "pullPct": 0.2475,
+    "middlePct": 0.0,
+    "oppoPct": 0.1332,
+    "airPullPct": 0.0996,
     "swingPct": 0.4647,
     "izSwingPct": 0.6505,
     "chasePct": 0.2883,
@@ -485,554 +485,664 @@
   },
   "sacqZones": [
     {
-      "spray": "center",
+      "spray": "center_oppo",
       "laMin": null,
       "laMax": 0,
       "laBin": 0,
-      "woba": 0.27,
-      "xwobacon": 0.196,
+      "woba": 0.126,
+      "xwobacon": 0.18,
       "quality": false,
-      "count": 336
+      "count": 243
     },
     {
-      "spray": "center",
+      "spray": "center_oppo",
       "laMin": 0,
       "laMax": 5,
       "laBin": 1,
-      "woba": 0.528,
-      "xwobacon": 0.407,
-      "quality": true,
-      "count": 91
+      "woba": 0.275,
+      "xwobacon": 0.387,
+      "quality": false,
+      "count": 63
     },
     {
-      "spray": "center",
+      "spray": "center_oppo",
       "laMin": 5,
       "laMax": 10,
       "laBin": 2,
-      "woba": 0.585,
-      "xwobacon": 0.531,
-      "quality": true,
-      "count": 131
-    },
-    {
-      "spray": "center",
-      "laMin": 10,
-      "laMax": 15,
-      "laBin": 3,
-      "woba": 0.682,
-      "xwobacon": 0.717,
-      "quality": true,
-      "count": 122
-    },
-    {
-      "spray": "center",
-      "laMin": 15,
-      "laMax": 20,
-      "laBin": 4,
-      "woba": 0.523,
-      "xwobacon": 0.664,
-      "quality": true,
-      "count": 149
-    },
-    {
-      "spray": "center",
-      "laMin": 20,
-      "laMax": 25,
-      "laBin": 5,
-      "woba": 0.347,
-      "xwobacon": 0.644,
-      "quality": false,
-      "count": 153
-    },
-    {
-      "spray": "center",
-      "laMin": 25,
-      "laMax": 30,
-      "laBin": 6,
-      "woba": 0.315,
-      "xwobacon": 0.754,
-      "quality": false,
-      "count": 154
-    },
-    {
-      "spray": "center",
-      "laMin": 30,
-      "laMax": 35,
-      "laBin": 7,
-      "woba": 0.222,
-      "xwobacon": 0.589,
-      "quality": false,
-      "count": 122
-    },
-    {
-      "spray": "center",
-      "laMin": 35,
-      "laMax": 40,
-      "laBin": 8,
-      "woba": 0.141,
-      "xwobacon": 0.382,
-      "quality": false,
-      "count": 88
-    },
-    {
-      "spray": "center",
-      "laMin": 40,
-      "laMax": 50,
-      "laBin": 9,
-      "woba": 0.066,
-      "xwobacon": 0.09,
-      "quality": false,
-      "count": 154
-    },
-    {
-      "spray": "center",
-      "laMin": 50,
-      "laMax": null,
-      "laBin": 10,
-      "woba": 0.011,
-      "xwobacon": 0.023,
-      "quality": false,
-      "count": 120
-    },
-    {
-      "spray": "oppo",
-      "laMin": null,
-      "laMax": 0,
-      "laBin": 0,
-      "woba": 0.315,
-      "xwobacon": 0.174,
-      "quality": false,
-      "count": 231
-    },
-    {
-      "spray": "oppo",
-      "laMin": 0,
-      "laMax": 5,
-      "laBin": 1,
-      "woba": 0.511,
-      "xwobacon": 0.33,
-      "quality": true,
-      "count": 66
-    },
-    {
-      "spray": "oppo",
-      "laMin": 5,
-      "laMax": 10,
-      "laBin": 2,
-      "woba": 0.742,
-      "xwobacon": 0.485,
-      "quality": true,
-      "count": 64
-    },
-    {
-      "spray": "oppo",
-      "laMin": 10,
-      "laMax": 15,
-      "laBin": 3,
-      "woba": 0.75,
-      "xwobacon": 0.672,
-      "quality": true,
-      "count": 75
-    },
-    {
-      "spray": "oppo",
-      "laMin": 15,
-      "laMax": 20,
-      "laBin": 4,
-      "woba": 0.62,
-      "xwobacon": 0.646,
-      "quality": true,
-      "count": 76
-    },
-    {
-      "spray": "oppo",
-      "laMin": 20,
-      "laMax": 25,
-      "laBin": 5,
-      "woba": 0.472,
-      "xwobacon": 0.555,
-      "quality": false,
-      "count": 100
-    },
-    {
-      "spray": "oppo",
-      "laMin": 25,
-      "laMax": 30,
-      "laBin": 6,
-      "woba": 0.495,
-      "xwobacon": 0.518,
-      "quality": false,
-      "count": 109
-    },
-    {
-      "spray": "oppo",
-      "laMin": 30,
-      "laMax": 35,
-      "laBin": 7,
-      "woba": 0.372,
-      "xwobacon": 0.3,
-      "quality": false,
-      "count": 104
-    },
-    {
-      "spray": "oppo",
-      "laMin": 35,
-      "laMax": 40,
-      "laBin": 8,
-      "woba": 0.196,
-      "xwobacon": 0.135,
-      "quality": false,
-      "count": 98
-    },
-    {
-      "spray": "oppo",
-      "laMin": 40,
-      "laMax": 50,
-      "laBin": 9,
-      "woba": 0.096,
-      "xwobacon": 0.063,
-      "quality": false,
-      "count": 188
-    },
-    {
-      "spray": "oppo",
-      "laMin": 50,
-      "laMax": null,
-      "laBin": 10,
-      "woba": 0.05,
-      "xwobacon": 0.016,
-      "quality": false,
-      "count": 414
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": null,
-      "laMax": 0,
-      "laBin": 0,
-      "woba": 0.211,
-      "xwobacon": 0.173,
-      "quality": false,
-      "count": 234
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 0,
-      "laMax": 5,
-      "laBin": 1,
-      "woba": 0.266,
-      "xwobacon": 0.392,
-      "quality": false,
-      "count": 75
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 5,
-      "laMax": 10,
-      "laBin": 2,
-      "woba": 0.362,
-      "xwobacon": 0.435,
-      "quality": false,
-      "count": 85
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 10,
-      "laMax": 15,
-      "laBin": 3,
-      "woba": 0.778,
-      "xwobacon": 0.729,
-      "quality": true,
-      "count": 92
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 15,
-      "laMax": 20,
-      "laBin": 4,
-      "woba": 0.592,
-      "xwobacon": 0.624,
-      "quality": true,
-      "count": 95
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 20,
-      "laMax": 25,
-      "laBin": 5,
-      "woba": 0.612,
-      "xwobacon": 0.643,
-      "quality": true,
-      "count": 97
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 25,
-      "laMax": 30,
-      "laBin": 6,
-      "woba": 0.41,
-      "xwobacon": 0.619,
+      "woba": 0.264,
+      "xwobacon": 0.488,
       "quality": false,
       "count": 83
     },
     {
+      "spray": "center_oppo",
+      "laMin": 10,
+      "laMax": 15,
+      "laBin": 3,
+      "woba": 0.537,
+      "xwobacon": 0.711,
+      "quality": true,
+      "count": 89
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 15,
+      "laMax": 20,
+      "laBin": 4,
+      "woba": 0.428,
+      "xwobacon": 0.638,
+      "quality": false,
+      "count": 99
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 20,
+      "laMax": 25,
+      "laBin": 5,
+      "woba": 0.4,
+      "xwobacon": 0.627,
+      "quality": false,
+      "count": 92
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 25,
+      "laMax": 30,
+      "laBin": 6,
+      "woba": 0.245,
+      "xwobacon": 0.678,
+      "quality": false,
+      "count": 106
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 30,
+      "laMax": 35,
+      "laBin": 7,
+      "woba": 0.149,
+      "xwobacon": 0.479,
+      "quality": false,
+      "count": 104
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 35,
+      "laMax": 40,
+      "laBin": 8,
+      "woba": 0.096,
+      "xwobacon": 0.383,
+      "quality": false,
+      "count": 75
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 40,
+      "laMax": 50,
+      "laBin": 9,
+      "woba": 0.051,
+      "xwobacon": 0.083,
+      "quality": false,
+      "count": 96
+    },
+    {
+      "spray": "center_oppo",
+      "laMin": 50,
+      "laMax": null,
+      "laBin": 10,
+      "woba": 0.023,
+      "xwobacon": 0.019,
+      "quality": false,
+      "count": 102
+    },
+    {
+      "spray": "center_pull",
+      "laMin": null,
+      "laMax": 0,
+      "laBin": 0,
+      "woba": 0.318,
+      "xwobacon": 0.19,
+      "quality": false,
+      "count": 336
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 0,
+      "laMax": 5,
+      "laBin": 1,
+      "woba": 0.589,
+      "xwobacon": 0.407,
+      "quality": true,
+      "count": 86
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 5,
+      "laMax": 10,
+      "laBin": 2,
+      "woba": 0.72,
+      "xwobacon": 0.526,
+      "quality": true,
+      "count": 106
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 10,
+      "laMax": 15,
+      "laBin": 3,
+      "woba": 0.87,
+      "xwobacon": 0.734,
+      "quality": true,
+      "count": 96
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 15,
+      "laMax": 20,
+      "laBin": 4,
+      "woba": 0.701,
+      "xwobacon": 0.683,
+      "quality": true,
+      "count": 137
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 20,
+      "laMax": 25,
+      "laBin": 5,
+      "woba": 0.473,
+      "xwobacon": 0.692,
+      "quality": false,
+      "count": 114
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 25,
+      "laMax": 30,
+      "laBin": 6,
+      "woba": 0.56,
+      "xwobacon": 0.851,
+      "quality": true,
+      "count": 98
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 30,
+      "laMax": 35,
+      "laBin": 7,
+      "woba": 0.485,
+      "xwobacon": 0.697,
+      "quality": false,
+      "count": 83
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 35,
+      "laMax": 40,
+      "laBin": 8,
+      "woba": 0.18,
+      "xwobacon": 0.332,
+      "quality": false,
+      "count": 61
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 40,
+      "laMax": 50,
+      "laBin": 9,
+      "woba": 0.076,
+      "xwobacon": 0.103,
+      "quality": false,
+      "count": 109
+    },
+    {
+      "spray": "center_pull",
+      "laMin": 50,
+      "laMax": null,
+      "laBin": 10,
+      "woba": 0.0,
+      "xwobacon": 0.022,
+      "quality": false,
+      "count": 86
+    },
+    {
+      "spray": "oppo",
+      "laMin": null,
+      "laMax": 0,
+      "laBin": 0,
+      "woba": 0.306,
+      "xwobacon": 0.166,
+      "quality": false,
+      "count": 156
+    },
+    {
+      "spray": "oppo",
+      "laMin": 0,
+      "laMax": 5,
+      "laBin": 1,
+      "woba": 0.593,
+      "xwobacon": 0.316,
+      "quality": true,
+      "count": 47
+    },
+    {
+      "spray": "oppo",
+      "laMin": 5,
+      "laMax": 10,
+      "laBin": 2,
+      "woba": 0.78,
+      "xwobacon": 0.479,
+      "quality": true,
+      "count": 44
+    },
+    {
+      "spray": "oppo",
+      "laMin": 10,
+      "laMax": 15,
+      "laBin": 3,
+      "woba": 0.802,
+      "xwobacon": 0.697,
+      "quality": true,
+      "count": 53
+    },
+    {
+      "spray": "oppo",
+      "laMin": 15,
+      "laMax": 20,
+      "laBin": 4,
+      "woba": 0.603,
+      "xwobacon": 0.613,
+      "quality": true,
+      "count": 51
+    },
+    {
+      "spray": "oppo",
+      "laMin": 20,
+      "laMax": 25,
+      "laBin": 5,
+      "woba": 0.509,
+      "xwobacon": 0.58,
+      "quality": true,
+      "count": 70
+    },
+    {
+      "spray": "oppo",
+      "laMin": 25,
+      "laMax": 30,
+      "laBin": 6,
+      "woba": 0.625,
+      "xwobacon": 0.513,
+      "quality": true,
+      "count": 74
+    },
+    {
+      "spray": "oppo",
+      "laMin": 30,
+      "laMax": 35,
+      "laBin": 7,
+      "woba": 0.425,
+      "xwobacon": 0.315,
+      "quality": false,
+      "count": 79
+    },
+    {
+      "spray": "oppo",
+      "laMin": 35,
+      "laMax": 40,
+      "laBin": 8,
+      "woba": 0.266,
+      "xwobacon": 0.149,
+      "quality": false,
+      "count": 65
+    },
+    {
+      "spray": "oppo",
+      "laMin": 40,
+      "laMax": 50,
+      "laBin": 9,
+      "woba": 0.104,
+      "xwobacon": 0.054,
+      "quality": false,
+      "count": 153
+    },
+    {
+      "spray": "oppo",
+      "laMin": 50,
+      "laMax": null,
+      "laBin": 10,
+      "woba": 0.058,
+      "xwobacon": 0.015,
+      "quality": false,
+      "count": 360
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": null,
+      "laMax": 0,
+      "laBin": 0,
+      "woba": 0.285,
+      "xwobacon": 0.181,
+      "quality": false,
+      "count": 219
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 0,
+      "laMax": 5,
+      "laBin": 1,
+      "woba": 0.31,
+      "xwobacon": 0.389,
+      "quality": false,
+      "count": 63
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 5,
+      "laMax": 10,
+      "laBin": 2,
+      "woba": 0.526,
+      "xwobacon": 0.463,
+      "quality": true,
+      "count": 80
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 10,
+      "laMax": 15,
+      "laBin": 3,
+      "woba": 0.775,
+      "xwobacon": 0.706,
+      "quality": true,
+      "count": 84
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 15,
+      "laMax": 20,
+      "laBin": 4,
+      "woba": 0.635,
+      "xwobacon": 0.65,
+      "quality": true,
+      "count": 78
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 20,
+      "laMax": 25,
+      "laBin": 5,
+      "woba": 0.558,
+      "xwobacon": 0.587,
+      "quality": true,
+      "count": 106
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 25,
+      "laMax": 30,
+      "laBin": 6,
+      "woba": 0.341,
+      "xwobacon": 0.582,
+      "quality": false,
+      "count": 90
+    },
+    {
       "spray": "oppo_side",
       "laMin": 30,
       "laMax": 35,
       "laBin": 7,
-      "woba": 0.258,
-      "xwobacon": 0.477,
+      "woba": 0.272,
+      "xwobacon": 0.449,
+      "quality": false,
+      "count": 97
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 35,
+      "laMax": 40,
+      "laBin": 8,
+      "woba": 0.051,
+      "xwobacon": 0.169,
+      "quality": false,
+      "count": 75
+    },
+    {
+      "spray": "oppo_side",
+      "laMin": 40,
+      "laMax": 50,
+      "laBin": 9,
+      "woba": 0.029,
+      "xwobacon": 0.078,
       "quality": false,
       "count": 106
     },
     {
       "spray": "oppo_side",
-      "laMin": 35,
-      "laMax": 40,
-      "laBin": 8,
-      "woba": 0.063,
-      "xwobacon": 0.268,
-      "quality": false,
-      "count": 76
-    },
-    {
-      "spray": "oppo_side",
-      "laMin": 40,
-      "laMax": 50,
-      "laBin": 9,
-      "woba": 0.031,
-      "xwobacon": 0.065,
-      "quality": false,
-      "count": 92
-    },
-    {
-      "spray": "oppo_side",
       "laMin": 50,
       "laMax": null,
       "laBin": 10,
-      "woba": 0.015,
-      "xwobacon": 0.019,
+      "woba": 0.007,
+      "xwobacon": 0.021,
       "quality": false,
-      "count": 126
+      "count": 141
     },
     {
       "spray": "pull",
       "laMin": null,
       "laMax": 0,
       "laBin": 0,
-      "woba": 0.164,
-      "xwobacon": 0.153,
+      "woba": 0.172,
+      "xwobacon": 0.149,
       "quality": false,
-      "count": 1208
+      "count": 969
     },
     {
       "spray": "pull",
       "laMin": 0,
       "laMax": 5,
       "laBin": 1,
-      "woba": 0.363,
-      "xwobacon": 0.374,
+      "woba": 0.38,
+      "xwobacon": 0.376,
       "quality": false,
-      "count": 233
+      "count": 180
     },
     {
       "spray": "pull",
       "laMin": 5,
       "laMax": 10,
       "laBin": 2,
-      "woba": 0.5,
-      "xwobacon": 0.525,
-      "quality": false,
-      "count": 213
+      "woba": 0.511,
+      "xwobacon": 0.534,
+      "quality": true,
+      "count": 162
     },
     {
       "spray": "pull",
       "laMin": 10,
       "laMax": 15,
       "laBin": 3,
-      "woba": 0.836,
+      "woba": 0.879,
       "xwobacon": 0.76,
       "quality": true,
-      "count": 212
+      "count": 168
     },
     {
       "spray": "pull",
       "laMin": 15,
       "laMax": 20,
       "laBin": 4,
-      "woba": 0.854,
+      "woba": 1.019,
       "xwobacon": 0.698,
       "quality": true,
-      "count": 176
+      "count": 132
     },
     {
       "spray": "pull",
       "laMin": 20,
       "laMax": 25,
       "laBin": 5,
-      "woba": 1.012,
-      "xwobacon": 0.825,
+      "woba": 1.082,
+      "xwobacon": 0.828,
       "quality": true,
-      "count": 166
+      "count": 131
     },
     {
       "spray": "pull",
       "laMin": 25,
       "laMax": 30,
       "laBin": 6,
-      "woba": 1.148,
-      "xwobacon": 0.929,
+      "woba": 1.178,
+      "xwobacon": 0.902,
       "quality": true,
-      "count": 137
+      "count": 106
     },
     {
       "spray": "pull",
       "laMin": 30,
       "laMax": 35,
       "laBin": 7,
-      "woba": 0.964,
-      "xwobacon": 0.668,
+      "woba": 1.011,
+      "xwobacon": 0.696,
       "quality": true,
-      "count": 100
+      "count": 67
     },
     {
       "spray": "pull",
       "laMin": 35,
       "laMax": 40,
       "laBin": 8,
-      "woba": 0.897,
-      "xwobacon": 0.579,
+      "woba": 0.942,
+      "xwobacon": 0.599,
       "quality": true,
-      "count": 68
+      "count": 47
     },
     {
       "spray": "pull",
       "laMin": 40,
       "laMax": 50,
       "laBin": 9,
-      "woba": 0.308,
-      "xwobacon": 0.135,
+      "woba": 0.39,
+      "xwobacon": 0.152,
       "quality": false,
-      "count": 87
+      "count": 65
     },
     {
       "spray": "pull",
       "laMin": 50,
       "laMax": null,
       "laBin": 10,
-      "woba": 0.042,
+      "woba": 0.041,
       "xwobacon": 0.016,
       "quality": false,
+      "count": 99
+    },
+    {
+      "spray": "pull_side",
+      "laMin": null,
+      "laMax": 0,
+      "laBin": 0,
+      "woba": 0.117,
+      "xwobacon": 0.165,
+      "quality": false,
+      "count": 686
+    },
+    {
+      "spray": "pull_side",
+      "laMin": 0,
+      "laMax": 5,
+      "laBin": 1,
+      "woba": 0.218,
+      "xwobacon": 0.378,
+      "quality": false,
+      "count": 162
+    },
+    {
+      "spray": "pull_side",
+      "laMin": 5,
+      "laMax": 10,
+      "laBin": 2,
+      "woba": 0.346,
+      "xwobacon": 0.493,
+      "quality": false,
+      "count": 156
+    },
+    {
+      "spray": "pull_side",
+      "laMin": 10,
+      "laMax": 15,
+      "laBin": 3,
+      "woba": 0.634,
+      "xwobacon": 0.757,
+      "quality": true,
       "count": 124
     },
     {
       "spray": "pull_side",
-      "laMin": null,
-      "laMax": 0,
-      "laBin": 0,
-      "woba": 0.139,
-      "xwobacon": 0.165,
-      "quality": false,
-      "count": 600
-    },
-    {
-      "spray": "pull_side",
-      "laMin": 0,
-      "laMax": 5,
-      "laBin": 1,
-      "woba": 0.24,
-      "xwobacon": 0.384,
-      "quality": false,
-      "count": 136
-    },
-    {
-      "spray": "pull_side",
-      "laMin": 5,
-      "laMax": 10,
-      "laBin": 2,
-      "woba": 0.365,
-      "xwobacon": 0.496,
-      "quality": false,
-      "count": 138
-    },
-    {
-      "spray": "pull_side",
-      "laMin": 10,
-      "laMax": 15,
-      "laBin": 3,
-      "woba": 0.678,
-      "xwobacon": 0.756,
-      "quality": true,
-      "count": 113
-    },
-    {
-      "spray": "pull_side",
       "laMin": 15,
       "laMax": 20,
       "laBin": 4,
-      "woba": 0.742,
+      "woba": 0.558,
       "xwobacon": 0.701,
       "quality": true,
-      "count": 117
+      "count": 116
     },
     {
       "spray": "pull_side",
       "laMin": 20,
       "laMax": 25,
       "laBin": 5,
-      "woba": 0.853,
-      "xwobacon": 0.822,
+      "woba": 0.827,
+      "xwobacon": 0.848,
       "quality": true,
-      "count": 101
+      "count": 104
     },
     {
       "spray": "pull_side",
       "laMin": 25,
       "laMax": 30,
       "laBin": 6,
-      "woba": 0.91,
-      "xwobacon": 0.941,
+      "woba": 0.94,
+      "xwobacon": 0.958,
       "quality": true,
-      "count": 78
+      "count": 87
     },
     {
       "spray": "pull_side",
       "laMin": 30,
       "laMax": 35,
       "laBin": 7,
-      "woba": 0.782,
-      "xwobacon": 0.692,
+      "woba": 0.831,
+      "xwobacon": 0.645,
       "quality": true,
-      "count": 79
+      "count": 81
     },
     {
       "spray": "pull_side",
       "laMin": 35,
       "laMax": 40,
       "laBin": 8,
-      "woba": 0.207,
-      "xwobacon": 0.328,
+      "woba": 0.395,
+      "xwobacon": 0.406,
       "quality": false,
-      "count": 57
+      "count": 64
     },
     {
       "spray": "pull_side",
       "laMin": 40,
       "laMax": 50,
       "laBin": 9,
-      "woba": 0.029,
-      "xwobacon": 0.144,
+      "woba": 0.038,
+      "xwobacon": 0.129,
       "quality": false,
-      "count": 79
+      "count": 71
     },
     {
       "spray": "pull_side",
       "laMin": 50,
       "laMax": null,
       "laBin": 10,
-      "woba": 0.0,
-      "xwobacon": 0.018,
+      "woba": 0.012,
+      "xwobacon": 0.02,
       "quality": false,
-      "count": 85
+      "count": 81
     }
   ],
   "mvnModels": {

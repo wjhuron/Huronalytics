@@ -652,32 +652,36 @@ def spray_angle(hc_x, hc_y):
 
 
 def spray_direction(angle, stands):
-    """Classify spray direction into 5 bins based on spray angle and batter side.
-    Returns: 'pull', 'pull_side', 'center', 'oppo_side', or 'oppo'."""
+    """Classify spray direction into 6 equal 15° bins based on spray angle and batter side.
+    Returns: 'pull', 'pull_side', 'center_pull', 'center_oppo', 'oppo_side', or 'oppo'."""
     if angle is None or not stands:
         return None
     if stands == 'R':
-        if angle < -25:
+        if angle < -30:
             return 'pull'
-        elif angle < -10:
+        elif angle < -15:
             return 'pull_side'
-        elif angle > 25:
-            return 'oppo'
-        elif angle > 10:
+        elif angle < 0:
+            return 'center_pull'
+        elif angle < 15:
+            return 'center_oppo'
+        elif angle < 30:
             return 'oppo_side'
         else:
-            return 'center'
+            return 'oppo'
     else:  # L
-        if angle > 25:
+        if angle > 30:
             return 'pull'
-        elif angle > 10:
+        elif angle > 15:
             return 'pull_side'
-        elif angle < -25:
-            return 'oppo'
-        elif angle < -10:
+        elif angle > 0:
+            return 'center_pull'
+        elif angle > -15:
+            return 'center_oppo'
+        elif angle > -30:
             return 'oppo_side'
         else:
-            return 'center'
+            return 'oppo'
 
 
 def compute_hitter_stats(pitches):

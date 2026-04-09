@@ -3349,13 +3349,13 @@ var PlayerPage = {
     var SACQ_MIN_BIP = 20;
     var zoneMetric = this._laSprayZoneMetric || 'xwobacon';
     var sprayBounds = {
-      pull: [-45, -25], pull_side: [-25, -10], center: [-10, 10],
-      oppo_side: [10, 25], oppo: [25, 45]
+      pull: [-45, -30], pull_side: [-30, -15], center_pull: [-15, 0],
+      center_oppo: [0, 15], oppo_side: [15, 30], oppo: [30, 45]
     };
     if (bats === 'L') {
       sprayBounds = {
-        pull: [25, 45], pull_side: [10, 25], center: [-10, 10],
-        oppo_side: [-25, -10], oppo: [-45, -25]
+        pull: [30, 45], pull_side: [15, 30], center_pull: [0, 15],
+        center_oppo: [-15, 0], oppo_side: [-30, -15], oppo: [-45, -30]
       };
     }
     var zonePlugin = {
@@ -3466,42 +3466,22 @@ var PlayerPage = {
     }
     var xwOBAsp_val = xwOBAsp_count > 0 ? (xwOBAsp_sum / xwOBAsp_count) : null;
 
-    // --- xwOBAsp annotation plugin ---
-    var annotationPlugin = {
-      id: 'xwOBAspAnnotation',
-      afterDraw: function (chart) {
-        if (xwOBAsp_val == null) return;
-        var ctx2 = chart.ctx;
-        var chartArea = chart.chartArea;
-        var px = chartArea.left + 8;
-        var py = chartArea.top + 8;
-        var valStr = xwOBAsp_val.toFixed(3);
-        var bipStr = xwOBAsp_count + ' qualifying BIP';
-        ctx2.save();
-        // Background box
-        ctx2.font = '600 13px Barlow';
-        var w1 = ctx2.measureText('xwOBAsp: ' + valStr).width;
-        ctx2.font = '400 11px Barlow';
-        var w2 = ctx2.measureText(bipStr).width;
-        var boxW = Math.max(w1, w2) + 16;
-        var boxH = 38;
-        ctx2.fillStyle = 'rgba(20,20,25,0.80)';
-        ctx2.beginPath();
-        ctx2.roundRect(px, py, boxW, boxH, 4);
-        ctx2.fill();
-        ctx2.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx2.lineWidth = 0.5;
-        ctx2.stroke();
-        // Text
-        ctx2.fillStyle = '#ccc';
-        ctx2.font = '600 13px Barlow';
-        ctx2.fillText('xwOBAsp: ' + valStr, px + 8, py + 16);
-        ctx2.fillStyle = '#888';
-        ctx2.font = '400 11px Barlow';
-        ctx2.fillText(bipStr, px + 8, py + 31);
-        ctx2.restore();
-      }
-    };
+    // --- xwOBAsp annotation (HTML element, outside chart) ---
+    var xwobaspNote = document.getElementById('la-spray-xwobasp-note');
+    if (!xwobaspNote) {
+      xwobaspNote = document.createElement('span');
+      xwobaspNote.id = 'la-spray-xwobasp-note';
+      xwobaspNote.style.cssText = 'font-size:12px;color:#888;margin-left:12px;';
+      var bipNote = document.getElementById('la-spray-bip-note');
+      if (bipNote) bipNote.parentElement.insertBefore(xwobaspNote, bipNote.nextSibling);
+    }
+    if (xwOBAsp_val != null) {
+      xwobaspNote.innerHTML = 'xwOBAsp: <span style="color:#ccc;font-weight:600;">' +
+        xwOBAsp_val.toFixed(3) + '</span> <span style="color:#666;">(' + xwOBAsp_count + ' qualifying BIP)</span>';
+      xwobaspNote.style.display = '';
+    } else {
+      xwobaspNote.style.display = 'none';
+    }
 
     // --- Zone hover tooltip ---
     var zoneTooltipEl = document.getElementById('la-spray-zone-tooltip');
@@ -3522,8 +3502,8 @@ var PlayerPage = {
     // LA bin label helper
     var LA_BIN_LABELS = ['< 0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
                          '25–30°', '30–35°', '35–40°', '40–50°', '50°+'];
-    var SPRAY_LABELS = { pull: 'Pull', pull_side: 'Pull-Side', center: 'Center',
-                         oppo_side: 'Oppo-Side', oppo: 'Oppo' };
+    var SPRAY_LABELS = { pull: 'Pull', pull_side: 'Pull-Side', center_pull: 'Center-Pull',
+                         center_oppo: 'Center-Oppo', oppo_side: 'Oppo-Side', oppo: 'Oppo' };
 
     // Remove previous handler if any
     if (this._laSprayZoneHoverHandler) {
@@ -3604,7 +3584,7 @@ var PlayerPage = {
     this._laSprayChart = new Chart(canvas, {
       type: 'scatter',
       data: { datasets: datasets },
-      plugins: [zonePlugin, annotationPlugin],
+      plugins: [zonePlugin],
       options: {
         responsive: true,
         maintainAspectRatio: true,
