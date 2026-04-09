@@ -3349,13 +3349,13 @@ var PlayerPage = {
     var SACQ_MIN_BIP = 20;
     var zoneMetric = this._laSprayZoneMetric || 'xwobacon';
     var sprayBounds = {
-      pull: [-45, -30], pull_side: [-30, -15], center_pull: [-15, 0],
-      center_oppo: [0, 15], oppo_side: [15, 30], oppo: [30, 45]
+      pull: [-50, -30], pull_side: [-30, -15], center_pull: [-15, 0],
+      center_oppo: [0, 15], oppo_side: [15, 30], oppo: [30, 50]
     };
     if (bats === 'L') {
       sprayBounds = {
-        pull: [30, 45], pull_side: [15, 30], center_pull: [0, 15],
-        center_oppo: [-15, 0], oppo_side: [-30, -15], oppo: [-45, -30]
+        pull: [30, 50], pull_side: [15, 30], center_pull: [0, 15],
+        center_oppo: [-15, 0], oppo_side: [-30, -15], oppo: [-50, -30]
       };
     }
     var zonePlugin = {
@@ -3609,8 +3609,8 @@ var PlayerPage = {
         },
         scales: {
           x: {
-            min: -45,
-            max: 45,
+            min: -50,
+            max: 50,
             title: {
               display: true,
               text: '← ' + leftLabel + '          Spray Angle          ' + rightLabel + ' →',
