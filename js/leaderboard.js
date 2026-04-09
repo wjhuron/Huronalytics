@@ -218,6 +218,8 @@ const COLUMNS = {
     { key: 'attackAngle', label: 'Attack Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'bat_tracking' },
     { key: 'attackDirection', label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'bat_tracking' },
     { key: 'swingPathTilt', label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, group: 'bat_tracking' },
+    { key: 'blastPct', label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — fast swing + squared up', group: 'bat_tracking' },
+    { key: 'idealAAPct', label: 'IdealAA%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
   ],
   hitterPitch: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -729,7 +731,7 @@ const Leaderboard = {
             pullPct: true, middlePct: true, oppoPct: true
           };
           // Hitter stats that require ≥10 competitive swings
-          const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true };
+          const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, blastPct: true, idealAAPct: true };
 
           if (isPitcherRow && isSinglePitchType) {
             // Pitcher pitch-type: shape metrics always qualify; outcome metrics need ≥50 pitches

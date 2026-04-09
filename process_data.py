@@ -71,6 +71,7 @@ HITTER_STAT_KEYS = [
     'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
     # Bat Tracking tab
     'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
+    'blastPct', 'idealAAPct',
     # Count-leverage stats
     'twoStrikeWhiffPct', 'firstPitchSwingPct',
     # Batted ball distance
@@ -843,6 +844,29 @@ def compute_hitter_stats(pitches):
     ad_vals = [safe_float(p.get('AttackDirection')) for p in pitches if safe_float(p.get('AttackDirection')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
     spt_vals = [safe_float(p.get('SwingPathTilt')) for p in pitches if safe_float(p.get('SwingPathTilt')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
 
+    # Blast% — competitive swings where BatSpeed >= 75 AND EV >= 80% of theoretical max EV
+    # Max EV = 0.2 * pitch_speed + 1.2 * bat_speed (Alan Nathan collision model)
+    n_blasts = 0
+    n_blast_eligible = 0  # competitive swings with both BatSpeed and EV
+    # IdealAA% — competitive swings with attack angle between 5-20 degrees
+    n_ideal_aa = 0
+    for p in pitches:
+        bs = safe_float(p.get('BatSpeed'))
+        if bs is None or bs < 50:
+            continue
+        # IdealAA: count swings in 5-20 degree attack angle window
+        aa = safe_float(p.get('AttackAngle'))
+        if aa is not None and 5 <= aa <= 20:
+            n_ideal_aa += 1
+        # Blast: need EV and pitch velocity
+        ev = safe_float(p.get('ExitVelo'))
+        velo = safe_float(p.get('Velocity'))
+        if ev is not None and velo is not None:
+            n_blast_eligible += 1
+            max_ev = 0.2 * velo + 1.2 * bs
+            if bs >= 75 and ev >= 0.80 * max_ev:
+                n_blasts += 1
+
     return {
         # Info / counts
         'pa': n_pa,
@@ -889,6 +913,8 @@ def compute_hitter_stats(pitches):
         'attackDirection': round(sum(ad_vals) / len(ad_vals), 1) if ad_vals else None,
         'swingPathTilt': round(sum(spt_vals) / len(spt_vals), 1) if spt_vals else None,
         'nCompSwings': len(bs_vals),  # competitive swings count
+        'blastPct': round(n_blasts / n_blast_eligible, 4) if n_blast_eligible > 0 else None,
+        'idealAAPct': round(n_ideal_aa / len(bs_vals), 4) if bs_vals else None,
         # Count-leverage stats
         'twoStrikeWhiffPct': two_strike_whiff_pct,
         'firstPitchSwingPct': first_pitch_swing_pct,
@@ -3474,11 +3500,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                  'xwOBAcon', 'xwOBAsp',
                  'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
+    # Bat tracking stats weighted by nCompSwings
+    comp_swing_stats = {'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
+                        'blastPct', 'idealAAPct'}
     for stat in HITTER_STAT_KEYS:
         if stat in pa_stats:
             weight_key = 'pa'
         elif stat in bip_stats:
             weight_key = 'nBip'
+        elif stat in comp_swing_stats:
+            weight_key = 'nCompSwings'
         else:
             weight_key = 'pa'  # default
         pairs = [(r[stat], r.get(weight_key, 0)) for r in hitter_lb_mlb if r.get(stat) is not None and r.get(weight_key, 0) > 0]

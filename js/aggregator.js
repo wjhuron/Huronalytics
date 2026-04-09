@@ -1159,7 +1159,7 @@ const Aggregator = {
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
-      'batSpeed', 'swingLength',
+      'batSpeed', 'swingLength', 'blastPct', 'idealAAPct',
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
       'sprintSpeed', 'runValue',
@@ -1352,7 +1352,7 @@ const Aggregator = {
     const hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
                       'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
                       'doubles', 'triples', 'hr', 'xbh',
-                      'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings',
+                      'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
                       'wOBA',
                       'sprintSpeed', 'nCompRuns', 'sprintQual',
                       'wRC', 'wRCplus', 'xWRCplus'];
