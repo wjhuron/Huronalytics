@@ -742,7 +742,7 @@ const Aggregator = {
     const PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
     const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
-    const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     const groups = {};
@@ -1001,6 +1001,9 @@ const Aggregator = {
         }
         // Max velo
         if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
+        // Stuff+ (pre-computed, always merge from JSON — not recomputable in browser)
+        if (ppre.stuffScore !== undefined) rows[pmi].stuffScore = ppre.stuffScore;
+        if (ppre.stuffScore_pctl !== undefined) rows[pmi].stuffScore_pctl = ppre.stuffScore_pctl;
       }
     }
 
@@ -1014,7 +1017,7 @@ const Aggregator = {
     const MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches for outcome metrics
     const ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true, hbOE: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
-    const SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, spinEff: true };
+    const SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, spinEff: true, stuffScore: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
       const minPctl = SHAPE_METRICS[key] ? 0 : MIN_PITCH_TYPE_PCTL;
       for (let pt in ptGroups) {
