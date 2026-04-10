@@ -738,7 +738,7 @@ const Aggregator = {
     const NO_PCTL_METRICS = { relPosZ: true, relPosX: true, extension: true, armAngle: true };
     const METRIC_PCTL_KEYS = METRIC_KEYS_LIST.filter(function (k) { return !NO_PCTL_METRICS[k]; });
     const PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
-    const PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct'];
+    const PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'puPct'];
     const PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
     const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
@@ -980,6 +980,8 @@ const Aggregator = {
         // Plate discipline fields not in micro counters
         if (ppre.strikePct !== undefined) rows[pmi].strikePct = ppre.strikePct;
         if (ppre.strikePct_pctl !== undefined) rows[pmi].strikePct_pctl = ppre.strikePct_pctl;
+        if (ppre.twoStrikeWhiffPct !== undefined) rows[pmi].twoStrikeWhiffPct = ppre.twoStrikeWhiffPct;
+        if (ppre.twoStrikeWhiffPct_pctl !== undefined) rows[pmi].twoStrikeWhiffPct_pctl = ppre.twoStrikeWhiffPct_pctl;
         // Batted ball and expected stats: use per-hand values when hand filter active
         const handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
         // Batted ball fields
@@ -997,9 +999,8 @@ const Aggregator = {
           // Percentiles are only meaningful for overall (not per-hand)
           if (!handSfx && ppre[xk + '_pctl'] !== undefined) rows[pmi][xk + '_pctl'] = ppre[xk + '_pctl'];
         }
-        // Max velo and tunnel distance
+        // Max velo
         if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
-        if (ppre.tunnelDist !== undefined) rows[pmi].tunnelDist = ppre.tunnelDist;
       }
     }
 

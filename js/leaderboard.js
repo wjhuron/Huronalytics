@@ -28,7 +28,6 @@ const COLUMNS = {
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
     { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Vertical approach angle at the plate (degrees)', group: 'metrics' },
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Horizontal approach angle at the plate (degrees)', group: 'metrics' },
-    { key: 'tunnelDist', label: 'Tunnel',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Tunnel distance from primary FB (inches) — lower = better deception', group: 'metrics' },
     // Outcomes
     { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (negative = better for pitcher)', group: 'outcomes' },
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches', group: 'outcomes' },

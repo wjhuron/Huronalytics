@@ -147,7 +147,6 @@ var PlayerPage = {
     { key: 'armAngle', label: 'Arm Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
     { key: 'nVAA', label: 'nVAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
     { key: 'nHAA', label: 'nHAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
-    { key: 'tunnelDist', label: 'Tunnel', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
   ],
 
   // Stats table (single row, pitcher-level) — matches leaderboard column order
