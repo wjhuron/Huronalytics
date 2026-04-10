@@ -3288,8 +3288,20 @@ var PlayerPage = {
       }
     }
 
-    // Get SACQ zones for overlay
-    var sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
+    // Get SACQ zones for overlay — prefer hand-specific for this batter, pooled as fallback
+    var _allSacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
+    var sacqZones = [];
+    // Build best zone per (spray, laBin): hand-specific if available, else pooled
+    var _handZones = {}, _pooledZones = {};
+    for (var _zi = 0; _zi < _allSacqZones.length; _zi++) {
+      var _z = _allSacqZones[_zi];
+      var _zk = _z.spray + '|' + _z.laBin;
+      if (_z.bats === bats) _handZones[_zk] = _z;
+      else if (!_z.bats) _pooledZones[_zk] = _z;
+    }
+    Object.keys(_pooledZones).forEach(function (k) {
+      sacqZones.push(_handZones[k] || _pooledZones[k]);
+    });
 
     var self = this;
     var mode = this._laSprayMode;
@@ -3448,20 +3460,17 @@ var PlayerPage = {
       hitterZoneCounts[hzKey] = (hitterZoneCounts[hzKey] || 0) + 1;
     }
 
-    // --- Compute xwOBAsp for annotation (from visible points, respects bat-side toggle) ---
-    var sacqZoneMap = {};
-    for (var smi = 0; smi < sacqZones.length; smi++) {
-      sacqZoneMap[sacqZones[smi].spray + '|' + sacqZones[smi].laBin] = sacqZones[smi];
-    }
+    // --- Compute xwOBAsp for annotation (hand-specific with pooled fallback) ---
+    var _sacqMaps = Aggregator.buildSacqZoneMaps();
     var xwOBAsp_sum = 0, xwOBAsp_count = 0;
     for (var xsi = 0; xsi < points.length; xsi++) {
       var xsDir = Aggregator.sprayDirection(points[xsi].x, bats);
       if (!xsDir) continue;
       var xsLaBin = Aggregator.getLABinIdx(points[xsi].realLA != null ? points[xsi].realLA : points[xsi].y);
       if (xsLaBin == null) continue;
-      var xsInfo = sacqZoneMap[xsDir + '|' + xsLaBin];
-      if (xsInfo && xsInfo.count >= 20 && xsInfo.woba != null) {
-        xwOBAsp_sum += xsInfo.woba;
+      var xsWoba = Aggregator.sacqLookup(_sacqMaps, xsDir, xsLaBin, bats);
+      if (xsWoba != null) {
+        xwOBAsp_sum += xsWoba;
         xwOBAsp_count++;
       }
     }

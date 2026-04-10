@@ -3183,7 +3183,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     SACQ_QUALITY_THRESHOLD = 0.500
 
     # Collect all BIPs with spray + wOBA data (MLB only — exclude ROC/AAA pitches)
-    sacq_bins = {}  # (spray_dir, la_bin_idx) → {'woba_sum', 'woba_denom', 'xwoba_sum', 'xwoba_count', 'count'}
+    # Build both hand-specific (spray_dir, la_bin, bats) and pooled (spray_dir, la_bin) tables.
+    # Hand-specific captures L/R differences in HR-range zones (park geometry, defensive positioning).
+    # Pooled serves as fallback when hand-specific bins are too thin.
+    _empty_bin = lambda: {'woba_sum': 0.0, 'woba_denom': 0.0, 'xwoba_sum': 0.0, 'xwoba_count': 0, 'count': 0}
+    sacq_bins_hand = {}   # (spray_dir, la_bin_idx, bats) → accumulators
+    sacq_bins_pooled = {} # (spray_dir, la_bin_idx) → accumulators
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue  # Exclude ROC/AAA pitches from SACQ zone computation
@@ -3193,9 +3198,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         hc_x = safe_float(p.get('HC_X'))
         hc_y = safe_float(p.get('HC_Y'))
         la = safe_float(p.get('LaunchAngle'))
-        # wOBAval is Statcast's per-pitch wOBA weight (the run-value of each outcome).
-        # This is the correct source for zone-level wOBA — different from player-level
-        # wOBA which uses Guts-weighted formula from boxscore counts.
         woba_val = safe_float(p.get('wOBAval'))
         woba_dom = safe_float(p.get('wOBAdom'))
         xwoba_val = safe_float(p.get('xwOBA'))
@@ -3206,7 +3208,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         direction = spray_direction(angle, bats)
         if not direction:
             continue
-        # Find LA bin
         la_bin_idx = None
         for bi, (lo, hi) in enumerate(LA_BINS):
             if lo <= la < hi:
@@ -3214,46 +3215,79 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 break
         if la_bin_idx is None:
             continue
-        key = (direction, la_bin_idx)
-        if key not in sacq_bins:
-            sacq_bins[key] = {'woba_sum': 0.0, 'woba_denom': 0.0, 'xwoba_sum': 0.0, 'xwoba_count': 0, 'count': 0}
-        sacq_bins[key]['count'] += 1
-        if woba_val is not None and woba_dom is not None and woba_dom > 0:
-            sacq_bins[key]['woba_sum'] += woba_val
-            sacq_bins[key]['woba_denom'] += woba_dom
-        if xwoba_val is not None:
-            sacq_bins[key]['xwoba_sum'] += xwoba_val
-            sacq_bins[key]['xwoba_count'] += 1
+        # Accumulate into both hand-specific and pooled bins
+        for key, table in [((direction, la_bin_idx, bats), sacq_bins_hand),
+                           ((direction, la_bin_idx), sacq_bins_pooled)]:
+            if key not in table:
+                table[key] = _empty_bin()
+            table[key]['count'] += 1
+            if woba_val is not None and woba_dom is not None and woba_dom > 0:
+                table[key]['woba_sum'] += woba_val
+                table[key]['woba_denom'] += woba_dom
+            if xwoba_val is not None:
+                table[key]['xwoba_sum'] += xwoba_val
+                table[key]['xwoba_count'] += 1
 
-    # Compute wOBA and xwOBAcon per bin, flag quality bins
-    sacq_zone_table = {}
-    for key, data in sacq_bins.items():
-        woba = data['woba_sum'] / data['woba_denom'] if data['woba_denom'] > 0 else None
-        xwobacon = data['xwoba_sum'] / data['xwoba_count'] if data['xwoba_count'] > 0 else None
-        quality = (data['count'] >= SACQ_MIN_BIP and woba is not None and woba >= SACQ_QUALITY_THRESHOLD)
-        sacq_zone_table[key] = {
-            'woba': round(woba, 3) if woba is not None else None,
-            'xwobacon': round(xwobacon, 3) if xwobacon is not None else None,
-            'quality': quality,
-            'count': data['count'],
-        }
+    def _finalize_bins(bins):
+        table = {}
+        for key, data in bins.items():
+            woba = data['woba_sum'] / data['woba_denom'] if data['woba_denom'] > 0 else None
+            xwobacon = data['xwoba_sum'] / data['xwoba_count'] if data['xwoba_count'] > 0 else None
+            quality = (data['count'] >= SACQ_MIN_BIP and woba is not None and woba >= SACQ_QUALITY_THRESHOLD)
+            table[key] = {
+                'woba': round(woba, 3) if woba is not None else None,
+                'xwobacon': round(xwobacon, 3) if xwobacon is not None else None,
+                'quality': quality,
+                'count': data['count'],
+            }
+        return table
 
-    # Build serializable zone data for frontend
+    sacq_zone_hand = _finalize_bins(sacq_bins_hand)
+    sacq_zone_pooled = _finalize_bins(sacq_bins_pooled)
+
+    def sacq_lookup(direction, la_bin_idx, bats_val):
+        """Look up zone wOBA: try hand-specific first, fall back to pooled."""
+        hand_info = sacq_zone_hand.get((direction, la_bin_idx, bats_val))
+        if hand_info and hand_info['count'] >= SACQ_MIN_BIP and hand_info['woba'] is not None:
+            return hand_info['woba']
+        pooled_info = sacq_zone_pooled.get((direction, la_bin_idx))
+        if pooled_info and pooled_info['count'] >= SACQ_MIN_BIP and pooled_info['woba'] is not None:
+            return pooled_info['woba']
+        return None
+
+    # Build serializable zone data for frontend (hand-specific + pooled)
     sacq_zones_output = []
-    for (direction, la_bin_idx), info in sorted(sacq_zone_table.items(), key=lambda x: (x[0][0], x[0][1])):
+    for (direction, la_bin_idx, bats_key), info in sorted(sacq_zone_hand.items(), key=lambda x: (x[0][2], x[0][0], x[0][1])):
         lo, hi = LA_BINS[la_bin_idx]
         sacq_zones_output.append({
             'spray': direction,
             'laMin': lo if lo > -999 else None,
             'laMax': hi if hi < 999 else None,
             'laBin': la_bin_idx,
+            'bats': bats_key,
             'woba': info['woba'],
             'xwobacon': info['xwobacon'],
             'quality': info['quality'],
             'count': info['count'],
         })
-    print(f"  SACQ zones: {len(sacq_zones_output)} bins, "
-          f"{sum(1 for z in sacq_zones_output if z['quality'])} quality bins")
+    # Also include pooled bins (bats=null) as fallback for frontend
+    for (direction, la_bin_idx), info in sorted(sacq_zone_pooled.items(), key=lambda x: (x[0][0], x[0][1])):
+        lo, hi = LA_BINS[la_bin_idx]
+        sacq_zones_output.append({
+            'spray': direction,
+            'laMin': lo if lo > -999 else None,
+            'laMax': hi if hi < 999 else None,
+            'laBin': la_bin_idx,
+            'bats': None,
+            'woba': info['woba'],
+            'xwobacon': info['xwobacon'],
+            'quality': info['quality'],
+            'count': info['count'],
+        })
+    n_hand_quality = sum(1 for v in sacq_zone_hand.values() if v['quality'])
+    n_pooled_quality = sum(1 for v in sacq_zone_pooled.values() if v['quality'])
+    print(f"  SACQ zones: {len(sacq_zone_hand)} hand-specific ({n_hand_quality} quality), "
+          f"{len(sacq_zone_pooled)} pooled ({n_pooled_quality} quality)")
 
     # --- Compute xwOBAsp for each pitcher (second pass, requires sacq_zone_table) ---
     pitcher_pitch_lookup = {}
@@ -3285,10 +3319,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     break
             if la_bin_idx is None:
                 continue
-            zone_key = (direction, la_bin_idx)
-            zone_info = sacq_zone_table.get(zone_key)
-            if zone_info and zone_info['count'] >= SACQ_MIN_BIP and zone_info['woba'] is not None:
-                xwobasp_sum += zone_info['woba']
+            zone_woba = sacq_lookup(direction, la_bin_idx, bats_val)
+            if zone_woba is not None:
+                xwobasp_sum += zone_woba
                 xwobasp_count += 1
         row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 
@@ -3313,7 +3346,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches))
 
-        # Compute xwOBAsp for this hitter
+        # Compute xwOBAsp for this hitter (hand-specific zone table with pooled fallback)
         xwobasp_sum = 0.0
         xwobasp_count = 0
         for p in pitches:
@@ -3337,10 +3370,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     break
             if la_bin_idx is None:
                 continue
-            zone_key = (direction, la_bin_idx)
-            zone_info = sacq_zone_table.get(zone_key)
-            if zone_info and zone_info['count'] >= SACQ_MIN_BIP and zone_info['woba'] is not None:
-                xwobasp_sum += zone_info['woba']
+            zone_woba = sacq_lookup(direction, la_bin_idx, bats_val)
+            if zone_woba is not None:
+                xwobasp_sum += zone_woba
                 xwobasp_count += 1
         row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
 

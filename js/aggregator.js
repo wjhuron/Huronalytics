@@ -170,6 +170,31 @@ const Aggregator = {
     return null;
   },
 
+  // Build hand-specific + pooled zone maps from METADATA.sacqZones.
+  // Returns { hand: {key→zone}, pooled: {key→zone} }
+  buildSacqZoneMaps: function () {
+    var zones = (window.METADATA && window.METADATA.sacqZones) || [];
+    var hand = {}, pooled = {};
+    for (var i = 0; i < zones.length; i++) {
+      var sz = zones[i];
+      if (sz.bats) {
+        hand[sz.spray + '|' + sz.laBin + '|' + sz.bats] = sz;
+      } else {
+        pooled[sz.spray + '|' + sz.laBin] = sz;
+      }
+    }
+    return { hand: hand, pooled: pooled };
+  },
+
+  // Look up zone wOBA: try hand-specific first, fall back to pooled
+  sacqLookup: function (maps, dir, laBin, bats) {
+    var info = maps.hand[dir + '|' + laBin + '|' + bats];
+    if (info && info.count >= 20 && info.woba != null) return info.woba;
+    info = maps.pooled[dir + '|' + laBin];
+    if (info && info.count >= 20 && info.woba != null) return info.woba;
+    return null;
+  },
+
   /**
    * Main entry: aggregate micro data for the given tab and filters.
    * Returns an array of row objects matching the pre-aggregated format.
@@ -424,15 +449,10 @@ const Aggregator = {
       if (bbt === 3) n_pu_bb++;
     }
 
-    // xwOBAsp: average league zone wOBA for BIP against this pitcher
+    // xwOBAsp: average league zone wOBA for BIP against this pitcher (hand-specific with pooled fallback)
     var xwOBAsp = null;
-    var sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
-    if (sacqZones.length > 0 && bipRecs.length > 0) {
-      var sacqZoneMap = {};
-      for (var szi = 0; szi < sacqZones.length; szi++) {
-        var sz = sacqZones[szi];
-        sacqZoneMap[sz.spray + '|' + sz.laBin] = sz;
-      }
+    var sacqMaps = Aggregator.buildSacqZoneMaps();
+    if (bipRecs.length > 0) {
       var xsp_sum = 0, xsp_count = 0;
       for (var sri = 0; sri < bipRecs.length; sri++) {
         var sla = bipRecs[sri][pbci.launchAngle];
@@ -445,9 +465,9 @@ const Aggregator = {
         if (!sDir) continue;
         var sLaBin = Aggregator.getLABinIdx(sla);
         if (sLaBin == null) continue;
-        var szInfo = sacqZoneMap[sDir + '|' + sLaBin];
-        if (szInfo && szInfo.count >= 20 && szInfo.woba != null) {
-          xsp_sum += szInfo.woba;
+        var zWoba = Aggregator.sacqLookup(sacqMaps, sDir, sLaBin, sBats);
+        if (zWoba != null) {
+          xsp_sum += zWoba;
           xsp_count++;
         }
       }
@@ -1239,15 +1259,10 @@ const Aggregator = {
         ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
       }
 
-      // xwOBAsp — compute from BIP records using zone table
+      // xwOBAsp — compute from BIP records using hand-specific zone table with pooled fallback
       let xwOBAsp_val = null;
-      const sacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
-      if (sacqZones.length > 0 && bipRecords.length > 0) {
-        const sacqZoneMap = {};
-        for (let szi = 0; szi < sacqZones.length; szi++) {
-          const sz = sacqZones[szi];
-          sacqZoneMap[sz.spray + '|' + sz.laBin] = sz;
-        }
+      const sacqMaps = Aggregator.buildSacqZoneMaps();
+      if (bipRecords.length > 0) {
         let xwOBAsp_sum = 0, xwOBAsp_count = 0;
         for (let sri = 0; sri < bipRecords.length; sri++) {
           const sla = bipRecords[sri][bci.launchAngle];
@@ -1259,9 +1274,9 @@ const Aggregator = {
           if (!sDir) continue;
           const sLaBin = Aggregator.getLABinIdx(sla);
           if (sLaBin == null) continue;
-          const szInfo = sacqZoneMap[sDir + '|' + sLaBin];
-          if (szInfo && szInfo.count >= 20 && szInfo.woba != null) {
-            xwOBAsp_sum += szInfo.woba;
+          const zWoba = Aggregator.sacqLookup(sacqMaps, sDir, sLaBin, stands);
+          if (zWoba != null) {
+            xwOBAsp_sum += zWoba;
             xwOBAsp_count++;
           }
         }
