@@ -754,13 +754,6 @@ def compute_hitter_stats(pitches):
     fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
     pu = sum(1 for p in bip if p.get('BBType') == 'popup')
 
-    # Exit Velocity & Launch Angle (only LA > 0 for EV stats)
-    ev_la_pos = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
-                 for p in bip
-                 if safe_float(p.get('LaunchAngle')) is not None and safe_float(p.get('LaunchAngle')) > 0
-                 and safe_float(p.get('ExitVelo')) is not None]
-    evs_pos = [ev for ev, la in ev_la_pos]
-
     # EV50: average of top 50% hardest hit balls across ALL batted balls (no LA filter).
     # Matches Savant's "Best Speed" / EV50 concept — weak contact is noise that
     # clouds our view of a hitter's true exit velocity talent. Year-to-year r≈.515.
@@ -797,10 +790,10 @@ def compute_hitter_stats(pitches):
         if direction:
             spray_data.append((direction, p.get('BBType')))
     n_spray = len(spray_data)
-    pull = sum(1 for d, _ in spray_data if d == 'pull')
-    center = sum(1 for d, _ in spray_data if d == 'center')
-    oppo = sum(1 for d, _ in spray_data if d == 'oppo')
-    air_pull = sum(1 for d, bb in spray_data if d == 'pull' and bb in ('line_drive', 'fly_ball', 'popup'))
+    pull = sum(1 for d, _ in spray_data if d in ('pull', 'pull_side'))
+    center = sum(1 for d, _ in spray_data if d in ('center_pull', 'center_oppo'))
+    oppo = sum(1 for d, _ in spray_data if d in ('oppo_side', 'oppo'))
+    air_pull = sum(1 for d, bb in spray_data if d in ('pull', 'pull_side') and bb in ('line_drive', 'fly_ball', 'popup'))
 
     # Hard-hit: EV >= 95 mph
     ev_valid = [safe_float(p.get('ExitVelo')) for p in bip]
@@ -882,7 +875,7 @@ def compute_hitter_stats(pitches):
         # Batted Ball tab
         'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
         'ev50': ev50,
-        'maxEV': round(max(evs_pos), 1) if evs_pos else None,
+        'maxEV': round(max(ev_valid), 1) if ev_valid else None,
         'medLA': round(median(all_la), 1) if all_la else None,
         'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
         'barrelPct': barrels / n_bip if n_bip > 0 else None,
@@ -1338,10 +1331,10 @@ def generate_micro_data(all_pitches):
             sd = spray_direction(sa, bats)
             if sd:
                 c[27] += 1  # nSpray
-                if sd == 'pull':    c[28] += 1
-                if sd == 'center':  c[29] += 1
-                if sd == 'oppo':    c[30] += 1
-                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball', 'popup'):
+                if sd in ('pull', 'pull_side'):    c[28] += 1
+                if sd in ('center_pull', 'center_oppo'):  c[29] += 1
+                if sd in ('oppo_side', 'oppo'):    c[30] += 1
+                if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1  # airPull
 
             # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)
@@ -1529,10 +1522,10 @@ def generate_micro_data(all_pitches):
             sd = spray_direction(sa, bats)
             if sd:
                 c[27] += 1
-                if sd == 'pull':    c[28] += 1
-                if sd == 'center':  c[29] += 1
-                if sd == 'oppo':    c[30] += 1
-                if sd == 'pull' and bb_type in ('line_drive', 'fly_ball', 'popup'):
+                if sd in ('pull', 'pull_side'):    c[28] += 1
+                if sd in ('center_pull', 'center_oppo'):  c[29] += 1
+                if sd in ('oppo_side', 'oppo'):    c[30] += 1
+                if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1
 
             # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)

@@ -1218,17 +1218,16 @@ const Aggregator = {
 
       // BIP medians
       const bipRecords = bipByHitter[g.hitterIdx] || [];
-      const evsAll = [], evsPos = [], allLA = [];
+      const evsAll = [], allLA = [];
       for (let bri = 0; bri < bipRecords.length; bri++) {
         const bev = bipRecords[bri][bci.exitVelo];
         const bla = bipRecords[bri][bci.launchAngle];
         if (bev !== null) evsAll.push(bev);
-        if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
         if (bla !== null) allLA.push(bla);
       }
 
       const avgEVAll = evsAll.length > 0 ? Math.round(evsAll.reduce(function(a,b){return a+b;},0) / evsAll.length * 10) / 10 : null;
-      const maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
+      const maxEV = evsAll.length > 0 ? Math.round(Math.max.apply(null, evsAll) * 10) / 10 : null;
       const medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
       // EV50: average of top 50% hardest-hit balls across ALL BIP (no LA filter)
@@ -1638,7 +1637,7 @@ const Aggregator = {
       const hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians — combine BIP records from all pitch types in this group
-      const evsAll2 = [], evsPos = [], allLA = [];
+      const evsAll2 = [], allLA = [];
       for (let bpi = 0; bpi < gg2.bipPtIdxs.length; bpi++) {
         const bpKey = gg2.hitterIdx + '|' + gg2.bipPtIdxs[bpi];
         const bipRecords = bipByKey[bpKey] || [];
@@ -1646,13 +1645,12 @@ const Aggregator = {
           const bev = bipRecords[bri][bci.exitVelo];
           const bla = bipRecords[bri][bci.launchAngle];
           if (bev !== null) evsAll2.push(bev);
-          if (bla !== null && bla > 0 && bev !== null) evsPos.push(bev);
           if (bla !== null) allLA.push(bla);
         }
       }
 
       const avgEVAll2 = evsAll2.length > 0 ? Math.round(evsAll2.reduce(function(a,b){return a+b;},0) / evsAll2.length * 10) / 10 : null;
-      const maxEV = evsPos.length > 0 ? Math.round(Math.max.apply(null, evsPos) * 10) / 10 : null;
+      const maxEV = evsAll2.length > 0 ? Math.round(Math.max.apply(null, evsAll2) * 10) / 10 : null;
       const medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 
       // EV50: average of top 50% hardest-hit balls across ALL BIP (no LA filter)
