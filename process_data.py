@@ -307,14 +307,6 @@ def safe_float(val):
         return None
 
 
-def safe_int(val):
-    """Convert a value to int, returning None if not possible."""
-    if val is None or val == '':
-        return None
-    try:
-        return int(float(val))
-    except (ValueError, TypeError):
-        return None
 
 
 def normalize_date(val):
@@ -697,19 +689,14 @@ def compute_hitter_stats(pitches):
     pa_pitches = [p for p in pitches if p.get('Event') and p['Event'] not in NON_PA_EVENTS]
     n_pa = len(pa_pitches)
 
-    n_h = sum(1 for p in pa_pitches if p['Event'] in HIT_EVENTS)
     n_2b = sum(1 for p in pa_pitches if p['Event'] == 'Double')
     n_3b = sum(1 for p in pa_pitches if p['Event'] == 'Triple')
     n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
-    n_1b = n_h - n_2b - n_3b - n_hr
     n_bb_all = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
-    n_ibb = sum(1 for p in pa_pitches if p['Event'] == 'Intent Walk')
-    n_bb = n_bb_all - n_ibb  # BB% excludes IBB (matches FanGraphs methodology)
     n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
     n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
     n_sh = sum(1 for p in pa_pitches if p['Event'] in SH_EVENTS)
     n_ci = sum(1 for p in pa_pitches if p['Event'] in CI_EVENTS)
-    n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
 
     # AB = PA - all BB (including IBB) - HBP - SF - SH - CI
     n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci
@@ -3586,7 +3573,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Boxscore Data: G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9 for pitchers; G, PA, AB, TB, SB, CS for hitters ---
     mlb_game_dates = sorted(set(normalize_date(p.get('Game Date')) for p in all_pitches
                                 if normalize_date(p.get('Game Date')) and p.get('_source', 'MLB') == 'MLB'))
-    game_dates = mlb_game_dates  # Used later for FIP/ERA calculations
     if mlb_game_dates:
         print(f"\n--- Fetching boxscore data ({label}) ---")
         pitcher_box, hitter_box, pitcher_id_map, hitter_id_map = fetch_and_aggregate_boxscores(mlb_game_dates)
