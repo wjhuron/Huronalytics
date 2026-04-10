@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-10 09:36",
+  "generatedAt": "2026-04-10 09:47",
   "totalPitches": 56164,
   "totalPitchers": 431,
   "totalHitters": 410,
@@ -54,6 +54,7 @@
   "leagueAverages": {
     "FF": {
       "velocity": 94.56,
+      "effectiveVelo": 94.63,
       "spinRate": 2314.54,
       "indVertBrk": 16.33,
       "horzBrk": 3.49,
@@ -81,6 +82,7 @@
     },
     "SI": {
       "velocity": 93.92,
+      "effectiveVelo": 93.85,
       "spinRate": 2189.4,
       "indVertBrk": 7.59,
       "horzBrk": 5.81,
@@ -108,6 +110,7 @@
     },
     "SL": {
       "velocity": 86.24,
+      "effectiveVelo": 86.38,
       "spinRate": 2431.52,
       "indVertBrk": 0.99,
       "horzBrk": -1.51,
@@ -135,6 +138,7 @@
     },
     "FS": {
       "velocity": 86.78,
+      "effectiveVelo": 87.15,
       "spinRate": 1413.35,
       "indVertBrk": 2.58,
       "horzBrk": 8.05,
@@ -162,6 +166,7 @@
     },
     "ST": {
       "velocity": 82.35,
+      "effectiveVelo": 82.11,
       "spinRate": 2570.97,
       "indVertBrk": 1.31,
       "horzBrk": -5.12,
@@ -189,6 +194,7 @@
     },
     "CH": {
       "velocity": 85.93,
+      "effectiveVelo": 85.91,
       "spinRate": 1759.05,
       "indVertBrk": 4.12,
       "horzBrk": 4.25,
@@ -216,6 +222,7 @@
     },
     "FC": {
       "velocity": 89.76,
+      "effectiveVelo": 90.06,
       "spinRate": 2381.06,
       "indVertBrk": 8.63,
       "horzBrk": -1.08,
@@ -243,6 +250,7 @@
     },
     "SV": {
       "velocity": 82.24,
+      "effectiveVelo": 82.07,
       "spinRate": 2593.1,
       "indVertBrk": -6.5,
       "horzBrk": -10.57,
@@ -270,6 +278,7 @@
     },
     "CU": {
       "velocity": 80.36,
+      "effectiveVelo": 80.17,
       "spinRate": 2553.66,
       "indVertBrk": -11.9,
       "horzBrk": -4.28,

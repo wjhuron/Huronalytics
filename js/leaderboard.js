@@ -9,8 +9,9 @@ const COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'usagePct',    label: 'Usage%',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Pct of pitcher\'s total pitches', group: 'info' },
     // Metrics (stuff first)
-    { key: 'velocity',    label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Average velocity (mph)', group: 'metrics' },
-    { key: 'maxVelo',     label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Maximum velocity (mph)', group: 'metrics' },
+    { key: 'velocity',       label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Average velocity (mph)', group: 'metrics' },
+    { key: 'effectiveVelo', label: 'EffVelo',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Effective velocity (mph) — perceived speed accounting for extension', group: 'metrics' },
+    { key: 'maxVelo',       label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Maximum velocity (mph)', group: 'metrics' },
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', desc: 'Average spin rate (rpm)', group: 'metrics' },
     { key: 'breakTilt',   label: 'OTilt',    format: Utils.formatTilt, sortType: 'numeric', sortKey: 'breakTiltMinutes', noPercentile: true, desc: 'Observed break tilt (clock notation) — direction of total break', group: 'metrics' },
     { key: 'indVertBrk',  label: 'IVB',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Induced vertical break (inches) — gravity-independent', group: 'metrics' },

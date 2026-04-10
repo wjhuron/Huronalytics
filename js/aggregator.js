@@ -721,6 +721,7 @@ const Aggregator = {
 
     const METRIC_MAP = [
       { key: 'velocity', sum: 'sumVelo', cnt: 'nVelo', round: 1 },
+      { key: 'effectiveVelo', sum: 'sumEffVelo', cnt: 'nEffVelo', round: 1 },
       { key: 'spinRate', sum: 'sumSpin', cnt: 'nSpin', round: 0 },
       { key: 'indVertBrk', sum: 'sumIVB', cnt: 'nIVB', round: 1 },
       { key: 'horzBrk', sum: 'sumHB', cnt: 'nHB', round: 1 },

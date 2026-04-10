@@ -35,12 +35,13 @@ SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
 METRIC_COLS = [
-    'Velocity', 'Spin Rate', 'IndVertBrk', 'HorzBrk',
+    'Velocity', 'EffectiveVelo', 'Spin Rate', 'IndVertBrk', 'HorzBrk',
     'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA'
 ]
 
 METRIC_KEYS = {
-    'Velocity': 'velocity', 'Spin Rate': 'spinRate',
+    'Velocity': 'velocity', 'EffectiveVelo': 'effectiveVelo',
+    'Spin Rate': 'spinRate',
     'IndVertBrk': 'indVertBrk', 'HorzBrk': 'horzBrk',
     'RelPosZ': 'relPosZ', 'RelPosX': 'relPosX',
     'Extension': 'extension', 'ArmAngle': 'armAngle',
@@ -1046,7 +1047,7 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitch micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, pitchTypeIdx, dateIdx, batterHand)
-    #  Values: 22 count fields + 27 metric fields = 49 fields
+    #  Values: 22 count fields + 29 metric fields = 51 fields
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
     #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
@@ -1058,15 +1059,16 @@ def generate_micro_data(all_pitches):
     #  42:sumPlateZ 43:nPlateZ
     #  44:sumTiltSin 45:sumTiltCos 46:nTilt
     #  47:sumPlateX 48:nPlateX
+    #  49:sumEffVelo 50:nEffVelo
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('IndVertBrk', 26),
         ('HorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
         ('Extension', 34), ('ArmAngle', 36), ('VAA', 38), ('HAA', 40),
-        ('PlateZ', 42), ('PlateX', 47),
+        ('PlateZ', 42), ('PlateX', 47), ('EffectiveVelo', 49),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 49)
+    pitch_micro = defaultdict(lambda: [0.0] * 51)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -1151,7 +1153,7 @@ def generate_micro_data(all_pitches):
         # 22 integer/float counts (0-21)
         for i in range(22):
             row.append(int(c[i]))
-        # 10 metric sum/count pairs
+        # 13 metric sum/count pairs
         for col_name, offset in METRIC_OFFSETS:
             row.append(round(c[offset], 2))       # metric sum
             row.append(int(c[offset + 1]))         # metric count
@@ -1648,6 +1650,7 @@ def generate_micro_data(all_pitches):
             'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
             'sumPlateZ', 'nPlateZ',
             'sumPlateX', 'nPlateX',
+            'sumEffVelo', 'nEffVelo',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
         ],
         'pitchMicro': pitch_rows,
