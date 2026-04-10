@@ -821,6 +821,7 @@ const Aggregator = {
         throws: g.throws,
         pitchType: lookups.pitchTypes[g.pitchTypeIdx],
         count: n,
+        nSwings: sw,
         nBip: bip,
         usagePct: pitcherTotal > 0 ? Math.round(n / pitcherTotal * 10000) / 10000 : null,
         pa: pa,
@@ -954,6 +955,8 @@ const Aggregator = {
       }
       if (filters.pitchTypes && filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
+      if (filters.minPitcherSwings && (obj.nSwings || 0) < filters.minPitcherSwings) continue;
+      if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
 
       rows.push(obj);
     }
@@ -977,7 +980,6 @@ const Aggregator = {
         // Plate discipline fields not in micro counters
         if (ppre.strikePct !== undefined) rows[pmi].strikePct = ppre.strikePct;
         if (ppre.strikePct_pctl !== undefined) rows[pmi].strikePct_pctl = ppre.strikePct_pctl;
-        if (ppre.nSwings !== undefined) rows[pmi].nSwings = ppre.nSwings;
         // Batted ball and expected stats: use per-hand values when hand filter active
         const handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
         // Batted ball fields
@@ -1722,6 +1724,8 @@ const Aggregator = {
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
       if (obj.count < (filters.minCount || 1)) continue;
+      if (filters.minSwings && (obj.nSwings || 0) < filters.minSwings) continue;
+      if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
 
       rows.push(obj);
     }
