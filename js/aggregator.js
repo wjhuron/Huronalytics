@@ -740,8 +740,8 @@ const Aggregator = {
     const PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
     const PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'puPct'];
     const PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
-    const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
-    const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true };
+    const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
+    const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
     const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
@@ -991,7 +991,7 @@ const Aggregator = {
           if (ppre[bbSrc] !== undefined) rows[pmi][bbf] = ppre[bbSrc];
         }
         // Expected stats
-        const xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA'];
+        const xKeys = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
         for (let xi = 0; xi < xKeys.length; xi++) {
           const xk = xKeys[xi];
           const xSrc = (handSfx && ppre[xk + handSfx] !== undefined) ? xk + handSfx : xk;
@@ -1604,7 +1604,7 @@ const Aggregator = {
 
     const HITTER_PITCH_PCTL_KEYS = [
       'avg', 'slg', 'iso', 'wOBA',
-      'xBA', 'xSLG', 'xwOBA',
+      'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
       'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
       'pullPct', 'airPullPct',
@@ -1720,6 +1720,10 @@ const Aggregator = {
         xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
         xSLG: ab > 0 && xSLG_count > 0 ? xSLG_sum / ab : null,
         xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
+        xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
+        twoStrikeWhiffPct: twoStrikeSwings > 0 ? twoStrikeWhiffs / twoStrikeSwings : null,
+        firstPitchSwingPct: firstPitchAppearances > 0 ? firstPitchSwings / firstPitchAppearances : null,
+        izSwChase: (izSwingPct !== null && chasePct_val !== null) ? Math.round((izSwingPct - chasePct_val) * 10000) / 10000 : null,
       };
 
       // Apply baseball-context filters (comparison group — affects percentiles)
@@ -1738,7 +1742,7 @@ const Aggregator = {
       const hpk = hpPreAgg[hpi].hitter + '|' + hpPreAgg[hpi].team + '|' + hpPreAgg[hpi].pitchType;
       hpPreMap[hpk] = hpPreAgg[hpi];
     }
-    const hpXKeys = ['wOBA', 'runValue', 'rv100'];
+    const hpXKeys = ['wOBA', 'runValue', 'rv100', 'avgFbDist', 'avgHrDist', 'xwOBAsp'];
     for (let hpmi = 0; hpmi < rows.length; hpmi++) {
       const hpmk = rows[hpmi].hitter + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType;
       const hpPre = hpPreMap[hpmk];

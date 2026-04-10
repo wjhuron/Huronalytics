@@ -52,7 +52,7 @@ PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izW
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct']
 
 # Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
 
 # Pitcher stats where lower is better (invert percentile)
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
@@ -2553,7 +2553,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                            'ldPct', 'fbPct', 'puPct', 'hrFbPct']:
                     if sk in hand_bb and hand_bb[sk] is not None:
                         row[sk + hand_label] = hand_bb[sk]
-                for sk in ['wOBA', 'xBA', 'xSLG', 'xwOBA']:
+                for sk in ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']:
                     if sk in hand_ex and hand_ex[sk] is not None:
                         row[sk + hand_label] = hand_ex[sk]
 
@@ -3186,13 +3186,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     print(f"  SACQ zones: {len(sacq_zone_hand)} hand-specific ({n_hand_quality} quality), "
           f"{len(sacq_zone_pooled)} pooled ({n_pooled_quality} quality)")
 
-    # --- Compute xwOBAsp for each pitcher (second pass, requires sacq_zone_table) ---
-    pitcher_pitch_lookup = {}
-    for (pitcher, team, throws), pitches in pitcher_groups.items():
-        pitcher_pitch_lookup[(pitcher, team)] = pitches
-
-    for row in pitcher_leaderboard:
-        pitches = pitcher_pitch_lookup.get((row['pitcher'], row['team']), [])
+    # --- Helper: compute xwOBAsp for a list of pitches using sacq_lookup ---
+    def compute_xwobasp(pitches):
         xwobasp_sum = 0.0
         xwobasp_count = 0
         for p in pitches:
@@ -3220,7 +3215,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if zone_woba is not None:
                 xwobasp_sum += zone_woba
                 xwobasp_count += 1
-        row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
+        return round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
+
+    # --- Compute xwOBAsp for each pitcher (second pass, requires sacq_zone_table) ---
+    pitcher_pitch_lookup = {}
+    for (pitcher, team, throws), pitches in pitcher_groups.items():
+        pitcher_pitch_lookup[(pitcher, team)] = pitches
+
+    for row in pitcher_leaderboard:
+        pitches = pitcher_pitch_lookup.get((row['pitcher'], row['team']), [])
+        row['xwOBAsp'] = compute_xwobasp(pitches)
+
+    # --- Compute xwOBAsp per pitch type for pitch_leaderboard ---
+    pitch_type_lookup = {}
+    for (pitcher, team, pitch_type, throws), pitches in pitch_groups.items():
+        pitch_type_lookup[(pitcher, team, pitch_type)] = pitches
+
+    for row in pitch_leaderboard:
+        pitches = pitch_type_lookup.get((row['pitcher'], row['team'], row['pitchType']), [])
+        row['xwOBAsp'] = compute_xwobasp(pitches)
 
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
@@ -3243,35 +3256,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches))
 
-        # Compute xwOBAsp for this hitter (hand-specific zone table with pooled fallback)
-        xwobasp_sum = 0.0
-        xwobasp_count = 0
-        for p in pitches:
-            bb_type = p.get('BBType')
-            if not bb_type or bb_type in BUNT_BB_TYPES:
-                continue
-            hc_x = safe_float(p.get('HC_X'))
-            hc_y = safe_float(p.get('HC_Y'))
-            la_val = safe_float(p.get('LaunchAngle'))
-            bats_val = p.get('Bats')
-            if la_val is None or hc_x is None or hc_y is None or not bats_val:
-                continue
-            angle = spray_angle(hc_x, hc_y)
-            direction = spray_direction(angle, bats_val)
-            if not direction:
-                continue
-            la_bin_idx = None
-            for bi, (lo, hi) in enumerate(LA_BINS):
-                if lo <= la_val < hi:
-                    la_bin_idx = bi
-                    break
-            if la_bin_idx is None:
-                continue
-            zone_woba = sacq_lookup(direction, la_bin_idx, bats_val)
-            if zone_woba is not None:
-                xwobasp_sum += zone_woba
-                xwobasp_count += 1
-        row['xwOBAsp'] = round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
+        row['xwOBAsp'] = compute_xwobasp(pitches)
 
         hitter_leaderboard.append(row)
 
@@ -3322,7 +3307,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Hitter pitch-type leaderboard ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
-        'wOBA', 'xBA', 'xSLG', 'xwOBA',
+        'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
         'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
@@ -3406,6 +3391,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
+
+    # Compute xwOBAsp per pitch type for hitter_pitch_leaderboard
+    for row in hitter_pitch_leaderboard:
+        pt = row['pitchType']
+        hitter_pitches = hitter_groups.get((row['hitter'], row['team']), [])
+        if pt == 'All':
+            pt_pitches = hitter_pitches
+        elif pt in PITCH_CATEGORIES:
+            cat_set = set(PITCH_CATEGORIES[pt])
+            pt_pitches = [p for p in hitter_pitches if p.get('Pitch Type') in cat_set]
+        else:
+            pt_pitches = [p for p in hitter_pitches if p.get('Pitch Type') == pt]
+        row['xwOBAsp'] = compute_xwobasp(pt_pitches)
 
     hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
     print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
@@ -3831,7 +3829,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 if row.get('nVAA_pctl') is not None:
                     row['nVAA_pctl'] = 100 - row['nVAA_pctl']
     for row in pitch_leaderboard:
-        for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA'):
+        for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'):
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
