@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Process ST 2026 pitching and hitting data from Google Sheets into JSON files for the leaderboard website."""
+"""Process pitching and hitting data from Google Sheets into JSON files for the leaderboard website."""
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -7,902 +7,46 @@ import json
 import math
 import os
 import time as time_module
-import urllib.request
-import urllib.parse
-from datetime import datetime, time
+from datetime import datetime
 from collections import defaultdict
-from guts import scrape_guts
 
-
-def _fetch_with_retry(url, headers=None, timeout=15, retries=3):
-    """Fetch URL with retry logic and exponential backoff."""
-    last_err = None
-    for attempt in range(retries):
-        try:
-            req = urllib.request.Request(url, headers=headers or {})
-            return urllib.request.urlopen(req, timeout=timeout).read()
-        except Exception as e:
-            last_err = e
-            if attempt < retries - 1:
-                time_module.sleep(2 ** attempt)  # exponential backoff
-    raise last_err
-
-SPREADSHEET_IDS = {
-    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',   # AL 2026 (15 AL teams)
-    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',   # NL 2026 (15 NL teams)
-}
-SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
-
-METRIC_COLS = [
-    'Velocity', 'EffectiveVelo', 'Spin Rate', 'IndVertBrk', 'HorzBrk',
-    'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA'
-]
-
-METRIC_KEYS = {
-    'Velocity': 'velocity', 'EffectiveVelo': 'effectiveVelo',
-    'Spin Rate': 'spinRate',
-    'IndVertBrk': 'indVertBrk', 'HorzBrk': 'horzBrk',
-    'RelPosZ': 'relPosZ', 'RelPosX': 'relPosX',
-    'Extension': 'extension', 'ArmAngle': 'armAngle',
-    'VAA': 'vaa', 'HAA': 'haa',
-}
-
-PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
-STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct']
-
-# Metrics that get percentile ranks on the pitch leaderboard (per pitch type)
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
-
-# Pitcher stats where lower is better (invert percentile)
-PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
-
-# --- Hitter Leaderboard constants ---
-SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
-HITTER_STAT_KEYS = [
-    # Hitter Stats tab
-    'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
-    # Expected Stats
-    'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
-    # Batted Ball tab
-    'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
-    'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
-    'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
-    # Swing Decisions tab
-    'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
-    # Bat Tracking tab
-    'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
-    'blastPct', 'idealAAPct',
-    # Count-leverage stats
-    'twoStrikeWhiffPct', 'firstPitchSwingPct',
-    # Batted ball distance
-    'avgFbDist', 'avgHrDist',
-    # Sprint Speed
-    'sprintSpeed',
-    # wRC+ / xWRC+
-    'wRCplus', 'xWRCplus',
-    # Run Value
-    'runValue',
-]
-# Hitter stats where lower is better (invert percentile so low value = red/high pctl)
-HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
-BUNT_BB_TYPES = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
-
-# Team abbreviation → MLB API team ID mapping
-TEAM_ABBREV_TO_ID = {
-    'ARI': 109, 'ATL': 144, 'BAL': 110, 'BOS': 111, 'CHC': 112,
-    'CWS': 145, 'CIN': 113, 'CLE': 114, 'COL': 115, 'DET': 116,
-    'HOU': 117, 'KCR': 118, 'LAA': 108, 'LAD': 119, 'MIA': 146,
-    'MIL': 158, 'MIN': 142, 'NYM': 121, 'NYY': 147, 'ATH': 133,
-    'PHI': 143, 'PIT': 134, 'SDP': 135, 'SFG': 137, 'SEA': 136,
-    'STL': 138, 'TBR': 139, 'TEX': 140, 'TOR': 141, 'WSH': 120,
-}
-
-# --- PA event classification ---
-HIT_EVENTS = {'Single', 'Double', 'Triple', 'Home Run'}
-K_EVENTS = {'Strikeout', 'Strikeout Double Play'}
-BB_EVENTS = {'Walk', 'Intent Walk'}
-HBP_EVENTS = {'Hit By Pitch'}
-SF_EVENTS = {'Sac Fly', 'Sac Fly Double Play'}
-SH_EVENTS = {'Sac Bunt'}  # sacrifice bunts — PA but not AB, not in OBP denominator
-CI_EVENTS = {'Catcher Interference'}
-NON_PA_EVENTS = {
-    'Caught Stealing 2B', 'Caught Stealing 3B', 'Caught Stealing Home',
-    'Pickoff 1B', 'Pickoff 2B', 'Pickoff 3B',
-    'Pickoff Caught Stealing 2B', 'Pickoff Caught Stealing 3B',
-    'Pickoff Caught Stealing Home',
-    'Runner Out', 'Wild Pitch', 'Game Advisory',
-}
-
-# 30 MLB team abbreviations (matching spreadsheet tab names)
-MLB_TEAMS = {
-    'ARI', 'ATH', 'ATL', 'BAL', 'BOS', 'CHC', 'CIN', 'CLE', 'COL', 'CWS',
-    'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY',
-    'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
-    'WBC',
-}
-
-# Minor league / AAA teams (included in data but excluded from MLB percentile pool)
-AAA_TEAMS = {'ROC'}
-ALL_TEAMS = MLB_TEAMS | AAA_TEAMS
-
-# --- wOBA weights and FIP constant — pulled live from FanGraphs Guts page ---
-WOBA_WEIGHTS = None  # set at runtime by fetch_guts_constants()
-FIP_CONSTANT = None  # set at runtime by fetch_guts_constants()
-GUTS_EXTRA = None    # wOBAScale, lgWOBA, lgRPA — set at runtime
-
-
-def fetch_guts_constants(year=2026):
-    """Scrape wOBA weights and cFIP from FanGraphs Guts page.
-    Delegates to guts.scrape_guts() to avoid duplicating scraping logic."""
-    row = scrape_guts(year)
-    weights = {
-        'BB': round(row['wBB'], 3),
-        'HBP': round(row['wHBP'], 3),
-        '1B': round(row['w1B'], 3),
-        '2B': round(row['w2B'], 3),
-        '3B': round(row['w3B'], 3),
-        'HR': round(row['wHR'], 3),
-    }
-    cfip = round(row['cFIP'], 3)
-    guts_extra = {
-        'wOBAScale': round(row['wOBAScale'], 4),
-        'lgWOBA': round(row['wOBA'], 4),
-        'lgRPA': round(row['R/PA'], 4),
-    }
-    print(f"  FanGraphs Guts {year}: wBB={weights['BB']}, wHBP={weights['HBP']}, "
-          f"w1B={weights['1B']}, w2B={weights['2B']}, w3B={weights['3B']}, "
-          f"wHR={weights['HR']}, cFIP={cfip}")
-    print(f"  wOBA Scale={guts_extra['wOBAScale']}, League wOBA={guts_extra['lgWOBA']}, "
-          f"League R/PA={guts_extra['lgRPA']}")
-    return weights, cfip, guts_extra
-
-
-def fetch_sprint_speed(year=2026):
-    """Fetch sprint speed leaderboard from Baseball Savant for the current year only.
-    Returns dict mapping MLB player ID (int) → {speed, competitive_runs}.
-    Uses min=1 to get all players with any sprint data; qualification (≥10 runs) handled in UI."""
-    import csv
-    import io
-    url = (f'https://baseballsavant.mlb.com/leaderboard/sprint_speed'
-           f'?type=raw&year={year}&position=&team=&min=1&csv=true')
-    try:
-        raw = _fetch_with_retry(url, headers={
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
-            'Accept': 'text/csv',
-        }, timeout=30)
-        data = raw.decode('utf-8-sig')  # Handle BOM
-        reader = csv.DictReader(io.StringIO(data))
-        result = {}
-        for row in reader:
-            try:
-                mlb_id = int(row.get('player_id') or 0)
-                speed_str = row.get('sprint_speed') or row.get('hp_to_1b') or ''
-                speed = float(speed_str) if speed_str else 0
-                comp_runs = int(row.get('competitive_runs') or 0)
-                if mlb_id and speed > 0:
-                    result[mlb_id] = {'speed': round(speed, 1), 'competitive_runs': comp_runs}
-            except (ValueError, TypeError):
-                continue
-        qualified = sum(1 for v in result.values() if v['competitive_runs'] >= 10)
-        print(f"  Sprint speed: fetched {len(result)} players from Savant ({year}), {qualified} qualified (≥10 runs)")
-        return result
-    except Exception as e:
-        print(f"  WARNING: Could not fetch sprint speed data: {e}")
-        return {}
-
-
-def fetch_park_factors(year=2026):
-    """Scrape park factors from FanGraphs, return dict of team abbrev → factor (divided by 100)."""
-    import re as _re
-    url = f'https://www.fangraphs.com/guts.aspx?type=pf&teamid=0&season={year}'
-    html = _fetch_with_retry(url, headers={
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
-        'Accept': 'text/html',
-    }, timeout=15).decode('utf-8')
-    match = _re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, _re.DOTALL)
-    if not match:
-        raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs park factors page')
-    data = json.loads(match.group(1))
-    # Map FanGraphs team names to our abbreviations
-    FG_TEAM_MAP = {
-        'Angels': 'LAA', 'Orioles': 'BAL', 'Red Sox': 'BOS', 'White Sox': 'CWS',
-        'Guardians': 'CLE', 'Tigers': 'DET', 'Royals': 'KCR', 'Twins': 'MIN',
-        'Yankees': 'NYY', 'Athletics': 'ATH', 'Mariners': 'SEA', 'Rays': 'TBR',
-        'Rangers': 'TEX', 'Blue Jays': 'TOR',
-        'Diamondbacks': 'ARI', 'Braves': 'ATL', 'Cubs': 'CHC', 'Reds': 'CIN',
-        'Rockies': 'COL', 'Marlins': 'MIA', 'Astros': 'HOU', 'Dodgers': 'LAD',
-        'Brewers': 'MIL', 'Nationals': 'WSH', 'Mets': 'NYM', 'Phillies': 'PHI',
-        'Pirates': 'PIT', 'Cardinals': 'STL', 'Padres': 'SDP', 'Giants': 'SFG',
-    }
-    queries = data['props']['pageProps']['dehydratedState']['queries']
-    park_factors = {}
-    for q in queries:
-        rows = q.get('state', {}).get('data', [])
-        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'Team' in rows[0]:
-            for row in rows:
-                abbr = FG_TEAM_MAP.get(row['Team'])
-                if abbr:
-                    park_factors[abbr] = round(row['Basic (5yr)'] / 100, 4)
-    print(f"  Park factors: {len(park_factors)} teams fetched")
-    return park_factors
-
-
-PARK_FACTORS = None  # set at runtime by fetch_park_factors()
-
-# Fallback GUTS constants (2025 season from FanGraphs, verified via web search)
-WOBA_WEIGHTS_FALLBACK = {
-    'BB': 0.692, 'HBP': 0.723, '1B': 0.884, '2B': 1.256, '3B': 1.591, 'HR': 2.048,
-}
-FIP_CONSTANT_FALLBACK = 3.102
-
-# Strike zone: ball radius adjustment for "any part of ball touches zone"
-BALL_RADIUS_FT = 1.45 / 12  # 1.45 inches = ~0.121 ft
-ZONE_HALF_WIDTH = 0.83       # half plate (8.5") + ball radius (1.45") in feet
-
-
-def compute_in_zone(p):
-    """Compute InZone from PlateX, PlateZ, SzTop, SzBot with ball-radius adjustment."""
-    px = safe_float(p.get('PlateX'))
-    pz = safe_float(p.get('PlateZ'))
-    top = safe_float(p.get('SzTop'))
-    bot = safe_float(p.get('SzBot'))
-    if any(v is None for v in [px, pz, top, bot]):
-        return None
-    if abs(px) <= ZONE_HALF_WIDTH and (bot - BALL_RADIUS_FT) <= pz <= (top + BALL_RADIUS_FT):
-        return 'Yes'
-    return 'No'
-
-
-def break_tilt_to_minutes(val):
-    """Convert a time value (clock notation) to total minutes (0-719).
-    Handles time objects, datetime objects, and string formats like '12:23' or '1:17'."""
-    if val is None:
-        return None
-    if isinstance(val, time):
-        return val.hour * 60 + val.minute
-    if isinstance(val, datetime):
-        return val.hour * 60 + val.minute
-    if isinstance(val, str) and ':' in val:
-        try:
-            parts = val.strip().split(':')
-            h, m = int(parts[0]), int(parts[1])
-            return h * 60 + m
-        except (ValueError, IndexError):
-            return None
-    return None
-
-
-def circular_mean_minutes(minute_values):
-    """Circular mean for clock-face values (0-719 minutes = 12 hours)."""
-    if not minute_values:
-        return None
-    angles = [m / 720.0 * 2 * math.pi for m in minute_values]
-    sin_avg = sum(math.sin(a) for a in angles) / len(angles)
-    cos_avg = sum(math.cos(a) for a in angles) / len(angles)
-    avg_angle = math.atan2(sin_avg, cos_avg)
-    if avg_angle < 0:
-        avg_angle += 2 * math.pi
-    avg_minutes = avg_angle / (2 * math.pi) * 720
-    return round(avg_minutes)
-
-
-def minutes_to_tilt_display(total_minutes):
-    """Convert minutes back to H:MM display format."""
-    if total_minutes is None:
-        return None
-    h = int(total_minutes) // 60
-    m = int(total_minutes) % 60
-    if h == 0:
-        h = 12
-    return f"{h}:{m:02d}"
-
-
-def safe_float(val):
-    """Convert a value to float, returning None if not possible."""
-    if val is None or val == '':
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
-
-
-
-
-def normalize_date(val):
-    """Normalize a date value to YYYY-MM-DD string."""
-    if val is None or val == '':
-        return None
-    if isinstance(val, datetime):
-        return val.strftime('%Y-%m-%d')
-    s = str(val).strip()
-    # ISO format: 2026-03-05 or 2026-03-05T...
-    if len(s) >= 10 and s[4] == '-' and s[7] == '-':
-        return s[:10]
-    # US format: M/D/YYYY or MM/DD/YYYY
-    parts = s.split('/')
-    if len(parts) == 3:
-        try:
-            m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
-            return f"{y:04d}-{m:02d}-{d:02d}"
-        except ValueError:
-            pass
-    return None
-
-
-def avg(values):
-    """Average a list of numbers, ignoring None."""
-    nums = [v for v in values if v is not None]
-    if not nums:
-        return None
-    return sum(nums) / len(nums)
-
-
-def compute_expected_stats(pitches):
-    """Compute wOBA, xBA, xSLG, xwOBA, xwOBAcon from pitch-level data.
-
-    wOBA uses FanGraphs Guts linear weights applied to actual outcomes.
-    xBA/xSLG/xwOBA use Statcast per-pitch expected values from the spreadsheet.
-
-    wOBA     = (wBB×uBB + wHBP×HBP + w1B×1B + w2B×2B + w3B×3B + wHR×HR) / (AB + uBB + SF + HBP)
-    xBA      = sum(xBA per BIP) / AB
-    xSLG     = sum(xSLG per BIP) / AB
-    xwOBA    = sum(xwOBA per PA) / (PA - IBB)
-    xwOBAcon = sum(xwOBA per BIP) / count(BIPs)  — contact only, no K/BB/HBP
-    """
-    ab = 0
-    ubb = 0
-    hbp_count = 0
-    sf = 0
-    singles = 0
-    doubles = 0
-    triples = 0
-    hr = 0
-    xba_sum = 0.0
-    xslg_sum = 0.0
-    xwoba_sum = 0.0
-    xwoba_denom = 0
-    xwobacon_sum = 0.0
-    xwobacon_denom = 0
-
-    for p in pitches:
-        event = p.get('Event')
-        if not event or event in NON_PA_EVENTS:
-            continue
-
-        if event == 'Intent Walk':
-            continue  # IBB excluded
-
-        # xwOBA: every non-IBB PA event contributes
-        xwoba_val = safe_float(p.get('xwOBA'))
-        if xwoba_val is not None:
-            xwoba_sum += xwoba_val
-            xwoba_denom += 1
-
-        # Track wOBA components
-        if event in BB_EVENTS:
-            ubb += 1
-            continue
-        elif event in HBP_EVENTS:
-            hbp_count += 1
-            continue
-        elif event in SF_EVENTS:
-            sf += 1
-            # SF are BIPs — include in xwOBAcon but not in AB-based stats (xBA, xSLG)
-            xwobacon_val = safe_float(p.get('xwOBA'))
-            if xwobacon_val is not None:
-                xwobacon_sum += xwobacon_val
-                xwobacon_denom += 1
-            continue
-        elif event in SH_EVENTS or event in CI_EVENTS:
-            continue
-
-        # Regular AB outcome
-        ab += 1
-        if event == 'Single':
-            singles += 1
-        elif event == 'Double':
-            doubles += 1
-        elif event == 'Triple':
-            triples += 1
-        elif event == 'Home Run':
-            hr += 1
-
-        xba_val = safe_float(p.get('xBA'))
-        xslg_val = safe_float(p.get('xSLG'))
-        if xba_val is not None:
-            xba_sum += xba_val
-        if xslg_val is not None:
-            xslg_sum += xslg_val
-
-        # xwOBAcon: BIPs from AB outcomes (exclude strikeouts)
-        if event not in K_EVENTS:
-            xwobacon_val = safe_float(p.get('xwOBA'))
-            if xwobacon_val is not None:
-                xwobacon_sum += xwobacon_val
-                xwobacon_denom += 1
-
-    result = {}
-
-    # wOBA from Guts weights
-    woba_denom = ab + ubb + sf + hbp_count
-    if woba_denom > 0 and WOBA_WEIGHTS:
-        woba_num = (WOBA_WEIGHTS['BB'] * ubb + WOBA_WEIGHTS['HBP'] * hbp_count +
-                    WOBA_WEIGHTS['1B'] * singles + WOBA_WEIGHTS['2B'] * doubles +
-                    WOBA_WEIGHTS['3B'] * triples + WOBA_WEIGHTS['HR'] * hr)
-        result['wOBA'] = round(woba_num / woba_denom, 3)
-    else:
-        result['wOBA'] = None
-
-    result['xBA'] = round(xba_sum / ab, 3) if ab > 0 else None
-    result['xSLG'] = round(xslg_sum / ab, 3) if ab > 0 else None
-    result['xwOBA'] = round(xwoba_sum / xwoba_denom, 3) if xwoba_denom > 0 else None
-    result['xwOBAcon'] = round(xwobacon_sum / xwobacon_denom, 3) if xwobacon_denom > 0 else None
-    return result
-
-
-def compute_stats(pitches):
-    """Compute IZ%, Whiff%, CSW%, Chase%, GB%, K%, BB%, K-BB%, BABIP from a list of pitch dicts."""
-    total = len(pitches)
-    if total == 0:
-        empty = {k: None for k in STAT_KEYS}
-        empty['nSwings'] = 0
-        empty['nBip'] = 0
-        empty['pa'] = 0
-        return empty
-
-    iz = sum(1 for p in pitches if p.get('InZone') == 'Yes')
-    swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
-    whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
-    csw = sum(1 for p in pitches if p['Description'] in ('Called Strike', 'Swinging Strike'))
-
-    iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
-    iz_swings = sum(1 for p in iz_pitches if p['Description'] in SWING_DESCRIPTIONS)
-    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] == 'Swinging Strike')
-    ooz = [p for p in pitches if p.get('InZone') == 'No']
-    ooz_swung = sum(1 for p in ooz if p['Description'] in ('Swinging Strike', 'In Play', 'Foul'))
-
-    # GB% — exclude bunts from denominator
-    bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
-    gb = sum(1 for p in bip if p.get('BBType') == 'ground_ball')
-
-    # K%, BB%, BABIP — count true plate appearances (exclude non-PA events)
-    pa_pitches = [p for p in pitches if p.get('Event') and p['Event'] not in NON_PA_EVENTS]
-    n_pa = len(pa_pitches)
-    n_h = sum(1 for p in pa_pitches if p['Event'] in HIT_EVENTS)
-    n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
-    n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
-    n_bb_all = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
-    n_ibb = sum(1 for p in pa_pitches if p['Event'] == 'Intent Walk')
-    n_bb = n_bb_all - n_ibb  # BB% excludes IBB (matches FanGraphs methodology)
-    n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
-    n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
-    n_sh = sum(1 for p in pa_pitches if p['Event'] in SH_EVENTS)
-    n_ci = sum(1 for p in pa_pitches if p['Event'] in CI_EVENTS)
-    n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci  # AB uses all BB (including IBB)
-    k_pct = n_k / n_pa if n_pa > 0 else None
-    bb_pct = n_bb / n_pa if n_pa > 0 else None  # excludes IBB
-    kbb_pct = round(k_pct - bb_pct, 4) if k_pct is not None and bb_pct is not None else None
-
-    # BABIP = (H - HR) / (AB - K - HR + SF)
-    babip_denom = n_ab - n_k - n_hr + n_sf
-    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
-
-    # Strike% — total strikes / total pitches
-    BALL_DESCRIPTIONS = {'Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'}
-    n_strikes = sum(1 for p in pitches if p.get('Description') not in BALL_DESCRIPTIONS)
-    strike_pct = n_strikes / total if total > 0 else None
-
-    # Run Value (RunExp) — sum of delta_pitcher_run_exp
-    # Positive = good for pitcher, negative = bad
-    # Store raw (unrounded) value — rounding happens at final output step
-    # to avoid rounding error accumulation when summing per-pitch-type values
-    rv_values = [safe_float(p.get('RunExp')) for p in pitches]
-    rv_values = [v for v in rv_values if v is not None]
-    run_value = sum(rv_values) if rv_values else None
-
-    # FPS% — first pitch strike rate (count == "0-0")
-    # A strike = called strike, swinging strike, foul, or in play
-    first_pitches = [p for p in pitches if p.get('Count') == '0-0']
-    fps_strikes = sum(1 for p in first_pitches
-                      if p.get('Description') in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'))
-    fps_pct = fps_strikes / len(first_pitches) if first_pitches else None
-
-    # 2-Strike Whiff% — whiff rate on pitches with 2 strikes
-    two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
-    two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
-    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
-    two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
-
-    return {
-        'pa': n_pa,
-        'strikePct': strike_pct,
-        'izPct': iz / total,
-        'swStrRate': whiffs / total if total > 0 else None,
-        'swStrPct': whiffs / swings if swings > 0 else None,
-        'cswPct': csw / total,
-        'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
-        'chasePct': ooz_swung / len(ooz) if ooz else None,
-        'gbPct': gb / len(bip) if bip else None,
-        'nSwings': swings,
-        'nBip': len(bip),
-        'kPct': k_pct,
-        'bbPct': bb_pct,
-        'kbbPct': kbb_pct,
-        'babip': babip,
-        'fpsPct': fps_pct,
-        'twoStrikeWhiffPct': two_strike_whiff_pct,
-        'runValue': run_value,
-    }
-
-
-def round_metric(key, value):
-    """Round a metric value according to its type."""
-    if value is None:
-        return None
-    if key == 'Spin Rate':
-        return round(value)
-    if key in ('VAA', 'HAA'):
-        return round(value, 2)
-    return round(value, 1)
-
-
-def median(values):
-    """Compute median, ignoring None values."""
-    nums = sorted(v for v in values if v is not None)
-    if not nums:
-        return None
-    n = len(nums)
-    if n % 2 == 1:
-        return nums[n // 2]
-    return (nums[n // 2 - 1] + nums[n // 2]) / 2
-
-
-def is_barrel(ev, la):
-    """Statcast barrel definition (MLB glossary / baseballr code_barrel).
-    Five conditions: LA in [8,50], EV>=98, EV*1.5-LA>=117, EV+LA>=124."""
-    if ev is None or la is None:
-        return False
-    return (la >= 8 and la <= 50 and ev >= 98 and
-            ev * 1.5 - la >= 117 and
-            ev + la >= 124)
-
-
-def compute_pitcher_batted_ball(pitches):
-    """Compute batted-ball-against stats for a pitcher: Avg EV, Hard-Hit%, Barrel%, LD%, FB%, PU%."""
-    bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
-    n_bip = len(bip)
-    if n_bip == 0:
-        return {
-            'avgEVAgainst': None, 'maxEVAgainst': None,
-            'hardHitPct': None, 'barrelPctAgainst': None,
-            'ldPct': None, 'fbPct': None, 'puPct': None,
-            'hrFbPct': None,
-        }
-
-    # Exit velo stats (all BIP, not just positive LA)
-    ev_vals = [safe_float(p.get('ExitVelo')) for p in bip]
-    ev_valid = [v for v in ev_vals if v is not None]
-    avg_ev = round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None
-    max_ev = round(max(ev_valid), 1) if ev_valid else None
-
-    # Hard-hit: EV >= 95 mph
-    hard_hit = sum(1 for v in ev_valid if v >= 95)
-    hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
-
-    # Barrel rate — use Barrel column (1-6 scale, 6=barrel) if available, else formula
-    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
-    if has_barrel_col:
-        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
-    else:
-        ev_la_pairs = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
-                       for p in bip
-                       if safe_float(p.get('ExitVelo')) is not None
-                       and safe_float(p.get('LaunchAngle')) is not None]
-        barrels = sum(1 for ev, la in ev_la_pairs if is_barrel(ev, la))
-    barrel_pct = barrels / n_bip if n_bip > 0 else None
-
-    # Batted ball type breakdown
-    ld = sum(1 for p in bip if p.get('BBType') == 'line_drive')
-    fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
-    pu = sum(1 for p in bip if p.get('BBType') == 'popup')
-
-    # HR/FB ratio — denominator = fly balls + popups + line drive HRs
-    n_hr_bb = sum(1 for p in bip if p.get('Event') == 'Home Run')
-    ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
-    fb_for_hrfb = fb + pu + ld_hr
-    hr_fb_pct = round(n_hr_bb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
-
-    return {
-        'avgEVAgainst': avg_ev,
-        'maxEVAgainst': max_ev,
-        'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
-        'barrelPctAgainst': round(barrel_pct, 4) if barrel_pct is not None else None,
-        'ldPct': round(ld / n_bip, 4) if n_bip > 0 else None,
-        'fbPct': round(fb / n_bip, 4) if n_bip > 0 else None,
-        'puPct': round(pu / n_bip, 4) if n_bip > 0 else None,
-        'hrFbPct': hr_fb_pct,
-    }
-
-
-PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct', 'xwOBAsp']
-PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'xwOBAsp'}
-
-
-def spray_angle(hc_x, hc_y):
-    """Compute spray angle in degrees. 0 = center, negative = left field, positive = right field."""
-    if hc_x is None or hc_y is None:
-        return None
-    hp_x, hp_y = 125.42, 198.27
-    dx = hc_x - hp_x
-    dy = hp_y - hc_y
-    if dy <= 0:
-        return None
-    return math.atan2(dx, dy) * (180 / math.pi)
-
-
-def spray_direction(angle, stands):
-    """Classify spray direction into 6 equal 15° bins based on spray angle and batter side.
-    Returns: 'pull', 'pull_side', 'center_pull', 'center_oppo', 'oppo_side', or 'oppo'."""
-    if angle is None or not stands:
-        return None
-    if stands == 'R':
-        if angle < -30:
-            return 'pull'
-        elif angle < -15:
-            return 'pull_side'
-        elif angle < 0:
-            return 'center_pull'
-        elif angle < 15:
-            return 'center_oppo'
-        elif angle < 30:
-            return 'oppo_side'
-        else:
-            return 'oppo'
-    else:  # L
-        if angle > 30:
-            return 'pull'
-        elif angle > 15:
-            return 'pull_side'
-        elif angle > 0:
-            return 'center_pull'
-        elif angle > -15:
-            return 'center_oppo'
-        elif angle > -30:
-            return 'oppo_side'
-        else:
-            return 'oppo'
-
-
-def compute_hitter_stats(pitches):
-    """Compute hitter stats from a list of pitch dicts for all three hitter leaderboard tabs:
-    Hitter Stats (AVG/OBP/SLG/OPS), Batted Ball Metrics, and Swing Decisions."""
-    total = len(pitches)
-    if total == 0:
-        empty = {k: None for k in HITTER_STAT_KEYS}
-        empty.update({'pa': 0, 'nSwings': 0, 'nBip': 0, 'nCompSwings': 0,
-                      'doubles': 0, 'triples': 0, 'hr': 0, 'xbh': 0})
-        return empty
-
-    # === PA and batting event counts ===
-    # PA = pitches with an Event, excluding non-PA events (pickoffs, caught stealings, etc.)
-    pa_pitches = [p for p in pitches if p.get('Event') and p['Event'] not in NON_PA_EVENTS]
-    n_pa = len(pa_pitches)
-
-    n_2b = sum(1 for p in pa_pitches if p['Event'] == 'Double')
-    n_3b = sum(1 for p in pa_pitches if p['Event'] == 'Triple')
-    n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
-    n_bb_all = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
-    n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
-    n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
-    n_sh = sum(1 for p in pa_pitches if p['Event'] in SH_EVENTS)
-    n_ci = sum(1 for p in pa_pitches if p['Event'] in CI_EVENTS)
-
-    # AB = PA - all BB (including IBB) - HBP - SF - SH - CI
-    n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci
-
-    # Traditional batting stats (AVG, OBP, SLG, OPS, ISO, K%, BB%, BABIP, wOBA)
-    # are NOT computed here — boxscore merge overwrites them with official values.
-    # See boxscore merge section for authoritative computation.
-    xbh = n_2b + n_3b + n_hr
-
-    # === Swing metrics ===
-    n_swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
-    whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
-
-    # In-zone / Out-of-zone
-    iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
-    ooz_pitches = [p for p in pitches if p.get('InZone') == 'No']
-    iz_swings = sum(1 for p in iz_pitches if p['Description'] in SWING_DESCRIPTIONS)
-    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] == 'Swinging Strike')
-    ooz_swings = sum(1 for p in ooz_pitches if p['Description'] in SWING_DESCRIPTIONS)
-
-    iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
-    chase_pct = ooz_swings / len(ooz_pitches) if ooz_pitches else None
-
-    # Contact%: overall contact rate — (Foul + In Play) / Swings
-    contact = sum(1 for p in pitches if p['Description'] in ('Foul', 'In Play'))
-    contact_pct = contact / n_swings if n_swings > 0 else None
-
-    # IZCT%: in-zone contact rate — (IZ Foul + IZ non-bunt In Play) / IZ swings (excl bunt BIP)
-    iz_swings_non_bunt = sum(1 for p in iz_pitches
-                             if p['Description'] in SWING_DESCRIPTIONS
-                             and p.get('BBType') not in BUNT_BB_TYPES)
-    iz_contact = sum(1 for p in iz_pitches
-                     if p['Description'] in ('Foul', 'In Play')
-                     and p.get('BBType') not in BUNT_BB_TYPES)
-    iz_contact_pct = iz_contact / iz_swings_non_bunt if iz_swings_non_bunt > 0 else None
-
-    # === Batted ball metrics (excluding bunts) ===
-    bip = [p for p in pitches if p.get('BBType') is not None and p.get('BBType') not in BUNT_BB_TYPES]
-    n_bip = len(bip)
-    gb = sum(1 for p in bip if p.get('BBType') == 'ground_ball')
-    ld = sum(1 for p in bip if p.get('BBType') == 'line_drive')
-    fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
-    pu = sum(1 for p in bip if p.get('BBType') == 'popup')
-
-    # EV50: average of top 50% hardest hit balls across ALL batted balls (no LA filter).
-    # Matches Savant's "Best Speed" / EV50 concept — weak contact is noise that
-    # clouds our view of a hitter's true exit velocity talent. Year-to-year r≈.515.
-    all_evs = [safe_float(p.get('ExitVelo')) for p in bip]
-    all_evs = [v for v in all_evs if v is not None]
-    ev50 = None
-    if all_evs:
-        sorted_evs = sorted(all_evs, reverse=True)
-        top_half = sorted_evs[:max(1, len(sorted_evs) // 2)]
-        ev50 = round(sum(top_half) / len(top_half), 1)
-
-    # Barrels — use Barrel column (1-6 scale, 6=barrel) if available, else formula
-    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
-    if has_barrel_col:
-        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
-    else:
-        ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
-                     for p in bip
-                     if safe_float(p.get('ExitVelo')) is not None
-                     and safe_float(p.get('LaunchAngle')) is not None]
-        barrels = sum(1 for ev, la in ev_la_all if is_barrel(ev, la))
-
-    # Median launch angle on ALL batted balls
-    all_la = [safe_float(p.get('LaunchAngle')) for p in bip
-              if safe_float(p.get('LaunchAngle')) is not None]
-
-    # Spray stats (Pull%, Middle%, Oppo%, AirPull%)
-    spray_data = []
-    for p in bip:
-        hc_x = safe_float(p.get('HC_X'))
-        hc_y = safe_float(p.get('HC_Y'))
-        angle = spray_angle(hc_x, hc_y)
-        direction = spray_direction(angle, p.get('Bats'))
-        if direction:
-            spray_data.append((direction, p.get('BBType')))
-    n_spray = len(spray_data)
-    pull = sum(1 for d, _ in spray_data if d in ('pull', 'pull_side'))
-    center = sum(1 for d, _ in spray_data if d in ('center_pull', 'center_oppo'))
-    oppo = sum(1 for d, _ in spray_data if d in ('oppo_side', 'oppo'))
-    air_pull = sum(1 for d, bb in spray_data if d in ('pull', 'pull_side') and bb in ('line_drive', 'fly_ball', 'popup'))
-
-    # Hard-hit: EV >= 95 mph
-    ev_valid = [safe_float(p.get('ExitVelo')) for p in bip]
-    ev_valid = [v for v in ev_valid if v is not None]
-    hard_hit = sum(1 for v in ev_valid if v >= 95)
-    hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
-
-    # HR/FB ratio for hitters — denominator = fly balls + popups + line drive HRs
-    n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
-    ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
-    fb_for_hrfb = fb + pu + ld_hr
-    hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
-
-    # === Count-leverage stats ===
-    # 2-Strike Whiff%: whiff rate when hitter has 2 strikes
-    two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
-    two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
-    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
-    two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
-
-    # First-Pitch Swing%: % of PAs where hitter swings on first pitch (count "0-0")
-    first_pitches_h = [p for p in pitches if p.get('Count') == '0-0']
-    first_pitch_swings = sum(1 for p in first_pitches_h if p['Description'] in SWING_DESCRIPTIONS)
-    first_pitch_swing_pct = first_pitch_swings / len(first_pitches_h) if first_pitches_h else None
-
-    # === Batted ball distance ===
-    # Avg fly ball distance (fly_ball only, not popups/LD)
-    fb_distances = [safe_float(p.get('Distance')) for p in bip if p.get('BBType') == 'fly_ball']
-    fb_distances = [d for d in fb_distances if d is not None]
-    avg_fb_dist = round(sum(fb_distances) / len(fb_distances), 0) if fb_distances else None
-
-    # Avg HR distance
-    hr_distances = [safe_float(p.get('Distance')) for p in bip if p.get('Event') == 'Home Run']
-    hr_distances = [d for d in hr_distances if d is not None]
-    avg_hr_dist = round(sum(hr_distances) / len(hr_distances), 0) if hr_distances else None
-
-    # Bat Tracking — only competitive swings (BatSpeed >= 50)
-    bs_vals = [safe_float(p.get('BatSpeed')) for p in pitches if safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    sl_vals = [safe_float(p.get('SwingLength')) for p in pitches if safe_float(p.get('SwingLength')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    aa_vals = [safe_float(p.get('AttackAngle')) for p in pitches if safe_float(p.get('AttackAngle')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    ad_vals = [safe_float(p.get('AttackDirection')) for p in pitches if safe_float(p.get('AttackDirection')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    spt_vals = [safe_float(p.get('SwingPathTilt')) for p in pitches if safe_float(p.get('SwingPathTilt')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-
-    # Blast% — competitive swings where BatSpeed >= 75 AND EV >= 80% of theoretical max EV
-    # Max EV = 0.2 * pitch_speed + 1.2 * bat_speed (Alan Nathan collision model)
-    n_blasts = 0
-    n_blast_eligible = 0  # competitive swings with both BatSpeed and EV
-    # IdealAA% — competitive swings with attack angle between 5-20 degrees
-    n_ideal_aa = 0
-    for p in pitches:
-        bs = safe_float(p.get('BatSpeed'))
-        if bs is None or bs < 50:
-            continue
-        # IdealAA: count swings in 5-20 degree attack angle window
-        aa = safe_float(p.get('AttackAngle'))
-        if aa is not None and 5 <= aa <= 20:
-            n_ideal_aa += 1
-        # Blast: need EV and pitch velocity
-        ev = safe_float(p.get('ExitVelo'))
-        velo = safe_float(p.get('Velocity'))
-        if ev is not None and velo is not None:
-            n_blast_eligible += 1
-            max_ev = 0.2 * velo + 1.2 * bs
-            if bs >= 75 and ev >= 0.80 * max_ev:
-                n_blasts += 1
-
-    return {
-        # Info / counts
-        'pa': n_pa,
-        'ab': n_ab,
-        'nSwings': n_swings,
-        'nBip': n_bip,
-        # Hitter Stats tab — traditional stats (avg, obp, slg, ops, iso, kPct, bbPct, babip, wOBA)
-        # are set later by boxscore merge (authoritative source)
-        'doubles': n_2b,
-        'triples': n_3b,
-        'hr': n_hr,
-        'xbh': xbh,
-        # Batted Ball tab
-        'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
-        'ev50': ev50,
-        'maxEV': round(max(ev_valid), 1) if ev_valid else None,
-        'medLA': round(median(all_la), 1) if all_la else None,
-        'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
-        'barrelPct': barrels / n_bip if n_bip > 0 else None,
-        'gbPct': gb / n_bip if n_bip > 0 else None,
-        'ldPct': ld / n_bip if n_bip > 0 else None,
-        'fbPct': fb / n_bip if n_bip > 0 else None,
-        'puPct': pu / n_bip if n_bip > 0 else None,
-        'hrFbPct': hr_fb_pct,
-        'pullPct': pull / n_spray if n_spray > 0 else None,
-        'middlePct': center / n_spray if n_spray > 0 else None,
-        'oppoPct': oppo / n_spray if n_spray > 0 else None,
-        'airPullPct': air_pull / n_spray if n_spray > 0 else None,
-        # Swing Decisions tab
-        'swingPct': n_swings / total if total > 0 else None,
-        'izSwingPct': iz_swing_pct,
-        'chasePct': chase_pct,
-        'izSwChase': round(iz_swing_pct - chase_pct, 4) if iz_swing_pct is not None and chase_pct is not None else None,
-        'contactPct': contact_pct,
-        'izContactPct': iz_contact_pct,
-        'whiffPct': whiffs / n_swings if n_swings > 0 else None,
-        'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
-        # Run Value — negate pitcher RunExp so positive = good for hitter
-        'runValue': (lambda vals: -sum(vals) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
-        # Bat Tracking — averages of competitive swings (BatSpeed >= 50)
-        'batSpeed': round(sum(bs_vals) / len(bs_vals), 1) if bs_vals else None,
-        'swingLength': round(sum(sl_vals) / len(sl_vals), 1) if sl_vals else None,
-        'attackAngle': round(sum(aa_vals) / len(aa_vals), 1) if aa_vals else None,
-        'attackDirection': round(sum(ad_vals) / len(ad_vals), 1) if ad_vals else None,
-        'swingPathTilt': round(sum(spt_vals) / len(spt_vals), 1) if spt_vals else None,
-        'nCompSwings': len(bs_vals),  # competitive swings count
-        'blastPct': round(n_blasts / n_blast_eligible, 4) if n_blast_eligible > 0 else None,
-        'idealAAPct': round(n_ideal_aa / len(bs_vals), 4) if bs_vals else None,
-        # Count-leverage stats
-        'twoStrikeWhiffPct': two_strike_whiff_pct,
-        'firstPitchSwingPct': first_pitch_swing_pct,
-        # Batted ball distance
-        'avgFbDist': avg_fb_dist,
-        'avgHrDist': avg_hr_dist,
-    }
+# ── Pipeline modules ─────────────────────────────────────────────────────
+from pipeline_utils import (
+    safe_float, normalize_date, _today_et, avg, median, round_metric,
+    is_barrel, spray_angle, spray_direction,
+    break_tilt_to_minutes, circular_mean_minutes, minutes_to_tilt_display,
+    compute_in_zone, outs_to_ip_str, outs_to_ip_float, ip_str_to_float,
+    DATA_DIR,
+    SWING_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
+    SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
+    MLB_TEAMS, AAA_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
+    BALL_RADIUS_FT, ZONE_HALF_WIDTH,
+)
+from pipeline_fetch import (
+    fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
+    read_pitches_from_sheet,
+    lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache,
+    fetch_and_aggregate_boxscores, fetch_and_aggregate_milb_boxscores,
+    SPREADSHEET_IDS, SERVICE_ACCOUNT_FILE,
+    WOBA_WEIGHTS_FALLBACK, FIP_CONSTANT_FALLBACK,
+)
+from pipeline_compute import (
+    compute_expected_stats, compute_stats,
+    compute_pitcher_batted_ball, compute_hitter_stats,
+    compute_percentile_ranks, compute_percentile_ranks_with_aaa,
+    METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
+    PITCH_PCTL_KEYS, PITCHER_INVERT_PCTL,
+    HITTER_STAT_KEYS, HITTER_INVERT_PCTL,
+    PITCHER_BB_KEYS, PITCHER_BB_INVERT,
+)
+import pipeline_compute
+
+
+# ── Runtime state (set in main) ──────────────────────────────────────────
+WOBA_WEIGHTS = None
+FIP_CONSTANT = None
+GUTS_EXTRA = None
+PARK_FACTORS = None
 
 
 def generate_micro_data(all_pitches):
@@ -1404,7 +548,9 @@ def generate_micro_data(all_pitches):
 
         dist = safe_float(p.get('Distance'))
         woba_val = safe_float(p.get('wOBAval'))
-        bat_side = p.get('Bats') or 'R'
+        bat_side = p.get('Bats')
+        if not bat_side:
+            bat_side = 'R'  # default to RHB if Bats field missing
         hitter_bip_rows.append([
             hi_idx[batter],
             dt_idx[date],
@@ -1689,629 +835,6 @@ def generate_micro_data(all_pitches):
         'veloTrendCols': ['pitcherIdx', 'pitchTypeIdx', 'dateIdx', 'sumVelo', 'nVelo'],
         'veloTrend': velo_trend_rows,
     }
-
-
-def read_sheet_with_retry(ws, max_retries=3):
-    """Read a worksheet with retry logic for rate limiting (429 errors)."""
-    for attempt in range(max_retries):
-        try:
-            return ws.get_all_values()
-        except gspread.exceptions.APIError as e:
-            if '429' in str(e) and attempt < max_retries - 1:
-                wait = 30 * (attempt + 1)
-                print(f"    Rate limited, waiting {wait}s...")
-                time_module.sleep(wait)
-            else:
-                raise
-
-
-def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
-    """Compute percentile rank (0-100) for each row's metric value.
-    Uses the 'mean rank' method for ties.
-    If min_count > 0, only rows with row[count_key] >= min_count participate
-    in the percentile pool. Sub-minimum rows are interpolated into the qualified
-    pool so they still get a percentile value (displayed as unqualified/gray)."""
-    pctl_key = metric_key + '_pctl'
-    valid = [(i, rows[i][metric_key]) for i in range(len(rows))
-             if rows[i].get(metric_key) is not None
-             and (min_count == 0 or (rows[i].get(count_key) or 0) >= min_count)]
-
-    if len(valid) < 2:
-        for row in rows:
-            row[pctl_key] = 50 if row.get(metric_key) is not None else None
-        return
-
-    values = [v for _, v in valid]
-    n = len(values)
-
-    # Compute percentiles for qualified rows (ranked among themselves)
-    for idx, val in valid:
-        below = sum(1 for x in values if x < val)
-        equal = sum(1 for x in values if x == val)
-        pctl = (below + 0.5 * (equal - 1)) / max(1, n - 1) * 100
-        rows[idx][pctl_key] = max(0, min(100, round(pctl)))
-
-    # Interpolate sub-minimum rows into the qualified pool
-    if min_count > 0:
-        for i, row in enumerate(rows):
-            if pctl_key in row:
-                continue  # Already computed above
-            val = row.get(metric_key)
-            if val is None:
-                row[pctl_key] = None
-                continue
-            below = sum(1 for x in values if x < val)
-            equal = sum(1 for x in values if x == val)
-            pctl = (below + 0.5 * equal) / n * 100
-            row[pctl_key] = max(0, min(100, round(pctl)))
-
-    # Set None for rows that don't have the metric
-    for row in rows:
-        if pctl_key not in row:
-            row[pctl_key] = None
-
-
-def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count'):
-    """Compute percentiles from MLB-only pool, then interpolate AAA players into that distribution.
-    AAA players (rows with _isROC=True) are excluded from the MLB percentile pool but
-    receive percentile values based on where they'd fall in the MLB distribution."""
-    pctl_key = metric_key + '_pctl'
-
-    mlb_rows = [r for r in rows if not r.get('_isROC')]
-    aaa_rows = [r for r in rows if r.get('_isROC')]
-
-    # Step 1: compute normal percentiles on MLB-only pool
-    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key)
-
-    # Step 2: interpolate AAA rows into MLB distribution
-    mlb_values = sorted([r[metric_key] for r in mlb_rows
-                         if r.get(metric_key) is not None
-                         and (min_count == 0 or (r.get(count_key) or 0) >= min_count)])
-    n = len(mlb_values)
-
-    for row in aaa_rows:
-        val = row.get(metric_key)
-        if val is None:
-            row[pctl_key] = None
-            continue
-        if n < 2:
-            row[pctl_key] = 50
-            continue
-        below = sum(1 for x in mlb_values if x < val)
-        equal = sum(1 for x in mlb_values if x == val)
-        pctl = (below + 0.5 * equal) / n * 100
-        row[pctl_key] = max(0, min(100, round(pctl)))
-
-
-def load_mlb_id_cache(cache_path):
-    """Load MLB ID cache from disk."""
-    if os.path.exists(cache_path):
-        with open(cache_path, 'r') as f:
-            return json.load(f)
-    return {}
-
-
-def save_mlb_id_cache(cache, cache_path):
-    """Save MLB ID cache to disk."""
-    with open(cache_path, 'w') as f:
-        json.dump(cache, f, indent=2)
-
-
-def lookup_mlb_id(player_name, team_abbrev, mlb_id_cache):
-    """Look up MLB player ID using the MLB Stats API, matching by name and team."""
-    cache_key = f"{player_name}|{team_abbrev}"
-    if cache_key in mlb_id_cache:
-        return mlb_id_cache[cache_key]
-
-    # Parse "Last, First" format
-    parts = player_name.split(', ')
-    if len(parts) == 2:
-        search_name = f"{parts[1]} {parts[0]}"
-    else:
-        search_name = player_name
-
-    try:
-        url = f"https://statsapi.mlb.com/api/v1/people/search?names={urllib.parse.quote(search_name)}&sportIds=1,11,12,13,14&hydrate=currentTeam&limit=25"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode())
-
-        team_id = TEAM_ABBREV_TO_ID.get(team_abbrev)
-        people = data.get('people', [])
-
-        # Try to match by team first
-        if team_id and people:
-            for person in people:
-                ct = person.get('currentTeam', {})
-                parent = ct.get('parentOrgId') or ct.get('id')
-                if parent == team_id or ct.get('id') == team_id:
-                    mlb_id = person['id']
-                    mlb_id_cache[cache_key] = mlb_id
-                    return mlb_id
-
-        # Fallback: first result with matching last name
-        if people:
-            last_name = parts[0] if len(parts) == 2 else player_name.split()[-1]
-            for person in people:
-                if person.get('lastName', '').lower() == last_name.lower():
-                    mlb_id = person['id']
-                    mlb_id_cache[cache_key] = mlb_id
-                    return mlb_id
-            # Last resort: first result
-            mlb_id = people[0]['id']
-            mlb_id_cache[cache_key] = mlb_id
-            return mlb_id
-
-    except Exception as e:
-        print(f"  Warning: MLB ID lookup failed for {player_name} ({team_abbrev}): {e}")
-
-    mlb_id_cache[cache_key] = None
-    return None
-
-
-def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
-    """Read all pitches from a single Google Sheets spreadsheet. Returns a list of pitch dicts.
-    extra_tabs: optional set of additional tab names to read (e.g. {'ROC', 'AAA'}).
-    Pitches from extra_tabs are tagged with _source=tab_name; MLB pitches get _source='MLB'."""
-    pitches = []
-    extra_tabs = extra_tabs or set()
-    sh = gc.open_by_key(sheet_id)
-    print(f"  {sh.title} ({len(sh.worksheets())} tabs)")
-    for i, ws in enumerate(sh.worksheets()):
-        tab_name = ws.title
-        is_extra = tab_name in extra_tabs
-        if tab_name not in MLB_TEAMS and not is_extra:
-            print(f"    Skipping {tab_name} (not a team sheet)")
-            continue
-        print(f"    Reading {ws.title}...")
-        if i > 0:
-            time_module.sleep(0.5)
-        rows = read_sheet_with_retry(ws)
-        if not rows:
-            continue
-        header = rows[0]
-        col_idx = {name: idx for idx, name in enumerate(header) if name}
-
-        for row in rows[1:]:
-            pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
-            if not pitcher:
-                continue
-
-            pitch = {}
-            for col_name, idx in col_idx.items():
-                val = row[idx] if idx < len(row) else None
-                # Convert empty strings to None
-                if val == '':
-                    val = None
-                pitch[col_name] = val
-
-            pitch['_source'] = tab_name if is_extra else 'MLB'
-            pitches.append(pitch)
-    return pitches
-
-
-# ---- Boxscore Data ----
-
-BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'boxscore_cache.json')
-MILB_BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'milb_boxscore_cache.json')
-
-# MiLB team configuration for boxscore fetching
-# Maps leaderboard team abbreviation -> config for MLB Stats API schedule lookup
-MILB_TEAMS_CONFIG = {
-    'ROC': {
-        'sport_id': 11,        # AAA = sportId 11
-        'search_name': 'Rochester',  # Match in schedule API team names
-        'api_name': 'Rochester Red Wings',  # Full name in API
-    },
-}
-
-# Maps MLB Stats API MiLB team full name -> leaderboard abbreviation
-MILB_TEAM_NAME_TO_ABBREV = {
-    'Rochester Red Wings': 'ROC',
-}
-
-# Full team name to abbreviation (for matching boxscore team names)
-TEAM_NAME_TO_ABBREV = {
-    'Arizona Diamondbacks': 'ARI', 'Athletics': 'ATH', 'Atlanta Braves': 'ATL',
-    'Baltimore Orioles': 'BAL', 'Boston Red Sox': 'BOS', 'Chicago Cubs': 'CHC',
-    'Chicago White Sox': 'CWS', 'Cincinnati Reds': 'CIN', 'Cleveland Guardians': 'CLE',
-    'Colorado Rockies': 'COL', 'Detroit Tigers': 'DET', 'Houston Astros': 'HOU',
-    'Kansas City Royals': 'KCR', 'Los Angeles Angels': 'LAA', 'Los Angeles Dodgers': 'LAD',
-    'Miami Marlins': 'MIA', 'Milwaukee Brewers': 'MIL', 'Minnesota Twins': 'MIN',
-    'New York Mets': 'NYM', 'New York Yankees': 'NYY', 'Philadelphia Phillies': 'PHI',
-    'Pittsburgh Pirates': 'PIT', 'San Diego Padres': 'SDP', 'San Francisco Giants': 'SFG',
-    'Seattle Mariners': 'SEA', 'St. Louis Cardinals': 'STL', 'Tampa Bay Rays': 'TBR',
-    'Texas Rangers': 'TEX', 'Toronto Blue Jays': 'TOR', 'Washington Nationals': 'WSH',
-}
-
-
-def _fullname_to_lastfirst(full_name):
-    """Convert 'First Last' to 'Last, First'. Simple split — handles most cases."""
-    parts = full_name.strip().split()
-    if len(parts) <= 1:
-        return full_name
-    # Handle suffixes
-    suffixes = {'jr.', 'jr', 'sr.', 'sr', 'ii', 'iii', 'iv', 'v'}
-    suffix = ''
-    if len(parts) > 2 and parts[-1].lower().rstrip('.') in suffixes:
-        suffix = ' ' + parts.pop()
-    return parts[-1] + suffix + ', ' + ' '.join(parts[:-1])
-
-
-def load_boxscore_cache():
-    if os.path.exists(BOXSCORE_CACHE_PATH):
-        with open(BOXSCORE_CACHE_PATH) as f:
-            return json.load(f)
-    return {}
-
-
-def save_boxscore_cache(cache):
-    with open(BOXSCORE_CACHE_PATH, 'w') as f:
-        json.dump(cache, f)
-
-
-def load_milb_boxscore_cache():
-    if os.path.exists(MILB_BOXSCORE_CACHE_PATH):
-        with open(MILB_BOXSCORE_CACHE_PATH) as f:
-            return json.load(f)
-    return {}
-
-
-def save_milb_boxscore_cache(cache):
-    with open(MILB_BOXSCORE_CACHE_PATH, 'w') as f:
-        json.dump(cache, f)
-
-
-def fetch_milb_game_pks_for_date(date_str, sport_id=11, team_filter=None):
-    """Fetch MiLB game PKs for a given date, optionally filtered by team name substring."""
-    url = f"https://statsapi.mlb.com/api/v1/schedule?date={date_str}&sportId={sport_id}&gameType=R"
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-        game_pks = []
-        for date_data in data.get('dates', []):
-            for game in date_data.get('games', []):
-                if game.get('status', {}).get('abstractGameState') != 'Final':
-                    continue
-                if team_filter:
-                    away_name = game.get('teams', {}).get('away', {}).get('team', {}).get('name', '')
-                    home_name = game.get('teams', {}).get('home', {}).get('team', {}).get('name', '')
-                    if team_filter not in away_name and team_filter not in home_name:
-                        continue
-                game_pks.append(game['gamePk'])
-        return game_pks
-    except Exception as e:
-        print(f"    Error fetching MiLB schedule for {date_str}: {e}")
-        return []
-
-
-def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
-    """Fetch MiLB boxscores for a specific AAA team. Returns aggregated pitcher and hitter stats."""
-    config = MILB_TEAMS_CONFIG.get(team_abbrev)
-    if not config:
-        return {}, {}, {}, {}
-
-    cache = load_milb_boxscore_cache()
-    new_fetches = 0
-    cache_key_prefix = team_abbrev + '|'
-
-    import datetime as _dt
-    today = _dt.date.today().isoformat()
-    yesterday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
-    recent_dates = {today, yesterday}
-
-    dates_to_fetch = []
-    for d in sorted(game_dates):
-        ck = cache_key_prefix + d
-        if ck not in cache or d in recent_dates:
-            dates_to_fetch.append(d)
-
-    if dates_to_fetch:
-        print(f"  Fetching MiLB boxscores for {team_abbrev}: {len(dates_to_fetch)} date(s): {dates_to_fetch}")
-        for d in dates_to_fetch:
-            ck = cache_key_prefix + d
-            game_pks = fetch_milb_game_pks_for_date(d, sport_id=config['sport_id'],
-                                                      team_filter=config['search_name'])
-            cache[ck] = []
-            for gpk in game_pks:
-                box = fetch_boxscore(gpk)
-                if box:
-                    cache[ck].append(box)
-                    new_fetches += 1
-                time_module.sleep(0.1)
-            time_module.sleep(0.5)
-        save_milb_boxscore_cache(cache)
-        print(f"  Fetched {new_fetches} MiLB boxscores for {team_abbrev}")
-    else:
-        print(f"  All {len(game_dates)} MiLB game dates for {team_abbrev} already cached")
-
-    # Aggregate — only include players from the target team
-    pitcher_agg = {}
-    hitter_agg = {}
-    pitcher_id_map = {}
-    hitter_id_map = {}
-
-    # Build set of accepted team names for this MiLB team
-    accepted_names = set()
-    for full_name, abbrev in MILB_TEAM_NAME_TO_ABBREV.items():
-        if abbrev == team_abbrev:
-            accepted_names.add(full_name)
-
-    for d in game_dates:
-        ck = cache_key_prefix + d
-        if ck not in cache:
-            continue
-        for box in cache[ck]:
-            for p in box.get('pitchers', []):
-                # Remap MiLB API team name to our abbreviation
-                p_team = MILB_TEAM_NAME_TO_ABBREV.get(p['team'], p['team'])
-                if p_team != team_abbrev:
-                    continue
-                key = p['name'] + '|' + team_abbrev
-                if key not in pitcher_agg:
-                    pitcher_agg[key] = {
-                        'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0,
-                        'er': 0, 'r': 0, 'h': 0, 'hr': 0, 'so': 0, 'bb': 0, 'hbp': 0, 'ibb': 0,
-                        'tbf': 0, 'pitchesThrown': 0, 'balls': 0, 'strikes': 0,
-                        'doubles': 0, 'triples': 0,
-                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0, 'airOuts': 0,
-                        'wp': 0, 'bk': 0, 'ir': 0, 'irs': 0,
-                    }
-                a = pitcher_agg[key]
-                for k in a:
-                    a[k] += p.get(k, 0)
-                if p.get('mlbId'):
-                    pitcher_id_map[p['mlbId']] = key
-
-            for h in box.get('hitters', []):
-                h_team = MILB_TEAM_NAME_TO_ABBREV.get(h['team'], h['team'])
-                if h_team != team_abbrev:
-                    continue
-                key = h['name'] + '|' + team_abbrev
-                if key not in hitter_agg:
-                    hitter_agg[key] = {
-                        'g': 0, 'pa': 0, 'ab': 0, 'h': 0, 'r': 0,
-                        'doubles': 0, 'triples': 0, 'hr': 0, 'rbi': 0,
-                        'tb': 0, 'sb': 0, 'cs': 0,
-                        'bb': 0, 'ibb': 0, 'hbp': 0, 'so': 0,
-                        'sacBunts': 0, 'sacFlies': 0,
-                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0,
-                    }
-                a = hitter_agg[key]
-                for k in a:
-                    a[k] += h.get(k, 0)
-                if h.get('mlbId'):
-                    hitter_id_map[h['mlbId']] = key
-
-    return pitcher_agg, hitter_agg, pitcher_id_map, hitter_id_map
-
-
-def fetch_game_pks_for_date(date_str):
-    """Fetch all MLB game PKs for a given date from the schedule API."""
-    url = f"https://statsapi.mlb.com/api/v1/schedule?date={date_str}&sportId=1&gameType=R,F,D,L,W"
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-        game_pks = []
-        for date_data in data.get('dates', []):
-            for game in date_data.get('games', []):
-                if game.get('status', {}).get('abstractGameState') == 'Final':
-                    game_pks.append(game['gamePk'])
-        return game_pks
-    except Exception as e:
-        print(f"    Error fetching schedule for {date_str}: {e}")
-        return []
-
-
-def fetch_boxscore(game_pk):
-    """Fetch boxscore data for a single game. Returns dict with pitcher and hitter stats."""
-    url = f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            box = json.loads(resp.read())
-    except Exception as e:
-        print(f"    Error fetching boxscore for game {game_pk}: {e}")
-        return None
-
-    result = {'gamePk': game_pk, 'pitchers': [], 'hitters': []}
-
-    for side in ['away', 'home']:
-        team_data = box.get('teams', {}).get(side, {})
-        team_name = team_data.get('team', {}).get('name', '')
-        team_abbrev = TEAM_NAME_TO_ABBREV.get(team_name, team_name)
-        pitcher_ids = team_data.get('pitchers', [])
-        batter_ids = team_data.get('batters', [])
-        players = team_data.get('players', {})
-
-        # Pitchers
-        for idx, pid in enumerate(pitcher_ids):
-            p = players.get(f'ID{pid}', {})
-            full_name = p.get('person', {}).get('fullName', '')
-            stats = p.get('stats', {}).get('pitching', {})
-            if not stats:
-                continue
-            # Get "Last, First" name — try lastFirstName, fall back to lookup
-            last_first = p.get('person', {}).get('lastFirstName', '')
-            if not last_first and full_name:
-                last_first = _fullname_to_lastfirst(full_name)
-            result['pitchers'].append({
-                'name': last_first,
-                'mlbId': pid,
-                'team': team_abbrev,
-                'g': 1,
-                'gs': 1 if idx == 0 else 0,
-                'outs': stats.get('outs', 0),
-                'w': stats.get('wins', 0),
-                'l': stats.get('losses', 0),
-                'sv': stats.get('saves', 0),
-                'hld': stats.get('holds', 0),
-                'er': stats.get('earnedRuns', 0),
-                'r': stats.get('runs', 0),
-                'h': stats.get('hits', 0),
-                'hr': stats.get('homeRuns', 0),
-                'so': stats.get('strikeOuts', 0),
-                'bb': stats.get('baseOnBalls', 0),
-                'hbp': stats.get('hitByPitch', 0),
-                'ibb': stats.get('intentionalWalks', 0),
-                'tbf': stats.get('battersFaced', 0),
-                'pitchesThrown': stats.get('pitchesThrown', 0),
-                'balls': stats.get('balls', 0),
-                'strikes': stats.get('strikes', 0),
-                'doubles': stats.get('doubles', 0),
-                'triples': stats.get('triples', 0),
-                'groundOuts': stats.get('groundOuts', 0),
-                'flyOuts': stats.get('flyOuts', 0),
-                'popOuts': stats.get('popOuts', 0),
-                'lineOuts': stats.get('lineOuts', 0),
-                'airOuts': stats.get('airOuts', 0),
-                'wp': stats.get('wildPitches', 0),
-                'bk': stats.get('balks', 0),
-                'ir': stats.get('inheritedRunners', 0),
-                'irs': stats.get('inheritedRunnersScored', 0),
-            })
-
-        # Hitters
-        for pid in batter_ids:
-            p = players.get(f'ID{pid}', {})
-            batting = p.get('stats', {}).get('batting', {})
-            if not batting or batting.get('plateAppearances', 0) == 0:
-                continue
-            full_name = p.get('person', {}).get('fullName', '')
-            last_first = p.get('person', {}).get('lastFirstName', '')
-            if not last_first and full_name:
-                last_first = _fullname_to_lastfirst(full_name)
-            result['hitters'].append({
-                'name': last_first,
-                'mlbId': pid,
-                'team': team_abbrev,
-                'g': 1,
-                'pa': batting.get('plateAppearances', 0),
-                'ab': batting.get('atBats', 0),
-                'h': batting.get('hits', 0),
-                'r': batting.get('runs', 0),
-                'doubles': batting.get('doubles', 0),
-                'triples': batting.get('triples', 0),
-                'hr': batting.get('homeRuns', 0),
-                'rbi': batting.get('rbi', 0),
-                'tb': batting.get('totalBases', 0),
-                'sb': batting.get('stolenBases', 0),
-                'cs': batting.get('caughtStealing', 0),
-                'bb': batting.get('baseOnBalls', 0),
-                'ibb': batting.get('intentionalWalks', 0),
-                'hbp': batting.get('hitByPitch', 0),
-                'so': batting.get('strikeOuts', 0),
-                'sacBunts': batting.get('sacBunts', 0),
-                'sacFlies': batting.get('sacFlies', 0),
-                'groundOuts': batting.get('groundOuts', 0),
-                'flyOuts': batting.get('flyOuts', 0),
-                'popOuts': batting.get('popOuts', 0),
-                'lineOuts': batting.get('lineOuts', 0),
-            })
-
-    return result
-
-
-def fetch_and_aggregate_boxscores(game_dates):
-    """Fetch boxscores for all game dates, using cache. Returns aggregated pitcher and hitter stats."""
-    cache = load_boxscore_cache()
-    new_fetches = 0
-
-    # Find dates we need to fetch
-    # Always re-fetch dates from the last 2 days (games may have finished since last run)
-    import datetime as _dt
-    today = _dt.date.today().isoformat()
-    yesterday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
-    recent_dates = {today, yesterday}
-
-    dates_to_fetch = []
-    for d in sorted(game_dates):
-        if d not in cache or d in recent_dates:
-            dates_to_fetch.append(d)
-
-    if dates_to_fetch:
-        print(f"  Fetching boxscores for {len(dates_to_fetch)} new date(s): {dates_to_fetch}")
-        for d in dates_to_fetch:
-            game_pks = fetch_game_pks_for_date(d)
-            cache[d] = []
-            for gpk in game_pks:
-                box = fetch_boxscore(gpk)
-                if box:
-                    cache[d].append(box)
-                    new_fetches += 1
-                time_module.sleep(0.1)  # Rate limit
-            time_module.sleep(0.5)
-        save_boxscore_cache(cache)
-        print(f"  Fetched {new_fetches} boxscores, cache now has {len(cache)} dates")
-    else:
-        print(f"  All {len(game_dates)} game dates already cached")
-
-    # Aggregate across all dates that are in our game_dates set
-    pitcher_agg = {}  # key: "name|team" -> accumulated stats
-    hitter_agg = {}
-    # MLB ID → name|team key (for fallback matching on compound last names)
-    pitcher_id_map = {}  # mlbId -> "name|team"
-    hitter_id_map = {}
-    seen_game_pks = set()  # Deduplicate games that appear under multiple dates
-
-    for d in game_dates:
-        if d not in cache:
-            continue
-        for box in cache[d]:
-            gpk = box.get('gamePk')
-            if gpk and gpk in seen_game_pks:
-                continue
-            if gpk:
-                seen_game_pks.add(gpk)
-            for p in box.get('pitchers', []):
-                key = p['name'] + '|' + p['team']
-                if key not in pitcher_agg:
-                    pitcher_agg[key] = {
-                        'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0,
-                        'er': 0, 'r': 0, 'h': 0, 'hr': 0, 'so': 0, 'bb': 0, 'hbp': 0, 'ibb': 0,
-                        'tbf': 0, 'pitchesThrown': 0, 'balls': 0, 'strikes': 0,
-                        'doubles': 0, 'triples': 0,
-                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0, 'airOuts': 0,
-                        'wp': 0, 'bk': 0, 'ir': 0, 'irs': 0,
-                    }
-                a = pitcher_agg[key]
-                for k in a:
-                    a[k] += p.get(k, 0)
-                if p.get('mlbId'):
-                    pitcher_id_map[p['mlbId']] = key
-
-            for h in box.get('hitters', []):
-                key = h['name'] + '|' + h['team']
-                if key not in hitter_agg:
-                    hitter_agg[key] = {
-                        'g': 0, 'pa': 0, 'ab': 0, 'h': 0, 'r': 0,
-                        'doubles': 0, 'triples': 0, 'hr': 0, 'rbi': 0,
-                        'tb': 0, 'sb': 0, 'cs': 0,
-                        'bb': 0, 'ibb': 0, 'hbp': 0, 'so': 0,
-                        'sacBunts': 0, 'sacFlies': 0,
-                        'groundOuts': 0, 'flyOuts': 0, 'popOuts': 0, 'lineOuts': 0,
-                    }
-                a = hitter_agg[key]
-                for k in a:
-                    a[k] += h.get(k, 0)
-                if h.get('mlbId'):
-                    hitter_id_map[h['mlbId']] = key
-
-    return pitcher_agg, hitter_agg, pitcher_id_map, hitter_id_map
-
-
-def outs_to_ip_str(outs):
-    """Convert total outs to IP string notation (e.g., 19 outs -> '6.1')."""
-    full = outs // 3
-    remainder = outs % 3
-    return f"{full}.{remainder}"
-
-
-def outs_to_ip_float(outs):
-    """Convert outs to float for calculations like ERA (19 outs -> 6.333...)."""
-    return outs / 3.0
 
 
 def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
@@ -3561,7 +2084,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 box_hr = box.get('hr', 0)
                 box_2b = box.get('doubles', 0)
                 box_3b = box.get('triples', 0)
-                box_1b = box_h - box_2b - box_3b - box_hr
+                box_1b = max(0, box_h - box_2b - box_3b - box_hr)
                 box_tb = box['tb']
                 box_so = box.get('so', 0)
 
@@ -3765,16 +2288,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_ip, 2)
 
     # HR/9 league average — weighted by IP (MLB only)
-    hr9_pairs = [(r['hr9'], float(r.get('ip', 0))) for r in pitcher_leaderboard
-                 if r.get('hr9') is not None and r.get('ip') is not None and float(r['ip']) > 0 and not r.get('_isROC')]
+    hr9_pairs = [(r['hr9'], ip_str_to_float(r.get('ip'))) for r in pitcher_leaderboard
+                 if r.get('hr9') is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0 and not r.get('_isROC')]
     if hr9_pairs:
         total_w = sum(w for _, w in hr9_pairs)
         metadata['pitcherLeagueAverages']['hr9'] = round(sum(v * w for v, w in hr9_pairs) / total_w, 2) if total_w > 0 else None
 
     # FIP, xFIP, SIERA league averages — weighted by IP (MLB only)
     for stat in ['fip', 'xFIP', 'siera']:
-        pairs = [(r[stat], float(r.get('ip', 0))) for r in pitcher_leaderboard
-                 if r.get(stat) is not None and r.get('ip') is not None and float(r['ip']) > 0 and not r.get('_isROC')]
+        pairs = [(r[stat], ip_str_to_float(r.get('ip'))) for r in pitcher_leaderboard
+                 if r.get(stat) is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0 and not r.get('_isROC')]
         if pairs:
             total_w = sum(w for _, w in pairs)
             metadata['pitcherLeagueAverages'][stat] = round(sum(v * w for v, w in pairs) / total_w, 2) if total_w > 0 else None
@@ -3892,7 +2415,35 @@ def write_json_outputs(result, suffix):
     """Write JSON output files with the given suffix."""
     def strip_internal_keys(rows):
         return [{k: v for k, v in row.items() if not k.startswith('_')} for row in rows]
-    with open(os.path.join(DATA_DIR, f'pitch_leaderboard{suffix}.json'), 'w') as f:
+
+    # Preserve Stuff+ scores from existing pitch leaderboard (injected by train_stuff_v10.py)
+    pitch_json_path = os.path.join(DATA_DIR, f'pitch_leaderboard{suffix}.json')
+    if os.path.exists(pitch_json_path):
+        try:
+            with open(pitch_json_path) as f:
+                existing = json.load(f)
+            stuff_map = {}
+            for row in existing:
+                if row.get('stuffScore') is not None:
+                    key = (row.get('pitcher'), row.get('team'), row.get('pitchType'))
+                    stuff_map[key] = {
+                        'stuffScore': row['stuffScore'],
+                        'stuffScore_pctl': row.get('stuffScore_pctl')
+                    }
+            if stuff_map:
+                n_merged = 0
+                for row in result['pitch_leaderboard']:
+                    key = (row.get('pitcher'), row.get('team'), row.get('pitchType'))
+                    if key in stuff_map:
+                        row['stuffScore'] = stuff_map[key]['stuffScore']
+                        if stuff_map[key]['stuffScore_pctl'] is not None:
+                            row['stuffScore_pctl'] = stuff_map[key]['stuffScore_pctl']
+                        n_merged += 1
+                print(f"  Preserved Stuff+ scores: {n_merged}/{len(stuff_map)} rows merged")
+        except (json.JSONDecodeError, KeyError):
+            print("  Warning: could not read existing Stuff+ scores")
+
+    with open(pitch_json_path, 'w') as f:
         json.dump(strip_internal_keys(result['pitch_leaderboard']), f)
     with open(os.path.join(DATA_DIR, f'pitcher_leaderboard{suffix}.json'), 'w') as f:
         json.dump(strip_internal_keys(result['pitcher_leaderboard']), f)
@@ -3946,11 +2497,15 @@ def main():
     try:
         WOBA_WEIGHTS, FIP_CONSTANT, GUTS_EXTRA = fetch_guts_constants(2026)
     except Exception as e:
-        print(f"  WARNING: Could not fetch Guts data ({e}), using fallback values")
+        print(f"\n  *** WARNING: Could not fetch Guts data ({e}) ***")
+        print(f"  *** Using 2025 FALLBACK values — wOBA weights may be inaccurate! ***\n")
         WOBA_WEIGHTS = WOBA_WEIGHTS_FALLBACK.copy()
         FIP_CONSTANT = FIP_CONSTANT_FALLBACK
-        # Fallback league-level constants (2024 season estimates)
+        # Fallback league-level constants (2025 season estimates)
         GUTS_EXTRA = {'wOBAScale': 1.25, 'lgWOBA': 0.317, 'lgRPA': 0.119}
+
+    # Propagate wOBA weights to pipeline_compute module
+    pipeline_compute.WOBA_WEIGHTS = WOBA_WEIGHTS
 
     # Fetch park factors
     print("Fetching FanGraphs park factors...")
@@ -3963,7 +2518,12 @@ def main():
     # Connect to Google Sheets
     print("Connecting to Google Sheets...")
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+    sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+    if sa_json:
+        import io as _io
+        creds = Credentials.from_service_account_info(json.loads(sa_json), scopes=scopes)
+    else:
+        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
 
     # Read Regular Season data
@@ -3994,6 +2554,25 @@ def main():
     print(f"  RS: {len(rs_result['pitcher_leaderboard'])} pitchers, "
           f"{len(rs_result['pitch_leaderboard'])} pitch rows, "
           f"{len(rs_result['hitter_leaderboard'])} hitters")
+
+    # Final integrity checks
+    warnings = []
+    for r in rs_result['pitcher_leaderboard']:
+        if r.get('era') is not None and r['era'] < 0:
+            warnings.append(f"Negative ERA: {r.get('pitcher')} = {r['era']}")
+    for r in rs_result['hitter_leaderboard']:
+        w = r.get('wOBA')
+        if w is not None and (w < 0 or w > 1.0):
+            warnings.append(f"wOBA out of bounds: {r.get('hitter')} = {w}")
+        a = r.get('avg')
+        if a is not None and (a < 0 or a > 1.0):
+            warnings.append(f"AVG out of bounds: {r.get('hitter')} = {a}")
+    if warnings:
+        print(f"\n*** DATA INTEGRITY WARNINGS ({len(warnings)}) ***")
+        for w in warnings[:20]:
+            print(f"  - {w}")
+    else:
+        print("  Data integrity checks passed.")
 
 
 if __name__ == '__main__':
