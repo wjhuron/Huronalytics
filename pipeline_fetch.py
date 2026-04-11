@@ -174,9 +174,13 @@ def fetch_park_factors(year=2026):
         rows = q.get('state', {}).get('data', [])
         if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'Team' in rows[0]:
             for row in rows:
-                abbr = FG_TEAM_MAP.get(row['Team'])
-                if abbr:
-                    park_factors[abbr] = round(row['Basic (5yr)'] / 100, 4)
+                team_name = row.get('Team')
+                if not team_name:
+                    continue
+                abbr = FG_TEAM_MAP.get(team_name)
+                basic = row.get('Basic (5yr)')
+                if abbr and basic is not None:
+                    park_factors[abbr] = round(basic / 100, 4)
     print(f"  Park factors: {len(park_factors)} teams fetched")
     return park_factors
 
