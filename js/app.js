@@ -364,7 +364,7 @@
       if (urlState.page) Leaderboard.currentPage = urlState.page;
       if (urlState.pitchTypes && urlState.pitchTypes.length) {
         selectedPitchTypes = urlState.pitchTypes;
-        updatePitchChipSelection();
+        updateHitterPitchChipVisuals();
       }
     }
 
