@@ -977,7 +977,7 @@ var PlayerPage = {
     var sectionLabel = document.createElement('div');
     sectionLabel.className = 'pctl-section-label';
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
-    sectionLabel.textContent = 'Pitch Run Value / 100';
+    sectionLabel.textContent = 'xPitch Run Value / 100';
     container.appendChild(sectionLabel);
 
     // Compute total pitches for overall RV qualifying
@@ -1061,9 +1061,9 @@ var PlayerPage = {
       return row;
     }
 
-    // Overall row (RV/100 — positive = good for pitcher)
-    var overallRV100 = data.rv100;
-    container.appendChild(buildPctlRow('Overall', overallRV100, data.rv100_pctl, null));
+    // Overall row (xRV/100 — positive = good for pitcher)
+    var overallRV100 = data.xRv100;
+    container.appendChild(buildPctlRow('Overall', overallRV100, data.xRv100_pctl, null));
 
     // Per-pitch-type rows (fixed order)
     var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN'];
@@ -1076,8 +1076,8 @@ var PlayerPage = {
     });
     for (var i = 0; i < sortedPitchRows.length; i++) {
       var pitch = sortedPitchRows[i];
-      var displayVal = pitch.rv100;
-      var pctl = pitch.rv100_pctl;
+      var displayVal = pitch.xRv100;
+      var pctl = pitch.xRv100_pctl;
 
       var badge = document.createElement('span');
       badge.className = 'pitch-badge-sm';
