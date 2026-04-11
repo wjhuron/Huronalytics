@@ -2939,7 +2939,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         velo = safe_float(p.get('Velocity'))
         spin = safe_float(p.get('Spin Rate'))
         tilt = p.get('OTilt') or p.get('Break Tilt')
-        rtilt = p.get('RTilt')
         rel_x = safe_float(p.get('RelPosX'))
         rel_z = safe_float(p.get('RelPosZ'))
         if pitcher and pt and ivb is not None and hb is not None:
@@ -2954,8 +2953,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 detail['sp'] = int(round(spin))
             if tilt and str(tilt).strip():
                 detail['tl'] = str(tilt).strip()
-            if rtilt and str(rtilt).strip():
-                detail['rtl'] = str(rtilt).strip()
             # Description (pitch outcome) — short codes for space efficiency
             desc_raw = p.get('Description', '')
             DESC_MAP = {

@@ -742,7 +742,7 @@ const Aggregator = {
     const PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
     const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
-    const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['spinEff', 'nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
     // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     const groups = {};
@@ -774,9 +774,6 @@ const Aggregator = {
         groups[gk].metricSums.sumTiltSin = 0;
         groups[gk].metricSums.sumTiltCos = 0;
         groups[gk].metricSums.nTilt = 0;
-        groups[gk].metricSums.sumRTiltSin = 0;
-        groups[gk].metricSums.sumRTiltCos = 0;
-        groups[gk].metricSums.nRTilt = 0;
       }
 
       const g = groups[gk];
@@ -790,11 +787,6 @@ const Aggregator = {
       g.metricSums.sumTiltSin += row[ci.sumTiltSin];
       g.metricSums.sumTiltCos += row[ci.sumTiltCos];
       g.metricSums.nTilt += row[ci.nTilt];
-      if (ci.sumRTiltSin !== undefined) {
-        g.metricSums.sumRTiltSin += row[ci.sumRTiltSin];
-        g.metricSums.sumRTiltCos += row[ci.sumRTiltCos];
-        g.metricSums.nRTilt += row[ci.nRTilt];
-      }
     }
 
     // Convert to row objects
@@ -910,32 +902,6 @@ const Aggregator = {
         obj.hbOE = null;
       }
 
-      // Spin efficiency (Nathan's formula with RTilt SSW correction)
-      // Projects movement onto spin-predicted direction to isolate Magnus component
-      if (obj.indVertBrk !== null && obj.horzBrk !== null && obj.spinRate !== null && obj.velocity !== null && obj.spinRate > 100 && obj.velocity > 50) {
-        let movFt = Math.sqrt(obj.indVertBrk * obj.indVertBrk + obj.horzBrk * obj.horzBrk) / 12.0;
-        // RTilt correction: if we have both OTilt and RTilt, project onto spin-predicted direction
-        if (ms.nTilt > 0 && ms.nRTilt > 0) {
-          const oTiltAngle = Math.atan2(ms.sumTiltSin / ms.nTilt, ms.sumTiltCos / ms.nTilt);
-          const rTiltAngle = Math.atan2(ms.sumRTiltSin / ms.nRTilt, ms.sumRTiltCos / ms.nRTilt);
-          const axisDev = oTiltAngle - rTiltAngle;
-          const cosDev = Math.cos(axisDev);
-          if (cosDev > 0) {
-            movFt = movFt * cosDev;
-          } else {
-            movFt = 0;  // movement opposes spin prediction
-          }
-        }
-        const veloFps = obj.velocity * 5280 / 3600;
-        const R = (obj.spinRate / 60.0) * (55.0 / veloFps);
-        const maxM = 0.96 * 2.58;
-        if (movFt > 0 && movFt < maxM * 0.999 && R > 0) {
-          const ratio = movFt / maxM;
-          const eps = -Math.log(1 - ratio) / (0.0857 * R);
-          obj.spinEff = Number((Math.min(eps, 1.0) * 100).toFixed(1));
-        } else { obj.spinEff = null; }
-      } else { obj.spinEff = null; }
-
       // Break Tilt (circular mean)
       if (ms.nTilt > 0) {
         const sinAvg = ms.sumTiltSin / ms.nTilt;
@@ -1020,9 +986,6 @@ const Aggregator = {
         }
         // Max velo
         if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
-        // Spin efficiency (pre-computed with RTilt SSW correction in Python)
-        if (ppre.spinEff !== undefined) rows[pmi].spinEff = ppre.spinEff;
-        if (ppre.spinEff_pctl !== undefined) rows[pmi].spinEff_pctl = ppre.spinEff_pctl;
         // Stuff+ (pre-computed, always merge from JSON — not recomputable in browser)
         if (ppre.stuffScore !== undefined) rows[pmi].stuffScore = ppre.stuffScore;
         if (ppre.stuffScore_pctl !== undefined) rows[pmi].stuffScore_pctl = ppre.stuffScore_pctl;
@@ -1039,7 +1002,7 @@ const Aggregator = {
     const MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches for outcome metrics
     const ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true, hbOE: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
-    const SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, spinEff: true, stuffScore: true };
+    const SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, stuffScore: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
       const minPctl = SHAPE_METRICS[key] ? 0 : MIN_PITCH_TYPE_PCTL;
       for (let pt in ptGroups) {
