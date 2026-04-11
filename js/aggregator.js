@@ -1359,13 +1359,14 @@ const Aggregator = {
     const hasHitterContextFilter = (vsHand !== 'all') ||
                                     (filters.dateStart || filters.dateEnd);
     // Stats that only boxscore/external data can provide (always merge)
+    // wOBA/wRC/wRCplus/xWRCplus need FanGraphs weights + park factors, not computable from micro
     const hBoxAlways = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
                         'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
-                        'sprintSpeed', 'nCompRuns', 'sprintQual'];
+                        'sprintSpeed', 'nCompRuns', 'sprintQual',
+                        'wOBA', 'wRC', 'wRCplus', 'xWRCplus'];
     // Rate stats that micro data computes (skip when filtered)
     const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
-                           'doubles', 'triples', 'hr', 'xbh',
-                           'wOBA', 'wRC', 'wRCplus', 'xWRCplus'];
+                           'doubles', 'triples', 'hr', 'xbh'];
     const hBoxFields = hasHitterContextFilter ? hBoxAlways : hBoxAlways.concat(hBoxRateStats);
     const hPreAgg = window.HITTER_DATA || [];
     const hPreAggMap = {};
