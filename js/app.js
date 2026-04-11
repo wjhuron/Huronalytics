@@ -795,16 +795,27 @@
     allData = data;
 
     // Compute league-wide data (all teams) for league avg row
+    // Keep contextual filters (vsHand, throws, role) but strip display thresholds
     const leagueFilters = {};
     for (const fk in filters) leagueFilters[fk] = filters[fk];
     leagueFilters.team = 'all';
+    leagueFilters.minCount = 1;
+    leagueFilters.minIp = 0;
+    leagueFilters.minTbf = 0;
+    leagueFilters.minPitcherSwings = 0;
+    leagueFilters.minBip = 0;
+    delete leagueFilters.dateStart;
+    delete leagueFilters.dateEnd;
+    delete leagueFilters.search;
     let leagueData = DataStore.getFilteredDataV2(dataTab, leagueFilters);
-    leagueData = applyRangeFilters(leagueData, columns);
 
     Leaderboard.render(data, columns, {
       teamFilter: filters.team,
       leagueData: leagueData,
-      pitchTypes: filters.pitchTypes
+      pitchTypes: filters.pitchTypes,
+      vsHand: filters.vsHand,
+      throws: filters.throws,
+      role: filters.role,
     });
     saveURLState();
   }

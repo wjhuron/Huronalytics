@@ -317,24 +317,28 @@ const Leaderboard = {
 
   computeLeagueAvgRow: function (data, columns, opts) {
     const avg = {};
-    // Use pre-computed weighted league averages from metadata when available
     const meta = DataStore.metadata || {};
-    const isPitcher = data.length > 0 && data[0].pitcher;
-    const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
-    const pitchTypeAvgs = meta.leagueAverages || {};
 
-    // Determine which precomputed averages to use based on pitch type filter
-    const pitchTypes = (opts && opts.pitchTypes) || 'all';
-    let precomputed;
-    if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
-      // Single pitch type selected — use per-pitch-type averages
-      precomputed = pitchTypeAvgs[pitchTypes[0]];
-    } else if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length > 1) {
-      // Multiple pitch types — fall back to computing from filtered data
-      precomputed = {};
-    } else {
-      // All pitches — use overall averages
-      precomputed = overallAvgs;
+    // When contextual filters (hand, role) are active, skip precomputed static
+    // averages and compute dynamically from the filtered league data
+    const hasContextualFilter = (opts.vsHand && opts.vsHand !== 'all') ||
+                                 (opts.throws && opts.throws !== 'all') ||
+                                 (opts.role && opts.role !== 'all');
+
+    let precomputed = {};
+    if (!hasContextualFilter) {
+      // No contextual filter — use precomputed weighted league averages
+      const isPitcher = data.length > 0 && data[0].pitcher;
+      const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
+      const pitchTypeAvgs = meta.leagueAverages || {};
+      const pitchTypes = (opts && opts.pitchTypes) || 'all';
+      if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
+        precomputed = pitchTypeAvgs[pitchTypes[0]];
+      } else if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length > 1) {
+        precomputed = {};
+      } else {
+        precomputed = overallAvgs;
+      }
     }
 
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
@@ -345,23 +349,51 @@ const Leaderboard = {
         numericKeys.push(columns[i].key);
       }
     }
+
+    // IP parser for ERA/FIP-style stats (ip stored as string like "6.1")
+    function _parseIP(ipStr) {
+      if (ipStr == null) return 0;
+      var parts = String(ipStr).split('.');
+      return parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
+    }
+
+    // Weight mapping — matches process_data.py precomputed average methodology
+    var IP_WEIGHTED = { era:1, fip:1, xFIP:1, siera:1, hr9:1 };
+    var BIP_WEIGHTED = { avgEVAgainst:1, maxEVAgainst:1, hardHitPct:1, barrelPctAgainst:1,
+                          gbPct:1, ldPct:1, fbPct:1, puPct:1, hrFbPct:1, xwOBAsp:1,
+                          avgEV:1, maxEV:1, barrelPct:1, pullPct:1, airPullPct:1 };
+    var PA_WEIGHTED = { wOBA:1, xBA:1, xSLG:1, xwOBA:1, xwOBAcon:1,
+                         kPct:1, bbPct:1, kbbPct:1, babip:1,
+                         avg:1, obp:1, slg:1, ops:1, iso:1 };
+
     numericKeys.forEach(function (key) {
       // Use precomputed weighted average if available
       if (precomputed[key] !== undefined && precomputed[key] !== null) {
         avg[key] = precomputed[key];
         return;
       }
-      // Fallback: simple average (for stats not in metadata)
-      let sum = 0, count = 0;
-      const useAbs = ABS_AVG_KEYS[key] || false;
-      for (let j = 0; j < data.length; j++) {
-        const v = data[j][key];
-        if (v !== null && v !== undefined) {
-          sum += useAbs ? Math.abs(v) : v;
-          count++;
+      // Dynamic weighted average from filtered data
+      var useAbs = ABS_AVG_KEYS[key] || false;
+      var sumW = 0, totalW = 0;
+      for (var j = 0; j < data.length; j++) {
+        var v = data[j][key];
+        if (v === null || v === undefined) continue;
+        var w;
+        if (IP_WEIGHTED[key]) {
+          w = _parseIP(data[j].ip);
+        } else if (BIP_WEIGHTED[key]) {
+          w = data[j].nBip || 0;
+        } else if (PA_WEIGHTED[key]) {
+          w = data[j].pa || 0;
+        } else {
+          w = data[j].count || 0;
+        }
+        if (w > 0) {
+          sumW += (useAbs ? Math.abs(v) : v) * w;
+          totalW += w;
         }
       }
-      avg[key] = count > 0 ? sum / count : null;
+      avg[key] = totalW > 0 ? sumW / totalW : null;
     });
     avg.pitcher = 'League Avg';
     avg.hitter = 'League Avg';
