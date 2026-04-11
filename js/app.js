@@ -119,10 +119,16 @@
 
       // Initial routing
       handleRoute();
+
+      // Dismiss loading overlay
+      var overlay = document.getElementById('loading-overlay');
+      if (overlay) overlay.remove();
     }).catch(function (err) {
       console.error('Failed to load data:', err);
       document.getElementById('no-results').textContent = 'Error loading data. Please refresh.';
       document.getElementById('no-results').style.display = '';
+      var overlay = document.getElementById('loading-overlay');
+      if (overlay) overlay.remove();
     });
   }
 
@@ -182,13 +188,19 @@
           const kv = p.split('=');
           qp[kv[0]] = decodeURIComponent(kv[1] || '');
         });
-        if (qp.team) teamSelect.value = qp.team;
-        if (qp.throws) throwsSelect.value = qp.throws;
-        if (qp.vsHand) vsHandSelect.value = qp.vsHand;
-        if (qp.min) minCountInput.value = qp.min;
-        if (qp.search) searchInput.value = qp.search;
-        if (qp.dateStart) dateStartInput.value = qp.dateStart;
-        if (qp.dateEnd) dateEndInput.value = qp.dateEnd;
+        // Helper: only set select value if it's a valid option
+        function _setIfValid(sel, val) {
+          for (var oi = 0; oi < sel.options.length; oi++) {
+            if (sel.options[oi].value === val) { sel.value = val; return; }
+          }
+        }
+        if (qp.team) _setIfValid(teamSelect, qp.team);
+        if (qp.throws) _setIfValid(throwsSelect, qp.throws);
+        if (qp.vsHand) _setIfValid(vsHandSelect, qp.vsHand);
+        if (qp.min) _setIfValid(minCountInput, qp.min);
+        if (qp.search) searchInput.value = qp.search.substring(0, 50);
+        if (qp.dateStart && /^\d{4}-\d{2}-\d{2}$/.test(qp.dateStart)) dateStartInput.value = qp.dateStart;
+        if (qp.dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(qp.dateEnd)) dateEndInput.value = qp.dateEnd;
         // Pass sort/page/pitch via urlState so they survive navigateToTab's reset
         var urlState = {};
         if (qp.sort) urlState.sortKey = qp.sort;

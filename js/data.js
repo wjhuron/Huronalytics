@@ -98,10 +98,12 @@ const DataStore = {
     const hasPitchType = (tab === 'pitch' || tab === 'hitterPitch');
     const selectedPitchTypes = filters.pitchTypes; // array or 'all'
 
-    const rocTeams = (this.metadata && this.metadata.rocTeams) || [];
+    const rocTeamsArr = (this.metadata && this.metadata.rocTeams) || [];
+    var rocTeamSet = {};
+    for (var ri = 0; ri < rocTeamsArr.length; ri++) rocTeamSet[rocTeamsArr[ri]] = true;
     return source.filter(function (row) {
       // Hide ROC players unless user explicitly selected their team
-      if (rocTeams.indexOf(row.team) !== -1 && filters.team !== row.team) return false;
+      if (rocTeamSet[row.team] && filters.team !== row.team) return false;
       if (filters.team !== 'all' && row.team !== filters.team) return false;
 
       // Throws filter applies to pitchers; stands filter applies to hitters (same dropdown)

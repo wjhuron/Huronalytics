@@ -27,15 +27,29 @@ jobs:
       - name: Install dependencies
         run: pip install gspread google-auth
 
-      - name: Write service account credentials
-        run: echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' > service_account.json
-
       - name: Fetch data and build leaderboard
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         run: python3 process_data.py
 
-      - name: Clean up credentials
-        if: always()
-        run: rm -f service_account.json
+      - name: Validate output integrity
+        run: |
+          python3 -c "
+          import json, sys
+          for f in ['data/pitch_leaderboard_rs.json', 'data/pitcher_leaderboard_rs.json', 'data/hitter_leaderboard_rs.json']:
+              d = json.load(open(f))
+              if len(d) < 50:
+                  print(f'FAIL: {f} has only {len(d)} rows (expected 50+)')
+                  sys.exit(1)
+              print(f'OK: {f} has {len(d)} rows')
+          # Check data_embedded.js is non-trivial
+          import os
+          size = os.path.getsize('data/data_embedded.js')
+          if size < 100000:
+              print(f'FAIL: data_embedded.js is only {size} bytes (expected 100KB+)')
+              sys.exit(1)
+          print(f'OK: data_embedded.js is {size:,} bytes')
+          "
 
       - name: Commit and push if changed
         run: |

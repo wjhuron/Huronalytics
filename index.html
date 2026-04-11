@@ -7,10 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=175">
+  <link rel="stylesheet" href="css/styles.css?v=176">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 </head>
 <body>
+  <!-- Loading overlay shown while data_embedded.js loads -->
+  <div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg,#1a1d23);color:var(--text,#e0e0e0);font-family:'Barlow',sans-serif;flex-direction:column;gap:12px;">
+    <div style="font-size:1.4rem;font-weight:600;letter-spacing:1px;">HURONALYTICS</div>
+    <div style="font-size:0.9rem;opacity:0.6;">Loading leaderboard data&hellip;</div>
+  </div>
   <header>
     <div class="header-main">
       <h1>Huronalytics</h1>
@@ -488,13 +493,13 @@
     <p>Data: MLB 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=175"></script>
-  <script src="js/utils.js?v=175"></script>
-  <script src="js/aggregator.js?v=175"></script>
-  <script src="js/data.js?v=175"></script>
-  <script src="js/leaderboard.js?v=175"></script>
-  <script src="js/scatter.js?v=175"></script>
-  <script src="js/player-page.js?v=175"></script>
-  <script src="js/app.js?v=175"></script>
+  <script src="data/data_embedded.js?v=176"></script>
+  <script src="js/utils.js?v=176"></script>
+  <script src="js/aggregator.js?v=176"></script>
+  <script src="js/data.js?v=176"></script>
+  <script src="js/leaderboard.js?v=176"></script>
+  <script src="js/scatter.js?v=176"></script>
+  <script src="js/player-page.js?v=176"></script>
+  <script src="js/app.js?v=176"></script>
 </body>
 </html>
