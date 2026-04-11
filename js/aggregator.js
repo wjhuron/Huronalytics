@@ -477,8 +477,8 @@ const Aggregator = {
     return {
       avgEVAgainst: evs.length > 0 ? Math.round(evs.reduce(function(a,b){return a+b;},0) / evs.length * 10) / 10 : null,
       maxEVAgainst: evs.length > 0 ? Math.round(Math.max.apply(null, evs) * 10) / 10 : null,
-      hardHitPct: n_bip_total > 0 ? n_hard / n_bip_total : null,
-      barrelPctAgainst: n_bip_total > 0 ? n_barrel / n_bip_total : null,
+      hardHitPct: evs.length > 0 ? n_hard / evs.length : null,
+      barrelPctAgainst: evs.length > 0 ? n_barrel / evs.length : null,
       ldPct: n_bip_total > 0 ? n_ld / n_bip_total : null,
       fbPct: n_bip_total > 0 ? n_fb_bb / n_bip_total : null,
       puPct: n_bip_total > 0 ? n_pu_bb / n_bip_total : null,
@@ -602,7 +602,7 @@ const Aggregator = {
     const handSplitFields = ['twoStrikeWhiffPct', 'fpsPct',
       'strikePct', 'izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct',
       'kPct', 'bbPct', 'kbbPct', 'babip', 'gbPct',
-      'avgEV', 'maxEV', 'hardHitPct', 'barrelPct',
+      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst',
       'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'];
     const handSuffix = vsHand !== 'all' ? '_vs' + vsHand : '';
@@ -1354,14 +1354,19 @@ const Aggregator = {
     }
 
     // Merge boxscore stats from pre-aggregated HITTER_DATA
-    // Stats now computed from micro data (filter-responsive) are no longer merged here.
-    const hBoxFields = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
-                      'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
-                      'doubles', 'triples', 'hr', 'xbh',
-                      'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
-                      'wOBA',
-                      'sprintSpeed', 'nCompRuns', 'sprintQual',
-                      'wRC', 'wRCplus', 'xWRCplus'];
+    // When contextual filters (vsHand, date range) are active, skip rate stats
+    // that micro data already computed correctly for the filtered subset.
+    const hasHitterContextFilter = (vsHand !== 'all') ||
+                                    (filters.dateStart || filters.dateEnd);
+    // Stats that only boxscore/external data can provide (always merge)
+    const hBoxAlways = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
+                        'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
+                        'sprintSpeed', 'nCompRuns', 'sprintQual'];
+    // Rate stats that micro data computes (skip when filtered)
+    const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
+                           'doubles', 'triples', 'hr', 'xbh',
+                           'wOBA', 'wRC', 'wRCplus', 'xWRCplus'];
+    const hBoxFields = hasHitterContextFilter ? hBoxAlways : hBoxAlways.concat(hBoxRateStats);
     const hPreAgg = window.HITTER_DATA || [];
     const hPreAggMap = {};
     for (let hbi = 0; hbi < hPreAgg.length; hbi++) {
@@ -1375,9 +1380,11 @@ const Aggregator = {
           const hbf = hBoxFields[hfi];
           if (hPre[hbf] !== undefined) rows[hmi][hbf] = hPre[hbf];
         }
-        // Also override PA and AB with boxscore values
-        if (hPre.pa !== undefined) rows[hmi].pa = hPre.pa;
-        if (hPre.ab !== undefined) rows[hmi].ab = hPre.ab;
+        // Override PA/AB with boxscore values only when unfiltered
+        if (!hasHitterContextFilter) {
+          if (hPre.pa !== undefined) rows[hmi].pa = hPre.pa;
+          if (hPre.ab !== undefined) rows[hmi].ab = hPre.ab;
+        }
       }
     }
 

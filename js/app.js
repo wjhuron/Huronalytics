@@ -187,16 +187,17 @@
         if (qp.vsHand) vsHandSelect.value = qp.vsHand;
         if (qp.min) minCountInput.value = qp.min;
         if (qp.search) searchInput.value = qp.search;
-        if (qp.sort) Leaderboard.currentSort.key = qp.sort;
-        if (qp.dir) Leaderboard.currentSort.dir = qp.dir;
-        if (qp.page) Leaderboard.currentPage = parseInt(qp.page, 10) || 1;
         if (qp.dateStart) dateStartInput.value = qp.dateStart;
         if (qp.dateEnd) dateEndInput.value = qp.dateEnd;
-        if (qp.pitch) {
-          selectedPitchTypes = qp.pitch.split(',');
-        }
+        // Pass sort/page/pitch via urlState so they survive navigateToTab's reset
+        var urlState = {};
+        if (qp.sort) urlState.sortKey = qp.sort;
+        if (qp.dir) urlState.sortDir = qp.dir;
+        if (qp.page) urlState.page = parseInt(qp.page, 10) || 1;
+        if (qp.pitch) urlState.pitchTypes = qp.pitch.split(',');
+        if (qp.role) document.getElementById('role-filter').value = qp.role;
       }
-      navigateToTab(tab, true);  // true = don't push hash (already there)
+      navigateToTab(tab, true, urlState);  // true = don't push hash (already there)
     } else {
       // Unknown route — go home
       showHome();
@@ -235,7 +236,10 @@
     if (pctlLeg) pctlLeg.style.display = '';
   }
 
-  function navigateToTab(tab, skipHash) {
+  var _navigating = false;
+  function navigateToTab(tab, skipHash, urlState) {
+    if (_navigating) return;
+    _navigating = true;
     currentTab = tab;
     currentSection = TAB_SECTION[tab];
 
@@ -353,8 +357,20 @@
     columnRangeFilters = {};
     updateRangeFilterBadge();
 
+    // Restore URL state after reset (sort, page, pitch selections)
+    if (urlState) {
+      if (urlState.sortKey) Leaderboard.currentSort.key = urlState.sortKey;
+      if (urlState.sortDir) Leaderboard.currentSort.dir = urlState.sortDir;
+      if (urlState.page) Leaderboard.currentPage = urlState.page;
+      if (urlState.pitchTypes && urlState.pitchTypes.length) {
+        selectedPitchTypes = urlState.pitchTypes;
+        updatePitchChipSelection();
+      }
+    }
+
     refresh();
     scrollTableToTop();
+    _navigating = false;
   }
 
   function setupDOM() {
@@ -804,6 +820,7 @@
     leagueFilters.minTbf = 0;
     leagueFilters.minPitcherSwings = 0;
     leagueFilters.minBip = 0;
+    leagueFilters.minSwings = 0;
     delete leagueFilters.dateStart;
     delete leagueFilters.dateEnd;
     delete leagueFilters.search;
@@ -1564,6 +1581,8 @@
     if (dateStartInput.value) parts.push('dateStart=' + dateStartInput.value);
     if (dateEndInput.value) parts.push('dateEnd=' + dateEndInput.value);
     if (selectedPitchTypes.length > 0) parts.push('pitch=' + selectedPitchTypes.join(','));
+    var roleVal = document.getElementById('role-filter').value;
+    if (roleVal && roleVal !== 'all') parts.push('role=' + roleVal);
     const hash = route + (parts.length > 0 ? '?' + parts.join('&') : '');
     if (window.location.hash !== '#' + hash) {
       history.replaceState(null, '', '#' + hash);
