@@ -270,8 +270,7 @@ def compute_pitcher_batted_ball(pitches):
     pu = sum(1 for p in bip if p.get('BBType') == 'popup')
 
     n_hr_bb = sum(1 for p in bip if p.get('Event') == 'Home Run')
-    ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
-    fb_for_hrfb = fb + pu + ld_hr
+    fb_for_hrfb = fb + pu
     hr_fb_pct = round(n_hr_bb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     return {
@@ -381,8 +380,7 @@ def compute_hitter_stats(pitches):
     hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
 
     n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
-    ld_hr = sum(1 for p in bip if p.get('Event') == 'Home Run' and p.get('BBType') == 'line_drive')
-    fb_for_hrfb = fb + pu + ld_hr
+    fb_for_hrfb = fb + pu
     hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
@@ -510,11 +508,7 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
             if val is None:
                 row[pctl_key] = None
                 continue
-            below = bisect.bisect_left(sorted_vals, val)
-            above = bisect.bisect_right(sorted_vals, val)
-            equal = above - below
-            pctl = (below + 0.5 * equal) / n * 100
-            row[pctl_key] = max(0, min(100, round(pctl)))
+            row[pctl_key] = _pctl_from_sorted(val, n)
 
     for row in rows:
         if pctl_key not in row:
