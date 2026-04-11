@@ -273,6 +273,7 @@ const Leaderboard = {
   initHiddenColumns: function () {
     this.hiddenColumns['vaa'] = true;
     this.hiddenColumns['haa'] = true;
+    this.hiddenColumns['stuffScore'] = true;
   },
 
   getVisibleColumns: function (columns) {
