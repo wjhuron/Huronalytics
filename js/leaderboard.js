@@ -325,21 +325,25 @@ const Leaderboard = {
                                  (opts.throws && opts.throws !== 'all') ||
                                  (opts.role && opts.role !== 'all');
 
-    let precomputed = {};
-    if (!hasContextualFilter) {
-      // No contextual filter — use precomputed weighted league averages
-      const isPitcher = data.length > 0 && data[0].pitcher;
-      const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
-      const pitchTypeAvgs = meta.leagueAverages || {};
-      const pitchTypes = (opts && opts.pitchTypes) || 'all';
-      if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
-        precomputed = pitchTypeAvgs[pitchTypes[0]];
-      } else if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length > 1) {
-        precomputed = {};
-      } else {
-        precomputed = overallAvgs;
-      }
+    // Always load precomputed averages
+    const isPitcher = data.length > 0 && data[0].pitcher;
+    const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
+    const pitchTypeAvgs = meta.leagueAverages || {};
+    const pitchTypes = (opts && opts.pitchTypes) || 'all';
+    let precomputed;
+    if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
+      precomputed = pitchTypeAvgs[pitchTypes[0]];
+    } else if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length > 1) {
+      precomputed = {};
+    } else {
+      precomputed = overallAvgs;
     }
+
+    // Stats that should recalculate when contextual filters are active.
+    // Everything else (pitch metrics, plate discipline) keeps precomputed values.
+    var DYNAMIC_STATS = { runValue:1, rv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1,
+                          era:1, fip:1, xFIP:1, siera:1, hr9:1,
+                          avg:1, obp:1, slg:1, ops:1, iso:1 };
 
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
     const ABS_AVG_KEYS = { horzBrk: true, haa: true, relPosX: true };
@@ -367,8 +371,10 @@ const Leaderboard = {
                          avg:1, obp:1, slg:1, ops:1, iso:1 };
 
     numericKeys.forEach(function (key) {
-      // Use precomputed weighted average if available
-      if (precomputed[key] !== undefined && precomputed[key] !== null) {
+      // Use precomputed weighted average if available,
+      // UNLESS a contextual filter is active AND this stat is in DYNAMIC_STATS
+      if (precomputed[key] !== undefined && precomputed[key] !== null &&
+          (!hasContextualFilter || !DYNAMIC_STATS[key])) {
         avg[key] = precomputed[key];
         return;
       }
