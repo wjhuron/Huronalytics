@@ -32,7 +32,7 @@ from pipeline_fetch import (
     WOBA_WEIGHTS_FALLBACK, FIP_CONSTANT_FALLBACK,
 )
 from pipeline_compute import (
-    compute_expected_stats, compute_stats,
+    compute_expected_stats, compute_stats, compute_xrv,
     compute_pitcher_batted_ball, compute_hitter_stats,
     compute_percentile_ranks, compute_percentile_ranks_with_aaa,
     METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
@@ -1060,11 +1060,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
         row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
-        # RV/100 for this pitch type (raw value — rounded at final output step)
+        row.update(compute_xrv(pitches,
+                                lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+                                woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None))
+        # RV/100 and xRV/100 for this pitch type (raw — rounded at final output step)
         if row.get('runValue') is not None and row.get('count', 0) > 0:
             row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
+        if row.get('xRunValue') is not None and row.get('count', 0) > 0:
+            row['xRv100'] = row['xRunValue'] / row['count'] * 100
+        else:
+            row['xRv100'] = None
 
         # Per-hand splits at pitch type level (for platoon toggle)
         for hand_label, hand_val in [('_vsL', 'L'), ('_vsR', 'R')]:
@@ -1439,12 +1446,29 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if pk in pitch_rv_by_pitcher:
             row['runValue'] = pitch_rv_by_pitcher[pk]
 
-    # Compute RV/100 (run value per 100 pitches) from raw values before rounding
+    # Recompute pitcher xRunValue as sum of raw per-pitch-type xRunValues
+    pitch_xrv_by_pitcher = {}
+    for pr in pitch_leaderboard:
+        pk = pr['pitcher'] + '|' + pr['team']
+        if pr.get('xRunValue') is not None:
+            if pk not in pitch_xrv_by_pitcher:
+                pitch_xrv_by_pitcher[pk] = 0.0
+            pitch_xrv_by_pitcher[pk] += pr['xRunValue']
+    for row in pitcher_leaderboard:
+        pk = row['pitcher'] + '|' + row['team']
+        if pk in pitch_xrv_by_pitcher:
+            row['xRunValue'] = pitch_xrv_by_pitcher[pk]
+
+    # Compute RV/100 and xRV/100 from raw values before rounding
     for row in pitcher_leaderboard:
         if row.get('runValue') is not None and row.get('count', 0) > 0:
             row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
+        if row.get('xRunValue') is not None and row.get('count', 0) > 0:
+            row['xRv100'] = row['xRunValue'] / row['count'] * 100
+        else:
+            row['xRv100'] = None
 
     pitcher_leaderboard.sort(key=lambda r: r['count'], reverse=True)
     print(f"Pitcher leaderboard: {len(pitcher_leaderboard)} rows")
@@ -1775,6 +1799,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         }
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
+        row.update(compute_xrv(pitches,
+                                lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+                                woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                negate=True))
 
         row['xwOBAsp'] = compute_xwobasp(pitches)
 
@@ -1832,6 +1860,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
         'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
+        'runValue', 'rv100', 'xRunValue', 'xRv100',
     ]
     HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
 
@@ -1867,6 +1896,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             }
             row.update(compute_hitter_stats(pt_pitches))
             row.update(compute_expected_stats(pt_pitches, woba_weights=WOBA_WEIGHTS))
+            row.update(compute_xrv(pt_pitches,
+                                    lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+                                    woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                    negate=True))
             hitter_pitch_leaderboard.append(row)
 
         row_all = {
@@ -1881,6 +1914,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         }
         row_all.update(compute_hitter_stats(pitches))
         row_all.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
+        row_all.update(compute_xrv(pitches,
+                                    lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+                                    woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                    negate=True))
         hitter_pitch_leaderboard.append(row_all)
 
         for cat_name, cat_types in PITCH_CATEGORIES.items():
@@ -1903,14 +1940,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 }
                 row_cat.update(compute_hitter_stats(cat_pitches))
                 row_cat.update(compute_expected_stats(cat_pitches, woba_weights=WOBA_WEIGHTS))
+                row_cat.update(compute_xrv(cat_pitches,
+                                            lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+                                            woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                            negate=True))
                 hitter_pitch_leaderboard.append(row_cat)
 
-    # Compute rv100 for hitter pitch leaderboard rows
+    # Compute rv100 and xRv100 for hitter pitch leaderboard rows
     for row in hitter_pitch_leaderboard:
         if row.get('runValue') is not None and row.get('count', 0) > 0:
             row['rv100'] = row['runValue'] / row['count'] * 100
         else:
             row['rv100'] = None
+        if row.get('xRunValue') is not None and row.get('count', 0) > 0:
+            row['xRv100'] = row['xRunValue'] / row['count'] * 100
+        else:
+            row['xRv100'] = None
 
     # Compute xwOBAsp per pitch type for hitter_pitch_leaderboard
     for row in hitter_pitch_leaderboard:
@@ -2319,7 +2364,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # 2. Pitcher percentiles (all stats including boxscore-derived)
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
-                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'era', 'hr9', 'fip', 'xFIP', 'siera'])
+                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera'])
     for stat in PITCHER_ALL_PCTL:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 
@@ -2378,26 +2423,40 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     print("  Percentiles computed and inversions applied.")
 
-    # Final rounding step for runValue/rv100 — applied after percentiles so
-    # percentile ranks use exact values, but output uses display-friendly precision.
+    # Final rounding step for runValue/rv100/xRunValue/xRv100 — applied after
+    # percentiles so percentile ranks use exact values, but output uses display precision.
     for row in pitch_leaderboard:
         if row.get('runValue') is not None:
             row['runValue'] = round(row['runValue'], 1)
         if row.get('rv100') is not None:
             row['rv100'] = round(row['rv100'], 2)
+        if row.get('xRunValue') is not None:
+            row['xRunValue'] = round(row['xRunValue'], 1)
+        if row.get('xRv100') is not None:
+            row['xRv100'] = round(row['xRv100'], 2)
     for row in pitcher_leaderboard:
         if row.get('runValue') is not None:
             row['runValue'] = round(row['runValue'], 1)
         if row.get('rv100') is not None:
             row['rv100'] = round(row['rv100'], 2)
+        if row.get('xRunValue') is not None:
+            row['xRunValue'] = round(row['xRunValue'], 1)
+        if row.get('xRv100') is not None:
+            row['xRv100'] = round(row['xRv100'], 2)
     for row in hitter_leaderboard:
         if row.get('runValue') is not None:
             row['runValue'] = round(row['runValue'], 1)
+        if row.get('xRunValue') is not None:
+            row['xRunValue'] = round(row['xRunValue'], 1)
     for row in hitter_pitch_leaderboard:
         if row.get('runValue') is not None:
             row['runValue'] = round(row['runValue'], 1)
         if row.get('rv100') is not None:
             row['rv100'] = round(row['rv100'], 2)
+        if row.get('xRunValue') is not None:
+            row['xRunValue'] = round(row['xRunValue'], 1)
+        if row.get('xRv100') is not None:
+            row['xRv100'] = round(row['xRv100'], 2)
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,

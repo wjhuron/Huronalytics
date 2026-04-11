@@ -31,7 +31,7 @@ METRIC_KEYS = {
 PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct']
 
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
 
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 
@@ -48,7 +48,7 @@ HITTER_STAT_KEYS = [
     'avgFbDist', 'avgHrDist',
     'sprintSpeed',
     'wRCplus', 'xWRCplus',
-    'runValue',
+    'runValue', 'xRunValue',
 ]
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
 
@@ -232,6 +232,30 @@ def compute_stats(pitches):
         'twoStrikeWhiffPct': two_strike_whiff_pct,
         'runValue': run_value,
     }
+
+
+def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False):
+    """Compute expected run value (xRV).
+
+    For BIP pitches with xwOBA: uses (xwOBA - lgWOBA) / wOBAScale.
+    For all other pitches: uses actual RunExp.
+    negate=True for hitter context (positive = better for hitter).
+    """
+    xrv_values = []
+    has_guts = lg_woba is not None and woba_scale is not None and woba_scale != 0
+    for p in pitches:
+        is_bip = p.get('Description') == 'In Play'
+        xwoba_val = safe_float(p.get('xwOBA')) if is_bip else None
+        if is_bip and xwoba_val is not None and has_guts:
+            xrv_values.append((xwoba_val - lg_woba) / woba_scale)
+        else:
+            rv = safe_float(p.get('RunExp'))
+            if rv is not None:
+                xrv_values.append(rv)
+    if not xrv_values:
+        return {'xRunValue': None}
+    total = sum(xrv_values)
+    return {'xRunValue': -total if negate else total}
 
 
 def compute_pitcher_batted_ball(pitches):

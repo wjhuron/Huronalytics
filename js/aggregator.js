@@ -583,8 +583,8 @@ const Aggregator = {
 
     // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
     // from pre-aggregated PITCHER_DATA — these aren't in micro-data
-    const boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100',
-                     'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
+    const boxFields = ['g', 'gs', 'ip', 'w', 'l', 'sv', 'hld', 'tbf', 'era', 'hr9', 'runValue', 'rv100', 'xRunValue', 'xRv100',
+                     'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'xRunValue_pctl', 'xRv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
                      'xwOBAcon', 'xwOBAcon_pctl',
                      'xwOBAsp', 'xwOBAsp_pctl',
@@ -959,6 +959,10 @@ const Aggregator = {
         if (ppre.runValue_pctl !== undefined) rows[pmi].runValue_pctl = ppre.runValue_pctl;
         if (ppre.rv100 !== undefined) rows[pmi].rv100 = ppre.rv100;
         if (ppre.rv100_pctl !== undefined) rows[pmi].rv100_pctl = ppre.rv100_pctl;
+        if (ppre.xRunValue !== undefined) rows[pmi].xRunValue = ppre.xRunValue;
+        if (ppre.xRunValue_pctl !== undefined) rows[pmi].xRunValue_pctl = ppre.xRunValue_pctl;
+        if (ppre.xRv100 !== undefined) rows[pmi].xRv100 = ppre.xRv100;
+        if (ppre.xRv100_pctl !== undefined) rows[pmi].xRv100_pctl = ppre.xRv100_pctl;
         // Plate discipline fields not in micro counters
         if (ppre.strikePct !== undefined) rows[pmi].strikePct = ppre.strikePct;
         if (ppre.strikePct_pctl !== undefined) rows[pmi].strikePct_pctl = ppre.strikePct_pctl;
