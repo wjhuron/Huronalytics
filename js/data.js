@@ -83,7 +83,7 @@ const DataStore = {
 
   /**
    * Filter data based on current filters.
-   * pitchTypes can be an array for multi-select: ['FF', 'SI'] or 'all'
+   * pitchTypes is always an array: ['all'], ['FF', 'SI'], etc.
    */
   getFilteredData: function (tab, filters) {
     const d = this.rs;
@@ -96,7 +96,7 @@ const DataStore = {
 
     const isHitter = (tab === 'hitter' || tab === 'hitterPitch');
     const hasPitchType = (tab === 'pitch' || tab === 'hitterPitch');
-    const selectedPitchTypes = filters.pitchTypes; // array or 'all'
+    const selectedPitchTypes = filters.pitchTypes; // always array
 
     const rocTeamsArr = (this.metadata && this.metadata.rocTeams) || [];
     var rocTeamSet = {};
@@ -137,7 +137,7 @@ const DataStore = {
         if (filters.role === 'RP' && isStarter) return false;
       }
 
-      if (hasPitchType && selectedPitchTypes !== 'all') {
+      if (hasPitchType && selectedPitchTypes.indexOf('all') === -1) {
         if (selectedPitchTypes.indexOf(row.pitchType) === -1) return false;
       }
       // Min count: use PA for hitters, pitch count for pitchers and hitterPitch

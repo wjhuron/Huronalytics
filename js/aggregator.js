@@ -123,10 +123,7 @@ const Aggregator = {
    */
   needsReaggregation: function (filters) {
     if (!this.loaded) return false;
-    // Reaggregate when hand/date filters are active, or always for correct qualifying percentiles
-    if (filters.vsHand && filters.vsHand !== 'all') return true;
-    if (filters.dateStart || filters.dateEnd) return true;
-    // Always reaggregate since qualifying thresholds affect percentile pools
+    // Always reaggregate — qualifying thresholds affect percentile pools
     return true;
   },
 
@@ -938,7 +935,7 @@ const Aggregator = {
         }
         if (this._roleCache[pitcherKey2] !== filters.role) continue;
       }
-      if (filters.pitchTypes && filters.pitchTypes !== 'all' && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
+      if (filters.pitchTypes && filters.pitchTypes.indexOf('all') === -1 && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
       if (filters.minPitcherSwings && (obj.nSwings || 0) < filters.minPitcherSwings) continue;
       if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
@@ -1445,7 +1442,7 @@ const Aggregator = {
 
     if (!micro || !ci) return [];
 
-    const selectedPitchTypes = filters.pitchTypes; // array or 'all'
+    const selectedPitchTypes = filters.pitchTypes; // always array (e.g. ['all'], ['FF','SL'])
     const CATS = this.PITCH_CATEGORIES;
 
     // Build reverse lookup: pitch type name -> set of pitchTypeIdx values
@@ -1467,7 +1464,7 @@ const Aggregator = {
     // Determine which output groups we need
     // Each selected chip becomes an output group with its own grouping logic
     const outputGroups = []; // { name, type: 'all'|'category'|'individual', idxSet }
-    if (selectedPitchTypes === 'all') {
+    if (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'all') {
       // Default: show all individual pitch types
       outputGroups.push({ name: 'all_individual', type: 'all_individual' });
     } else {

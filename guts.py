@@ -24,7 +24,12 @@ def scrape_guts(year=2026):
         raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs Guts page')
 
     data = json.loads(match.group(1))
-    queries = data['props']['pageProps']['dehydratedState']['queries']
+    props = data.get('props', {})
+    page_props = props.get('pageProps', {})
+    dehydrated = page_props.get('dehydratedState', {})
+    queries = dehydrated.get('queries', [])
+    if not queries:
+        raise RuntimeError('FanGraphs Guts page structure changed — no queries found in __NEXT_DATA__')
 
     for q in queries:
         rows = q.get('state', {}).get('data', [])

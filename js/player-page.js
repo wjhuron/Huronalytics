@@ -605,7 +605,7 @@ var PlayerPage = {
     this._clickOutsideHandler = function (e) {
       var inner = document.querySelector('.player-page-inner');
       // If click is on the player-page backdrop but NOT inside the inner content
-      if (!inner.contains(e.target)) {
+      if (inner && !inner.contains(e.target)) {
         self.close();
       }
     };
@@ -1383,7 +1383,9 @@ var PlayerPage = {
       document.body.appendChild(ellipseTooltip);
     }
     var chartRef = this.chart;
-    canvas.addEventListener('mousemove', function (e) {
+    // Remove prior mousemove listener to prevent accumulation on re-render
+    if (canvas._ellipseMousemove) canvas.removeEventListener('mousemove', canvas._ellipseMousemove);
+    canvas._ellipseMousemove = function (e) {
       var rect = canvas.getBoundingClientRect();
       var mx = e.clientX - rect.left;
       var my = e.clientY - rect.top;
@@ -1406,7 +1408,14 @@ var PlayerPage = {
         ellipseTooltip.style.background = isDk ? 'rgba(30,33,40,0.95)' : 'rgba(255,255,255,0.95)';
         ellipseTooltip.style.color = isDk ? '#eee' : '#333';
         ellipseTooltip.style.border = '1px solid ' + hit.color;
-        ellipseTooltip.innerHTML = '<b>' + hit.label + ' Expected</b><br>xIVB: ' + hit.xIVB.toFixed(1) + '"<br>xHB: ' + hit.xHB.toFixed(1) + '"';
+        ellipseTooltip.textContent = '';
+        var ttB = document.createElement('b');
+        ttB.textContent = hit.label + ' Expected';
+        ellipseTooltip.appendChild(ttB);
+        ellipseTooltip.appendChild(document.createElement('br'));
+        ellipseTooltip.appendChild(document.createTextNode('xIVB: ' + hit.xIVB.toFixed(1) + '"'));
+        ellipseTooltip.appendChild(document.createElement('br'));
+        ellipseTooltip.appendChild(document.createTextNode('xHB: ' + hit.xHB.toFixed(1) + '"'));
         ellipseTooltip.style.display = 'block';
         ellipseTooltip.style.left = (e.pageX + 12) + 'px';
         ellipseTooltip.style.top = (e.pageY - 10) + 'px';
@@ -1415,7 +1424,8 @@ var PlayerPage = {
         ellipseTooltip.style.display = 'none';
         canvas.style.cursor = '';
       }
-    });
+    };
+    canvas.addEventListener('mousemove', canvas._ellipseMousemove);
     canvas.addEventListener('mouseleave', function () {
       ellipseTooltip.style.display = 'none';
       canvas.style.cursor = '';
@@ -3486,8 +3496,16 @@ var PlayerPage = {
       if (bipNote) bipNote.parentElement.insertBefore(xwobaspNote, bipNote.nextSibling);
     }
     if (xwOBAsp_val != null) {
-      xwobaspNote.innerHTML = 'xwOBAsp: <span style="color:#ccc;font-weight:600;">' +
-        xwOBAsp_val.toFixed(3) + '</span> <span style="color:#666;">(' + xwOBAsp_count + ' qualifying BIP)</span>';
+      xwobaspNote.textContent = '';
+      xwobaspNote.appendChild(document.createTextNode('xwOBAsp: '));
+      var valSpan = document.createElement('span');
+      valSpan.style.cssText = 'color:#ccc;font-weight:600;';
+      valSpan.textContent = xwOBAsp_val.toFixed(3);
+      xwobaspNote.appendChild(valSpan);
+      var countSpan = document.createElement('span');
+      countSpan.style.color = '#666';
+      countSpan.textContent = ' (' + xwOBAsp_count + ' qualifying BIP)';
+      xwobaspNote.appendChild(countSpan);
       xwobaspNote.style.display = '';
     } else {
       xwobaspNote.style.display = 'none';

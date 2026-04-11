@@ -39,7 +39,6 @@ from pipeline_compute import (
     HITTER_STAT_KEYS, HITTER_INVERT_PCTL,
     PITCHER_BB_KEYS, PITCHER_BB_INVERT,
 )
-import pipeline_compute
 
 
 # ── Runtime state (set in main) ──────────────────────────────────────────
@@ -1059,7 +1058,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
-        row.update(compute_expected_stats(pitches))
+        row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
         # RV/100 for this pitch type (raw value — rounded at final output step)
         if row.get('runValue') is not None and row.get('count', 0) > 0:
             row['rv100'] = row['runValue'] / row['count'] * 100
@@ -1071,7 +1070,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             hand_pitches = [p for p in pitches if p.get('Bats') == hand_val]
             if hand_pitches:
                 hand_bb = compute_pitcher_batted_ball(hand_pitches)
-                hand_ex = compute_expected_stats(hand_pitches)
+                hand_ex = compute_expected_stats(hand_pitches, woba_weights=WOBA_WEIGHTS)
                 for sk in ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst',
                            'ldPct', 'fbPct', 'puPct', 'hrFbPct']:
                     if sk in hand_bb and hand_bb[sk] is not None:
@@ -1382,7 +1381,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row[key_name] = round_metric(col, avg(values))
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))
-        row.update(compute_expected_stats(pitches))
+        row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
 
         # Per-hand splits for stats not in micro data (2K Whiff%, plate disc, batted ball, expected)
         for hand_label, hand_val in [('_vsL', 'L'), ('_vsR', 'R')]:
@@ -1390,7 +1389,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if hand_pitches:
                 hand_stats = compute_stats(hand_pitches)
                 hand_bb = compute_pitcher_batted_ball(hand_pitches)
-                hand_ex = compute_expected_stats(hand_pitches)
+                hand_ex = compute_expected_stats(hand_pitches, woba_weights=WOBA_WEIGHTS)
                 for suffix_key in ['twoStrikeWhiffPct', 'fpsPct',
                                    'strikePct', 'izPct', 'swStrPct', 'cswPct',
                                    'izWhiffPct', 'chasePct', 'kPct', 'bbPct', 'kbbPct',
@@ -1774,7 +1773,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             '_isROC': team in AAA_TEAMS,
         }
         row.update(compute_hitter_stats(pitches))
-        row.update(compute_expected_stats(pitches))
+        row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
 
         row['xwOBAsp'] = compute_xwobasp(pitches)
 
@@ -1866,7 +1865,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 '_isROC': is_roc,
             }
             row.update(compute_hitter_stats(pt_pitches))
-            row.update(compute_expected_stats(pt_pitches))
+            row.update(compute_expected_stats(pt_pitches, woba_weights=WOBA_WEIGHTS))
             hitter_pitch_leaderboard.append(row)
 
         row_all = {
@@ -1880,7 +1879,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             '_isROC': is_roc,
         }
         row_all.update(compute_hitter_stats(pitches))
-        row_all.update(compute_expected_stats(pitches))
+        row_all.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
         hitter_pitch_leaderboard.append(row_all)
 
         for cat_name, cat_types in PITCH_CATEGORIES.items():
@@ -1902,7 +1901,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     '_isROC': is_roc,
                 }
                 row_cat.update(compute_hitter_stats(cat_pitches))
-                row_cat.update(compute_expected_stats(cat_pitches))
+                row_cat.update(compute_expected_stats(cat_pitches, woba_weights=WOBA_WEIGHTS))
                 hitter_pitch_leaderboard.append(row_cat)
 
     # Compute rv100 for hitter pitch leaderboard rows
@@ -2505,7 +2504,7 @@ def main():
         GUTS_EXTRA = {'wOBAScale': 1.25, 'lgWOBA': 0.317, 'lgRPA': 0.119}
 
     # Propagate wOBA weights to pipeline_compute module
-    pipeline_compute.WOBA_WEIGHTS = WOBA_WEIGHTS
+    # WOBA_WEIGHTS passed explicitly to compute_expected_stats calls
 
     # Fetch park factors
     print("Fetching FanGraphs park factors...")
@@ -2520,8 +2519,12 @@ def main():
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
     if sa_json:
-        import io as _io
-        creds = Credentials.from_service_account_info(json.loads(sa_json), scopes=scopes)
+        try:
+            sa_info = json.loads(sa_json)
+        except json.JSONDecodeError as e:
+            print(f"FATAL: GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON: {e}")
+            sys.exit(1)
+        creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
     else:
         creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
@@ -2571,6 +2574,9 @@ def main():
         print(f"\n*** DATA INTEGRITY WARNINGS ({len(warnings)}) ***")
         for w in warnings[:20]:
             print(f"  - {w}")
+        if os.environ.get('CI'):
+            print("FATAL: Data integrity checks failed in CI — aborting.")
+            sys.exit(1)
     else:
         print("  Data integrity checks passed.")
 

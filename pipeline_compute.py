@@ -5,8 +5,8 @@ import math
 from collections import defaultdict
 
 from pipeline_utils import (
-    safe_float, normalize_date, avg, median, round_metric, is_barrel,
-    spray_angle, spray_direction, break_tilt_to_minutes,
+    safe_float, median, is_barrel,
+    spray_angle, spray_direction,
     SWING_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
     ALL_TEAMS,
@@ -55,10 +55,6 @@ HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPc
 PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct', 'xwOBAsp']
 PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'xwOBAsp'}
 
-# ── Runtime state (set by process_data.main) ─────────────────────────────
-WOBA_WEIGHTS = None
-
-
 # ── Stat computation functions ───────────────────────────────────────────
 
 def compute_expected_stats(pitches, woba_weights=None):
@@ -67,7 +63,7 @@ def compute_expected_stats(pitches, woba_weights=None):
     wOBA uses FanGraphs Guts linear weights applied to actual outcomes.
     xBA/xSLG/xwOBA use Statcast per-pitch expected values from the spreadsheet.
     """
-    weights = woba_weights or WOBA_WEIGHTS
+    weights = woba_weights
 
     ab = 0
     ubb = 0

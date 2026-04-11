@@ -252,6 +252,7 @@
   function navigateToTab(tab, skipHash, urlState) {
     if (_navigating) return;
     _navigating = true;
+    try {
     currentTab = tab;
     currentSection = TAB_SECTION[tab];
 
@@ -382,7 +383,9 @@
 
     refresh();
     scrollTableToTop();
-    _navigating = false;
+    } finally {
+      _navigating = false;
+    }
   }
 
   function setupDOM() {
@@ -725,7 +728,7 @@
   function getFilters() {
     return {
       team: teamSelect.value,
-      pitchTypes: (selectedPitchTypes.length === 0 || (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All')) ? 'all' : selectedPitchTypes,
+      pitchTypes: (selectedPitchTypes.length === 0 || (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All')) ? ['all'] : selectedPitchTypes.slice(),
       throws: throwsSelect.value,
       vsHand: vsHandSelect.value,
       minCount: currentTab === 'pitcherStats' ? 0 : _resolveMinCount(),

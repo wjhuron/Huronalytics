@@ -16,8 +16,8 @@ from pipeline_utils import (
 
 # ── Config ───────────────────────────────────────────────────────────────
 SPREADSHEET_IDS = {
-    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',
-    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',
+    'AL': os.environ.get('SPREADSHEET_ID_AL', '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U'),
+    'NL': os.environ.get('SPREADSHEET_ID_NL', '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE'),
 }
 SERVICE_ACCOUNT_FILE = os.environ.get(
     'GOOGLE_SERVICE_ACCOUNT_FILE',
@@ -137,7 +137,7 @@ def fetch_sprint_speed(year=2026):
         print(f"  Sprint speed: fetched {len(result)} players from Savant ({year}), {qualified} qualified (≥10 runs)")
         return result
     except Exception as e:
-        print(f"  WARNING: Could not fetch sprint speed data: {e}")
+        print(f"  WARNING: Could not fetch sprint speed data ({type(e).__name__}): {e}")
         return {}
 
 
@@ -153,6 +153,12 @@ def fetch_park_factors(year=2026):
     if not match:
         raise RuntimeError('Could not find __NEXT_DATA__ on FanGraphs park factors page')
     data = json.loads(match.group(1))
+    props = data.get('props', {})
+    page_props = props.get('pageProps', {})
+    dehydrated = page_props.get('dehydratedState', {})
+    queries = dehydrated.get('queries', [])
+    if not queries:
+        raise RuntimeError('FanGraphs park factors page structure changed — no queries in __NEXT_DATA__')
     FG_TEAM_MAP = {
         'Angels': 'LAA', 'Orioles': 'BAL', 'Red Sox': 'BOS', 'White Sox': 'CWS',
         'Guardians': 'CLE', 'Tigers': 'DET', 'Royals': 'KCR', 'Twins': 'MIN',
@@ -163,7 +169,6 @@ def fetch_park_factors(year=2026):
         'Brewers': 'MIL', 'Nationals': 'WSH', 'Mets': 'NYM', 'Phillies': 'PHI',
         'Pirates': 'PIT', 'Cardinals': 'STL', 'Padres': 'SDP', 'Giants': 'SFG',
     }
-    queries = data['props']['pageProps']['dehydratedState']['queries']
     park_factors = {}
     for q in queries:
         rows = q.get('state', {}).get('data', [])
@@ -282,9 +287,8 @@ def lookup_mlb_id(player_name, team_abbrev, mlb_id_cache):
                     mlb_id = person['id']
                     mlb_id_cache[cache_key] = mlb_id
                     return mlb_id
-            mlb_id = people[0]['id']
-            mlb_id_cache[cache_key] = mlb_id
-            return mlb_id
+            # Do NOT fall back to people[0] — wrong-player matches are worse than no match
+            print(f"  Warning: MLB ID lookup found no team/name match for {player_name} ({team_abbrev})")
 
     except Exception as e:
         print(f"  Warning: MLB ID lookup failed for {player_name} ({team_abbrev}): {e}")

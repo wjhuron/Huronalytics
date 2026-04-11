@@ -329,11 +329,12 @@ const Leaderboard = {
     const isPitcher = data.length > 0 && data[0].pitcher;
     const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
     const pitchTypeAvgs = meta.leagueAverages || {};
-    const pitchTypes = (opts && opts.pitchTypes) || 'all';
+    const pitchTypes = (opts && opts.pitchTypes) || ['all'];
     let precomputed;
-    if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
+    var isAllPitches = pitchTypes.indexOf('all') !== -1;
+    if (!isAllPitches && pitchTypes.length === 1 && pitchTypeAvgs[pitchTypes[0]]) {
       precomputed = pitchTypeAvgs[pitchTypes[0]];
-    } else if (pitchTypes !== 'all' && Array.isArray(pitchTypes) && pitchTypes.length > 1) {
+    } else if (!isAllPitches && pitchTypes.length > 1) {
       precomputed = {};
     } else {
       precomputed = overallAvgs;
@@ -628,8 +629,11 @@ const Leaderboard = {
     tbody.appendChild(fragment);
 
     // Event delegation: single click handler on tbody instead of per-row listeners
-    if (!tbody._delegatedClick) {
-      tbody.addEventListener('click', function (e) {
+    // Remove old listener if tbody was replaced (prevents accumulation)
+    if (tbody._delegatedClick) {
+      tbody.removeEventListener('click', tbody._delegatedClick);
+    }
+    tbody._delegatedClick = function (e) {
         if (e.target.type === 'checkbox') return;
         const tr = e.target.closest('tr.clickable-row');
         if (!tr || !tr._rowData) return;
@@ -647,9 +651,8 @@ const Leaderboard = {
         if (typeof App !== 'undefined' && App.openSidePanel) {
           App.openSidePanel(personName, r.team, r.throws || r.stands, r);
         }
-      });
-      tbody._delegatedClick = true;
-    }
+    };
+    tbody.addEventListener('click', tbody._delegatedClick);
     document.getElementById('row-count').textContent = totalRows;
   },
 
