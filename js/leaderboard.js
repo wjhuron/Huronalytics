@@ -371,43 +371,49 @@ const Leaderboard = {
                          avg:1, obp:1, slg:1, ops:1, iso:1 };
 
     numericKeys.forEach(function (key) {
-      // Use precomputed weighted average if available,
-      // UNLESS a contextual filter is active AND this stat is in DYNAMIC_STATS
-      if (precomputed[key] !== undefined && precomputed[key] !== null &&
-          (!hasContextualFilter || !DYNAMIC_STATS[key])) {
-        avg[key] = precomputed[key];
-        return;
-      }
-      // Dynamic weighted average from filtered data
-      var useAbs = ABS_AVG_KEYS[key] || false;
-      var sumW = 0, totalW = 0;
-      for (var j = 0; j < data.length; j++) {
-        var v = data[j][key];
-        if (v === null || v === undefined) continue;
-        var w;
-        if (IP_WEIGHTED[key]) {
-          w = _parseIP(data[j].ip);
-        } else if (BIP_WEIGHTED[key]) {
-          w = data[j].nBip || 0;
-        } else if (PA_WEIGHTED[key]) {
-          w = data[j].pa || 0;
-        } else {
-          w = data[j].count || 0;
+      if (DYNAMIC_STATS[key]) {
+        // Dynamic stats: use precomputed when no contextual filter, else compute from filtered data
+        if (!hasContextualFilter && precomputed[key] !== undefined && precomputed[key] !== null) {
+          avg[key] = precomputed[key];
+          return;
         }
-        if (w > 0) {
-          sumW += (useAbs ? Math.abs(v) : v) * w;
-          totalW += w;
+        var useAbs = ABS_AVG_KEYS[key] || false;
+        var sumW = 0, totalW = 0;
+        for (var j = 0; j < data.length; j++) {
+          var v = data[j][key];
+          if (v === null || v === undefined) continue;
+          var w;
+          if (IP_WEIGHTED[key]) {
+            w = _parseIP(data[j].ip);
+          } else if (BIP_WEIGHTED[key]) {
+            w = data[j].nBip || 0;
+          } else if (PA_WEIGHTED[key]) {
+            w = data[j].pa || 0;
+          } else {
+            w = data[j].count || 0;
+          }
+          if (w > 0) {
+            sumW += (useAbs ? Math.abs(v) : v) * w;
+            totalW += w;
+          }
+        }
+        avg[key] = totalW > 0 ? sumW / totalW : null;
+      } else {
+        // Non-dynamic stats (velo, spin, IVB, etc.): only use precomputed values.
+        // Shows "--" when no precomputed value exists (e.g. all pitch types view).
+        if (precomputed[key] !== undefined && precomputed[key] !== null) {
+          avg[key] = precomputed[key];
         }
       }
-      avg[key] = totalW > 0 ? sumW / totalW : null;
     });
     avg.pitcher = 'League Avg';
     avg.hitter = 'League Avg';
     avg._isLeagueAvg = true;
     avg._rank = '';
-    // wRC+ and xWRC+ are by definition 100 for league average
+    // wRC+, xWRC+, and Stuff+ are by definition 100 for league average
     avg.wRCplus = 100;
     avg.xWRCplus = 100;
+    avg.stuffScore = 100;
     return avg;
   },
 
