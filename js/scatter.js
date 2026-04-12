@@ -26,7 +26,7 @@ const ScatterChart = {
   },
 
   computeEllipse: function (points) {
-    if (points.length < 3) return null;
+    if (points.length < 6) return null;
     const n = points.length;
     let mx = 0, my = 0;
     for (let i = 0; i < n; i++) { mx += points[i].x; my += points[i].y; }
