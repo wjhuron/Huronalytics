@@ -332,33 +332,40 @@ const Aggregator = {
     const sortedMlb = mlbValid.map(function (v) { return v.val; });
     sortedMlb.sort(function (a, b) { return a - b; });
 
+    // Track which rows get computed percentiles
+    var processed = {};
+
     // Compute percentiles for MLB rows using binary search: O(n log n)
     for (let k = 0; k < mlbValid.length; k++) {
       rows[mlbValid[k].idx][pctlKey] = self._percentileFromSorted(sortedMlb, mlbValid[k].val, true);
+      processed[mlbValid[k].idx] = true;
     }
 
     // Interpolate ROC rows into MLB distribution: O(r log n)
     for (let r = 0; r < rocValid.length; r++) {
       rows[rocValid[r].idx][pctlKey] = self._percentileFromSorted(sortedMlb, rocValid[r].val, false);
+      processed[rocValid[r].idx] = true;
     }
 
     // Interpolate sub-minimum rows: O(s log n)
     if (interpolateSubMinimum) {
       for (let s = 0; s < rows.length; s++) {
-        if (pctlKey in rows[s]) continue;
+        if (processed[s]) continue;
         const sVal = rows[s][metricKey];
         if (sVal === null || sVal === undefined) {
           rows[s][pctlKey] = null;
+          processed[s] = true;
           continue;
         }
         const sv = useAbs ? Math.abs(sVal) : sVal;
         rows[s][pctlKey] = self._percentileFromSorted(sortedMlb, sv, false);
+        processed[s] = true;
       }
     }
 
-    // Fill nulls for unprocessed rows
+    // Fill nulls for unprocessed rows (overwrite any stale pre-aggregated pctls)
     for (let j2 = 0; j2 < rows.length; j2++) {
-      if (!(pctlKey in rows[j2])) {
+      if (!processed[j2]) {
         rows[j2][pctlKey] = null;
       }
     }
@@ -679,6 +686,20 @@ const Aggregator = {
         const pk = inv + '_pctl';
         if (rows[ri][pk] !== null && rows[ri][pk] !== undefined) {
           rows[ri][pk] = 100 - rows[ri][pk];
+        }
+      }
+    }
+
+    // Null out pre-aggregated boxFields pctls for unqualified pitchers.
+    // boxFields merges _pctl values from PITCHER_DATA for stats not in STAT_KEYS
+    // (era, fip, xFIP, siera, rv100, etc.). These must respect IP qualification.
+    // Exception: fbVelo_pctl — always shown regardless of qualification.
+    for (let uq = 0; uq < rows.length; uq++) {
+      if (!rows[uq]._qualified) {
+        for (var pkey in rows[uq]) {
+          if (pkey.endsWith('_pctl') && pkey !== 'fbVelo_pctl') {
+            rows[uq][pkey] = null;
+          }
         }
       }
     }

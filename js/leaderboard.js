@@ -768,7 +768,8 @@ const Leaderboard = {
           const isHitterRow = !!row.hitter;
           const isSinglePitchType = self._lastRenderOpts &&
               Array.isArray(self._lastRenderOpts.pitchTypes) &&
-              self._lastRenderOpts.pitchTypes.length === 1;
+              self._lastRenderOpts.pitchTypes.length === 1 &&
+              self._lastRenderOpts.pitchTypes[0] !== 'all';
           const isHitterPitchType = isHitterRow && row.pitchType != null;
           const teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
           const tg = teamGames[row.team] || 0;
