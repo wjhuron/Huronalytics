@@ -471,7 +471,7 @@ def compute_hitter_stats(pitches):
         'pullPct': pull / n_spray if n_spray > 0 else None,
         'middlePct': center / n_spray if n_spray > 0 else None,
         'oppoPct': oppo / n_spray if n_spray > 0 else None,
-        'airPullPct': air_pull / n_spray if n_spray > 0 else None,
+        'airPullPct': air_pull / (ld + fb + pu) if (ld + fb + pu) > 0 else None,
         'swingPct': n_swings / total if total > 0 else None,
         'izSwingPct': iz_swing_pct,
         'chasePct': chase_pct,

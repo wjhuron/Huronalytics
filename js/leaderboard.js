@@ -184,7 +184,7 @@ const COLUMNS = {
     { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, sectionStart: true, desc: 'Pull rate (BIP to pull side)', group: 'spray' },
     { key: 'middlePct',   label: 'Middle%',  format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Center rate (BIP up the middle)', group: 'spray' },
     { key: 'oppoPct',     label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Oppo rate (BIP to opposite field)', group: 'spray' },
-    { key: 'airPullPct',  label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', desc: 'Air-pull rate (LD + FB + PU to pull side / total BIP)', group: 'spray' },
+    { key: 'airPullPct',  label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', desc: 'Air-pull rate — pulled (LD + FB + PU) / total air balls (LD + FB + PU)', group: 'spray' },
     // Distance
     { key: 'avgFbDist',   label: 'Avg FB Dist', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, desc: 'Average fly ball distance (feet)', sectionStart: true, group: 'distance' },
     { key: 'avgHrDist',   label: 'Avg HR Dist', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, desc: 'Average home run distance (feet)', group: 'distance' },
