@@ -2332,6 +2332,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     else:
         siera_constant = 5.77  # fallback
     print(f"  SIERA constant: {siera_constant:.3f}")
+    metadata['sieraConstant'] = round(siera_constant, 4)
 
     # Second pass: apply SIERA constant and clean up
     for row in pitcher_leaderboard:
