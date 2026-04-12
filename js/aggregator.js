@@ -411,9 +411,9 @@ const Aggregator = {
       const brow = pitcherBipData[bi];
       if (!validDates[brow[pbci.dateIdx]]) continue;
       if (vsHand !== 'all' && brow[pbci.batterHand] !== vsHand) continue;
-      const pIdx = brow[pbci.pitcherIdx];
-      if (!bipByPitcher[pIdx]) bipByPitcher[pIdx] = [];
-      bipByPitcher[pIdx].push(brow);
+      const pKey = brow[pbci.pitcherIdx] + '|' + brow[pbci.teamIdx];
+      if (!bipByPitcher[pKey]) bipByPitcher[pKey] = [];
+      bipByPitcher[pKey].push(brow);
     }
 
     return { groups: groups, bipByPitcher: bipByPitcher };
@@ -567,7 +567,7 @@ const Aggregator = {
 
     for (let gk2 in groups) {
       const g = groups[gk2];
-      const bipRecs = bipByPitcher[g.pitcherIdx] || [];
+      const bipRecs = bipByPitcher[g.pitcherIdx + '|' + g.teamIdx] || [];
       const bipStats = this._computePitcherBipStats(bipRecs);
       const obj = this._buildPitcherRow(g, lookups, mlbIdMap, bipStats);
 
@@ -1153,9 +1153,9 @@ const Aggregator = {
       if (!validDates[brow[bci.dateIdx]]) continue;
       if (vsHand !== 'all' && brow[bci.pitcherHand] !== vsHand) continue;
 
-      const hIdx = brow[bci.hitterIdx];
-      if (!bipByHitter[hIdx]) bipByHitter[hIdx] = [];
-      bipByHitter[hIdx].push(brow);
+      const hKey = brow[bci.hitterIdx] + '|' + brow[bci.teamIdx];
+      if (!bipByHitter[hKey]) bipByHitter[hKey] = [];
+      bipByHitter[hKey].push(brow);
     }
 
     function median(arr) {
@@ -1230,7 +1230,7 @@ const Aggregator = {
       const hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians
-      const bipRecords = bipByHitter[g.hitterIdx] || [];
+      const bipRecords = bipByHitter[g.hitterIdx + '|' + g.teamIdx] || [];
       const evsAll = [], allLA = [];
       for (let bri = 0; bri < bipRecords.length; bri++) {
         const bev = bipRecords[bri][bci.exitVelo];
@@ -1522,7 +1522,7 @@ const Aggregator = {
         if (!validDates[brow[bci.dateIdx]]) continue;
         if (vsHand !== 'all' && brow[bci.pitcherHand] !== vsHand) continue;
 
-        const bipKey = brow[bci.hitterIdx] + '|' + brow[bci.pitchTypeIdx];
+        const bipKey = brow[bci.hitterIdx] + '|' + brow[bci.teamIdx] + '|' + brow[bci.pitchTypeIdx];
         if (!bipByKey[bipKey]) bipByKey[bipKey] = [];
         bipByKey[bipKey].push(brow);
       }
@@ -1655,7 +1655,7 @@ const Aggregator = {
       // BIP medians — combine BIP records from all pitch types in this group
       const evsAll2 = [], allLA = [];
       for (let bpi = 0; bpi < gg2.bipPtIdxs.length; bpi++) {
-        const bpKey = gg2.hitterIdx + '|' + gg2.bipPtIdxs[bpi];
+        const bpKey = gg2.hitterIdx + '|' + gg2.teamIdx + '|' + gg2.bipPtIdxs[bpi];
         const bipRecords = bipByKey[bpKey] || [];
         for (let bri = 0; bri < bipRecords.length; bri++) {
           const bev = bipRecords[bri][bci.exitVelo];
@@ -1804,19 +1804,21 @@ const Aggregator = {
    * Get velocity trend data for a pitcher, grouped by pitch type.
    * Returns { pitchType: [{ date: 'YYYY-MM-DD', avgVelo: N }, ...], ... }
    */
-  getVeloTrend: function(pitcherName) {
+  getVeloTrend: function(pitcherName, teamName) {
     const d = this.data;
     if (!d || !d.veloTrend) return {};
     const lookups = d.lookups;
     const ci = this._colIdx.veloTrendCols;
     const piIdx = lookups.pitchers.indexOf(pitcherName);
     if (piIdx < 0) return {};
+    const tiIdx = teamName ? lookups.teams.indexOf(teamName) : -1;
 
     const result = {};
     const rows = d.veloTrend;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       if (r[ci.pitcherIdx] !== piIdx) continue;
+      if (tiIdx >= 0 && r[ci.teamIdx] !== tiIdx) continue;
       const pt = lookups.pitchTypes[r[ci.pitchTypeIdx]];
       const date = lookups.dates[r[ci.dateIdx]];
       const sumV = r[ci.sumVelo];

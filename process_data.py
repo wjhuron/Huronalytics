@@ -343,6 +343,7 @@ def generate_micro_data(all_pitches):
         hc_y = safe_float(p.get('HC_Y'))
         pitcher_bip_rows.append([
             pi_idx[pitcher],
+            tm_idx[team],
             dt_idx[date],
             batter_hand,
             round(ev, 1) if ev is not None else None,
@@ -553,6 +554,7 @@ def generate_micro_data(all_pitches):
             bat_side = 'R'  # default to RHB if Bats field missing
         hitter_bip_rows.append([
             hi_idx[batter],
+            tm_idx[team],
             dt_idx[date],
             pitcher_hand,
             bat_side,
@@ -729,6 +731,7 @@ def generate_micro_data(all_pitches):
 
         hitter_pitch_bip_rows.append([
             hi_idx[batter],
+            tm_idx[team],
             pt_idx[pitch_type],
             dt_idx[date],
             pitcher_hand,
@@ -756,13 +759,13 @@ def generate_micro_data(all_pitches):
         if not date or velo is None:
             continue
 
-        key = (pi_idx[pitcher], pt_idx[pitch_type], dt_idx[date])
+        key = (pi_idx[pitcher], tm_idx[team], pt_idx[pitch_type], dt_idx[date])
         velo_trend[key][0] += velo
         velo_trend[key][1] += 1
 
     velo_trend_rows = []
-    for (pi, pti, di), (s, n) in velo_trend.items():
-        velo_trend_rows.append([pi, pti, di, round(s, 1), n])
+    for (pi, ti, pti, di), (s, n) in velo_trend.items():
+        velo_trend_rows.append([pi, ti, pti, di, round(s, 1), n])
     print(f"  Velocity trend rows: {len(velo_trend_rows)}")
 
     # ==========================================================
@@ -783,7 +786,7 @@ def generate_micro_data(all_pitches):
             'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu', 'nStrikes',
         ],
         'pitcherMicro': pitcher_rows,
-        'pitcherBipCols': ['pitcherIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats'],
+        'pitcherBipCols': ['pitcherIdx', 'teamIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats'],
         'pitcherBip': pitcher_bip_rows,
         'pitchCols': [
             'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',
@@ -814,7 +817,7 @@ def generate_micro_data(all_pitches):
             'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
         ],
         'hitterMicro': hitter_rows,
-        'hitterBipCols': ['hitterIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
+        'hitterBipCols': ['hitterIdx', 'teamIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
         'hitterBip': hitter_bip_rows,
         'hitterPitchCols': [
             'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',
@@ -830,9 +833,9 @@ def generate_micro_data(all_pitches):
             'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
         ],
         'hitterPitchMicro': hitter_pitch_rows,
-        'hitterPitchBipCols': ['hitterIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
+        'hitterPitchBipCols': ['hitterIdx', 'teamIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
         'hitterPitchBip': hitter_pitch_bip_rows,
-        'veloTrendCols': ['pitcherIdx', 'pitchTypeIdx', 'dateIdx', 'sumVelo', 'nVelo'],
+        'veloTrendCols': ['pitcherIdx', 'teamIdx', 'pitchTypeIdx', 'dateIdx', 'sumVelo', 'nVelo'],
         'veloTrend': velo_trend_rows,
     }
 

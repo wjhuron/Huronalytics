@@ -1709,7 +1709,7 @@ var PlayerPage = {
     section.style.display = '';
 
     // Get velocity trend data for sparklines
-    var veloTrend = Aggregator.loaded ? Aggregator.getVeloTrend(data.pitcher) : {};
+    var veloTrend = Aggregator.loaded ? Aggregator.getVeloTrend(data.pitcher, data.team) : {};
 
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
@@ -3032,9 +3032,11 @@ var PlayerPage = {
       this._renderSprayLegend('all');
       return;
     }
+    var teamIdx = (lookups.teams || []).indexOf(data.team);
 
     var bipCols = microData.hitterBipCols;
     var hiIdx = bipCols.indexOf('hitterIdx');
+    var tiIdx = bipCols.indexOf('teamIdx');
     var hcXIdx = bipCols.indexOf('hcX');
     var hcYIdx = bipCols.indexOf('hcY');
     var bbTypeIdx = bipCols.indexOf('bbType');
@@ -3048,6 +3050,7 @@ var PlayerPage = {
     var filteredBips = [];
     for (var bi = 0; bi < bips.length; bi++) {
       if (bips[bi][hiIdx] !== hitterIdx) continue;
+      if (teamIdx >= 0 && tiIdx >= 0 && bips[bi][tiIdx] !== teamIdx) continue;
       if (activeSide && activeSide !== 'both' && batSideIdx >= 0 && bips[bi][batSideIdx] !== activeSide) continue;
       filteredBips.push(bips[bi]);
     }
@@ -3243,6 +3246,7 @@ var PlayerPage = {
     var bats = (activeSide && activeSide !== 'both') ? activeSide : (data.stands || 'R');
     var bipCols = microData.hitterBipCols;
     var hiIdx = bipCols.indexOf('hitterIdx');
+    var tiIdx = bipCols.indexOf('teamIdx');
     var laIdx = bipCols.indexOf('launchAngle');
     var hcXIdx = bipCols.indexOf('hcX');
     var hcYIdx = bipCols.indexOf('hcY');
@@ -3251,13 +3255,14 @@ var PlayerPage = {
     var eventIdx = bipCols.indexOf('event');
     var batSideIdx = bipCols.indexOf('batSide');
 
-    // Find hitter index
+    // Find hitter index and team index
     var lookups = microData.lookups;
     var playerIdx = -1;
     for (var i = 0; i < lookups.hitters.length; i++) {
       if (lookups.hitters[i] === data.hitter) { playerIdx = i; break; }
     }
     if (playerIdx === -1) return;
+    var teamIdx = (lookups.teams || []).indexOf(data.team);
 
     // Collect BIP data points
     var points = [];
@@ -3266,6 +3271,7 @@ var PlayerPage = {
     for (var bi = 0; bi < bipData.length; bi++) {
       var row = bipData[bi];
       if (row[hiIdx] !== playerIdx) continue;
+      if (teamIdx >= 0 && tiIdx >= 0 && row[tiIdx] !== teamIdx) continue;
       if (activeSide && activeSide !== 'both' && batSideIdx >= 0 && row[batSideIdx] !== activeSide) continue;
       totalBip++;
       var la = row[laIdx];
