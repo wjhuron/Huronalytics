@@ -22,7 +22,7 @@ const COLUMNS = {
     { key: 'hbOE',        label: 'HBOE',     format: Utils.formatSignedDecimal(1), sortType: 'numeric', desc: 'HB over expected (HB − xHB)', group: 'metrics' },
     { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Vertical release point (feet)', group: 'metrics' },
     { key: 'relPosX',     label: 'RelX',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Horizontal release point (feet, pitcher POV)', group: 'metrics' },
-    { key: 'extension',   label: 'Ext',      format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Extension toward home plate at release (feet)', group: 'metrics' },
+    { key: 'extension',   label: 'Ext',      format: Utils.formatFeetInches, sortType: 'numeric', desc: 'Extension toward home plate at release (feet)', group: 'metrics' },
     { key: 'armAngle',    label: 'Arm Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Arm angle at release (degrees)', group: 'metrics' },
     { key: 'nVAA',        label: 'nVAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized VAA — location-independent (VAA minus expected VAA at that plate height)', group: 'metrics' },
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
@@ -766,17 +766,15 @@ const Leaderboard = {
           // Determine qualifying status
           const isPitcherRow = !!row.pitcher;
           const isHitterRow = !!row.hitter;
-          const isSinglePitchType = self._lastRenderOpts &&
-              Array.isArray(self._lastRenderOpts.pitchTypes) &&
-              self._lastRenderOpts.pitchTypes.length === 1 &&
-              self._lastRenderOpts.pitchTypes[0] !== 'all';
+          const isPitcherPitchType = isPitcherRow && row.pitchType != null;
           const isHitterPitchType = isHitterRow && row.pitchType != null;
           const teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
           const tg = teamGames[row.team] || 0;
           let showColor;
-          // Pitch shape metrics always show color on single-pitch-type views (no min count)
+          // Pitch shape metrics always show color on pitch-type views (no min count)
           const PITCH_SHAPE_ALWAYS_COLOR = {
             velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
+            extension: true,
             vaa: true, haa: true, nVAA: true, nHAA: true
           };
           // Hitter stats that require ≥20 BIP
@@ -795,8 +793,8 @@ const Leaderboard = {
           // Hitter stats that require ≥10 competitive swings
           const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, blastPct: true, idealAAPct: true };
 
-          if (isPitcherRow && isSinglePitchType) {
-            // Pitcher pitch-type: shape metrics always qualify; outcome metrics need ≥50 pitches
+          if (isPitcherPitchType) {
+            // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need ≥50 pitches
             showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= 50;
           } else if (isPitcherRow) {
             // Pitcher overall: IP-based qualification

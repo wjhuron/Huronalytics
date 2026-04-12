@@ -758,7 +758,7 @@ const Aggregator = {
       { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
     ];
     const METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ' && k !== '_plateX'; });
-    const NO_PCTL_METRICS = { relPosZ: true, relPosX: true, extension: true, armAngle: true };
+    const NO_PCTL_METRICS = { relPosZ: true, relPosX: true, armAngle: true };
     const METRIC_PCTL_KEYS = METRIC_KEYS_LIST.filter(function (k) { return !NO_PCTL_METRICS[k]; });
     const PITCH_STAT_KEYS = ['izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct'];
     const PITCH_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'puPct'];
@@ -1115,6 +1115,26 @@ const Aggregator = {
             r[xPk] = 100 - r[xPk];
           }
         }
+      });
+    }
+
+    // Apply IP-based qualification filter for pitch-type data (Qualified mode)
+    if (filters.minIp === 'Q') {
+      const teamGames = this.getTeamGamesPlayed();
+      const ipLookup = {};
+      const preAggIP = window.PITCHER_DATA || [];
+      for (var ipi = 0; ipi < preAggIP.length; ipi++) {
+        ipLookup[preAggIP[ipi].pitcher + '|' + preAggIP[ipi].team] = preAggIP[ipi];
+      }
+      rows = rows.filter(function (r) {
+        var p = ipLookup[r.pitcher + '|' + r.team];
+        if (!p) return false;
+        var tg = teamGames[r.team] || 0;
+        var ipParts = String(p.ip || '0').split('.');
+        var ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
+        var pg = p.g || 0, pgs = p.gs || 0;
+        var isStarter = pg > 0 && (pgs / pg) > 0.5;
+        return ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
       });
     }
 

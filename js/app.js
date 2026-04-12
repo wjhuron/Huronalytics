@@ -708,6 +708,10 @@
       if (isHitterTab(currentTab) && currentTab !== 'hitterPitch') {
         return 'Q';
       }
+      // Pitcher tabs: IP-based qualification handles the real filter (via minIp='Q')
+      if (isPitcherTab(currentTab)) {
+        return 1;
+      }
       return 10; // pitch tabs: just use 10 as reasonable default
     }
     return parseInt(val) || 1;
@@ -730,7 +734,7 @@
       vsHand: vsHandSelect.value,
       minCount: currentTab === 'pitcherStats' ? 0 : _resolveMinCount(),
       minSwings: parseInt(minSwingsInput.value) || 1,
-      minIp: currentTab === 'pitcherStats' ? _resolveMinIp() : 0,
+      minIp: currentTab === 'pitcherStats' ? _resolveMinIp() : (isPitcherTab(currentTab) && minCountInput.value === 'Q' ? 'Q' : 0),
       minTbf: currentTab === 'pitcherStats' ? (parseInt(minTbfInput.value) || 1) : 0,
       minBip: (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall') ? (parseInt(minBipInput.value) || 1) : 0,
       minPitcherSwings: currentTab === 'pitcherSwingDecisions' ? (parseInt(minPitcherSwingsInput.value) || 1) : 0,
