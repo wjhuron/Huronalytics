@@ -704,9 +704,9 @@
   function _resolveMinCount() {
     const val = minCountInput.value;
     if (val === 'Q') {
-      // Qualified: hitters = 3.1 PA/team game, pitchers = 10 pitches (fallback)
+      // Hitter stats: use per-row _qualified flag (team-specific 3.1 PA/game)
       if (isHitterTab(currentTab) && currentTab !== 'hitterPitch') {
-        return Math.round(_getMaxTeamGames() * 3.1) || 1;
+        return 'Q';
       }
       return 10; // pitch tabs: just use 10 as reasonable default
     }
@@ -716,11 +716,8 @@
   function _resolveMinIp() {
     const val = minIpInput.value;
     if (val === 'Q') {
-      // Qualified: SP = 1.0 IP/game, RP = 0.1 IP/game
-      const maxTg = _getMaxTeamGames();
-      const role = document.getElementById('role-filter').value;
-      if (role === 'RP') return Math.round(maxTg * 0.1 * 10) / 10 || 0;
-      return Math.round(maxTg * 1.0 * 10) / 10 || 0; // default to SP threshold
+      // Use per-row _qualified flag (team-specific SP/RP thresholds)
+      return 'Q';
     }
     return parseFloat(val) || 0;
   }

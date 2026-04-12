@@ -142,13 +142,19 @@ const DataStore = {
       }
       // Min count: use PA for hitters, pitch count for pitchers and hitterPitch
       if (tab === 'hitter') {
-        if ((row.pa || 0) < filters.minCount) return false;
+        if (filters.minCount === 'Q') {
+          if (!row._qualified) return false;
+        } else if ((row.pa || 0) < filters.minCount) return false;
       } else {
         if (row.count < filters.minCount) return false;
       }
       if (tab === 'hitter' && filters.minSwings && row.nSwings < filters.minSwings) return false;
       if (tab === 'pitcher' && filters.minTbf && (row.pa || 0) < filters.minTbf) return false;
-      if (tab === 'pitcher' && filters.minIp && (row.ip || 0) < filters.minIp) return false;
+      if (tab === 'pitcher' && filters.minIp) {
+        if (filters.minIp === 'Q') {
+          if (!row._qualified) return false;
+        } else if ((row.ip || 0) < filters.minIp) return false;
+      }
       if ((tab === 'pitcher' || tab === 'hitter') && filters.minBip && row.nBip != null && row.nBip < filters.minBip) return false;
       if (tab === 'pitcher' && filters.minPitcherSwings && row.nSwings != null && row.nSwings < filters.minPitcherSwings) return false;
       if (filters.search) {

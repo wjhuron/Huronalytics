@@ -1393,6 +1393,14 @@ const Aggregator = {
       }
     }
 
+    // Mark hitter qualification: 3.1 PA per team game
+    const teamGames = this.getTeamGamesPlayed();
+    for (let qi = 0; qi < rows.length; qi++) {
+      const r = rows[qi];
+      const tg = teamGames[r.team] || 0;
+      r._qualified = (r.pa || 0) >= tg * 3.1;
+    }
+
     // Compute percentiles — all players in pool, qualification handled by frontend
     const self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
