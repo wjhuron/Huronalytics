@@ -1,8 +1,12 @@
 # Secrets
 service_account.json
 
-# Local data source
+# Local data / caches
 *.xlsx
+mlb_id_cache.json
+outlier_results.json
+name_duplicates_report.txt
+data_embedded.js
 
 # Python
 __pycache__/
