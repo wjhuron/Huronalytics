@@ -632,10 +632,6 @@ const Aggregator = {
         return true;
       });
     }
-    if (filters.minIp) {
-      rows = rows.filter(function (r) { return (r.ip || 0) >= filters.minIp; });
-    }
-
     // Compute percentiles with IP-based qualifying
     // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP/team game.
     const teamGames = this.getTeamGamesPlayed();
@@ -684,6 +680,15 @@ const Aggregator = {
         if (rows[ri][pk] !== null && rows[ri][pk] !== undefined) {
           rows[ri][pk] = 100 - rows[ri][pk];
         }
+      }
+    }
+
+    // Apply min IP filter AFTER percentiles (don't change comparison group)
+    if (filters.minIp) {
+      if (filters.minIp === 'Q') {
+        rows = rows.filter(function (r) { return r._qualified; });
+      } else {
+        rows = rows.filter(function (r) { return (r.ip || 0) >= filters.minIp; });
       }
     }
 
@@ -1350,7 +1355,7 @@ const Aggregator = {
 
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
-      if ((obj.pa || 0) < (filters.minCount || 1)) continue;
+      if (filters.minCount !== 'Q' && (obj.pa || 0) < (filters.minCount || 1)) continue;
       if (filters.minSwings && obj.nSwings < filters.minSwings) continue;
       if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
 
@@ -1412,6 +1417,15 @@ const Aggregator = {
           rows[ri2][pk2] = 100 - rows[ri2][pk2];
         }
       }
+    }
+
+    // Apply min PA qualified filter AFTER percentiles
+    if (filters.minCount === 'Q') {
+      const tgHitter = this.getTeamGamesPlayed();
+      rows = rows.filter(function (r) {
+        var tg = tgHitter[r.team] || 0;
+        return (r.pa || 0) >= tg * 3.1;
+      });
     }
 
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
