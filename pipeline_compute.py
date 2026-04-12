@@ -15,14 +15,14 @@ from pipeline_utils import (
 # ── Metric / leaderboard constants ───────────────────────────────────────
 
 METRIC_COLS = [
-    'Velocity', 'EffectiveVelo', 'Spin Rate', 'IndVertBrk', 'HorzBrk',
+    'Velocity', 'EffectiveVelo', 'Spin Rate', 'xIndVrtBrk', 'xHorzBrk',
     'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA'
 ]
 
 METRIC_KEYS = {
     'Velocity': 'velocity', 'EffectiveVelo': 'effectiveVelo',
     'Spin Rate': 'spinRate',
-    'IndVertBrk': 'indVertBrk', 'HorzBrk': 'horzBrk',
+    'xIndVrtBrk': 'indVertBrk', 'xHorzBrk': 'horzBrk',
     'RelPosZ': 'relPosZ', 'RelPosX': 'relPosX',
     'Extension': 'extension', 'ArmAngle': 'armAngle',
     'VAA': 'vaa', 'HAA': 'haa',

@@ -233,6 +233,11 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
                     val = None
                 pitch[col_name] = val
             pitch['_source'] = tab_name if is_extra else 'MLB'
+            # Fallback: use raw movement if adjusted values not yet backfilled
+            if pitch.get('xIndVrtBrk') is None and pitch.get('IndVertBrk') is not None:
+                pitch['xIndVrtBrk'] = pitch['IndVertBrk']
+            if pitch.get('xHorzBrk') is None and pitch.get('HorzBrk') is not None:
+                pitch['xHorzBrk'] = pitch['HorzBrk']
             pitches.append(pitch)
     return pitches
 

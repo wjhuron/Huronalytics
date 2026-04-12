@@ -206,8 +206,8 @@ def generate_micro_data(all_pitches):
     #  49:sumEffVelo 50:nEffVelo
     # ==========================================================
     METRIC_OFFSETS = [
-        ('Velocity', 22), ('Spin Rate', 24), ('IndVertBrk', 26),
-        ('HorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
+        ('Velocity', 22), ('Spin Rate', 24), ('xIndVrtBrk', 26),
+        ('xHorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
         ('Extension', 34), ('ArmAngle', 36), ('VAA', 38), ('HAA', 40),
         ('PlateZ', 42), ('PlateX', 47), ('EffectiveVelo', 49),
     ]
@@ -1186,8 +1186,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         for p in all_pitches:
             pt = p.get('Pitch Type') or p.get('TaggedPitchType')
             throws = p.get('Throws')
-            ivb = safe_float(p.get('IndVertBrk'))
-            hb = safe_float(p.get('HorzBrk'))
+            ivb = safe_float(p.get('xIndVrtBrk'))
+            hb = safe_float(p.get('xHorzBrk'))
             if not pt or not throws or ivb is None or hb is None:
                 continue
             key = pt + '_' + throws
@@ -1496,8 +1496,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if (pitcher, team) in ep_pitchers:
             continue
         pt = p.get('Pitch Type')
-        ivb = safe_float(p.get('IndVertBrk'))
-        hb = safe_float(p.get('HorzBrk'))
+        ivb = safe_float(p.get('xIndVrtBrk'))
+        hb = safe_float(p.get('xHorzBrk'))
         velo = safe_float(p.get('Velocity'))
         spin = safe_float(p.get('Spin Rate'))
         tilt = p.get('OTilt') or p.get('Break Tilt')
