@@ -323,7 +323,9 @@ def compute_hitter_stats(pitches):
 
     n_2b = sum(1 for p in pa_pitches if p['Event'] == 'Double')
     n_3b = sum(1 for p in pa_pitches if p['Event'] == 'Triple')
+    n_h = sum(1 for p in pa_pitches if p['Event'] in HIT_EVENTS)
     n_hr = sum(1 for p in pa_pitches if p['Event'] == 'Home Run')
+    n_k = sum(1 for p in pa_pitches if p['Event'] in K_EVENTS)
     n_bb_all = sum(1 for p in pa_pitches if p['Event'] in BB_EVENTS)
     n_hbp = sum(1 for p in pa_pitches if p['Event'] in HBP_EVENTS)
     n_sf = sum(1 for p in pa_pitches if p['Event'] in SF_EVENTS)
@@ -332,6 +334,8 @@ def compute_hitter_stats(pitches):
 
     n_ab = n_pa - n_bb_all - n_hbp - n_sf - n_sh - n_ci
     xbh = n_2b + n_3b + n_hr
+    babip_denom = n_ab - n_k - n_hr + n_sf
+    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
     n_swings = sum(1 for p in pitches if p['Description'] in SWING_DESCRIPTIONS)
     whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
@@ -467,6 +471,7 @@ def compute_hitter_stats(pitches):
         'maxEV': round(max(ev_valid), 1) if ev_valid else None,
         'medLA': round(median(all_la), 1) if all_la else None,
         'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
+        'babip': babip,
         'barrelPct': barrels / len(ev_valid) if ev_valid else None,
         'gbPct': gb / n_bip if n_bip > 0 else None,
         'ldPct': ld / n_bip if n_bip > 0 else None,

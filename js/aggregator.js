@@ -1647,6 +1647,8 @@ const Aggregator = {
       const batting_avg = ab > 0 ? Math.round(h / ab * 1000) / 1000 : null;
       const slg_val = ab > 0 ? Math.round(tb_val / ab * 1000) / 1000 : null;
       const iso_val = (slg_val !== null && batting_avg !== null) ? Math.round((slg_val - batting_avg) * 1000) / 1000 : null;
+      const babip_denom3 = ab - k - hr + sf;
+      const babip_val3 = babip_denom3 > 0 ? Math.round((h - hr) / babip_denom3 * 1000) / 1000 : null;
 
       const izSwingPct = izPitches > 0 ? izSwings / izPitches : null;
       const chasePct_val = oozPitches > 0 ? oozSwings / oozPitches : null;
@@ -1699,6 +1701,7 @@ const Aggregator = {
         avg: batting_avg,
         slg: slg_val,
         iso: iso_val,
+        babip: babip_val3,
         avgEVAll: avgEVAll2,
         ev50: ev50,
         maxEV: maxEV,

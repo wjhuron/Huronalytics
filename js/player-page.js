@@ -59,8 +59,8 @@ var PlayerPage = {
     { key: 'ops', label: 'OPS', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'iso', label: 'ISO', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
-    { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
-    { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
     { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'doubles', label: '2B', format: function(v) { return v != null ? v : '—'; } },
@@ -124,7 +124,7 @@ var PlayerPage = {
     { key: 'breakTilt', label: 'OTilt', format: function(v) { return v || '—'; } },
     { key: 'indVertBrk', label: 'IVB',  format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
-    { key: 'armAngle',  label: 'Arm\u00B0', format: function(v) { return v != null ? v.toFixed(1) + '\u00B0' : '—'; } },
+    { key: 'armAngle',  label: 'Arm\u00B0', format: function(v) { return v != null ? v.toFixed(1) + '\u00B0' : '—'; }, rocHide: true },
   ],
 
   // Expanded pitch metrics table (full detail view)
@@ -133,7 +133,7 @@ var PlayerPage = {
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'usagePct', label: 'Usage', format: function(v) { return Utils.formatPct(v); } },
     { key: 'velocity', label: 'Velo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
-    { key: 'effectiveVelo', label: 'EffVelo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'effectiveVelo', label: 'EffVelo', format: function(v) { return v != null ? v.toFixed(1) : '—'; }, rocHide: true },
     { key: 'maxVelo', label: 'Max Velo', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'spinRate', label: 'Spin', format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'breakTilt', label: 'OTilt', format: function(v) { return v || '—'; } },
@@ -144,7 +144,7 @@ var PlayerPage = {
     { key: 'xHB', label: 'xHB', format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'hbOE', label: 'HBOE', format: function(v) { return v != null ? (v > 0 ? '+' : '') + v.toFixed(1) + '"' : '—'; } },
     { key: 'extension', label: 'Ext', format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
-    { key: 'armAngle', label: 'Arm Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
+    { key: 'armAngle', label: 'Arm Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; }, rocHide: true },
     { key: 'nVAA', label: 'nVAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
     { key: 'nHAA', label: 'nHAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
   ],
@@ -326,6 +326,7 @@ var PlayerPage = {
     // Check if ROC player
     var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
     var isROCPlayer = rocTeams.indexOf(data.team) !== -1;
+    this._isROC = isROCPlayer;
 
     if (!isROCPlayer) {
       this._renderPitchRunValues(filteredData);
@@ -471,6 +472,7 @@ var PlayerPage = {
     // Check if this is a ROC/AAA player (no run value, bat speed, or expected stats)
     var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
     var isROCPlayer = rocTeams.indexOf(data.team) !== -1;
+    this._isROC = isROCPlayer;
 
     if (!isROCPlayer) {
       this._renderHitterRunValue(data);
@@ -1163,19 +1165,23 @@ var PlayerPage = {
     var filteredPitches = this._getFilteredDetails(data);
     if (filteredPitches.length === 0) return;
 
-    // Compute and display average arm angle
+    // Compute and display average arm angle (hide for ROC — no arm angle data)
     var aaLabel = document.getElementById('player-arm-angle');
     if (aaLabel) {
-      var aaVals = [];
-      for (var ai = 0; ai < filteredPitches.length; ai++) {
-        if (filteredPitches[ai].aa != null) aaVals.push(filteredPitches[ai].aa);
-      }
-      if (aaVals.length > 0) {
-        var avgAA = (aaVals.reduce(function(a,b){return a+b;},0) / aaVals.length).toFixed(1);
-        aaLabel.textContent = 'Arm Angle = ' + avgAA + '\u00B0';
-        aaLabel.style.display = '';
-      } else {
+      if (this._isROC) {
         aaLabel.style.display = 'none';
+      } else {
+        var aaVals = [];
+        for (var ai = 0; ai < filteredPitches.length; ai++) {
+          if (filteredPitches[ai].aa != null) aaVals.push(filteredPitches[ai].aa);
+        }
+        if (aaVals.length > 0) {
+          var avgAA = (aaVals.reduce(function(a,b){return a+b;},0) / aaVals.length).toFixed(1);
+          aaLabel.textContent = 'Arm Angle = ' + avgAA + '\u00B0';
+          aaLabel.style.display = '';
+        } else {
+          aaLabel.style.display = 'none';
+        }
       }
     }
     var groups = {};
@@ -1505,15 +1511,20 @@ var PlayerPage = {
     var pitchRows = filtered.length > 0 ? this._aggregateDetailsToRows(filtered) : [];
     if (pitchRows.length === 0) return;
 
+    var cols = this.PITCH_TABLE_COLS;
+    if (this._isROC) {
+      cols = cols.filter(function (c) { return !c.rocHide; });
+    }
+
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table';
 
     // Header
     var thead = document.createElement('thead');
     var headerRow = document.createElement('tr');
-    for (var i = 0; i < this.PITCH_TABLE_COLS.length; i++) {
+    for (var i = 0; i < cols.length; i++) {
       var th = document.createElement('th');
-      th.textContent = this.PITCH_TABLE_COLS[i].label;
+      th.textContent = cols[i].label;
       headerRow.appendChild(th);
     }
     thead.appendChild(headerRow);
@@ -1524,8 +1535,8 @@ var PlayerPage = {
     for (var r = 0; r < pitchRows.length; r++) {
       var row = pitchRows[r];
       var tr = document.createElement('tr');
-      for (var c = 0; c < this.PITCH_TABLE_COLS.length; c++) {
-        var col = this.PITCH_TABLE_COLS[c];
+      for (var c = 0; c < cols.length; c++) {
+        var col = cols[c];
         var td = document.createElement('td');
         if (col.key === 'pitchType') {
           var badge = document.createElement('span');
@@ -1711,15 +1722,20 @@ var PlayerPage = {
     // Get velocity trend data for sparklines
     var veloTrend = Aggregator.loaded ? Aggregator.getVeloTrend(data.pitcher, data.team) : {};
 
+    var cols = this.EXPANDED_PITCH_COLS;
+    if (this._isROC) {
+      cols = cols.filter(function (c) { return !c.rocHide; });
+    }
+
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
 
     // Header
     var thead = document.createElement('thead');
     var headerRow = document.createElement('tr');
-    for (var i = 0; i < this.EXPANDED_PITCH_COLS.length; i++) {
+    for (var i = 0; i < cols.length; i++) {
       var th = document.createElement('th');
-      th.textContent = this.EXPANDED_PITCH_COLS[i].label;
+      th.textContent = cols[i].label;
       headerRow.appendChild(th);
     }
     // Add Velo Trend column header
@@ -1735,8 +1751,8 @@ var PlayerPage = {
     for (var r = 0; r < pitchRows.length; r++) {
       var row = pitchRows[r];
       var tr = document.createElement('tr');
-      for (var c = 0; c < this.EXPANDED_PITCH_COLS.length; c++) {
-        var col = this.EXPANDED_PITCH_COLS[c];
+      for (var c = 0; c < cols.length; c++) {
+        var col = cols[c];
         var td = document.createElement('td');
         if (col.key === 'pitchType') {
           var badge = document.createElement('span');
