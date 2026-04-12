@@ -633,7 +633,7 @@ const Aggregator = {
       });
     }
     // Compute percentiles with IP-based qualifying
-    // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP/team game.
+    // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP (⅓ inning)/team game.
     const teamGames = this.getTeamGamesPlayed();
     // Mark each row as qualified or not
     for (let qi = 0; qi < rows.length; qi++) {
@@ -647,7 +647,7 @@ const Aggregator = {
       }
       const pg = r.g || 0, pgs = r.gs || 0;
       const isStarter = pg > 0 && (pgs / pg) > 0.5;
-      r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg * 0.1);
+      r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
     }
     // Set bipQual flag BEFORE percentiles so BIP stats can use it
     const BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };

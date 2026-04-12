@@ -836,7 +836,7 @@ var PlayerPage = {
       var g = data.g || 0;
       var gs = data.gs || 0;
       var isStarter = g > 0 && (gs / g) > 0.5;
-      var ipThreshold = isStarter ? tg * 1.0 : tg * 0.1;
+      var ipThreshold = isStarter ? tg * 1.0 : tg / 3;
       isQualified = ipFloat >= ipThreshold;
     } else {
       isQualified = (data.pa || 0) >= tg * 3.1;

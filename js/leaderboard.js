@@ -782,10 +782,14 @@ const Leaderboard = {
           const HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
             hardHitPct: true, barrelPct: true,
-            xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true,
-            babip: true, hrFbPct: true, airPullPct: true,
+            xwOBAsp: true, airPullPct: true,
             gbPct: true, ldPct: true, fbPct: true, puPct: true,
             pullPct: true, middlePct: true, oppoPct: true
+          };
+          // Hitter stats that use PA qualifier (3.1 PA/team game) — NOT BIP
+          const HITTER_PA_STATS = {
+            babip: true, hrFbPct: true,
+            xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true
           };
           // Hitter stats that require ≥10 competitive swings
           const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, blastPct: true, idealAAPct: true };
@@ -804,7 +808,7 @@ const Leaderboard = {
             const rg = row.g || 0;
             const rgs = row.gs || 0;
             const isStarter = rg > 0 && (rgs / rg) > 0.5;
-            const ipThresh = isStarter ? tg * 1.0 : tg * 0.1;
+            const ipThresh = isStarter ? tg * 1.0 : tg / 3;
             showColor = ipFloat >= ipThresh;
             // Pitcher always-color: FB velo, extension
             if (!showColor) showColor = col.key === 'fbVelo' || col.key === 'extension';
@@ -816,6 +820,8 @@ const Leaderboard = {
             const paQual = (row.pa || 0) >= tg * 3.1;
             if (HITTER_BIP_STATS[col.key]) {
               showColor = (row.nBip || 0) >= 20;
+            } else if (HITTER_PA_STATS[col.key]) {
+              showColor = paQual;
             } else if (HITTER_BAT_TRACKING[col.key]) {
               showColor = (row.nCompSwings || 0) >= 10;
             } else if (col.key === 'sprintSpeed') {

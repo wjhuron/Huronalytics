@@ -162,7 +162,7 @@ const DataStore = {
           var ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
           var pg = row.g || 0, pgs = row.gs || 0;
           var isStarter = pg > 0 && (pgs / pg) > 0.5;
-          var ipThresh = isStarter ? ptg * 1.0 : ptg * 0.1;
+          var ipThresh = isStarter ? ptg * 1.0 : ptg / 3;
           if (ipFloat < ipThresh) return false;
         } else if ((row.ip || 0) < filters.minIp) return false;
       }
