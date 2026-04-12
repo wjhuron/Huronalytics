@@ -504,7 +504,7 @@ const Aggregator = {
     const babip_denom = ab - k - hr + sf;
     const babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
     const fpsPct = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
-    const fb_for_hrfb = fb_cnt + pu_cnt + ldHr;
+    const fb_for_hrfb = fb_cnt + pu_cnt;
     const hrFbPct = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
     const pitcherName = lookups.pitchers[g.pitcherIdx];
@@ -1133,15 +1133,15 @@ const Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           batsSet: {},
-          counts: new Array(47)
+          counts: new Array(49)
         };
-        for (let z = 0; z < 47; z++) groups[gk].counts[z] = 0;
+        for (let z = 0; z < 49; z++) groups[gk].counts[z] = 0;
       }
 
       const g = groups[gk];
       g.batsSet[row[ci.bats]] = true;
 
-      for (let f = 0; f < 47; f++) {
+      for (let f = 0; f < 49; f++) {
         g.counts[f] += row[5 + f];
       }
     }
@@ -1202,6 +1202,7 @@ const Aggregator = {
       const firstPitchAppearances = c[37], firstPitchSwings = c[38];
       const xBA_sum = c[39], xBA_count = c[40], xSLG_sum = c[41], xSLG_count = c[42];
       const xwOBA_sum = c[43], xwOBA_count = c[44], xwOBAcon_sum = c[45], xwOBAcon_count = c[46];
+      const swingsNonBunt = c[47], contactNonBunt = c[48];
 
       const ab = pa - bb - hbp - sf - sh - ci_v;
       const singles = h - db - tp - hr;
@@ -1223,10 +1224,9 @@ const Aggregator = {
       const chasePct_val = oozPitches > 0 ? oozSwings / oozPitches : null;
       const izSwChase = (izSwingPct !== null && chasePct_val !== null)
         ? Math.round((izSwingPct - chasePct_val) * 10000) / 10000 : null;
-      const contactPct = swings > 0 ? contact / swings : null;
+      const contactPct = swingsNonBunt > 0 ? contactNonBunt / swingsNonBunt : null;
       const izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
-      const hardHitPct = bip > 0 ? hardHit / bip : null;
-      const fb_for_hrfb = fb + pu + ldHr;
+      const fb_for_hrfb = fb + pu;
       const hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians
@@ -1251,6 +1251,9 @@ const Aggregator = {
         const topHalf = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 2)));
         ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
       }
+
+      // hardHitPct and barrelPct: use EV-valid count as denominator (not total BIP)
+      const hardHitPct = evsAll.length > 0 ? hardHit / evsAll.length : null;
 
       // xwOBAsp — compute from BIP records using hand-specific zone table with pooled fallback
       let xwOBAsp_val = null;
@@ -1305,7 +1308,7 @@ const Aggregator = {
         maxEV: maxEV,
         medLA: medLA,
         hardHitPct: hardHitPct,
-        barrelPct: bip > 0 ? barrels / bip : null,
+        barrelPct: evsAll.length > 0 ? barrels / evsAll.length : null,
         xwOBAsp: xwOBAsp_val,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
@@ -1505,11 +1508,11 @@ const Aggregator = {
           hitterIdx: row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           pitchTypeIdx: row[ci.pitchTypeIdx],
-          counts: new Array(47)
+          counts: new Array(49)
         };
-        for (let z = 0; z < 47; z++) perPT[gk].counts[z] = 0;
+        for (let z = 0; z < 49; z++) perPT[gk].counts[z] = 0;
       }
-      for (let f = 0; f < 47; f++) {
+      for (let f = 0; f < 49; f++) {
         perPT[gk].counts[f] += row[6 + f];
       }
     }
@@ -1567,13 +1570,13 @@ const Aggregator = {
               hitterIdx: entry.hitterIdx,
               teamIdx: entry.teamIdx,
               outputName: og.name,
-              counts: new Array(47),
+              counts: new Array(49),
               bipPtIdxs: []
             };
-            for (let z2 = 0; z2 < 47; z2++) groups[outKey].counts[z2] = 0;
+            for (let z2 = 0; z2 < 49; z2++) groups[outKey].counts[z2] = 0;
           }
           const gg = groups[outKey];
-          for (let f2 = 0; f2 < 47; f2++) {
+          for (let f2 = 0; f2 < 49; f2++) {
             gg.counts[f2] += entry.counts[f2];
           }
           if (gg.bipPtIdxs.indexOf(ptIdx) === -1) gg.bipPtIdxs.push(ptIdx);
@@ -1588,12 +1591,12 @@ const Aggregator = {
             hitterIdx: entry.hitterIdx,
             teamIdx: entry.teamIdx,
             outputName: ptName,
-            counts: new Array(47),
+            counts: new Array(49),
             bipPtIdxs: [ptIdx]
           };
-          for (let z3 = 0; z3 < 47; z3++) groups[outKey2].counts[z3] = 0;
+          for (let z3 = 0; z3 < 49; z3++) groups[outKey2].counts[z3] = 0;
         }
-        for (let f3 = 0; f3 < 47; f3++) {
+        for (let f3 = 0; f3 < 49; f3++) {
           groups[outKey2].counts[f3] += entry.counts[f3];
         }
       }
@@ -1635,6 +1638,7 @@ const Aggregator = {
       const firstPitchAppearances = c[37], firstPitchSwings = c[38];
       const xBA_sum = c[39], xBA_count = c[40], xSLG_sum = c[41], xSLG_count = c[42];
       const xwOBA_sum = c[43], xwOBA_count = c[44], xwOBAcon_sum = c[45], xwOBAcon_count = c[46];
+      const swingsNonBunt = c[47], contactNonBunt = c[48];
 
       const ab = pa - bb - hbp - sf - sh - ci_v;
       const singles = h - db - tp - hr;
@@ -1646,10 +1650,9 @@ const Aggregator = {
 
       const izSwingPct = izPitches > 0 ? izSwings / izPitches : null;
       const chasePct_val = oozPitches > 0 ? oozSwings / oozPitches : null;
-      const contactPct = swings > 0 ? contact / swings : null;
+      const contactPct = swingsNonBunt > 0 ? contactNonBunt / swingsNonBunt : null;
       const izContactPct = izSwNonBunt > 0 ? izContact / izSwNonBunt : null;
-      const hardHitPct = bip > 0 ? hardHit / bip : null;
-      const fb_for_hrfb = fb + pu + ldHr;
+      const fb_for_hrfb = fb + pu;
       const hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians — combine BIP records from all pitch types in this group
@@ -1677,6 +1680,9 @@ const Aggregator = {
         ev50 = Math.round(topHalf.reduce(function (s, v) { return s + v; }, 0) / topHalf.length * 10) / 10;
       }
 
+      // hardHitPct and barrelPct: use EV-valid count as denominator (not total BIP)
+      const hardHitPct = evsAll2.length > 0 ? hardHit / evsAll2.length : null;
+
       const hpName = lookups.hitters[gg2.hitterIdx];
       const hpTeam = lookups.teams[gg2.teamIdx];
       const obj = {
@@ -1698,7 +1704,7 @@ const Aggregator = {
         maxEV: maxEV,
         medLA: medLA,
         hardHitPct: hardHitPct,
-        barrelPct: bip > 0 ? barrels / bip : null,
+        barrelPct: evsAll2.length > 0 ? barrels / evsAll2.length : null,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,

@@ -276,7 +276,7 @@ def compute_pitcher_batted_ball(pitches):
     max_ev = round(max(ev_valid), 1) if ev_valid else None
 
     hard_hit = sum(1 for v in ev_valid if v >= 95)
-    hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
+    hard_hit_pct = hard_hit / len(ev_valid) if ev_valid else None
 
     has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
     if has_barrel_col:
@@ -287,7 +287,7 @@ def compute_pitcher_batted_ball(pitches):
                        if safe_float(p.get('ExitVelo')) is not None
                        and safe_float(p.get('LaunchAngle')) is not None]
         barrels = sum(1 for ev, la in ev_la_pairs if is_barrel(ev, la))
-    barrel_pct = barrels / n_bip if n_bip > 0 else None
+    barrel_pct = barrels / len(ev_valid) if ev_valid else None
 
     ld = sum(1 for p in bip if p.get('BBType') == 'line_drive')
     fb = sum(1 for p in bip if p.get('BBType') == 'fly_ball')
@@ -345,8 +345,13 @@ def compute_hitter_stats(pitches):
     iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
     chase_pct = ooz_swings / len(ooz_pitches) if ooz_pitches else None
 
-    contact = sum(1 for p in pitches if p['Description'] in ('Foul', 'In Play'))
-    contact_pct = contact / n_swings if n_swings > 0 else None
+    swings_non_bunt = sum(1 for p in pitches
+                          if p['Description'] in SWING_DESCRIPTIONS
+                          and p.get('BBType') not in BUNT_BB_TYPES)
+    contact_non_bunt = sum(1 for p in pitches
+                           if p['Description'] in ('Foul', 'In Play')
+                           and p.get('BBType') not in BUNT_BB_TYPES)
+    contact_pct = contact_non_bunt / swings_non_bunt if swings_non_bunt > 0 else None
 
     iz_swings_non_bunt = sum(1 for p in iz_pitches
                              if p['Description'] in SWING_DESCRIPTIONS
@@ -401,7 +406,7 @@ def compute_hitter_stats(pitches):
     ev_valid = [safe_float(p.get('ExitVelo')) for p in bip]
     ev_valid = [v for v in ev_valid if v is not None]
     hard_hit = sum(1 for v in ev_valid if v >= 95)
-    hard_hit_pct = hard_hit / n_bip if n_bip > 0 else None
+    hard_hit_pct = hard_hit / len(ev_valid) if ev_valid else None
 
     n_hr_fb = sum(1 for p in bip if p.get('Event') == 'Home Run')
     fb_for_hrfb = fb + pu
@@ -462,7 +467,7 @@ def compute_hitter_stats(pitches):
         'maxEV': round(max(ev_valid), 1) if ev_valid else None,
         'medLA': round(median(all_la), 1) if all_la else None,
         'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
-        'barrelPct': barrels / n_bip if n_bip > 0 else None,
+        'barrelPct': barrels / len(ev_valid) if ev_valid else None,
         'gbPct': gb / n_bip if n_bip > 0 else None,
         'ldPct': ld / n_bip if n_bip > 0 else None,
         'fbPct': fb / n_bip if n_bip > 0 else None,

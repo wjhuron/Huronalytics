@@ -372,7 +372,7 @@ def generate_micro_data(all_pitches):
     #  39:xBA_sum  40:xBA_count  41:xSLG_sum  42:xSLG_count
     #  43:xwOBA_sum  44:xwOBA_count  45:xwOBAcon_sum  46:xwOBAcon_count
     # ==========================================================
-    hitter_micro = defaultdict(lambda: [0.0] * 47)
+    hitter_micro = defaultdict(lambda: [0.0] * 49)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -436,6 +436,12 @@ def generate_micro_data(all_pitches):
         # Contact (overall)
         if desc in ('Foul', 'In Play'):
             c[18] += 1
+
+        # Contact excluding bunts (for contactPct)
+        if desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES:
+            c[47] += 1  # swingsNonBunt
+        if desc in ('Foul', 'In Play') and bb_type not in BUNT_BB_TYPES:
+            c[48] += 1  # contactNonBunt
 
         # Batted ball data (non-bunt BIPs)
         if bb_type and bb_type not in BUNT_BB_TYPES:
@@ -505,7 +511,7 @@ def generate_micro_data(all_pitches):
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
         row = [hi, ti, bats, di, ph]
-        for i in range(47):
+        for i in range(49):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_rows.append(row)
@@ -573,7 +579,7 @@ def generate_micro_data(all_pitches):
     #  Key: (hitterIdx, teamIdx, bats, pitchTypeIdx, dateIdx, pitcherHand)
     #  Same 47 count fields as hitter micro
     # ==========================================================
-    hitter_pitch_micro = defaultdict(lambda: [0.0] * 47)
+    hitter_pitch_micro = defaultdict(lambda: [0.0] * 49)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -633,6 +639,12 @@ def generate_micro_data(all_pitches):
 
         if desc in ('Foul', 'In Play'):
             c[18] += 1  # contact
+
+        # Contact excluding bunts (for contactPct)
+        if desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES:
+            c[47] += 1  # swingsNonBunt
+        if desc in ('Foul', 'In Play') and bb_type not in BUNT_BB_TYPES:
+            c[48] += 1  # contactNonBunt
 
         if bb_type and bb_type not in BUNT_BB_TYPES:
             c[21] += 1  # bip
@@ -699,7 +711,7 @@ def generate_micro_data(all_pitches):
     hitter_pitch_rows = []
     for (hi, ti, bats, pti, di, ph), c in hitter_pitch_micro.items():
         row = [hi, ti, bats, pti, di, ph]
-        for i in range(47):
+        for i in range(49):
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_pitch_rows.append(row)
