@@ -101,6 +101,9 @@ const DataStore = {
     const rocTeamsArr = (this.metadata && this.metadata.rocTeams) || [];
     var rocTeamSet = {};
     for (var ri = 0; ri < rocTeamsArr.length; ri++) rocTeamSet[rocTeamsArr[ri]] = true;
+    // Team games for per-team qualifying thresholds
+    var _teamGames = (filters.minIp === 'Q' || filters.minCount === 'Q')
+      ? (Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {}) : {};
     return source.filter(function (row) {
       // Hide ROC players unless user explicitly selected their team
       if (rocTeamSet[row.team] && filters.team !== row.team) return false;
@@ -143,7 +146,8 @@ const DataStore = {
       // Min count: use PA for hitters, pitch count for pitchers and hitterPitch
       if (tab === 'hitter') {
         if (filters.minCount === 'Q') {
-          if (!row._qualified) return false;
+          var tg = _teamGames[row.team] || 0;
+          if ((row.pa || 0) < tg * 3.1) return false;
         } else if ((row.pa || 0) < filters.minCount) return false;
       } else {
         if (row.count < filters.minCount) return false;
@@ -152,7 +156,14 @@ const DataStore = {
       if (tab === 'pitcher' && filters.minTbf && (row.pa || 0) < filters.minTbf) return false;
       if (tab === 'pitcher' && filters.minIp) {
         if (filters.minIp === 'Q') {
-          if (!row._qualified) return false;
+          var ptg = _teamGames[row.team] || 0;
+          var ipStr = String(row.ip || '0');
+          var ipParts = ipStr.split('.');
+          var ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
+          var pg = row.g || 0, pgs = row.gs || 0;
+          var isStarter = pg > 0 && (pgs / pg) > 0.5;
+          var ipThresh = isStarter ? ptg * 1.0 : ptg * 0.1;
+          if (ipFloat < ipThresh) return false;
         } else if ((row.ip || 0) < filters.minIp) return false;
       }
       if ((tab === 'pitcher' || tab === 'hitter') && filters.minBip && row.nBip != null && row.nBip < filters.minBip) return false;
