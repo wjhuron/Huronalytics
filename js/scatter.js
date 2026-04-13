@@ -183,7 +183,7 @@ const ScatterChart = {
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                return ctx.dataset.label + ': HB ' + ctx.parsed.x + ', IVB ' + ctx.parsed.y;
+                return ctx.dataset.label + ': IVB ' + ctx.parsed.y + ', HB ' + ctx.parsed.x;
               }
             }
           }
@@ -275,7 +275,7 @@ const ScatterChart = {
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                return ctx.dataset.label + ': HB ' + ctx.parsed.x + ', IVB ' + ctx.parsed.y;
+                return ctx.dataset.label + ': IVB ' + ctx.parsed.y + ', HB ' + ctx.parsed.x;
               }
             }
           }

@@ -1282,7 +1282,7 @@ var PlayerPage = {
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                return ctx.dataset.label + ': HB ' + ctx.parsed.x.toFixed(1) + ', IVB ' + ctx.parsed.y.toFixed(1);
+                return ctx.dataset.label + ': IVB ' + ctx.parsed.y.toFixed(1) + ', HB ' + ctx.parsed.x.toFixed(1);
               },
             },
           },
