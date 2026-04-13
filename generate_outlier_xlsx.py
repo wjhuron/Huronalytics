@@ -2,6 +2,7 @@
 """Generate Excel outlier report from outlier_results.json."""
 
 import json
+import os
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter

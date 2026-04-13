@@ -13,7 +13,10 @@ import unicodedata
 import re
 from collections import defaultdict
 
-SPREADSHEET_ID = '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo'
+SPREADSHEET_IDS = {
+    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',
+    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',
+}
 SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 
 MLB_TEAMS = {
@@ -57,8 +60,13 @@ def main():
     scopes = ['https://www.googleapis.com/auth/spreadsheets']
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
-    sh = gc.open_by_key(SPREADSHEET_ID)
-    print(f"Spreadsheet: {sh.title} ({len(sh.worksheets())} sheets)")
+
+    # Open both AL and NL spreadsheets
+    spreadsheets = {}
+    for league, sid in SPREADSHEET_IDS.items():
+        spreadsheets[league] = gc.open_by_key(sid)
+        sh = spreadsheets[league]
+        print(f"Spreadsheet ({league}): {sh.title} ({len(sh.worksheets())} sheets)")
 
     # ===== PASS 1: Read all data, build Batter -> MLB team mapping =====
     print("\n--- Pass 1: Reading all sheets to build MLB team mapping ---")
@@ -67,28 +75,29 @@ def main():
     # All (batter_name, bteam) pairs for name duplicate check
     all_batter_entries = []
 
-    for i, ws in enumerate(sh.worksheets()):
-        print(f"  Reading {ws.title}...")
-        if i > 0:
-            time.sleep(1.5)
-        rows = read_sheet_with_retry(ws)
-        if not rows:
-            continue
-        header = rows[0]
-        col_idx = {name: j for j, name in enumerate(header) if name}
+    for league, sh in spreadsheets.items():
+        for i, ws in enumerate(sh.worksheets()):
+            print(f"  [{league}] Reading {ws.title}...")
+            if i > 0:
+                time.sleep(1.5)
+            rows = read_sheet_with_retry(ws)
+            if not rows:
+                continue
+            header = rows[0]
+            col_idx = {name: j for j, name in enumerate(header) if name}
 
-        batter_col = col_idx.get('Batter')
-        bteam_col = col_idx.get('BTeam')
-        if batter_col is None or bteam_col is None:
-            print(f"    Skipping {ws.title} (no Batter/BTeam columns)")
-            continue
+            batter_col = col_idx.get('Batter')
+            bteam_col = col_idx.get('BTeam')
+            if batter_col is None or bteam_col is None:
+                print(f"    Skipping {ws.title} (no Batter/BTeam columns)")
+                continue
 
-        for row in rows[1:]:
-            batter = row[batter_col] if batter_col < len(row) else ''
-            bteam = row[bteam_col] if bteam_col < len(row) else ''
-            if batter and bteam:
-                batter_teams[batter].add(bteam)
-                all_batter_entries.append((batter, bteam))
+            for row in rows[1:]:
+                batter = row[batter_col] if batter_col < len(row) else ''
+                bteam = row[bteam_col] if bteam_col < len(row) else ''
+                if batter and bteam:
+                    batter_teams[batter].add(bteam)
+                    all_batter_entries.append((batter, bteam))
 
     # Build mapping: batters who have both MLB and country teams
     batter_mlb_map = {}  # batter_name -> MLB team
@@ -110,49 +119,50 @@ def main():
     print(f"\n--- Pass 2: Updating BTeam values in spreadsheet ---")
     total_updates = 0
 
-    for i, ws in enumerate(sh.worksheets()):
-        if i > 0:
-            time.sleep(1.5)
-        rows = read_sheet_with_retry(ws)
-        if not rows:
-            continue
-        header = rows[0]
-        col_idx = {name: j for j, name in enumerate(header) if name}
+    for league, sh in spreadsheets.items():
+        for i, ws in enumerate(sh.worksheets()):
+            if i > 0:
+                time.sleep(1.5)
+            rows = read_sheet_with_retry(ws)
+            if not rows:
+                continue
+            header = rows[0]
+            col_idx = {name: j for j, name in enumerate(header) if name}
 
-        batter_col = col_idx.get('Batter')
-        bteam_col = col_idx.get('BTeam')
-        if batter_col is None or bteam_col is None:
-            continue
+            batter_col = col_idx.get('Batter')
+            bteam_col = col_idx.get('BTeam')
+            if batter_col is None or bteam_col is None:
+                continue
 
-        # Collect cells that need updating (row, col, new_value)
-        # gspread uses 1-indexed rows and columns
-        updates = []
-        for r_idx, row in enumerate(rows[1:], start=2):  # start=2 because row 1 is header
-            batter = row[batter_col] if batter_col < len(row) else ''
-            bteam = row[bteam_col] if bteam_col < len(row) else ''
-            if batter in batter_mlb_map and bteam not in MLB_TEAMS and bteam:
-                updates.append({
-                    'row': r_idx,
-                    'col': bteam_col + 1,  # gspread is 1-indexed
-                    'old': bteam,
-                    'new': batter_mlb_map[batter],
-                    'batter': batter,
-                })
+            # Collect cells that need updating (row, col, new_value)
+            # gspread uses 1-indexed rows and columns
+            updates = []
+            for r_idx, row in enumerate(rows[1:], start=2):  # start=2 because row 1 is header
+                batter = row[batter_col] if batter_col < len(row) else ''
+                bteam = row[bteam_col] if bteam_col < len(row) else ''
+                if batter in batter_mlb_map and bteam not in MLB_TEAMS and bteam:
+                    updates.append({
+                        'row': r_idx,
+                        'col': bteam_col + 1,  # gspread is 1-indexed
+                        'old': bteam,
+                        'new': batter_mlb_map[batter],
+                        'batter': batter,
+                    })
 
-        if updates:
-            print(f"  {ws.title}: {len(updates)} cells to update")
-            # Batch update using cell list
-            cells_to_update = []
-            for u in updates:
-                cell = gspread.Cell(row=u['row'], col=u['col'], value=u['new'])
-                cells_to_update.append(cell)
+            if updates:
+                print(f"  {ws.title}: {len(updates)} cells to update")
+                # Batch update using cell list
+                cells_to_update = []
+                for u in updates:
+                    cell = gspread.Cell(row=u['row'], col=u['col'], value=u['new'])
+                    cells_to_update.append(cell)
 
-            # gspread batch update (max ~50k cells per call)
-            ws.update_cells(cells_to_update, value_input_option='RAW')
-            total_updates += len(updates)
-            time.sleep(2)  # Rate limit buffer after write
-        else:
-            print(f"  {ws.title}: no updates needed")
+                # gspread batch update (max ~50k cells per call)
+                ws.update_cells(cells_to_update, value_input_option='RAW')
+                total_updates += len(updates)
+                time.sleep(2)  # Rate limit buffer after write
+            else:
+                print(f"  {ws.title}: no updates needed")
 
     print(f"\nTotal cells updated: {total_updates}")
 

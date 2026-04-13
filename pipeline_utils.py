@@ -21,7 +21,7 @@ K_EVENTS = {'Strikeout', 'Strikeout Double Play'}
 BB_EVENTS = {'Walk', 'Intent Walk'}
 HBP_EVENTS = {'Hit By Pitch'}
 SF_EVENTS = {'Sac Fly', 'Sac Fly Double Play'}
-SH_EVENTS = {'Sac Bunt'}
+SH_EVENTS = {'Sac Bunt', 'Sac Bunt Double Play'}
 CI_EVENTS = {'Catcher Interference'}
 NON_PA_EVENTS = {
     'Caught Stealing 2B', 'Caught Stealing 3B', 'Caught Stealing Home',
@@ -29,6 +29,8 @@ NON_PA_EVENTS = {
     'Pickoff Caught Stealing 2B', 'Pickoff Caught Stealing 3B',
     'Pickoff Caught Stealing Home',
     'Runner Out', 'Wild Pitch', 'Game Advisory',
+    'Stolen Base 2B', 'Stolen Base 3B', 'Stolen Base Home',
+    'Balk', 'Passed Ball',
 }
 BUNT_BB_TYPES = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 

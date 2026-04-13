@@ -1959,7 +1959,7 @@ var PlayerPage = {
     // Horizontal scroll fade indicator
     container.style.position = 'relative';
     var fadeDiv = document.createElement('div');
-    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, #1a1d21);pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
+    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, var(--bg-card, #1a1d21));pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
     container.appendChild(fadeDiv);
     container.addEventListener('scroll', function() {
       var maxScroll = container.scrollWidth - container.clientWidth;
@@ -2789,104 +2789,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Hitter: Batted Ball Chart (donut) ---
-
-  _renderBattedBallChart: function (data) {
-    this.destroyChart();
-
-    var canvas = document.getElementById('player-pitch-chart');
-    var ctx = canvas.getContext('2d');
-
-    var gb = data.gbPct || 0;
-    var ld = data.ldPct || 0;
-    var fb = data.fbPct || 0;
-    var pu = data.puPct || 0;
-
-    var isDark = document.body.classList.contains('dark');
-    var labelColor = isDark ? '#ccc' : '#333';
-
-    this.chart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['GB', 'LD', 'FB', 'PU'],
-        datasets: [{
-          data: [
-            Math.round(gb * 1000) / 10,
-            Math.round(ld * 1000) / 10,
-            Math.round(fb * 1000) / 10,
-            Math.round(pu * 1000) / 10
-          ],
-          backgroundColor: ['#4e79a7', '#59a14f', '#f28e2b', '#e15759'],
-          borderWidth: 2,
-          borderColor: isDark ? '#1a1a2e' : '#fff'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: '55%',
-        plugins: {
-          legend: {
-            display: true,
-            position: 'bottom',
-            labels: { color: labelColor, usePointStyle: true, padding: 12, font: { size: 12 } }
-          },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                return ctx.label + ': ' + ctx.parsed.toFixed(1) + '%';
-              }
-            }
-          }
-        }
-      }
-    });
-  },
-
-  // --- Hitter: Stats Table (below chart) ---
-
-  _renderHitterStatsTable: function (data) {
-    var container = document.getElementById('player-pitch-usage-table');
-    container.innerHTML = '';
-
-    var statRows = [
-      { label: 'AVG', value: data.avg != null ? data.avg.toFixed(3).replace(/^0/, '') : '—' },
-      { label: 'OBP', value: data.obp != null ? data.obp.toFixed(3).replace(/^0/, '') : '—' },
-      { label: 'SLG', value: data.slg != null ? data.slg.toFixed(3).replace(/^0/, '') : '—' },
-      { label: 'OPS', value: data.ops != null ? data.ops.toFixed(3).replace(/^0/, '') : '—' },
-      { label: 'ISO', value: data.iso != null ? data.iso.toFixed(3).replace(/^0/, '') : '—' },
-      { label: 'BABIP', value: data.babip != null ? data.babip.toFixed(3).replace(/^0/, '') : '—' },
-      { label: 'HR', value: data.hr != null ? data.hr : '—' },
-      { label: 'XBH', value: data.xbh != null ? data.xbh : '—' },
-      { label: 'Pull%', value: data.pullPct != null ? (data.pullPct * 100).toFixed(1) + '%' : '—' },
-      { label: 'Oppo%', value: data.oppoPct != null ? (data.oppoPct * 100).toFixed(1) + '%' : '—' },
-    ];
-
-    var table = document.createElement('table');
-    table.className = 'player-pitch-stats-table';
-    var thead = document.createElement('thead');
-    var hrow = document.createElement('tr');
-    var th1 = document.createElement('th'); th1.textContent = 'Stat'; hrow.appendChild(th1);
-    var th2 = document.createElement('th'); th2.textContent = 'Value'; hrow.appendChild(th2);
-    thead.appendChild(hrow);
-    table.appendChild(thead);
-
-    var tbody = document.createElement('tbody');
-    for (var i = 0; i < statRows.length; i++) {
-      var tr = document.createElement('tr');
-      var tdLabel = document.createElement('td');
-      tdLabel.textContent = statRows[i].label;
-      tdLabel.style.fontWeight = '600';
-      var tdVal = document.createElement('td');
-      tdVal.textContent = statRows[i].value;
-      tr.appendChild(tdLabel);
-      tr.appendChild(tdVal);
-      tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
-    container.appendChild(table);
-  },
-
   // --- Hitter lookup ---
 
   _findHitterByMlbId: function (mlbId) {
@@ -3217,7 +3119,7 @@ var PlayerPage = {
 
   _unbindSprayToggle: function () {
     if (this._sprayToggleHandler) {
-      var el = document.getElementById('spray-toggle');
+      var el = document.getElementById('spray-toggle-inline') || document.getElementById('spray-toggle');
       if (el) el.removeEventListener('click', this._sprayToggleHandler);
       this._sprayToggleHandler = null;
     }
@@ -4028,7 +3930,7 @@ var PlayerPage = {
     // Horizontal scroll fade indicator
     container.style.position = 'relative';
     var fadeDiv = document.createElement('div');
-    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, #1a1d21);pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
+    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, var(--bg-card, #1a1d21));pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
     container.appendChild(fadeDiv);
     container.addEventListener('scroll', function() {
       var maxScroll = container.scrollWidth - container.clientWidth;

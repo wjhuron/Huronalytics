@@ -250,7 +250,7 @@ const COLUMNS = {
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA vs this pitch type (Statcast, EV + LA)', group: 'stats' },
     { key: 'ev50',        label: 'EV50',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Avg EV of top 50% hardest-hit BIP (mph)', group: 'ev' },
     { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Maximum exit velocity (mph)', group: 'ev' },
-    { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Median launch angle (degrees)', group: 'batted_ball' },
+    { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, sectionStart: true, desc: 'Median launch angle (degrees)', group: 'batted_ball' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', desc: 'Barrel rate (denominator = BIP with valid EV)', group: 'batted_ball' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'batted_ball' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Line drive rate', group: 'batted_ball' },
@@ -277,10 +277,39 @@ const Leaderboard = {
   selectedForCompare: {},  // pitcher name -> true
   keyboardFocusIndex: -1,
 
-  initHiddenColumns: function () {
+  _tabDefaultHidden: {},  // tracks which keys were hidden by tab defaults
+
+  _TAB_HIDDEN_DEFAULTS: {
+    pitchMetrics:      ['maxVelo', 'xIVB', 'xHB', 'relPosZ', 'relPosX'],
+    pitcherStats:      ['w', 'l', 'sv', 'hld'],
+    hitterStats:       ['ab', 'doubles', 'triples', 'cs', 'sbPct'],
+    hitterBattedBall:  ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist'],
+    hitterPitch:       ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct']
+  },
+
+  initHiddenColumns: function (tab) {
+    // Clear previous tab-default hiding
+    var self = this;
+    Object.keys(this._tabDefaultHidden).forEach(function (k) {
+      if (self._tabDefaultHidden[k]) {
+        delete self.hiddenColumns[k];
+      }
+    });
+    this._tabDefaultHidden = {};
+
+    // Always hide these regardless of tab
     this.hiddenColumns['vaa'] = true;
     this.hiddenColumns['haa'] = true;
     this.hiddenColumns['stuffScore'] = true;
+
+    // Per-tab defaults
+    var defaults = this._TAB_HIDDEN_DEFAULTS[tab];
+    if (defaults) {
+      for (var i = 0; i < defaults.length; i++) {
+        this.hiddenColumns[defaults[i]] = true;
+        this._tabDefaultHidden[defaults[i]] = true;
+      }
+    }
   },
 
   getVisibleColumns: function (columns) {
@@ -350,8 +379,8 @@ const Leaderboard = {
 
     // Stats that should recalculate when contextual filters are active.
     // Everything else (pitch metrics, plate discipline) keeps precomputed values.
-    var DYNAMIC_STATS = { runValue:1, rv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1,
-                          era:1, fip:1, xFIP:1, siera:1, hr9:1,
+    var DYNAMIC_STATS = { runValue:1, rv100:1, xRunValue:1, xRv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1,
+                          era:1, fip:1, xFIP:1, siera:1,
                           avg:1, obp:1, slg:1, ops:1, iso:1 };
 
     // Keys where average should use absolute values (RHP/LHP have opposite signs)
@@ -371,10 +400,10 @@ const Leaderboard = {
     }
 
     // Weight mapping — matches process_data.py precomputed average methodology
-    var IP_WEIGHTED = { era:1, fip:1, xFIP:1, siera:1, hr9:1 };
+    var IP_WEIGHTED = { era:1, fip:1, xFIP:1, siera:1 };
     var BIP_WEIGHTED = { avgEVAgainst:1, maxEVAgainst:1, hardHitPct:1, barrelPctAgainst:1,
-                          gbPct:1, ldPct:1, fbPct:1, puPct:1, hrFbPct:1, xwOBAsp:1,
-                          avgEV:1, maxEV:1, barrelPct:1, pullPct:1, airPullPct:1 };
+                          gbPct:1, ldPct:1, fbPct:1, hrFbPct:1, xwOBAsp:1,
+                          avgEV:1, avgEVAll:1, ev50:1, maxEV:1, barrelPct:1, pullPct:1, airPullPct:1 };
     var PA_WEIGHTED = { wOBA:1, xBA:1, xSLG:1, xwOBA:1, xwOBAcon:1,
                          kPct:1, bbPct:1, kbbPct:1, babip:1,
                          avg:1, obp:1, slg:1, ops:1, iso:1 };
@@ -774,7 +803,7 @@ const Leaderboard = {
           // Pitch shape metrics always show color on pitch-type views (no min count)
           const PITCH_SHAPE_ALWAYS_COLOR = {
             velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
-            extension: true,
+            extension: true, effectiveVelo: true,
             vaa: true, haa: true, nVAA: true, nHAA: true
           };
           // Hitter stats that require ≥20 BIP
@@ -782,8 +811,8 @@ const Leaderboard = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
             hardHitPct: true, barrelPct: true,
             xwOBAsp: true, airPullPct: true,
-            gbPct: true, ldPct: true, fbPct: true, puPct: true,
-            pullPct: true, middlePct: true, oppoPct: true
+            gbPct: true, ldPct: true, fbPct: true,
+            pullPct: true, oppoPct: true
           };
           // Hitter stats that use PA qualifier (3.1 PA/team game) — NOT BIP
           const HITTER_PA_STATS = {
@@ -809,8 +838,8 @@ const Leaderboard = {
             const isStarter = rg > 0 && (rgs / rg) > 0.5;
             const ipThresh = isStarter ? tg * 1.0 : tg / 3;
             showColor = ipFloat >= ipThresh;
-            // Pitcher always-color: FB velo, extension
-            if (!showColor) showColor = col.key === 'fbVelo' || col.key === 'extension';
+            // Pitcher always-color: extension
+            if (!showColor) showColor = col.key === 'extension';
           } else if (isHitterPitchType) {
             // Hitter pitch-type: ≥25 pitches of that type seen
             showColor = (row.count || 0) >= 25;
@@ -863,5 +892,5 @@ const Leaderboard = {
   },
 };
 
-// Initialize hidden columns on load
-Leaderboard.initHiddenColumns();
+// Initialize hidden columns on load (default tab is pitcherStats)
+Leaderboard.initHiddenColumns('pitcherStats');

@@ -35,16 +35,16 @@ STAT_HEADERS = ['IP', 'TBF', 'R', 'ER', 'H', 'K', 'BB', 'HR']
 STAT_VALUES = ['6.1', '23', '0', '0', '3', '4', '1', '0']
 
 PITCH_COLORS = {
-    'FF': '#0000FF', 'SI': '#FFD700', 'CF': '#8B4513', 'FC': '#FFA500',
-    'SL': '#006400', 'ST': '#FF1493', 'CU': '#B22222', 'SV': '#32CD32',
-    'CH': '#800080', 'FS': '#40E0D0', 'KN': '#000000'
+    'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#FFA500',
+    'SL': '#DDDDDD', 'ST': '#FF1493', 'CU': '#E03030', 'SV': '#32CD32',
+    'CH': '#CC66EE', 'FS': '#40E0D0', 'KN': '#AAAAAA',
 }
 PITCH_NAMES = {
-    'FF': 'Fastball', 'SI': 'Sinker', 'CF': 'Cut-Fastball', 'FC': 'Cutter',
+    'FF': 'Fastball', 'SI': 'Sinker', 'FC': 'Cutter',
     'SL': 'Slider', 'ST': 'Sweeper', 'CU': 'Curveball', 'SV': 'Slurve',
-    'CH': 'Changeup', 'FS': 'Splitter', 'KN': 'Knuckleball'
+    'CH': 'Changeup', 'FS': 'Splitter', 'KN': 'Knuckleball',
 }
-PITCH_ORDER = ['FF', 'SI', 'CF', 'FC', 'SL', 'ST', 'CU', 'SV', 'CH', 'FS', 'KN']
+PITCH_ORDER = ['FF', 'SI', 'FC', 'SL', 'ST', 'CU', 'SV', 'CH', 'FS', 'KN']
 SWING_DESC = ['Swinging Strike', 'Foul', 'Foul Bunt', 'In Play', 'Missed Bunt']
 STRIKE_DESC = ['Called Strike', 'Swinging Strike', 'Foul', 'Foul Bunt', 'In Play']
 

@@ -284,6 +284,7 @@
     if (activeTab) { activeTab.classList.add('active'); activeTab.setAttribute('aria-selected', 'true'); }
 
     // Reset state for new tab
+    Leaderboard.initHiddenColumns(currentTab);
     Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
     Leaderboard.currentPage = 1;
     Leaderboard.keyboardFocusIndex = -1;
@@ -1256,6 +1257,9 @@
     tbody.addEventListener('mouseover', function (e) {
       const td = e.target.closest('td[data-pctl]');
       if (!td) { tooltip.classList.remove('visible'); return; }
+      // Suppress tooltip on league average row
+      const tr = td.closest('tr');
+      if (tr && tr.classList.contains('league-avg-row')) { tooltip.classList.remove('visible'); return; }
       const pctl = td.getAttribute('data-pctl');
       const label = td.getAttribute('data-col-label');
       const colKey = td.getAttribute('data-col-key');
@@ -1542,41 +1546,11 @@
     });
   }
 
-  // ---- Dark Mode ----
+  // ---- Dark Mode (removed — site is dark-mode only) ----
   function setupDarkMode() {
-    const toggle = document.getElementById('dark-mode-toggle');
-    const sunIcon = toggle.querySelector('.icon-sun');
-    const moonIcon = toggle.querySelector('.icon-moon');
-
-    // Check saved preference or system preference
-    const saved = localStorage.getItem('darkMode');
-    if (saved === 'true' || (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      enableDark();
-    }
-
-    toggle.addEventListener('click', function () {
-      if (document.body.classList.contains('dark')) {
-        disableDark();
-      } else {
-        enableDark();
-      }
-      // Re-render to update percentile colors
-      refresh();
-    });
-
-    function enableDark() {
-      document.body.classList.add('dark');
-      sunIcon.style.display = 'none';
-      moonIcon.style.display = '';
-      localStorage.setItem('darkMode', 'true');
-    }
-
-    function disableDark() {
-      document.body.classList.remove('dark');
-      sunIcon.style.display = '';
-      moonIcon.style.display = 'none';
-      localStorage.setItem('darkMode', 'false');
-    }
+    // No light theme exists; dark mode toggle has been removed from UI.
+    // Ensure dark class is always present for any code that checks it.
+    document.body.classList.add('dark');
   }
 
   // ---- URL State ----

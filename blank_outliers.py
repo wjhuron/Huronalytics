@@ -12,7 +12,10 @@ import time as time_module
 from collections import defaultdict
 from datetime import datetime
 
-SPREADSHEET_ID = '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo'
+SPREADSHEET_IDS = {
+    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',
+    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',
+}
 SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 OUTLIER_FILE = os.path.join(os.path.expanduser('~/Downloads'), 'Untitled spreadsheet (1).xlsx')
 
@@ -139,14 +142,18 @@ def main():
     scopes = ['https://www.googleapis.com/auth/spreadsheets']
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
-    sh = gc.open_by_key(SPREADSHEET_ID)
-    print(f"Spreadsheet: {sh.title}")
+
+    # Build worksheet lookup across both AL and NL spreadsheets
+    worksheets = {}
+    for league, sid in SPREADSHEET_IDS.items():
+        sh = gc.open_by_key(sid)
+        print(f"Spreadsheet ({league}): {sh.title}")
+        for ws in sh.worksheets():
+            worksheets[ws.title] = ws
 
     total_blanked = 0
     total_missed = 0
     missed_details = []
-
-    worksheets = {ws.title: ws for ws in sh.worksheets()}
 
     for team in sorted(outliers_by_team):
         if team not in worksheets:

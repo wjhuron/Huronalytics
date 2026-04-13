@@ -5,9 +5,11 @@ const Utils = {
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   },
 
-  formatPct: function (value) {
+  formatPct: function (value, sign) {
     if (value === null || value === undefined) return '--';
-    return (value * 100).toFixed(1) + '%';
+    var str = (value * 100).toFixed(1) + '%';
+    if (sign && value > 0) str = '+' + str;
+    return str;
   },
 
   formatDecimal: function (places) {

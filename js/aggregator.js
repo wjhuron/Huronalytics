@@ -8,6 +8,12 @@ const Aggregator = {
   loaded: false,
   _colIdx: {},
 
+  // Convert baseball IP notation (e.g. "5.2" = 5⅔ innings) to a true float
+  _ipToFloat: function (ip) {
+    var parts = String(ip || 0).split('.');
+    return parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
+  },
+
   // --- MVN conditional expected movement utilities ---
   _matInvGeneral: function (M) {
     const n = M.length;
@@ -310,7 +316,7 @@ const Aggregator = {
     const rocValid = [];
     for (let i = 0; i < rows.length; i++) {
       const rawVal = rows[i][metricKey];
-      if (rawVal !== null && rawVal !== undefined && qualifyFn(rows[i])) {
+      if (rawVal !== null && rawVal !== undefined && rawVal === rawVal && qualifyFn(rows[i])) {
         const entry = { idx: i, val: useAbs ? Math.abs(rawVal) : rawVal };
         if (self._isROCTeam(rows[i].team)) {
           rocValid.push(entry);
@@ -432,7 +438,7 @@ const Aggregator = {
    * Returns an object with: avgEVAgainst, maxEVAgainst, hardHitPct, barrelPctAgainst,
    *   ldPct, fbPct, puPct.
    */
-  _computePitcherBipStats: function (bipRecs) {
+  _computePitcherBipStats: function (bipRecs, sacqMaps) {
     const pbci = this._colIdx.pitcherBipCols;
 
     function isBarrel(ev, la) {
@@ -455,7 +461,6 @@ const Aggregator = {
 
     // xwOBAsp: average league zone wOBA for BIP against this pitcher (hand-specific with pooled fallback)
     var xwOBAsp = null;
-    var sacqMaps = Aggregator.buildSacqZoneMaps();
     if (bipRecs.length > 0) {
       var xsp_sum = 0, xsp_count = 0;
       for (var sri = 0; sri < bipRecs.length; sri++) {
@@ -571,11 +576,12 @@ const Aggregator = {
                      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'xwOBAsp'];
     const INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
     let rows = [];
+    const sacqMaps = this.buildSacqZoneMaps();
 
     for (let gk2 in groups) {
       const g = groups[gk2];
       const bipRecs = bipByPitcher[g.pitcherIdx + '|' + g.teamIdx] || [];
-      const bipStats = this._computePitcherBipStats(bipRecs);
+      const bipStats = this._computePitcherBipStats(bipRecs, sacqMaps);
       const obj = this._buildPitcherRow(g, lookups, mlbIdMap, bipStats);
 
       // Apply baseball-context filters (comparison group — affects percentiles)
@@ -709,7 +715,7 @@ const Aggregator = {
       if (filters.minIp === 'Q') {
         rows = rows.filter(function (r) { return r._qualified; });
       } else {
-        rows = rows.filter(function (r) { return (r.ip || 0) >= filters.minIp; });
+        rows = rows.filter(function (r) { return Aggregator._ipToFloat(r.ip) >= filters.minIp; });
       }
     }
 
@@ -741,6 +747,17 @@ const Aggregator = {
     const validDates = this._getValidDateSet(filters);
     const vsHand = filters.vsHand || 'all';
     const mlbIdMap = this._getMlbIdMap('pitcher');
+
+    // Build role cache upfront from PITCHER_DATA (SP vs RP based on GS/G ratio)
+    if (!this._roleCache) {
+      this._roleCache = {};
+      const pd = window.PITCHER_DATA || [];
+      for (let ri3 = 0; ri3 < pd.length; ri3++) {
+        const rKey = pd[ri3].pitcher + '|' + pd[ri3].team;
+        const pg2 = pd[ri3].g || 0, pgs2 = pd[ri3].gs || 0;
+        this._roleCache[rKey] = pg2 > 0 && (pgs2 / pg2) > 0.5 ? 'SP' : 'RP';
+      }
+    }
 
     const METRIC_MAP = [
       { key: 'velocity', sum: 'sumVelo', cnt: 'nVelo', round: 1 },
@@ -945,21 +962,9 @@ const Aggregator = {
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
       if (filters.role && filters.role !== 'all') {
-        // Pitch rows don't have G/GS — look up from pitcher leaderboard
+        // Pitch rows don't have G/GS — look up from pre-built role cache
         const pitcherKey2 = obj.pitcher + '|' + obj.team;
-        if (!this._roleCache) this._roleCache = {};
-        if (!(pitcherKey2 in this._roleCache)) {
-          const pd = window.PITCHER_DATA || [];
-          for (let ri3 = 0; ri3 < pd.length; ri3++) {
-            if (pd[ri3].pitcher === obj.pitcher && pd[ri3].team === obj.team) {
-              const pg2 = pd[ri3].g || 0, pgs2 = pd[ri3].gs || 0;
-              this._roleCache[pitcherKey2] = pg2 > 0 && (pgs2 / pg2) > 0.5 ? 'SP' : 'RP';
-              break;
-            }
-          }
-          if (!(pitcherKey2 in this._roleCache)) this._roleCache[pitcherKey2] = 'RP';
-        }
-        if (this._roleCache[pitcherKey2] !== filters.role) continue;
+        if ((this._roleCache[pitcherKey2] || 'RP') !== filters.role) continue;
       }
       if (filters.pitchTypes && filters.pitchTypes.indexOf('all') === -1 && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
       if (obj.count < (filters.minCount || 1)) continue;
@@ -1229,6 +1234,7 @@ const Aggregator = {
     };
 
     let rows = [];
+    const sacqMaps = Aggregator.buildSacqZoneMaps();
     for (let gk2 in groups) {
       const g = groups[gk2];
       const c = g.counts;
@@ -1303,7 +1309,6 @@ const Aggregator = {
 
       // xwOBAsp — compute from BIP records using hand-specific zone table with pooled fallback
       let xwOBAsp_val = null;
-      const sacqMaps = Aggregator.buildSacqZoneMaps();
       if (bipRecords.length > 0) {
         let xwOBAsp_sum = 0, xwOBAsp_count = 0;
         for (let sri = 0; sri < bipRecords.length; sri++) {

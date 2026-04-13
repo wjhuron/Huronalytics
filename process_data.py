@@ -107,14 +107,14 @@ def generate_micro_data(all_pitches):
     # ==========================================================
     #  Pitcher micro-aggs
     #  Key: (pitcherIdx, teamIdx, throws, dateIdx, batterHand)
-    #  Values: 24 count fields
+    #  Values: 28 count fields
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
     #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
     #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (line-drive HRs)
-    #  25:pu (popups, for HR/FB denominator)
+    #  25:pu (popups, for HR/FB denominator)  26:nStrikes  27:ibb
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 27)
+    pitcher_micro = defaultdict(lambda: [0] * 28)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -174,6 +174,7 @@ def generate_micro_data(all_pitches):
             if event == 'Home Run':      c[11] += 1  # hr
             if event in K_EVENTS:        c[12] += 1  # k
             if event in BB_EVENTS:       c[13] += 1  # bb (all walks including IBB)
+            if event == 'Intent Walk':   c[27] += 1  # ibb
             if event in HBP_EVENTS:      c[14] += 1  # hbp
             if event in SF_EVENTS:       c[15] += 1  # sf
             if event in SH_EVENTS:       c[16] += 1  # sh
@@ -359,7 +360,7 @@ def generate_micro_data(all_pitches):
     #  Hitter micro-aggs
     #  Key: (hitterIdx, teamIdx, bats, dateIdx, pitcherHand)
     #  bats = actual batting side for these pitches (R/L)
-    #  Values: 47 count fields
+    #  Values: 50 count fields
     #  0:n  1:pa  2:h  3:db  4:tp  5:hr  6:bb  7:hbp  8:sf  9:sh  10:ci  11:k
     #  12:swings  13:whiffs  14:izPitches  15:oozPitches
     #  16:izSwings  17:oozSwings  18:contact
@@ -371,8 +372,9 @@ def generate_micro_data(all_pitches):
     #  37:firstPitchAppearances  38:firstPitchSwings
     #  39:xBA_sum  40:xBA_count  41:xSLG_sum  42:xSLG_count
     #  43:xwOBA_sum  44:xwOBA_count  45:xwOBAcon_sum  46:xwOBAcon_count
+    #  47:swingsNonBunt  48:contactNonBunt  49:ibb
     # ==========================================================
-    hitter_micro = defaultdict(lambda: [0.0] * 49)
+    hitter_micro = defaultdict(lambda: [0.0] * 50)
 
     for p in all_pitches:
         batter = p.get('Batter')
@@ -795,7 +797,7 @@ def generate_micro_data(all_pitches):
             'pitcherIdx', 'teamIdx', 'throws', 'dateIdx', 'batterHand',
             'n', 'iz', 'sw', 'wh', 'csw', 'ooz', 'oozSw', 'bip', 'gb',
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
-            'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu', 'nStrikes',
+            'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu', 'nStrikes', 'ibb',
         ],
         'pitcherMicro': pitcher_rows,
         'pitcherBipCols': ['pitcherIdx', 'teamIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats'],
@@ -827,6 +829,7 @@ def generate_micro_data(all_pitches):
             'firstPitchAppearances', 'firstPitchSwings',
             'xBA_sum', 'xBA_count', 'xSLG_sum', 'xSLG_count',
             'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
+            'swingsNonBunt', 'contactNonBunt', 'ibb',
         ],
         'hitterMicro': hitter_rows,
         'hitterBipCols': ['hitterIdx', 'teamIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],

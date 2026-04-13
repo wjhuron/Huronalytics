@@ -13,7 +13,10 @@ import json
 import math
 from collections import defaultdict
 
-SPREADSHEET_ID = '1hNILKCGBuyQKV6KPWawgkS1cu72672TBALi8iNBbIFo'
+SPREADSHEET_IDS = {
+    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',
+    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',
+}
 SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 
 MLB_TEAMS = {
@@ -222,37 +225,38 @@ def main():
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
-    sh = gc.open_by_key(SPREADSHEET_ID)
-    print(f"Spreadsheet: {sh.title}")
 
-    # Read all pitches
+    # Read all pitches from both AL and NL spreadsheets
     all_pitches = []
-    for i, ws in enumerate(sh.worksheets()):
-        if ws.title not in MLB_TEAMS:
-            print(f"  Skipping {ws.title}")
-            continue
-        print(f"  Reading {ws.title}...")
-        if i > 0:
-            time_module.sleep(1.5)
-        rows = read_sheet_with_retry(ws)
-        if not rows:
-            continue
-        header = rows[0]
-        col_idx = {name: j for j, name in enumerate(header) if name}
-
-        for row in rows[1:]:
-            pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx and col_idx['Pitcher'] < len(row) else None
-            if not pitcher:
+    for league, sid in SPREADSHEET_IDS.items():
+        sh = gc.open_by_key(sid)
+        print(f"Spreadsheet ({league}): {sh.title}")
+        for i, ws in enumerate(sh.worksheets()):
+            if ws.title not in MLB_TEAMS:
+                print(f"  Skipping {ws.title}")
                 continue
-            pitch = {}
-            for col_name, idx in col_idx.items():
-                val = row[idx] if idx < len(row) else None
-                if val == '':
-                    val = None
-                pitch[col_name] = val
-            # Store team from sheet title
-            pitch['Team'] = ws.title
-            all_pitches.append(pitch)
+            print(f"  Reading {ws.title}...")
+            if i > 0:
+                time_module.sleep(1.5)
+            rows = read_sheet_with_retry(ws)
+            if not rows:
+                continue
+            header = rows[0]
+            col_idx = {name: j for j, name in enumerate(header) if name}
+
+            for row in rows[1:]:
+                pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx and col_idx['Pitcher'] < len(row) else None
+                if not pitcher:
+                    continue
+                pitch = {}
+                for col_name, idx in col_idx.items():
+                    val = row[idx] if idx < len(row) else None
+                    if val == '':
+                        val = None
+                    pitch[col_name] = val
+                # Store team from sheet title
+                pitch['Team'] = ws.title
+                all_pitches.append(pitch)
 
     print(f"\nTotal pitches read: {len(all_pitches)}")
 

@@ -433,11 +433,23 @@ def compute_hitter_stats(pitches):
     hr_distances = [d for d in hr_distances if d is not None]
     avg_hr_dist = round(sum(hr_distances) / len(hr_distances), 0) if hr_distances else None
 
-    bs_vals = [safe_float(p.get('BatSpeed')) for p in pitches if safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    sl_vals = [safe_float(p.get('SwingLength')) for p in pitches if safe_float(p.get('SwingLength')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    aa_vals = [safe_float(p.get('AttackAngle')) for p in pitches if safe_float(p.get('AttackAngle')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    ad_vals = [safe_float(p.get('AttackDirection')) for p in pitches if safe_float(p.get('AttackDirection')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
-    spt_vals = [safe_float(p.get('SwingPathTilt')) for p in pitches if safe_float(p.get('SwingPathTilt')) is not None and safe_float(p.get('BatSpeed')) is not None and safe_float(p.get('BatSpeed')) >= 50]
+    bs_vals = []
+    sl_vals = []
+    aa_vals = []
+    ad_vals = []
+    spt_vals = []
+    for p in pitches:
+        bs = safe_float(p.get('BatSpeed'))
+        if bs is not None and bs >= 50:
+            bs_vals.append(bs)
+            sl = safe_float(p.get('SwingLength'))
+            if sl is not None: sl_vals.append(sl)
+            aa = safe_float(p.get('AttackAngle'))
+            if aa is not None: aa_vals.append(aa)
+            ad = safe_float(p.get('AttackDirection'))
+            if ad is not None: ad_vals.append(ad)
+            spt = safe_float(p.get('SwingPathTilt'))
+            if spt is not None: spt_vals.append(spt)
 
     n_blasts = 0
     n_blast_eligible = 0
