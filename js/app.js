@@ -140,7 +140,9 @@
       const mlbId = hash.split('=')[1];
       // Sanitize mlbId: only allow numeric values to prevent XSS
       if (mlbId && /^\d+$/.test(mlbId) && !PlayerPage.isOpen) {
-        PlayerPage.open(mlbId);
+        var preferTeam = teamSelect ? teamSelect.value : null;
+        if (preferTeam === 'all') preferTeam = null;
+        PlayerPage.open(mlbId, preferTeam);
       }
       return;
     }

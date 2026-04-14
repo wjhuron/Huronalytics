@@ -756,7 +756,7 @@ const Leaderboard = {
         nameLink.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
-          PlayerPage.open(row.mlbId);
+          PlayerPage.open(row.mlbId, row.team);
         });
         td.appendChild(nameLink);
         if (col.align) td.classList.add('align-' + col.align);

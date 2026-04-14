@@ -221,10 +221,10 @@ var PlayerPage = {
     return result;
   },
 
-  open: function (mlbId) {
-    // Try pitcher first, then hitter
-    var pitcherData = this._findPitcherByMlbId(mlbId);
-    var hitterData = !pitcherData ? this._findHitterByMlbId(mlbId) : null;
+  open: function (mlbId, team) {
+    // Try pitcher first, then hitter; prefer the specified team
+    var pitcherData = this._findPitcherByMlbId(mlbId, team);
+    var hitterData = !pitcherData ? this._findHitterByMlbId(mlbId, team) : null;
 
     if (!pitcherData && !hitterData) {
       console.warn('Player not found for mlbId:', mlbId);
@@ -630,13 +630,17 @@ var PlayerPage = {
 
   // --- Data Lookup ---
 
-  _findPitcherByMlbId: function (mlbId) {
+  _findPitcherByMlbId: function (mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
     var pitcherData = window.PITCHER_DATA || [];
+    var fallback = null;
     for (var i = 0; i < pitcherData.length; i++) {
-      if (pitcherData[i].mlbId === mlbId) return pitcherData[i];
+      if (pitcherData[i].mlbId === mlbId) {
+        if (preferTeam && pitcherData[i].team === preferTeam) return pitcherData[i];
+        if (!fallback) fallback = pitcherData[i];
+      }
     }
-    return null;
+    return fallback;
   },
 
   _getPitchRows: function (pitcherName, team) {
@@ -2791,13 +2795,17 @@ var PlayerPage = {
 
   // --- Hitter lookup ---
 
-  _findHitterByMlbId: function (mlbId) {
+  _findHitterByMlbId: function (mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
     var hitterData = window.HITTER_DATA || [];
+    var fallback = null;
     for (var i = 0; i < hitterData.length; i++) {
-      if (hitterData[i].mlbId === mlbId) return hitterData[i];
+      if (hitterData[i].mlbId === mlbId) {
+        if (preferTeam && hitterData[i].team === preferTeam) return hitterData[i];
+        if (!fallback) fallback = hitterData[i];
+      }
     }
-    return null;
+    return fallback;
   },
 
   // --- Hitter: Spray Chart ---
@@ -4065,7 +4073,10 @@ var PlayerPage = {
     var hash = window.location.hash.replace(/^#/, '');
     var match = hash.match(/player=(\d+)/);
     if (match) {
-      this.open(match[1]);
+      var teamEl = document.getElementById('team-filter');
+      var preferTeam = teamEl ? teamEl.value : null;
+      if (preferTeam === 'all') preferTeam = null;
+      this.open(match[1], preferTeam);
       return true;
     }
     return false;
