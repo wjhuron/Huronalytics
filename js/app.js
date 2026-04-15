@@ -1,12 +1,10 @@
 (function () {
-  // ---- State ----
   let currentTab = 'pitcherStats';
   let currentSection = 'pitchers';  // 'home', 'pitchers', 'hitters'
   let selectedPitchTypes = []; // empty = all; or array of selected types
   let allData = []; // current filtered + sorted data (full, before pagination)
   let columnRangeFilters = {}; // { colKey: { min: number|null, max: number|null } }
 
-  // Tab → section mapping
   const TAB_SECTION = {
     pitcherStats: 'pitchers', pitchMetrics: 'pitchers',
     pitcherBattedBall: 'pitchers', pitcherSwingDecisions: 'pitchers',
@@ -15,7 +13,6 @@
     hitterPitch: 'hitters'
   };
 
-  // Tab → data source mapping
   const TAB_DATA = {
     pitcherStats: 'pitcher', pitchMetrics: 'pitch',
     pitcherBattedBall: 'pitcher', pitcherSwingDecisions: 'pitcher',
@@ -24,7 +21,6 @@
     hitterPitch: 'hitterPitch'
   };
 
-  // Tab → hash route mapping
   const TAB_ROUTE = {
     pitcherStats: 'pitchers/stats', pitchMetrics: 'pitchers/pitch-metrics',
     pitcherBattedBall: 'pitchers/batted-ball', pitcherSwingDecisions: 'pitchers/plate-discipline',
@@ -33,18 +29,15 @@
     hitterPitch: 'hitters/pitch-type'
   };
 
-  // Hash route → tab mapping (reverse of TAB_ROUTE)
   const ROUTE_TAB = {};
   Object.keys(TAB_ROUTE).forEach(function (t) { ROUTE_TAB[TAB_ROUTE[t]] = t; });
 
-  // Old tab names → new tab names (backward compat)
   const OLD_TAB_MAP = {
     pitcher: 'pitcherStats', pitch: 'pitchMetrics',
     hitterStats: 'hitterStats', hitterBattedBall: 'hitterBattedBall',
     hitterSwingDecisions: 'hitterSwingDecisions', hitterPitch: 'hitterPitch'
   };
 
-  // Tabs that show pitch type filter
   const PITCH_TYPE_TABS = {
     pitchMetrics: true, hitterPitch: true,
     pitcherBattedBall: true, pitcherSwingDecisions: true,
@@ -60,15 +53,12 @@
     return TAB_SECTION[tab] === 'pitchers';
   }
 
-  // ---- DOM refs ----
   let teamSelect, throwsSelect, vsHandSelect, minCountInput, minSwingsInput, searchInput;
   let minIpInput, minTbfInput, minBipInput, minPitcherSwingsInput;
   let dateStartInput, dateEndInput;
-  let currentGameType = 'RS';
   let sidePanel, panelOverlay, panelClose;
 
-  // ---- Init ----
-  // Detect ?roc=1 URL parameter for hidden ROC team filter
+  // ?roc=1 URL parameter enables hidden ROC team filter
   const rocMode = (new URLSearchParams(window.location.search)).get('roc') === '1';
   window._rocMode = rocMode;
 
@@ -94,7 +84,6 @@
       setupRangeFilters();
       setupDarkMode();
 
-      // Populate home page counts
       const pitcherCount = document.getElementById('home-pitcher-count');
       const hitterCount = document.getElementById('home-hitter-count');
       const rocTeamsInit = (DataStore.metadata.rocTeams || []);
@@ -107,20 +96,17 @@
         hitterCount.textContent = mlbHitters.length + ' hitters';
       }
 
-      // Player page back button
       document.getElementById('player-back').addEventListener('click', function () {
         PlayerPage.close();
       });
 
-      // Handle browser navigation (back/forward, hash changes)
       window.addEventListener('hashchange', function () {
         handleRoute();
       });
 
-      // Initial routing
       handleRoute();
 
-      // Dismiss loading overlay
+
       var overlay = document.getElementById('loading-overlay');
       if (overlay) overlay.remove();
     }).catch(function (err) {
@@ -135,10 +121,8 @@
   function handleRoute() {
     const hash = window.location.hash.replace(/^#/, '');
 
-    // Player page route
     if (hash.indexOf('player=') === 0) {
       const mlbId = hash.split('=')[1];
-      // Sanitize mlbId: only allow numeric values to prevent XSS
       if (mlbId && /^\d+$/.test(mlbId) && !PlayerPage.isOpen) {
         var preferTeam = teamSelect ? teamSelect.value : null;
         if (preferTeam === 'all') preferTeam = null;
@@ -147,12 +131,10 @@
       return;
     }
 
-    // Close player page if open
     if (PlayerPage.isOpen) {
       PlayerPage.close();
     }
 
-    // Home page
     if (!hash || hash === 'home') {
       showHome();
       return;
@@ -162,7 +144,6 @@
     if (hash.indexOf('tab=') !== -1) {
       const oldParams = Utils.readHash();
       const newTab = OLD_TAB_MAP[oldParams.tab] || oldParams.tab || 'pitcherStats';
-      // Restore filter state from old params
       if (oldParams.team) teamSelect.value = oldParams.team;
       if (oldParams.throws) throwsSelect.value = oldParams.throws;
       if (oldParams.vsHand) vsHandSelect.value = oldParams.vsHand;
@@ -175,22 +156,18 @@
       return;
     }
 
-    // New route format: "pitchers/stats?team=NYY&throws=R"
     const parts = hash.split('?');
     let routePart = parts[0];
-    // Backward compat: old swing-decisions → plate-discipline
     if (routePart === 'pitchers/swing-decisions') routePart = 'pitchers/plate-discipline';
     if (routePart === 'hitters/swing-decisions') routePart = 'hitters/plate-discipline';
     const tab = ROUTE_TAB[routePart];
     if (tab) {
-      // Parse query params and apply filters before navigating
       if (parts[1]) {
         const qp = {};
         parts[1].split('&').forEach(function (p) {
           const kv = p.split('=');
           qp[kv[0]] = decodeURIComponent(kv[1] || '');
         });
-        // Helper: only set select value if it's a valid option
         function _setIfValid(sel, val) {
           for (var oi = 0; oi < sel.options.length; oi++) {
             if (sel.options[oi].value === val) { sel.value = val; return; }
@@ -203,7 +180,6 @@
         if (qp.search) searchInput.value = qp.search.substring(0, 50);
         if (qp.dateStart && /^\d{4}-\d{2}-\d{2}$/.test(qp.dateStart)) dateStartInput.value = qp.dateStart;
         if (qp.dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(qp.dateEnd)) dateEndInput.value = qp.dateEnd;
-        // Pass sort/page/pitch via urlState so they survive navigateToTab's reset
         var urlState = {};
         if (qp.sort) urlState.sortKey = qp.sort;
         if (qp.dir) urlState.sortDir = qp.dir;
@@ -213,7 +189,6 @@
       }
       navigateToTab(tab, true, urlState);  // true = don't push hash (already there)
     } else {
-      // Unknown route — go home
       showHome();
     }
   }
@@ -230,12 +205,10 @@
     const pctlLeg = document.getElementById('pctl-legend');
     if (pctlLeg) pctlLeg.style.display = 'none';
 
-    // Update section tabs
     document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); });
     const homeBtn = document.querySelector('.section-tab[data-section="home"]');
     if (homeBtn) homeBtn.classList.add('active');
 
-    // Hide subtabs
     document.getElementById('pitcher-subtabs').style.display = 'none';
     document.getElementById('hitter-subtabs').style.display = 'none';
   }
@@ -258,7 +231,6 @@
     currentTab = tab;
     currentSection = TAB_SECTION[tab];
 
-    // Update URL hash
     if (!skipHash) {
       window.location.hash = TAB_ROUTE[tab];
     }
@@ -273,11 +245,9 @@
     const sectionBtn = document.querySelector('.section-tab[data-section="' + currentSection + '"]');
     if (sectionBtn) { sectionBtn.classList.add('active'); sectionBtn.setAttribute('aria-selected', 'true'); }
 
-    // Show/hide subtab bars
     document.getElementById('pitcher-subtabs').style.display = currentSection === 'pitchers' ? '' : 'none';
     document.getElementById('hitter-subtabs').style.display = currentSection === 'hitters' ? '' : 'none';
 
-    // Update active subtab + ARIA
     document.querySelectorAll('.nav-subtabs .tab').forEach(function (t) {
       t.classList.remove('active');
       t.setAttribute('aria-selected', 'false');
@@ -285,21 +255,17 @@
     const activeTab = document.querySelector('.tab[data-tab="' + tab + '"]');
     if (activeTab) { activeTab.classList.add('active'); activeTab.setAttribute('aria-selected', 'true'); }
 
-    // Reset state for new tab
     Leaderboard.initHiddenColumns(currentTab);
     Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
     Leaderboard.currentPage = 1;
     Leaderboard.keyboardFocusIndex = -1;
 
-    // Show/hide pitch type filter
     document.getElementById('pitch-type-filter-group').style.display =
       PITCH_TYPE_TABS[currentTab] ? '' : 'none';
 
-    // Show/hide min swings filter (hitter tabs except hitterPitch and hitterBattedBall)
     document.getElementById('min-swings-filter-group').style.display =
       (isHitterTab(currentTab) && currentTab !== 'hitterPitch' && currentTab !== 'hitterBattedBall') ? '' : 'none';
 
-    // Show/hide pitcher-specific filters
     document.getElementById('min-ip-filter-group').style.display =
       currentTab === 'pitcherStats' ? '' : 'none';
     document.getElementById('min-tbf-filter-group').style.display =
@@ -309,7 +275,6 @@
     document.getElementById('min-pitcher-swings-filter-group').style.display =
       currentTab === 'pitcherSwingDecisions' ? '' : 'none';
 
-    // Show SP/RP role filter on all pitcher tabs
     const isPitcherTab = currentTab === 'pitcherStats' || currentTab === 'pitchMetrics' ||
                        currentTab === 'pitcherBattedBall' || currentTab === 'pitcherSwingDecisions';
     document.getElementById('role-filter-group').style.display = isPitcherTab ? '' : 'none';
@@ -318,7 +283,6 @@
     document.getElementById('min-count').parentElement.style.display =
       currentTab === 'pitcherStats' ? 'none' : '';
 
-    // Rebuild pitch chips
     selectedPitchTypes = [];
     if (currentTab === 'hitterPitch') {
       buildHitterPitchChips(false);
@@ -330,7 +294,6 @@
       buildPitchChips();
     }
 
-    // Update labels
     const throwsLabel = document.querySelector('#throws-filter-group label');
     if (throwsLabel) {
       throwsLabel.textContent = isHitterTab(currentTab) ? 'Bats' : 'Throws';
@@ -340,7 +303,6 @@
     if (minCountLabel) {
       minCountLabel.textContent = isMinPA ? 'Min PA' : 'Min Pitches';
     }
-    // Update dropdown options based on whether this is PA or pitch count
     const savedVal = minCountInput.value;
     const paOpts = [['Q','Qualified'],['1','1'],['10','10'],['25','25'],['50','50'],['75','75'],['100','100'],['150','150']];
     const pitchOpts = [['Q','Qualified'],['1','1'],['10','10'],['25','25'],['50','50'],['100','100'],['150','150'],['200','200']];
@@ -351,7 +313,6 @@
       o.value = opts[oi][0]; o.textContent = opts[oi][1];
       minCountInput.appendChild(o);
     }
-    // Restore previous value if it exists in new options, otherwise default to Q
     let found = false;
     for (let oi2 = 0; oi2 < minCountInput.options.length; oi2++) {
       if (minCountInput.options[oi2].value === savedVal) { found = true; break; }
@@ -360,20 +321,16 @@
     updateVsHandLabels();
     searchInput.placeholder = isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...';
 
-    // Hide compare button on hitter tabs
     document.getElementById('compare-btn').style.display = isHitterTab(currentTab) ? 'none' : '';
 
-    // Tab banner
     const banner = document.getElementById('tab-banner');
     if (banner) {
       banner.style.display = 'none';
     }
 
-    // Reset range filters
     columnRangeFilters = {};
     updateRangeFilterBadge();
 
-    // Restore URL state after reset (sort, page, pitch selections)
     if (urlState) {
       if (urlState.sortKey) Leaderboard.currentSort.key = urlState.sortKey;
       if (urlState.sortDir) Leaderboard.currentSort.dir = urlState.sortDir;
@@ -408,7 +365,6 @@
     panelOverlay = document.getElementById('panel-overlay');
     panelClose = document.getElementById('panel-close');
 
-    // Scroll shadow: add/remove class when table is scrolled horizontally
     const tableContainer = document.getElementById('table-container');
     if (tableContainer) {
       tableContainer.addEventListener('scroll', function () {
@@ -421,7 +377,6 @@
     }
   }
 
-  // ---- Rebuild team dropdown based on current game type ----
   function rebuildTeamDropdown() {
     teamSelect.innerHTML = '<option value="all">All Teams</option>';
     const rocTeams = (DataStore.metadata.rocTeams || []);
@@ -436,18 +391,11 @@
     });
   }
 
-  // Expose current game type for player pages
-  window.getCurrentGameType = function() { return currentGameType; };
-
-  // ---- Filters ----
   function setupFilters() {
-    // Populate team dropdown (will be rebuilt when game type changes)
     rebuildTeamDropdown();
 
-    // Populate pitch type chips (will be rebuilt on tab switch if needed)
     buildPitchChips();
 
-    // Set generated date
     const genDate = document.getElementById('generated-date');
     if (genDate) genDate.textContent = DataStore.metadata.generatedAt;
     const freshness = document.getElementById('data-freshness');
@@ -474,7 +422,6 @@
       dateEndInput.title = 'Requires micro data';
     }
 
-    // Filter listeners
     teamSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     throwsSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     vsHandSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
@@ -509,16 +456,9 @@
   ].concat(PITCH_TYPE_ORDER);
 
   // Category chip colors
-  const CATEGORY_CHIP_COLORS = {
-    'All': '#888',
-    'Hard': '#d62728',
-    'Breaking': '#2ca02c',
-    'Offspeed': '#ff7f0e'
-  };
-
   // Shared chip creation helper — avoids duplicating DOM logic across 3 builders
   function _createChip(item, onClick, isSelected) {
-    const color = CATEGORY_CHIP_COLORS[item] || Utils.getPitchColor(item);
+    const color = (item === 'All' ? '#888' : Utils.CATEGORY_COLORS[item]) || Utils.getPitchColor(item);
     const btn = document.createElement('button');
     btn.className = 'pitch-chip';
     btn.textContent = item;
@@ -593,37 +533,29 @@
     const idx = selectedPitchTypes.indexOf(pt);
 
     if (isAll) {
-      // Clicking "All": if not selected, select it and deselect everything else
       if (idx === -1) {
         selectedPitchTypes = ['All'];
       }
-      // If already selected, do nothing (can't deselect All by clicking it again — always need something)
     } else {
-      // Clicking a non-All chip
-      // First remove "All" if it's selected
       const allIdx = selectedPitchTypes.indexOf('All');
       if (allIdx !== -1) {
         selectedPitchTypes.splice(allIdx, 1);
       }
 
       if (idx === -1) {
-        // Not accounting for possible shift from removing All
         selectedPitchTypes.push(pt);
       } else {
-        // Recalculate idx since All removal may have shifted it
         const newIdx = selectedPitchTypes.indexOf(pt);
         if (newIdx !== -1) {
           selectedPitchTypes.splice(newIdx, 1);
         }
       }
 
-      // If nothing selected after toggle, revert to "All"
       if (selectedPitchTypes.length === 0) {
         selectedPitchTypes = ['All'];
       }
     }
 
-    // Re-render chips to update visual state
     updateHitterPitchChipVisuals();
   }
 
@@ -660,9 +592,7 @@
     }
   }
 
-  // ---- Tabs ----
   function setupTabs() {
-    // Section tab clicks (Home / Pitchers / Hitters)
     document.querySelectorAll('.section-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const section = btn.getAttribute('data-section');
@@ -676,7 +606,6 @@
       });
     });
 
-    // Subtab clicks
     document.querySelectorAll('.nav-subtabs .tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
         const tabKey = tab.getAttribute('data-tab');
@@ -685,7 +614,6 @@
     });
   }
 
-  // ---- vs-Hand label helper ----
   function updateVsHandLabels() {
     if (!vsHandSelect) return;
     const opts = vsHandSelect.options;
@@ -696,7 +624,6 @@
     }
   }
 
-  // ---- Core refresh ----
   function _getMaxTeamGames() {
     const tg = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
     let max = 0;
@@ -757,7 +684,6 @@
     const filters = getFilters();
     let dataTab = TAB_DATA[currentTab] || 'pitcher';
 
-    // When pitch types are selected, switch to pitch-level data sources
     const hasPitchTypeFilter = selectedPitchTypes.length > 0 && !(selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All');
 
     if ((currentTab === 'pitcherSwingDecisions' || currentTab === 'pitcherBattedBall') && hasPitchTypeFilter) {
@@ -771,7 +697,6 @@
     const rocTeamsRefresh = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
     const isROCTeam = rocTeamsRefresh.indexOf(filters.team) !== -1;
 
-    // Clear previous ROC-specific hiding
     ALL_ROC_HIDDEN.forEach(function (k) {
       if (Leaderboard._rocHidden && Leaderboard._rocHidden[k]) {
         delete Leaderboard.hiddenColumns[k];
@@ -801,10 +726,8 @@
     let data = DataStore.getFilteredDataV2(dataTab, filters);
     const columns = COLUMNS[currentTab];
 
-    // Apply column range filters
     data = applyRangeFilters(data, columns);
 
-    // Apply sort
     if (!Leaderboard.currentSort.key) {
       Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
     }
@@ -856,19 +779,7 @@
     saveURLState();
   }
 
-  // ---- Toolbar ----
   function setupToolbar() {
-    // League average toggle (button removed — always on)
-    const avgBtn = document.getElementById('league-avg-toggle');
-    if (avgBtn) {
-      avgBtn.addEventListener('click', function () {
-        Leaderboard.showLeagueAvg = !Leaderboard.showLeagueAvg;
-        avgBtn.classList.toggle('active', Leaderboard.showLeagueAvg);
-        refresh();
-      });
-    }
-
-    // Compact mode toggle
     (function () {
       const compactBtn = document.getElementById('compact-toggle');
       if (!compactBtn) return;
@@ -884,28 +795,24 @@
       });
     })();
 
-    // Export CSV
     document.getElementById('export-csv-btn').addEventListener('click', function () {
       const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab]).filter(function (c) {
         return c.key !== '_rank' && !c.isCompare;
       });
       const csv = Utils.toCSV(allData, visCols);
       Utils.downloadFile(csv, 'leaderboard_' + currentTab + '.csv');
-      // Visual feedback
       const btn = document.getElementById('export-csv-btn');
       const orig = btn.textContent;
       btn.textContent = 'Downloaded!';
       setTimeout(function () { btn.textContent = orig; }, 1500);
     });
 
-    // Copy to clipboard
     document.getElementById('copy-clipboard-btn').addEventListener('click', function () {
       const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab]).filter(function (c) {
         return c.key !== '_rank' && !c.isCompare;
       });
       const tsv = Utils.toTSV(allData, visCols);
       Utils.copyToClipboard(tsv);
-      // Visual feedback
       const btn = document.getElementById('copy-clipboard-btn');
       const orig = btn.textContent;
       btn.textContent = 'Copied!';
@@ -913,7 +820,6 @@
     });
   }
 
-  // ---- Pagination ----
   function setupPagination() {
     document.getElementById('page-prev').addEventListener('click', function () {
       if (Leaderboard.currentPage > 1) {
@@ -947,7 +853,6 @@
     }
   }
 
-  // ---- Side Panel ----
   function setupSidePanel() {
     window.App = window.App || {};
 
@@ -965,16 +870,13 @@
       sidePanel.classList.add('open');
       panelOverlay.classList.add('visible');
 
-      // Chart container and metrics table
       const chartContainer = sidePanel.querySelector('.chart-container');
 
       if (isHitterTab(currentTab)) {
-        // Hide scatter chart for hitters
         if (chartContainer) chartContainer.style.display = 'none';
         ScatterChart.destroy();
         buildHitterPanelTable(name, team);
       } else {
-        // Show scatter chart for pitchers
         if (chartContainer) chartContainer.style.display = '';
         ScatterChart.render(name, team);
         buildPanelMetricsTable(name, team);
@@ -985,7 +887,6 @@
       sidePanel.classList.remove('open');
       panelOverlay.classList.remove('visible');
       ScatterChart.destroy();
-      // Restore chart container visibility
       const chartContainer = sidePanel.querySelector('.chart-container');
       if (chartContainer) chartContainer.style.display = '';
       const active = document.querySelectorAll('.active-row');
@@ -1012,14 +913,12 @@
     const container = document.getElementById('panel-metrics-table');
     container.innerHTML = '';
 
-    // Get pitch data for this pitcher
     const pitchData = DataStore.pitchData;
     if (!pitchData) return;
 
     const pitcherRows = pitchData.filter(function (r) { return r.pitcher === pitcherName && r.team === team; });
     if (pitcherRows.length === 0) return;
 
-    // Sort by usage descending
     pitcherRows.sort(function (a, b) { return (b.usagePct || 0) - (a.usagePct || 0); });
 
     const metricCols = [
@@ -1052,12 +951,7 @@
       metricCols.forEach(function (mc) {
         const td = document.createElement('td');
         if (mc.key === 'pitchType') {
-          const badge = document.createElement('span');
-          badge.className = 'pitch-badge';
-          badge.textContent = row[mc.key];
-          const _bc = Utils.getPitchColor(row[mc.key]);
-          badge.style.backgroundColor = _bc;
-          badge.style.color = Utils.badgeTextColor(_bc);
+          const badge = Utils.createPitchBadge(row[mc.key], false);
           td.appendChild(badge);
           td.style.textAlign = 'left';
         } else {
@@ -1070,12 +964,6 @@
     table.appendChild(tbody);
     container.appendChild(table);
   }
-
-  const PANEL_CATEGORY_COLORS = {
-    'Hard': '#d62728',
-    'Breaking': '#2ca02c',
-    'Offspeed': '#ff7f0e'
-  };
 
   function buildHitterPanelTable(hitterName, team) {
     const container = document.getElementById('panel-metrics-table');
@@ -1168,12 +1056,7 @@
           indicator.className = 'expand-indicator';
           indicator.textContent = '\u25B6';
           td.appendChild(indicator);
-          const badge = document.createElement('span');
-          badge.className = 'pitch-badge';
-          badge.textContent = catName;
-          const catColor = PANEL_CATEGORY_COLORS[catName] || '#888';
-          badge.style.backgroundColor = catColor;
-          badge.style.color = Utils.badgeTextColor(catColor);
+          const badge = Utils.createCategoryBadge(catName, false);
           td.appendChild(badge);
           td.style.textAlign = 'left';
         } else {
@@ -1196,12 +1079,7 @@
               const td = document.createElement('td');
               if (mc.key === 'pitchType') {
                 td.style.paddingLeft = '24px';
-                const badge = document.createElement('span');
-                badge.className = 'pitch-badge';
-                badge.textContent = row[mc.key];
-                const _bc = Utils.getPitchColor(row[mc.key]);
-                badge.style.backgroundColor = _bc;
-                badge.style.color = Utils.badgeTextColor(_bc);
+                const badge = Utils.createPitchBadge(row[mc.key], false);
                 td.appendChild(badge);
                 td.style.textAlign = 'left';
               } else {
@@ -1226,7 +1104,6 @@
     container.appendChild(table);
   }
 
-  // ---- Compare Modal ----
   function setupCompareModal() {
     window.App = window.App || {};
 
@@ -1251,7 +1128,6 @@
     });
   }
 
-  // ---- Percentile Tooltips ----
   function setupPercentileTooltips() {
     const tooltip = document.getElementById('pctl-tooltip');
     const tbody = document.getElementById('table-body');
@@ -1259,26 +1135,13 @@
     tbody.addEventListener('mouseover', function (e) {
       const td = e.target.closest('td[data-pctl]');
       if (!td) { tooltip.classList.remove('visible'); return; }
-      // Suppress tooltip on league average row
       const tr = td.closest('tr');
       if (tr && tr.classList.contains('league-avg-row')) { tooltip.classList.remove('visible'); return; }
       const pctl = td.getAttribute('data-pctl');
       const label = td.getAttribute('data-col-label');
       const colKey = td.getAttribute('data-col-key');
 
-      // Build tooltip text
       const text = pctl + 'th percentile';
-
-      // Add league average if available
-      const meta = DataStore.metadata;
-      if (meta && meta.leagueAverages) {
-        // Try to find which pitch type this row belongs to
-        const tr = td.closest('tr');
-        if (tr && tr._playerName) {
-          // For simplicity, just show the percentile
-        }
-      }
-
       tooltip.textContent = text;
       tooltip.classList.add('visible');
     });
@@ -1297,10 +1160,8 @@
     });
   }
 
-  // ---- Keyboard Navigation ----
   function setupKeyboardNav() {
     document.addEventListener('keydown', function (e) {
-      // Only handle when not focused on an input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
       const tbody = document.getElementById('table-body');
@@ -1331,7 +1192,6 @@
     }
   }
 
-  // ---- Range Filters ----
   function setupRangeFilters() {
     const btn = document.getElementById('range-filter-btn');
     const panel = document.getElementById('range-filter-panel');
@@ -1344,7 +1204,6 @@
       }
     });
 
-    // Close on outside click
     document.addEventListener('click', function (e) {
       if (!panel.contains(e.target) && e.target !== btn) {
         panel.classList.remove('open');
@@ -1367,7 +1226,6 @@
       if (col.sortType !== 'numeric') return;
       if (col.key === '_rank' || col.isCompare) return;
 
-      // Group header
       if (col.group && col.group !== currentGroup) {
         currentGroup = col.group;
         const groupLabel = document.createElement('div');
@@ -1412,7 +1270,6 @@
       row.appendChild(maxInput);
       panel.appendChild(row);
 
-      // Debounced input handlers
       let debounceTimer = null;
       function onInput() {
         clearTimeout(debounceTimer);
@@ -1420,7 +1277,6 @@
           let minVal = minInput.value !== '' ? parseFloat(minInput.value) : null;
           let maxVal = maxInput.value !== '' ? parseFloat(maxInput.value) : null;
 
-          // Scale percentage inputs
           if (isPct) {
             if (minVal !== null) minVal = minVal / 100;
             if (maxVal !== null) maxVal = maxVal / 100;
@@ -1442,7 +1298,6 @@
       maxInput.addEventListener('input', onInput);
     });
 
-    // Clear All button
     const actions = document.createElement('div');
     actions.className = 'range-filter-actions';
     const clearBtn = document.createElement('button');
@@ -1469,7 +1324,6 @@
         const filter = columnRangeFilters[key];
         const val = row[key];
 
-        // Exclude rows with null values for filtered columns
         if (val === null || val === undefined) return false;
 
         if (filter.min !== null && val < filter.min) return false;
@@ -1490,7 +1344,6 @@
     }
   }
 
-  // ---- Column Settings ----
   function setupColumnSettings() {
     const btn = document.getElementById('col-settings-btn');
     const panel = document.getElementById('col-settings-panel');
@@ -1503,7 +1356,6 @@
       }
     });
 
-    // Close on outside click
     document.addEventListener('click', function (e) {
       if (!panel.contains(e.target) && e.target !== btn) {
         panel.classList.remove('open');
@@ -1521,7 +1373,6 @@
     columns.forEach(function (col) {
       if (col.noToggle) return;
 
-      // Group header
       if (col.group && col.group !== currentGroup) {
         currentGroup = col.group;
         const groupLabel = document.createElement('div');
@@ -1548,18 +1399,12 @@
     });
   }
 
-  // ---- Dark Mode (removed — site is dark-mode only) ----
   function setupDarkMode() {
-    // No light theme exists; dark mode toggle has been removed from UI.
-    // Ensure dark class is always present for any code that checks it.
     document.body.classList.add('dark');
   }
 
-  // ---- URL State ----
   function saveURLState() {
-    // Don't overwrite player page URL
     if (PlayerPage.isOpen) return;
-    // Use new route format: #pitchers/stats?team=NYY&throws=R
     const route = TAB_ROUTE[currentTab] || 'pitchers/stats';
     const parts = [];
     if (teamSelect.value !== 'all') parts.push('team=' + teamSelect.value);
@@ -1581,8 +1426,6 @@
     }
   }
 
-  // applyURLState is now handled by handleRoute()
 
-  // Start the app
   init();
 })();

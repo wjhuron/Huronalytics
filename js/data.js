@@ -1,13 +1,8 @@
 const DataStore = {
   rs: {},
-  gameType: 'RS',
 
   active: function () {
     return this.rs;
-  },
-
-  getMetadata: function () {
-    return this.rs.metadata;
   },
 
   load: function () {
@@ -24,24 +19,9 @@ const DataStore = {
       };
     }
 
-    // Backwards compat: if old flat globals exist and new ones don't
-    if (!window.RS_DATA && window.PITCHER_DATA && window.METADATA) {
-      this.rs = {
-        pitcherData: window.PITCHER_DATA || [],
-        pitchData: window.PITCH_DATA || [],
-        hitterData: window.HITTER_DATA || [],
-        hitterPitchData: window.HITTER_PITCH_LB || [],
-        metadata: window.METADATA || {},
-        microData: window.MICRO_DATA || null,
-        pitchDetails: window.PITCH_DETAILS || {},
-        hitterPitchDetails: window.HITTER_PITCH_DETAILS || {},
-      };
-    }
-
-    // Set flat globals for backwards compatibility
+    // Set flat globals so aggregator.js, player-page.js, scatter.js can access data
     this.updateGlobals();
 
-    // Expose convenience properties
     this.metadata = this.rs.metadata;
     this.pitcherData = this.rs.pitcherData;
     this.pitchData = this.rs.pitchData;
@@ -62,7 +42,6 @@ const DataStore = {
     window.PITCH_DETAILS = d.pitchDetails;
     window.HITTER_PITCH_DETAILS = d.hitterPitchDetails;
 
-    // Also update convenience properties
     this.metadata = d.metadata;
     this.pitcherData = d.pitcherData;
     this.pitchData = d.pitchData;
@@ -73,6 +52,9 @@ const DataStore = {
   /**
    * Smart filter: uses Aggregator when date/hand filters are active,
    * otherwise falls back to pre-aggregated data.
+   * @param {'pitcher'|'pitch'|'hitter'|'hitterPitch'} tab - Data source tab.
+   * @param {FilterState} filters - Current filter state.
+   * @returns {(PitcherRow|PitchRow|HitterRow)[]} Filtered row array.
    */
   getFilteredDataV2: function (tab, filters) {
     if (Aggregator.needsReaggregation(filters)) {
@@ -82,8 +64,10 @@ const DataStore = {
   },
 
   /**
-   * Filter data based on current filters.
-   * pitchTypes is always an array: ['all'], ['FF', 'SI'], etc.
+   * Filter pre-aggregated data based on current filters.
+   * @param {'pitcher'|'pitch'|'hitter'|'hitterPitch'} tab - Data source tab.
+   * @param {FilterState} filters - Current filter state (pitchTypes is always an array).
+   * @returns {(PitcherRow|PitchRow|HitterRow)[]} Filtered row array.
    */
   getFilteredData: function (tab, filters) {
     const d = this.rs;
@@ -135,7 +119,7 @@ const DataStore = {
           if (cached) { g = cached.g; gs = cached.gs; }
         }
         g = g || 0; gs = gs || 0;
-        const isStarter = g > 0 && (gs / g) > 0.5;
+        const isStarter = g > 0 && (gs / g) > QUAL.SP_GS_RATIO;
         if (filters.role === 'SP' && !isStarter) return false;
         if (filters.role === 'RP' && isStarter) return false;
       }
@@ -147,7 +131,7 @@ const DataStore = {
       if (tab === 'hitter') {
         if (filters.minCount === 'Q') {
           var tg = _teamGames[row.team] || 0;
-          if ((row.pa || 0) < tg * 3.1) return false;
+          if ((row.pa || 0) < tg * QUAL.PA_PER_GAME) return false;
         } else if ((row.pa || 0) < filters.minCount) return false;
       } else {
         if (row.count < filters.minCount) return false;
@@ -157,11 +141,8 @@ const DataStore = {
       if (tab === 'pitcher' && filters.minIp) {
         if (filters.minIp === 'Q') {
           var ptg = _teamGames[row.team] || 0;
-          var ipStr = String(row.ip || '0');
-          var ipParts = ipStr.split('.');
-          var ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
-          var pg = row.g || 0, pgs = row.gs || 0;
-          var isStarter = pg > 0 && (pgs / pg) > 0.5;
+          var ipFloat = Utils.parseIP(row.ip);
+          var isStarter = Utils.isStarter(row.g, row.gs);
           var ipThresh = isStarter ? ptg * 1.0 : ptg / 3;
           if (ipFloat < ipThresh) return false;
         } else if ((row.ip || 0) < filters.minIp) return false;

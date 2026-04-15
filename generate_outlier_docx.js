@@ -137,7 +137,7 @@ children.push(new Paragraph({
 
 // Section definitions
 const sections = [
-    { key: 'Spin Rate', title: 'Spin Rate Outliers', desc: 'Spin rate errors are the most common tracking issue during Spring Training. Values near 0 RPM or dramatically different from a pitcher\u2019s average are almost always sensor malfunctions.' },
+    { key: 'Spin Rate', title: 'Spin Rate Outliers', desc: 'Spin rate errors are the most common tracking issue. Values near 0 RPM or dramatically different from a pitcher\u2019s average are almost always sensor malfunctions.' },
     { key: 'Extension', title: 'Extension Outliers', desc: 'Extension measures how far toward home plate the pitcher releases the ball (typically 5.5\u20137.5 ft). Negative values or values above 10 ft are clearly erroneous.' },
     { key: 'Release Height', title: 'Release Height (RelZ) Outliers', desc: 'Release height is generally very consistent for a given pitcher across pitch types (typically 5\u20136.5 ft). Deviations of 0.3+ ft from a pitcher\u2019s norm for a pitch type are suspicious.' },
     { key: 'Release Side', title: 'Release Side (RelX) Outliers', desc: 'Release side measures lateral release point. Like release height, this is typically very consistent. Deviations of 0.3+ ft suggest tracking errors.' },
