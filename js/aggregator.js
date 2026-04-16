@@ -399,12 +399,12 @@ const Aggregator = {
           pitcherIdx: row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
           throws: row[ci.throws],
-          counts: new Array(27)
+          counts: new Array(31)
         };
-        for (let z = 0; z < 27; z++) groups[gk].counts[z] = 0;
+        for (let z = 0; z < 31; z++) groups[gk].counts[z] = 0;
       }
       const c = groups[gk].counts;
-      for (let f = 0; f < 27; f++) {
+      for (let f = 0; f < 31; f++) {
         c[f] += row[ci.n + f];
       }
     }
