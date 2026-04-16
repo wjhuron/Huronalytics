@@ -29,7 +29,7 @@ METRIC_KEYS = {
 }
 
 PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
-STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct']
+STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct', 'oneOneWinPct', 'earlyActionPct']
 
 PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
 
@@ -213,6 +213,24 @@ def compute_stats(pitches):
     two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
 
+    one_one_pitches = [p for p in pitches if p.get('Count') == '1-1']
+    one_one_wins = sum(1 for p in one_one_pitches if p.get('Description') not in BALL_DESCRIPTIONS)
+    one_one_win_pct = one_one_wins / len(one_one_pitches) if one_one_pitches else None
+
+    early_action = 0
+    for p in pitches:
+        ev = p.get('Event')
+        if ev and ev not in NON_PA_EVENTS:
+            pid = p.get('PitchID') or ''
+            parts = pid.split('_')
+            if len(parts) == 3:
+                try:
+                    if int(parts[2]) <= 3:
+                        early_action += 1
+                except ValueError:
+                    pass
+    early_action_pct = early_action / n_pa if n_pa > 0 else None
+
     return {
         'pa': n_pa,
         'strikePct': strike_pct,
@@ -231,6 +249,8 @@ def compute_stats(pitches):
         'babip': babip,
         'fpsPct': fps_pct,
         'twoStrikeWhiffPct': two_strike_whiff_pct,
+        'oneOneWinPct': one_one_win_pct,
+        'earlyActionPct': early_action_pct,
         'runValue': run_value,
     }
 

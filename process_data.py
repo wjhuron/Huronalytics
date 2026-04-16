@@ -113,8 +113,9 @@ def generate_micro_data(all_pitches):
     #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
     #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (line-drive HRs)
     #  25:pu (popups, for HR/FB denominator)  26:nStrikes  27:ibb
+    #  28:oneOneTotal  29:oneOneWins  30:earlyActionPAs
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 28)
+    pitcher_micro = defaultdict(lambda: [0] * 31)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -184,6 +185,24 @@ def generate_micro_data(all_pitches):
             c[20] += 1  # firstPitches
             if desc in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'):
                 c[21] += 1  # firstPitchStrikes
+
+        # 1-1 Win%: everything except balls/HBP/pitchout counts as winning the 1-1 pitch
+        if p.get('Count') == '1-1':
+            c[28] += 1  # oneOneTotal
+            if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
+                c[29] += 1  # oneOneWins
+
+        # Early Action: PA ended in 3 or fewer pitches
+        if event and event not in NON_PA_EVENTS:
+            pitch_id = p.get('PitchID') or ''
+            parts = pitch_id.split('_')
+            if len(parts) == 3:
+                try:
+                    pitch_num = int(parts[2])
+                    if pitch_num <= 3:
+                        c[30] += 1  # earlyActionPAs
+                except ValueError:
+                    pass
 
     pitcher_rows = []
     for (pi, ti, throws, di, bh), c in pitcher_micro.items():

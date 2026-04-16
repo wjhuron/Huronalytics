@@ -99,6 +99,8 @@ const COLUMNS = {
     { key: 'izWhiffPct',  label: 'IZ Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on in-zone swings', group: 'stats' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate', group: 'stats' },
     { key: 'fpsPct',      label: 'FPS%',     format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch strike rate', group: 'stats' },
+    { key: 'oneOneWinPct', label: '1-1 Win%', format: Utils.formatPct, sortType: 'numeric', desc: 'Strike rate on 1-1 counts (strikes + BIP / total 1-1 pitches)', group: 'stats' },
+    { key: 'earlyActionPct', label: 'EarlyAction%', format: Utils.formatPct, sortType: 'numeric', desc: 'PAs ending in 3 or fewer pitches / total PAs', group: 'stats' },
   ],
   hitterStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },

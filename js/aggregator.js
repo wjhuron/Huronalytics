@@ -499,6 +499,7 @@ const Aggregator = {
     const hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
     const izSw = c[18], izWh = c[19];
     const firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24], pu_cnt = c[25], nStrikes = c[26];
+    const oneOneTotal = c[28], oneOneWins = c[29], earlyActionPAs = c[30];
     const ab = pa - bb - hbp - sf - sh - ci_val;
 
     const strikePct = n > 0 ? nStrikes / n : null;
@@ -508,6 +509,8 @@ const Aggregator = {
     const babip_denom = ab - k - hr + sf;
     const babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
     const fpsPct = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
+    const oneOneWinPct = oneOneTotal > 0 ? oneOneWins / oneOneTotal : null;
+    const earlyActionPct = pa > 0 ? earlyActionPAs / pa : null;
     const fb_for_hrfb = fb_cnt + pu_cnt;
     const hrFbPct = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
@@ -535,6 +538,8 @@ const Aggregator = {
       kbbPct: kbbPct,
       babip: babip,
       fpsPct: fpsPct,
+      oneOneWinPct: oneOneWinPct,
+      earlyActionPct: earlyActionPct,
       hrFbPct: hrFbPct,
       avgEVAgainst: bipStats.avgEVAgainst,
       maxEVAgainst: bipStats.maxEVAgainst,
@@ -558,7 +563,7 @@ const Aggregator = {
 
     const mlbIdMap = this._getMlbIdMap('pitcher');
 
-    const STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
+    const STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'oneOneWinPct', 'earlyActionPct', 'hrFbPct',
                      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'xwOBAsp'];
     const INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
     let rows = [];
