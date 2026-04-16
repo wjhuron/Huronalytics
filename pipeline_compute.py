@@ -49,6 +49,7 @@ HITTER_STAT_KEYS = [
     'sprintSpeed',
     'wRCplus', 'xWRCplus',
     'runValue', 'xRunValue',
+    'hr', 'sb',
 ]
 HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
 

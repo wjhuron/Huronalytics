@@ -1196,6 +1196,7 @@ const Aggregator = {
       'avgFbDist', 'avgHrDist',
       'sprintSpeed', 'runValue',
       'wRCplus', 'xWRCplus',
+      'hr', 'sb',
     ];
     const HITTER_INVERT = {
       swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true, firstPitchSwingPct: true
@@ -1637,6 +1638,7 @@ const Aggregator = {
       'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
       'pullPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
+      'runValue', 'rv100', 'xRunValue', 'xRv100',
     ];
     const HITTER_PITCH_INVERT = {
       swingPct: true, chasePct: true, whiffPct: true, gbPct: true
