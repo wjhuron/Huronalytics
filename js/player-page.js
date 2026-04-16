@@ -93,7 +93,6 @@ var PlayerPage = {
     { key: 'contactPct', label: 'Contact%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'whiffPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   HITTER_BAT_TRACKING_COLS: [

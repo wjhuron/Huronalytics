@@ -15,11 +15,7 @@ const COLUMNS = {
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', desc: 'Average spin rate (rpm)', group: 'metrics' },
     { key: 'breakTilt',   label: 'OTilt',    format: Utils.formatTilt, sortType: 'numeric', sortKey: 'breakTiltMinutes', noPercentile: true, desc: 'Observed break tilt (clock notation) — direction of total break', group: 'metrics' },
     { key: 'indVertBrk',  label: 'IVB',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Induced vertical break (inches) — gravity-independent', group: 'metrics' },
-    { key: 'xIVB',        label: 'xIVB',     format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Expected IVB from MVN model given velo, spin, arm slot', group: 'metrics' },
-    { key: 'ivbOE',       label: 'IVBOE',    format: Utils.formatSignedDecimal(1), sortType: 'numeric', desc: 'IVB over expected (IVB − xIVB) — positive = more rise than expected', group: 'metrics' },
     { key: 'horzBrk',     label: 'HB',       format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Horizontal break (inches, pitcher POV)', group: 'metrics' },
-    { key: 'xHB',         label: 'xHB',      format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Expected HB from MVN model given velo, spin, arm slot', group: 'metrics' },
-    { key: 'hbOE',        label: 'HBOE',     format: Utils.formatSignedDecimal(1), sortType: 'numeric', desc: 'HB over expected (HB − xHB)', group: 'metrics' },
     { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Vertical release point (feet)', group: 'metrics' },
     { key: 'relPosX',     label: 'RelX',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Horizontal release point (feet, pitcher POV)', group: 'metrics' },
     { key: 'extension',   label: 'Ext',      format: Utils.formatFeetInches, sortType: 'numeric', desc: 'Extension toward home plate at release (feet)', group: 'metrics' },
@@ -36,7 +32,6 @@ const COLUMNS = {
     { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches', group: 'outcomes' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected batting average (Statcast model, based on EV + LA)', group: 'outcomes' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected slugging (Statcast model, based on EV + LA)', group: 'outcomes' },
-    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average — all plate outcomes weighted by run value', group: 'outcomes' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast model, based on EV + LA)', group: 'outcomes' },
   ],
   pitcherStats: [
@@ -45,7 +40,6 @@ const COLUMNS = {
     { key: 'pitcher',     label: 'Pitcher',  format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'throws',      label: 'Throws',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
-    { key: 'armAngle',   label: 'Arm\u00B0',  format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Arm angle at release (degrees)', group: 'info' },
     // Counting stats (from boxscore API)
     { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, sectionStart: true, group: 'counting' },
     { key: 'gs',          label: 'GS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
@@ -64,14 +58,8 @@ const COLUMNS = {
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Strikeout rate (K / TBF)', group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / TBF)', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', desc: 'K% minus BB%', group: 'stats' },
-    // Run Value
-    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (negative = better)', group: 'run_value' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches', group: 'run_value' },
-    { key: 'xRunValue',   label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP', group: 'run_value' },
-    { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches', group: 'run_value' },
-    // Expected
-    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Weighted on-base average against', group: 'expected' },
-    { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA against (Statcast model)', group: 'expected' },
+    // Pitch Quality
+    { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Expected run value per 100 pitches', group: 'run_value' },
   ],
   pitcherBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -111,7 +99,6 @@ const COLUMNS = {
     { key: 'izWhiffPct',  label: 'IZ Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on in-zone swings', group: 'stats' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate', group: 'stats' },
     { key: 'fpsPct',      label: 'FPS%',     format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch strike rate', group: 'stats' },
-    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on pitches with 2 strikes', group: 'stats' },
   ],
   hitterStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -140,8 +127,6 @@ const COLUMNS = {
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast, EV + LA)', group: 'expected' },
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
     { key: 'xWRCplus',   label: 'xWRC+',    format: Utils.formatInt, sortType: 'numeric', desc: 'Expected wRC+ (derived from xwOBA, park-adjusted)', group: 'expected' },
-    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Pitch-level run value (positive = better for hitter)', group: 'expected' },
-    { key: 'xRunValue',  label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for hitter)', group: 'expected' },
     // Counting
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
@@ -178,10 +163,10 @@ const COLUMNS = {
     { key: 'xwOBAsp',    label: 'xwOBAsp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted — avg zone wOBA by LA × spray direction', group: 'expected' },
     // Composition
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'composition' },
-    { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Line drive rate', group: 'composition' },
-    { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Fly ball rate', group: 'composition' },
+    { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Line drive rate', group: 'composition' },
+    { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Fly ball rate', group: 'composition' },
     // Spray
-    { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, sectionStart: true, desc: 'Pull rate (BIP to pull side)', group: 'spray' },
+    { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Pull rate (BIP to pull side)', group: 'spray' },
     { key: 'middlePct',   label: 'Middle%',  format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Center rate (BIP up the middle)', group: 'spray' },
     { key: 'oppoPct',     label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Oppo rate (BIP to opposite field)', group: 'spray' },
     { key: 'airPullPct',  label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', desc: 'Air-pull rate — pulled (LD + FB + PU) / total air balls (LD + FB + PU)', group: 'spray' },
@@ -198,9 +183,6 @@ const COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchType: true },
-    // Rates
-    { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Strikeout rate (K / PA)', group: 'rates' },
-    { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / PA)', group: 'rates' },
     // Discipline
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Overall swing rate (swings / pitches seen)', group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone swing rate', group: 'discipline' },
@@ -210,7 +192,6 @@ const COLUMNS = {
     { key: 'contactPct',  label: 'Contact%', format: Utils.formatPct, sortType: 'numeric', desc: 'Contact rate excluding bunts (contact / swings)', group: 'discipline' },
     { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone contact rate', group: 'discipline' },
     { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
-    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on pitches with 2 strikes', group: 'discipline' },
   ],
   hitterBatTracking: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -278,7 +259,7 @@ const Leaderboard = {
   _tabDefaultHidden: {},  // tracks which keys were hidden by tab defaults
 
   _TAB_HIDDEN_DEFAULTS: {
-    pitchMetrics:      ['maxVelo', 'xIVB', 'xHB', 'relPosZ', 'relPosX'],
+    pitchMetrics:      ['maxVelo', 'relPosZ', 'relPosX'],
     pitcherStats:      ['w', 'l', 'sv', 'hld'],
     hitterStats:       ['ab', 'doubles', 'triples', 'cs', 'sbPct'],
     hitterBattedBall:  ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist'],
