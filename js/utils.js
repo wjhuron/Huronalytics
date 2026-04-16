@@ -1,3 +1,102 @@
+// ============================================================================
+//  JSDoc Type Definitions -- shared data shapes used across the codebase
+// ============================================================================
+
+/**
+ * A column definition used in leaderboard tables and player-page tables.
+ * @typedef {Object} ColumnDef
+ * @property {string}   key          - Data-row property name (e.g. 'velocity', 'kPct').
+ * @property {string}   label        - Display header text.
+ * @property {function} [format]     - Formatter: (value) => string. Omit for pitch-type badge cols.
+ * @property {string}   [sortType]   - 'numeric' | 'string' | null (unsortable).
+ * @property {string}   [sortKey]    - Alternate row property to sort on (defaults to key).
+ * @property {boolean}  [sectionStart] - If true, renders a left-border divider before this column.
+ * @property {boolean}  [noPercentile] - If true, skip percentile coloring for this column.
+ * @property {string}   [desc]       - Tooltip description for header hover.
+ * @property {string}   [group]      - Column group label (e.g. 'metrics', 'ev', 'discipline').
+ * @property {boolean}  [rocHide]    - If true, hide this column for ROC/AAA players.
+ * @property {boolean}  [noPctl]     - Player-page: skip percentile circle for this stat.
+ */
+
+/**
+ * A row from the pitcher leaderboard (PITCHER_DATA / Aggregator output).
+ * @typedef {Object} PitcherRow
+ * @property {string}  pitcher     - Pitcher full name.
+ * @property {string}  team        - Team abbreviation (e.g. 'NYY').
+ * @property {number}  [mlbId]     - MLB player ID (for linking to player page).
+ * @property {string}  throws      - Throwing hand: 'R' or 'L'.
+ * @property {number}  count       - Total pitches thrown.
+ * @property {number}  [pa]        - Plate appearances (total batters faced).
+ * @property {number}  [nSwings]   - Swing count.
+ * @property {number}  [nBip]      - Batted balls in play.
+ * @property {number}  [g]         - Games.
+ * @property {number}  [gs]        - Games started.
+ * @property {string}  [ip]        - Innings pitched (baseball notation, e.g. '6.2').
+ * @property {number}  [kPct]      - Strikeout rate (0-1).
+ * @property {number}  [bbPct]     - Walk rate (0-1).
+ * @property {number}  [era]       - Earned run average.
+ * @property {number}  [fip]       - Fielding-independent pitching.
+ * @property {number}  [xwOBA]     - Expected wOBA against.
+ * @property {boolean} [_qualified] - True if IP-qualified for percentile pool.
+ * @property {boolean} [bipQual]   - True if BIP >= MIN_BIP_PCTL for batted-ball percentiles.
+ */
+
+/**
+ * A row from the pitch-type leaderboard (PITCH_DATA / Aggregator output).
+ * @typedef {Object} PitchRow
+ * @property {string}  pitcher     - Pitcher full name.
+ * @property {string}  team        - Team abbreviation.
+ * @property {string}  throws      - Throwing hand: 'R' or 'L'.
+ * @property {string}  pitchType   - Pitch type code (e.g. 'FF', 'SL', 'CH').
+ * @property {number}  count       - Number of pitches of this type.
+ * @property {number}  [velocity]  - Average velocity (mph).
+ * @property {number}  [spinRate]  - Average spin rate (rpm).
+ * @property {number}  [indVertBrk]- Induced vertical break (inches).
+ * @property {number}  [horzBrk]   - Horizontal break (inches).
+ * @property {string}  [breakTilt] - Break tilt (clock notation, e.g. '1:30').
+ * @property {number}  [nVAA]      - Normalized vertical approach angle (degrees).
+ * @property {number}  [swStrPct]  - Whiff rate (0-1).
+ * @property {number}  [cswPct]    - Called strike + whiff rate (0-1).
+ */
+
+/**
+ * A row from the hitter leaderboard (HITTER_DATA / Aggregator output).
+ * @typedef {Object} HitterRow
+ * @property {string}  hitter      - Hitter full name.
+ * @property {string}  team        - Team abbreviation.
+ * @property {number}  [mlbId]     - MLB player ID.
+ * @property {string}  stands      - Batting side: 'R', 'L', or 'S'.
+ * @property {number}  [pa]        - Plate appearances.
+ * @property {number}  [nSwings]   - Swing count.
+ * @property {number}  [nBip]      - Batted balls in play.
+ * @property {number}  [avg]       - Batting average.
+ * @property {number}  [obp]       - On-base percentage.
+ * @property {number}  [slg]       - Slugging percentage.
+ * @property {number}  [xwOBA]     - Expected wOBA.
+ * @property {number}  [avgEVAll]  - Average exit velocity (all BIP, mph).
+ * @property {number}  [barrelPct] - Barrel rate (0-1).
+ * @property {number}  [batSpeed]  - Average bat speed (mph).
+ * @property {boolean} [_qualified]- True if PA-qualified for percentile pool.
+ */
+
+/**
+ * Filter state object passed between app.js, data.js, and aggregator.js.
+ * @typedef {Object} FilterState
+ * @property {string}   team         - Team abbreviation or 'all'.
+ * @property {string}   throws       - 'R', 'L', or 'all' (also used as stands filter for hitters).
+ * @property {string}   [vsHand]     - Opponent hand filter: 'R', 'L', or 'all'.
+ * @property {string}   [role]       - 'SP', 'RP', or 'all'.
+ * @property {string[]} pitchTypes   - Array of pitch type codes, or ['all'].
+ * @property {number|string} minCount - Minimum pitch/PA count, or 'Q' for qualified.
+ * @property {number}   [minSwings]  - Minimum swing count (hitter tabs).
+ * @property {number}   [minBip]     - Minimum BIP count.
+ * @property {number|string} [minIp] - Minimum IP, or 'Q' for qualified (pitcher tabs).
+ * @property {number}   [minTbf]     - Minimum total batters faced.
+ * @property {string}   [dateStart]  - YYYY-MM-DD start date filter.
+ * @property {string}   [dateEnd]    - YYYY-MM-DD end date filter.
+ * @property {string}   [search]     - Name search substring.
+ */
+
 const Utils = {
   ordinal: function (n) {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -36,11 +135,6 @@ const Utils = {
     return value;
   },
 
-  formatStuff: function (value) {
-    if (value === null || value === undefined) return '--';
-    return Math.round(value).toString();
-  },
-
   // Convert decimal feet to feet'inches format (e.g., 5.86 → "5'10", -1.8 → "-1'10")
   formatFeetInches: function (value) {
     if (value === null || value === undefined) return '--';
@@ -62,15 +156,85 @@ const Utils = {
     return this.PITCH_TYPE_LABELS[code] || code;
   },
 
-  // Pitch type colors (matches scatter.js)
+  // Pitch type colors — single source of truth (used by scatter.js, leaderboard, player page)
   PITCH_COLORS: {
     FF: '#4488FF', SI: '#FFD700', FC: '#FFA500', SL: '#DDDDDD',
     ST: '#FF1493', SV: '#32CD32', CU: '#E03030', CH: '#CC66EE',
     FS: '#40E0D0', KN: '#AAAAAA', SC: '#999999', CS: '#666666',
   },
 
+  // Border colors for scatter chart markers (derived from PITCH_COLORS)
+  PITCH_BORDER_COLORS: {
+    FF: '#3366CC', SI: '#CCB000', FC: '#CC8400', SL: '#BBBBBB',
+    ST: '#CC1076', SV: '#28A428', CU: '#B32626', CH: '#A352BE',
+    FS: '#33B3A6', KN: '#888888', SC: '#777777', CS: '#4D4D4D',
+  },
+
   getPitchColor: function (pt) {
     return this.PITCH_COLORS[pt] || '#999';
+  },
+
+  getPitchBorderColor: function (pt) {
+    return this.PITCH_BORDER_COLORS[pt] || '#777';
+  },
+
+  // Canonical pitch type sort order — used everywhere pitch types are sorted
+  PITCH_ORDER: ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'],
+
+  // Sort comparator for pitch type codes (for use with Array.sort)
+  pitchTypeSortCompare: function (a, b) {
+    var ai = this.PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
+    var bi = this.PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
+    return ai - bi;
+  },
+
+  // Sort an array of pitch type strings in canonical order
+  sortPitchTypes: function (types) {
+    var self = this;
+    return types.slice().sort(function (a, b) { return self.pitchTypeSortCompare(a, b); });
+  },
+
+  // Category colors for grouped pitch type display (Hard/Breaking/Offspeed)
+  CATEGORY_COLORS: {
+    'Hard': '#d62728',
+    'Breaking': '#2ca02c',
+    'Offspeed': '#ff7f0e',
+  },
+
+  // Parse baseball IP notation (e.g. "5.2" = 5 and 2/3 innings) to a float
+  parseIP: function (ipStr) {
+    if (ipStr == null) return 0;
+    var parts = String(ipStr).split('.');
+    return parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
+  },
+
+  // Determine if a pitcher is a starter based on games / games started
+  isStarter: function (g, gs) {
+    g = g || 0;
+    gs = gs || 0;
+    return g > 0 && (gs / g) > QUAL.SP_GS_RATIO;
+  },
+
+  // Create a pitch badge <span> element (small or regular size)
+  createPitchBadge: function (pitchType, small) {
+    var badge = document.createElement('span');
+    badge.className = small ? 'pitch-badge-sm' : 'pitch-badge';
+    var color = this.getPitchColor(pitchType);
+    badge.style.backgroundColor = color;
+    badge.style.color = this.badgeTextColor(color);
+    badge.textContent = pitchType;
+    return badge;
+  },
+
+  // Create a category badge (Hard/Breaking/Offspeed) <span> element
+  createCategoryBadge: function (category, small) {
+    var badge = document.createElement('span');
+    badge.className = small ? 'pitch-badge-sm' : 'pitch-badge';
+    var color = this.CATEGORY_COLORS[category] || '#888';
+    badge.style.backgroundColor = color;
+    badge.style.color = this.badgeTextColor(color);
+    badge.textContent = category;
+    return badge;
   },
 
   badgeTextColor: function (hexColor) {
@@ -185,7 +349,6 @@ const Utils = {
     'AirPull%': 'Air Pull Rate (LD + FB + PU to pull side / total BIP)',
   },
 
-  // URL state helpers
   readHash: function () {
     const hash = window.location.hash.replace(/^#/, '');
     if (!hash) return {};
@@ -197,20 +360,6 @@ const Utils = {
     return params;
   },
 
-  writeHash: function (params) {
-    const parts = [];
-    Object.keys(params).forEach(function (k) {
-      if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
-        parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
-      }
-    });
-    const newHash = parts.join('&');
-    if (window.location.hash.replace(/^#/, '') !== newHash) {
-      history.replaceState(null, '', '#' + newHash);
-    }
-  },
-
-  // Export data as CSV string
   toCSV: function (data, columns) {
     const lines = [];
     // Header
@@ -228,7 +377,21 @@ const Utils = {
     return lines.join('\n');
   },
 
-  // Download text as file
+  // Add a horizontal scroll fade indicator to a scrollable container
+  addScrollFade: function (container) {
+    container.style.position = 'relative';
+    var fadeDiv = document.createElement('div');
+    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, var(--bg-card, #1a1d21));pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
+    container.appendChild(fadeDiv);
+    container.addEventListener('scroll', function() {
+      var maxScroll = container.scrollWidth - container.clientWidth;
+      fadeDiv.style.opacity = (container.scrollLeft >= maxScroll - 2) ? '0' : '1';
+    });
+    setTimeout(function() {
+      if (container.scrollWidth > container.clientWidth) fadeDiv.style.opacity = '1';
+    }, 100);
+  },
+
   downloadFile: function (content, filename, mimeType) {
     const blob = new Blob([content], { type: mimeType || 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -238,7 +401,6 @@ const Utils = {
     URL.revokeObjectURL(link.href);
   },
 
-  // Copy text to clipboard
   copyToClipboard: function (text) {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text).catch(function () {
@@ -260,7 +422,6 @@ const Utils = {
     document.body.removeChild(ta);
   },
 
-  // Tab-separated for clipboard (pastes into Excel/Sheets nicely)
   toTSV: function (data, columns) {
     const lines = [];
     lines.push(columns.map(function (c) { return c.label; }).join('\t'));

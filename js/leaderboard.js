@@ -272,8 +272,6 @@ const Leaderboard = {
   showLeagueAvg: true,
   currentPage: 1,
   pageSize: 50,
-  lastRenderedData: null,
-  lastRenderedColumns: null,
   selectedForCompare: {},  // pitcher name -> true
   keyboardFocusIndex: -1,
 
@@ -319,6 +317,13 @@ const Leaderboard = {
     });
   },
 
+  /**
+   * Sort data in-place by the given column, toggling asc/desc on repeated clicks.
+   * @param {(PitcherRow|PitchRow|HitterRow)[]} data - Row array to sort.
+   * @param {string} columnKey - The ColumnDef.key to sort by.
+   * @param {ColumnDef[]} columns - Full column definition list.
+   * @returns {(PitcherRow|PitchRow|HitterRow)[]} The sorted data (same reference).
+   */
   sortData: function (data, columnKey, columns) {
     let col = null;
     for (let i = 0; i < columns.length; i++) {
@@ -362,7 +367,6 @@ const Leaderboard = {
                                  (opts.throws && opts.throws !== 'all') ||
                                  (opts.role && opts.role !== 'all');
 
-    // Always load precomputed averages
     const isPitcher = data.length > 0 && data[0].pitcher;
     const overallAvgs = isPitcher ? (meta.pitcherLeagueAverages || {}) : (meta.hitterLeagueAverages || {});
     const pitchTypeAvgs = meta.leagueAverages || {};
@@ -393,11 +397,7 @@ const Leaderboard = {
     }
 
     // IP parser for ERA/FIP-style stats (ip stored as string like "6.1")
-    function _parseIP(ipStr) {
-      if (ipStr == null) return 0;
-      var parts = String(ipStr).split('.');
-      return parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
-    }
+    var _parseIP = Utils.parseIP;
 
     // Weight mapping — matches process_data.py precomputed average methodology
     var IP_WEIGHTED = { era:1, fip:1, xFIP:1, siera:1 };
@@ -455,6 +455,12 @@ const Leaderboard = {
     return avg;
   },
 
+  /**
+   * Render the leaderboard table for the current page of data.
+   * @param {(PitcherRow|PitchRow|HitterRow)[]} data - Full sorted dataset.
+   * @param {ColumnDef[]} columns - Column definitions for the active tab.
+   * @param {Object} [opts] - Render options (pitchTypes, vsHand, throws, role, tab).
+   */
   render: function (data, columns, opts) {
     opts = opts || {};
     const self = this;
@@ -465,11 +471,8 @@ const Leaderboard = {
     const noResults = document.getElementById('no-results');
     const isDark = document.body.classList.contains('dark');
 
-    this.lastRenderedData = data;
-    this.lastRenderedColumns = columns;
     this._lastRenderOpts = opts;
 
-    // Pagination
     const totalRows = data.length;
     const pageSize = this.pageSize;
     const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(totalRows / pageSize)) : 1;
@@ -478,7 +481,6 @@ const Leaderboard = {
     const endIdx = pageSize > 0 ? Math.min(startIdx + pageSize, totalRows) : totalRows;
     const pageData = data.slice(startIdx, endIdx);
 
-    // Update pagination UI
     const pageInfo = document.getElementById('page-info');
     const pagePrev = document.getElementById('page-prev');
     const pageNext = document.getElementById('page-next');
@@ -486,11 +488,9 @@ const Leaderboard = {
     if (pagePrev) pagePrev.disabled = this.currentPage <= 1;
     if (pageNext) pageNext.disabled = this.currentPage >= totalPages;
 
-    // Build header - group row + column row
     let thead = document.querySelector('#leaderboard-table thead');
     thead.innerHTML = '';
 
-    // Group header row
     const groupRow = document.createElement('tr');
     groupRow.id = 'table-group-header';
     const groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', advanced: 'Advanced', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking', outcomes: 'Outcomes', expected: 'Expected', run_value: 'Run Value', quality: 'Quality', composition: 'Composition', supplemental: 'Supplemental', distance: 'Distance', baserunning: 'Baserunning' };
@@ -523,7 +523,6 @@ const Leaderboard = {
       thead.appendChild(groupRow);
     }
 
-    // Column header row
     headerRow = document.createElement('tr');
     headerRow.id = 'table-header';
     visCols.forEach(function (col) {
@@ -535,7 +534,6 @@ const Leaderboard = {
         const labelSpan = document.createElement('span');
         labelSpan.textContent = col.label;
         th.appendChild(labelSpan);
-        // Fixed-width sort indicator to prevent layout shift
         if (col.sortType !== null) {
           const sortSpan = document.createElement('span');
           sortSpan.className = 'sort-indicator';
@@ -577,7 +575,6 @@ const Leaderboard = {
     });
     thead.appendChild(headerRow);
 
-    // Set column header sticky top below group header
     if (hasGroups) {
       const groupRowHeight = groupRow.offsetHeight || 25;
       for (let hi = 0; hi < headerRow.cells.length; hi++) {
@@ -585,7 +582,6 @@ const Leaderboard = {
       }
     }
 
-    // Calculate sticky column offsets (for frozen Team column)
     this._stickyLeftOffsets = {};
     let firstStickyTh = null;
     for (let si = 0; si < visCols.length; si++) {
@@ -600,15 +596,12 @@ const Leaderboard = {
         if (visCols[si2].stickyIdx === 1) {
           headerRow.cells[si2].style.left = firstStickyWidth + 'px';
           this._stickyLeftOffsets[visCols[si2].key] = firstStickyWidth;
-          // Also set on group header if present
           if (hasGroups) {
-            // Find which group cell contains this column
           }
         }
       }
     }
 
-    // Build body
     tbody.innerHTML = '';
     if (pinnedBody) pinnedBody.innerHTML = '';
 
@@ -646,7 +639,6 @@ const Leaderboard = {
 
     const fragment = document.createDocumentFragment();
 
-    // Data rows
     for (let ri = 0; ri < pageData.length; ri++) {
       const row = pageData[ri];
       const globalRank = startIdx + ri + 1;
@@ -665,8 +657,6 @@ const Leaderboard = {
 
     tbody.appendChild(fragment);
 
-    // Event delegation: single click handler on tbody instead of per-row listeners
-    // Remove old listener if tbody was replaced (prevents accumulation)
     if (tbody._delegatedClick) {
       tbody.removeEventListener('click', tbody._delegatedClick);
     }
@@ -674,10 +664,8 @@ const Leaderboard = {
         if (e.target.type === 'checkbox') return;
         const tr = e.target.closest('tr.clickable-row');
         if (!tr || !tr._rowData) return;
-        // Remove active from all rows
         const prev = tbody.querySelectorAll('.active-row');
         for (let k = 0; k < prev.length; k++) prev[k].classList.remove('active-row');
-        // Highlight all rows for this person
         const personName = tr._playerName;
         const allRows = tbody.querySelectorAll('tr');
         allRows.forEach(function (row) {
@@ -735,12 +723,7 @@ const Leaderboard = {
 
       // Special: pitch type badge
       if (col.isPitchType && row[col.key] && !isAvgRow) {
-        const badge = document.createElement('span');
-        badge.className = 'pitch-badge';
-        badge.textContent = row[col.key];
-        const pitchColor = Utils.getPitchColor(row[col.key]);
-        badge.style.backgroundColor = pitchColor;
-        badge.style.color = Utils.badgeTextColor(pitchColor);
+        const badge = Utils.createPitchBadge(row[col.key], false);
         td.appendChild(badge);
         if (col.align) td.classList.add('align-' + col.align);
         tr.appendChild(td);
@@ -823,37 +806,30 @@ const Leaderboard = {
           const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, blastPct: true, idealAAPct: true };
 
           if (isPitcherPitchType) {
-            // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need ≥50 pitches
-            showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= 50;
+            // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
+            showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
           } else if (isPitcherRow) {
             // Pitcher overall: IP-based qualification
-            const ipStr = row.ip;
-            let ipFloat = 0;
-            if (ipStr != null) {
-              const ipParts = String(ipStr).split('.');
-              ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
-            }
-            const rg = row.g || 0;
-            const rgs = row.gs || 0;
-            const isStarter = rg > 0 && (rgs / rg) > 0.5;
+            const ipFloat = Utils.parseIP(row.ip);
+            const isStarter = Utils.isStarter(row.g, row.gs);
             const ipThresh = isStarter ? tg * 1.0 : tg / 3;
             showColor = ipFloat >= ipThresh;
             // Pitcher always-color: extension
             if (!showColor) showColor = col.key === 'extension';
           } else if (isHitterPitchType) {
-            // Hitter pitch-type: ≥25 pitches of that type seen
-            showColor = (row.count || 0) >= 25;
+            // Hitter pitch-type: minimum pitches of that type seen
+            showColor = (row.count || 0) >= QUAL.MIN_HITTER_PT;
           } else {
             // Hitter overall: per-stat qualification gates
-            const paQual = (row.pa || 0) >= tg * 3.1;
+            const paQual = (row.pa || 0) >= tg * QUAL.PA_PER_GAME;
             if (HITTER_BIP_STATS[col.key]) {
-              showColor = (row.nBip || 0) >= 20;
+              showColor = (row.nBip || 0) >= QUAL.MIN_BIP_PCTL;
             } else if (HITTER_PA_STATS[col.key]) {
               showColor = paQual;
             } else if (HITTER_BAT_TRACKING[col.key]) {
-              showColor = (row.nCompSwings || 0) >= 10;
+              showColor = (row.nCompSwings || 0) >= QUAL.MIN_BAT_TRACKING;
             } else if (col.key === 'sprintSpeed') {
-              showColor = (row.nCompRuns || 0) >= 10;
+              showColor = (row.nCompRuns || 0) >= QUAL.MIN_SPRINT_RUNS;
             } else {
               showColor = paQual;
             }

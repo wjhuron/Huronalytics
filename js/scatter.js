@@ -1,32 +1,15 @@
 const ScatterChart = {
   chart: null,
   compareChart: null,
-  currentPitcher: null,
-
-  COLORS: {
-    FF: { bg: '#4488FF', border: '#3366CC' },
-    SI: { bg: '#FFD700', border: '#CCB000' },
-
-    FC: { bg: '#FFA500', border: '#CC8400' },
-    SL: { bg: '#DDDDDD', border: '#BBBBBB' },
-    ST: { bg: '#FF1493', border: '#CC1076' },
-    SV: { bg: '#32CD32', border: '#28A428' },
-    CU: { bg: '#E03030', border: '#B32626' },
-    CH: { bg: '#CC66EE', border: '#A352BE' },
-    FS: { bg: '#40E0D0', border: '#33B3A6' },
-    KN: { bg: '#AAAAAA', border: '#888888' },
-    SC: { bg: '#999999', border: '#777777' },
-    CS: { bg: '#666666', border: '#4D4D4D' },
-  },
 
   MARKER_STYLES: ['circle', 'triangle', 'rect', 'rectRot'],
 
   getColor: function (pt) {
-    return this.COLORS[pt] || { bg: '#999', border: '#777' };
+    return { bg: Utils.getPitchColor(pt), border: Utils.getPitchBorderColor(pt) };
   },
 
   computeEllipse: function (points) {
-    if (points.length < 6) return null;
+    if (points.length < QUAL.MIN_ELLIPSE_PTS) return null;
     const n = points.length;
     let mx = 0, my = 0;
     for (let i = 0; i < n; i++) { mx += points[i].x; my += points[i].y; }
@@ -50,7 +33,6 @@ const ScatterChart = {
     return { cx: mx, cy: my, rx: rx, ry: ry, angle: angle };
   },
 
-  // Custom Chart.js plugin for ellipses and crosshairs
   ellipsePlugin: {
     id: 'ellipsePlugin',
     afterDatasetsDraw: function (chart) {
@@ -60,7 +42,6 @@ const ScatterChart = {
 
       ctx.save();
 
-      // Draw dashed crosshairs at (0, 0)
       const zeroX = xScale.getPixelForValue(0);
       const zeroY = yScale.getPixelForValue(0);
       ctx.strokeStyle = '#999';
@@ -75,7 +56,6 @@ const ScatterChart = {
       ctx.lineTo(xScale.right, zeroY);
       ctx.stroke();
 
-      // Draw ellipses
       const meta = chart._ellipseMeta;
       if (meta) {
         for (let i = 0; i < meta.length; i++) {
@@ -129,25 +109,18 @@ const ScatterChart = {
   },
 
   render: function (pitcherName, team) {
-    this.currentPitcher = pitcherName;
-
     const groups = this._buildMovementData(pitcherName, team);
     if (!groups) return;
 
     const datasets = [];
     const ellipseMeta = [];
-    const PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
-    const pitchTypes = Object.keys(groups).sort(function(a, b) {
-      let ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
-      let bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
-      return ai - bi;
-    });
+    const pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
 
     for (let j = 0; j < pitchTypes.length; j++) {
       const pt = pitchTypes[j];
       const pts = groups[pt];
       const color = this.getColor(pt);
-      const label = pt + ' - ' + (Utils.pitchTypeLabel(pt) || pt);
+      const label = pt + ' - ' + Utils.pitchTypeLabel(pt);
 
       datasets.push({
         label: label,
@@ -210,7 +183,6 @@ const ScatterChart = {
     this.chart._ellipseMeta = ellipseMeta;
   },
 
-  // Compare mode: overlay multiple pitchers
   renderCompare: function (pitcherNames) {
     if (!pitcherNames || pitcherNames.length === 0) return;
 
@@ -231,12 +203,7 @@ const ScatterChart = {
         groups[p.pt].push({ x: p.hb, y: p.ivb });
       }
 
-      const PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
-    const pitchTypes = Object.keys(groups).sort(function(a, b) {
-      let ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
-      let bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
-      return ai - bi;
-    });
+      const pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
       const markerStyle = this.MARKER_STYLES[pi % this.MARKER_STYLES.length];
 
       for (let j = 0; j < pitchTypes.length; j++) {
@@ -299,7 +266,6 @@ const ScatterChart = {
       plugins: [this.ellipsePlugin],
     });
 
-    // Add crosshairs meta (no ellipses for compare)
     this.compareChart._ellipseMeta = [];
   },
 

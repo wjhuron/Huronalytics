@@ -3,18 +3,28 @@
  * Enables filtering by opponent hand and date range by
  * summing pre-computed counts and recomputing final stats + percentiles.
  */
+
+// ---- Qualification & classification constants ----
+// These thresholds appear across aggregator, data, and leaderboard modules.
+// Centralizing them here prevents silent drift when one file is updated but not another.
+var QUAL = {
+  PA_PER_GAME:       3.1,   // Hitter qualified: PA >= teamGames * 3.1
+  SP_GS_RATIO:       0.5,   // Starter if GS/G > 0.5
+  HARD_HIT_MPH:      95,    // Exit velo >= 95 mph = hard hit
+  MIN_BIP_PCTL:      20,    // Minimum BIP for batted-ball percentile coloring
+  MIN_BAT_TRACKING:  10,    // Minimum competitive swings for bat tracking stats
+  MIN_SPRINT_RUNS:   10,    // Minimum competitive runs for sprint speed
+  MIN_PITCH_PCTL:    50,    // Minimum pitches for outcome-metric percentiles (pitch-type level)
+  MIN_HITTER_PT:     25,    // Minimum pitches seen for hitter pitch-type percentile coloring
+  MIN_SACQ:          20,    // Minimum zone count for SACQ wOBA lookup
+  MIN_ELLIPSE_PTS:   6,     // Minimum points for scatter ellipse computation
+};
+
 const Aggregator = {
   data: null,
   loaded: false,
   _colIdx: {},
 
-  // Convert baseball IP notation (e.g. "5.2" = 5⅔ innings) to a true float
-  _ipToFloat: function (ip) {
-    var parts = String(ip || 0).split('.');
-    return parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
-  },
-
-  // --- MVN conditional expected movement utilities ---
   _matInvGeneral: function (M) {
     const n = M.length;
     const aug = [];
@@ -54,7 +64,6 @@ const Aggregator = {
     const nAcc = 2; // IVB, HB
     const nRel = mu.length - nAcc;
     if (relValues.length !== nRel) return null;
-    // Extract sub-matrices
     const sigmaRel = [];
     for (let i = 0; i < nRel; i++) {
       sigmaRel[i] = [];
@@ -64,14 +73,12 @@ const Aggregator = {
     if (!sigmaRel_inv) return null;
     const rDiff = [];
     for (let k = 0; k < nRel; k++) rDiff[k] = relValues[k] - mu[nAcc + k];
-    // sigmaRel_inv * rDiff
     const sriRdiff = [];
     for (let ii = 0; ii < nRel; ii++) {
       let s = 0;
       for (let jj = 0; jj < nRel; jj++) s += sigmaRel_inv[ii][jj] * rDiff[jj];
       sriRdiff[ii] = s;
     }
-    // sigmaCross * sriRdiff => adjustment for each acc variable
     const muBar = [];
     for (let a = 0; a < nAcc; a++) {
       let adj = 0;
@@ -83,21 +90,18 @@ const Aggregator = {
 
   load: function (microData) {
     this._roleCache = null;  // Clear role cache on reload
-    // Accept micro data directly (from DataStore)
     if (microData) {
       this.data = microData;
       this._buildIndexes();
       this.loaded = true;
       return Promise.resolve();
     }
-    // Try embedded data (for file:// usage, backwards compat)
     if (window.MICRO_DATA) {
       this.data = window.MICRO_DATA;
       this._buildIndexes();
       this.loaded = true;
       return Promise.resolve();
     }
-    // Fallback: fetch JSON
     const self = this;
     return fetch('data/micro_data.json')
       .then(function (r) { return r.json(); })
@@ -124,16 +128,12 @@ const Aggregator = {
     }
   },
 
-  /**
-   * Returns true if advanced filters are active and re-aggregation is needed.
-   */
+  // Always reaggregate when loaded -- qualifying thresholds affect percentile pools
   needsReaggregation: function (filters) {
     if (!this.loaded) return false;
-    // Always reaggregate — qualifying thresholds affect percentile pools
     return true;
   },
 
-  // --- Spray angle utilities for SACQ% ---
   _HP_X: 125.42,
   _HP_Y: 198.27,
   _LA_BINS: [[-999,0],[0,5],[5,10],[10,15],[15,20],[20,25],[25,30],[30,35],[35,40],[40,50],[50,999]],
@@ -192,15 +192,17 @@ const Aggregator = {
   // Look up zone wOBA: try hand-specific first, fall back to pooled
   sacqLookup: function (maps, dir, laBin, bats) {
     var info = maps.hand[dir + '|' + laBin + '|' + bats];
-    if (info && info.count >= 20 && info.woba != null) return info.woba;
+    if (info && info.count >= QUAL.MIN_SACQ && info.woba != null) return info.woba;
     info = maps.pooled[dir + '|' + laBin];
-    if (info && info.count >= 20 && info.woba != null) return info.woba;
+    if (info && info.count >= QUAL.MIN_SACQ && info.woba != null) return info.woba;
     return null;
   },
 
   /**
    * Main entry: aggregate micro data for the given tab and filters.
-   * Returns an array of row objects matching the pre-aggregated format.
+   * @param {'pitcher'|'pitch'|'hitter'|'hitterPitch'} tab - Data source tab.
+   * @param {FilterState} filters - Current filter state.
+   * @returns {(PitcherRow|PitchRow|HitterRow)[]} Aggregated rows with percentiles.
    */
   aggregate: function (tab, filters) {
     if (tab === 'pitcher') return this._aggregatePitcher(filters);
@@ -210,7 +212,6 @@ const Aggregator = {
     return [];
   },
 
-  // ---- MLB ID lookup helper (from static pre-aggregated data) ----
   _getMlbIdMap: function (type) {
     const data = type === 'pitcher' ? (window.PITCHER_DATA || []) : (window.HITTER_DATA || []);
     const nameKey = type === 'pitcher' ? 'pitcher' : 'hitter';
@@ -223,7 +224,6 @@ const Aggregator = {
     return map;
   },
 
-  // ---- Date filtering helper ----
   _getValidDateSet: function (filters) {
     const dates = this.data.lookups.dates;
     const minDate = filters.dateStart || '';
@@ -249,7 +249,6 @@ const Aggregator = {
     return !!this._rocTeamSet[team];
   },
 
-  // Binary search: find index of first element >= val in sorted array
   _bisectLeft: function (arr, val) {
     let lo = 0, hi = arr.length;
     while (lo < hi) {
@@ -260,7 +259,6 @@ const Aggregator = {
     return lo;
   },
 
-  // Binary search: find index of first element > val in sorted array
   _bisectRight: function (arr, val) {
     let lo = 0, hi = arr.length;
     while (lo < hi) {
@@ -311,7 +309,6 @@ const Aggregator = {
     const pctlKey = metricKey + '_pctl';
     const self = this;
 
-    // Separate qualified MLB and ROC rows
     const mlbValid = [];
     const rocValid = [];
     for (let i = 0; i < rows.length; i++) {
@@ -338,7 +335,6 @@ const Aggregator = {
     const sortedMlb = mlbValid.map(function (v) { return v.val; });
     sortedMlb.sort(function (a, b) { return a - b; });
 
-    // Track which rows get computed percentiles
     var processed = {};
 
     // Compute percentiles for MLB rows using binary search: O(n log n)
@@ -377,9 +373,6 @@ const Aggregator = {
     }
   },
 
-  // ==================================================================
-  //  Pitcher aggregation helpers
-  // ==================================================================
 
   /**
    * Group pitcherMicro rows by (pitcherIdx, teamIdx), applying date and hand filters.
@@ -416,7 +409,6 @@ const Aggregator = {
       }
     }
 
-    // Filter pitcher BIP records for batted ball stats
     const pbci = this._colIdx.pitcherBipCols;
     const pitcherBipData = d.pitcherBip || [];
     const bipByPitcher = {};
@@ -452,7 +444,7 @@ const Aggregator = {
       const bev = bipRecs[bri][pbci.exitVelo];
       const bla = bipRecs[bri][pbci.launchAngle];
       const bbt = bipRecs[bri][pbci.bbType]; // 0=gb, 1=ld, 2=fb, 3=pu
-      if (bev !== null) { evs.push(bev); if (bev >= 95) n_hard++; }
+      if (bev !== null) { evs.push(bev); if (bev >= QUAL.HARD_HIT_MPH) n_hard++; }
       if (isBarrel(bev, bla)) n_barrel++;
       if (bbt === 1) n_ld++;
       if (bbt === 2) n_fb_bb++;
@@ -555,23 +547,17 @@ const Aggregator = {
     };
   },
 
-  // ==================================================================
-  //  Pitcher aggregation
-  // ==================================================================
   _aggregatePitcher: function (filters) {
     const d = this.data;
     const lookups = d.lookups;
     const vsHand = filters.vsHand || 'all';
 
-    // Group micro data and BIP records by pitcher/team
     const grouped = this._groupPitcherMicro(filters);
     const groups = grouped.groups;
     const bipByPitcher = grouped.bipByPitcher;
 
-    // MLB ID lookup for clickable names
     const mlbIdMap = this._getMlbIdMap('pitcher');
 
-    // Convert to row objects
     const STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'hrFbPct',
                      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'xwOBAsp'];
     const INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
@@ -639,7 +625,7 @@ const Aggregator = {
     if (filters.role && filters.role !== 'all') {
       rows = rows.filter(function (r) {
         const pg = r.g || 0, pgs = r.gs || 0;
-        const isSP = pg > 0 && (pgs / pg) > 0.5;
+        const isSP = pg > 0 && (pgs / pg) > QUAL.SP_GS_RATIO;
         if (filters.role === 'SP') return isSP;
         if (filters.role === 'RP') return !isSP;
         return true;
@@ -652,20 +638,14 @@ const Aggregator = {
     for (let qi = 0; qi < rows.length; qi++) {
       const r = rows[qi];
       const tg = teamGames[r.team] || 0;
-      const ipStr = r.ip;
-      let ipFloat = 0;
-      if (ipStr != null) {
-        const ipp = String(ipStr).split('.');
-        ipFloat = parseInt(ipp[0], 10) + (ipp[1] ? parseInt(ipp[1], 10) / 3 : 0);
-      }
-      const pg = r.g || 0, pgs = r.gs || 0;
-      const isStarter = pg > 0 && (pgs / pg) > 0.5;
+      const ipFloat = Utils.parseIP(r.ip);
+      const isStarter = Utils.isStarter(r.g, r.gs);
       r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
     }
     // Set bipQual flag BEFORE percentiles so BIP stats can use it
     const BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
     for (let bqi = 0; bqi < rows.length; bqi++) {
-      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
+      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= QUAL.MIN_BIP_PCTL;
     }
     // Use _qualified flag for percentile pool: only qualified pitchers get percentiles
     // BIP-dependent stats additionally require bipQual (≥20 BIP)
@@ -715,7 +695,7 @@ const Aggregator = {
       if (filters.minIp === 'Q') {
         rows = rows.filter(function (r) { return r._qualified; });
       } else {
-        rows = rows.filter(function (r) { return Aggregator._ipToFloat(r.ip) >= filters.minIp; });
+        rows = rows.filter(function (r) { return Utils.parseIP(r.ip) >= filters.minIp; });
       }
     }
 
@@ -735,9 +715,6 @@ const Aggregator = {
     return rows;
   },
 
-  // ==================================================================
-  //  Pitch aggregation
-  // ==================================================================
   _aggregatePitch: function (filters) {
     const self = this;
     const d = this.data;
@@ -755,7 +732,7 @@ const Aggregator = {
       for (let ri3 = 0; ri3 < pd.length; ri3++) {
         const rKey = pd[ri3].pitcher + '|' + pd[ri3].team;
         const pg2 = pd[ri3].g || 0, pgs2 = pd[ri3].gs || 0;
-        this._roleCache[rKey] = pg2 > 0 && (pgs2 / pg2) > 0.5 ? 'SP' : 'RP';
+        this._roleCache[rKey] = pg2 > 0 && (pgs2 / pg2) > QUAL.SP_GS_RATIO ? 'SP' : 'RP';
       }
     }
 
@@ -784,7 +761,6 @@ const Aggregator = {
     const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
     const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
 
-    // Group by (pitcherIdx, teamIdx, pitchTypeIdx)
     const groups = {};
     const pitcherTotals = {};
 
@@ -829,7 +805,6 @@ const Aggregator = {
       g.metricSums.nTilt += row[ci.nTilt];
     }
 
-    // Convert to row objects
     let rows = [];
     for (let gk2 in groups) {
       const g = groups[gk2];
@@ -879,7 +854,6 @@ const Aggregator = {
         fpsPct: fpsPct_val,
       };
 
-      // Metric averages
       METRIC_MAP.forEach(function (m) {
         const cnt = ms[m.cnt];
         if (cnt > 0) {
@@ -974,7 +948,6 @@ const Aggregator = {
       rows.push(obj);
     }
 
-    // Merge fields from pre-aggregated PITCH_DATA that aren't computed from micro counters
     const pitchPreAgg = window.PITCH_DATA || [];
     const pitchPreMap = {};
     for (let ppi = 0; ppi < pitchPreAgg.length; ppi++) {
@@ -1031,7 +1004,7 @@ const Aggregator = {
       ptGroups[r.pitchType].push(r);
     });
 
-    const MIN_PITCH_TYPE_PCTL = 50;  // minimum pitches for outcome metrics
+    const MIN_PITCH_TYPE_PCTL = QUAL.MIN_PITCH_PCTL;  // minimum pitches for outcome metrics
     const ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true, hbOE: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
     const SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, stuffScore: true };
@@ -1135,10 +1108,8 @@ const Aggregator = {
         var p = ipLookup[r.pitcher + '|' + r.team];
         if (!p) return false;
         var tg = teamGames[r.team] || 0;
-        var ipParts = String(p.ip || '0').split('.');
-        var ipFloat = parseInt(ipParts[0], 10) + (ipParts[1] ? parseInt(ipParts[1], 10) / 3 : 0);
-        var pg = p.g || 0, pgs = p.gs || 0;
-        var isStarter = pg > 0 && (pgs / pg) > 0.5;
+        var ipFloat = Utils.parseIP(p.ip);
+        var isStarter = Utils.isStarter(p.g, p.gs);
         return ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
       });
     }
@@ -1157,9 +1128,6 @@ const Aggregator = {
     return rows;
   },
 
-  // ==================================================================
-  //  Hitter aggregation
-  // ==================================================================
   _aggregateHitter: function (filters) {
     const d = this.data;
     const ci = this._colIdx.hitterCols;
@@ -1452,7 +1420,7 @@ const Aggregator = {
 
     // Set bipQual flag for each hitter
     for (let bqi = 0; bqi < rows.length; bqi++) {
-      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= 20;
+      rows[bqi].bipQual = (rows[bqi].nBip || 0) >= QUAL.MIN_BIP_PCTL;
     }
 
     // Invert where lower is better
@@ -1470,7 +1438,7 @@ const Aggregator = {
       const tgHitter = this.getTeamGamesPlayed();
       rows = rows.filter(function (r) {
         var tg = tgHitter[r.team] || 0;
-        return (r.pa || 0) >= tg * 3.1;
+        return (r.pa || 0) >= tg * QUAL.PA_PER_GAME;
       });
     }
 
@@ -1866,9 +1834,7 @@ const Aggregator = {
     return rows;
   },
 
-  // ==================================================================
   //  Team games played (distinct game dates per team)
-  // ==================================================================
   /**
    * Get velocity trend data for a pitcher, grouped by pitch type.
    * Returns { pitchType: [{ date: 'YYYY-MM-DD', avgVelo: N }, ...], ... }

@@ -4,30 +4,24 @@ var PlayerPage = {
   isOpen: false,
   _playerType: null, // 'pitcher' or 'hitter'
 
-  // Percentile stat definitions for the pitching section
   PITCHING_STATS: [
-    // Expected stats
     { key: 'xBA',               label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',              label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    // Stuff & command — velo rows injected dynamically before this point
     { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
     { key: 'strikePct',         label: 'Strike%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'izWhiffPct',        label: 'IZ Whiff%',        format: function(v) { return Utils.formatPct(v); } },
-    // Results
     { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
-    // Contact quality
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
   ],
 
-  // Percentile stat definitions for the hitting section
   HITTING_STATS: [
     { key: 'xBA',             label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
@@ -48,7 +42,6 @@ var PlayerPage = {
     { key: 'sprintSpeed',   label: 'Sprint Speed',     format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
   ],
 
-  // Hitter Stats table columns (single row)
   HITTER_STATS_COLS: [
     { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; } },
     { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; } },
@@ -68,7 +61,6 @@ var PlayerPage = {
     { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
   ],
 
-  // Hitter Batted Ball table columns (per pitch type + total)
   HITTER_BATTED_BALL_COLS: [
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
@@ -89,7 +81,6 @@ var PlayerPage = {
     { key: 'oppoPct', label: 'Oppo%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
-  // Hitter Plate Discipline table columns (per pitch type + total)
   HITTER_PLATE_DISCIPLINE_COLS: [
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
@@ -105,7 +96,6 @@ var PlayerPage = {
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
-  // Hitter Bat Tracking table columns (placeholder)
   HITTER_BAT_TRACKING_COLS: [
     { key: 'batSpeed', label: 'Bat Speed', format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'swingLength', label: 'Swing Length', format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
@@ -114,7 +104,6 @@ var PlayerPage = {
     { key: 'swingPathTilt', label: 'Swing Path Tilt', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
   ],
 
-  // Pitch usage table columns
   PITCH_TABLE_COLS: [
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
@@ -127,7 +116,6 @@ var PlayerPage = {
     { key: 'armAngle',  label: 'Arm\u00B0', format: function(v) { return v != null ? v.toFixed(1) + '\u00B0' : '—'; }, rocHide: true },
   ],
 
-  // Expanded pitch metrics table (full detail view)
   EXPANDED_PITCH_COLS: [
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
@@ -149,7 +137,6 @@ var PlayerPage = {
     { key: 'nHAA', label: 'nHAA', format: function(v) { return v != null ? v.toFixed(2) + '°' : '—'; } },
   ],
 
-  // Stats table (single row, pitcher-level) — matches leaderboard column order
   STATS_COLS: [
     { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; } },
     { key: 'gs', label: 'GS', format: function(v) { return v != null ? v : '—'; } },
@@ -167,7 +154,6 @@ var PlayerPage = {
     { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   ],
 
-  // Batted Ball table (per pitch type + total)
   BATTED_BALL_COLS: [
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
@@ -184,7 +170,6 @@ var PlayerPage = {
     { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
   ],
 
-  // Plate Discipline table (per pitch type + total)
   PLATE_DISCIPLINE_COLS: [
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
@@ -198,10 +183,7 @@ var PlayerPage = {
     { key: 'fpsPct', label: 'FPS%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
-  // Get player data for current game type (data is already game-type-specific via DataStore)
   _getFilteredPlayerData: function (data, isPitcher) {
-    // Data is already filtered to the active game type via DataStore/updateGlobals
-    // Just look up the player in the current dataset
     var nameKey = isPitcher ? 'pitcher' : 'hitter';
     var source = isPitcher ? window.PITCHER_DATA : window.HITTER_DATA;
     if (!source) return data;
@@ -214,15 +196,11 @@ var PlayerPage = {
     return null;
   },
 
-  // Get pitch-level rows for current game type (data is already game-type-specific)
   _getFilteredPitchRows: function (data) {
-    // Data is already filtered to the active game type via DataStore/updateGlobals
-    var result = this._getPitchRows(data.pitcher, data.team);
-    return result;
+    return this._getPitchRows(data.pitcher, data.team);
   },
 
   open: function (mlbId, team) {
-    // Try pitcher first, then hitter; prefer the specified team
     var pitcherData = this._findPitcherByMlbId(mlbId, team);
     var hitterData = !pitcherData ? this._findHitterByMlbId(mlbId, team) : null;
 
@@ -231,7 +209,6 @@ var PlayerPage = {
       return;
     }
 
-    // Save current route for back navigation
     var curHash = window.location.hash.replace(/^#/, '');
     if (curHash.indexOf('player=') === -1) {
       this._lastRoute = curHash;
@@ -240,7 +217,6 @@ var PlayerPage = {
     this.isOpen = true;
     this._playerType = pitcherData ? 'pitcher' : 'hitter';
 
-    // Show player page as fixed overlay (leaderboard stays rendered underneath)
     document.getElementById('player-page').style.display = 'block';
     var pctlLeg = document.getElementById('pctl-legend');
     if (pctlLeg) pctlLeg.style.display = 'none';
@@ -251,10 +227,8 @@ var PlayerPage = {
       this._renderHitterPage(hitterData);
     }
 
-    // Scroll overlay to top
     document.getElementById('player-page').scrollTop = 0;
 
-    // Click-outside-to-close: listen on the player-page backdrop
     this._bindClickOutside();
   },
 
@@ -267,7 +241,6 @@ var PlayerPage = {
     this._zoneMetric = 'usage';
     this._platoonHand = 'all';
     this._gameDate = null; // null = all games
-    this._playerGameType = 'RS';
     this._currentData = data;
     this._renderGameLog(data);
     this._renderPitcherContent(data);
@@ -276,7 +249,6 @@ var PlayerPage = {
     this._bindGameLog();
   },
 
-  // Check if there is data for the current game type (data is already game-type-specific)
   _hasDataForGameType: function (data) {
     var isPitcher = !!(data.pitcher);
     if (isPitcher) {
@@ -285,7 +257,6 @@ var PlayerPage = {
       var pitches = details[key];
       return pitches && pitches.length > 0;
     } else {
-      // For hitters, check if they exist in the current dataset
       var hitterData = window.HITTER_DATA || [];
       for (var i = 0; i < hitterData.length; i++) {
         if (hitterData[i].hitter === data.hitter && hitterData[i].team === data.team) return true;
@@ -294,12 +265,10 @@ var PlayerPage = {
     }
   },
 
-  // Render game-date-sensitive sections (called on initial load and game date change)
   _renderPitcherContent: function (data) {
     this._platoonHand = 'all';
     this._resetPlatoonToggleUI('pitcher-platoon-toggle');
     document.getElementById('player-percentiles').innerHTML = '';
-    // Clear all content sections
     var sections = ['player-pitch-usage-table', 'player-stats-table', 'player-expanded-pitch-table',
                     'player-batted-ball-table', 'player-plate-discipline-table',
                     'player-heat-maps', 'player-zone-profiles', 'player-count-table'];
@@ -308,7 +277,6 @@ var PlayerPage = {
       if (el) el.innerHTML = '';
     }
     this.destroyChart();
-    // Update pitch usage (left column) based on game date filter
     this._renderUsage(data);
 
     if (!this._hasDataForGameType(data)) {
@@ -316,14 +284,11 @@ var PlayerPage = {
       container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
       return;
     }
-    // Get aggregator-filtered data for stats/percentiles
     var filteredData = this._getFilteredPlayerData(data, true) || data;
     var filteredPitchRows = this._getFilteredPitchRows(data);
-    // Store for use by table renderers
     this._filteredData = filteredData;
     this._filteredPitchRows = filteredPitchRows;
 
-    // Check if ROC player
     var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
     var isROCPlayer = rocTeams.indexOf(data.team) !== -1;
     this._isROC = isROCPlayer;
@@ -442,7 +407,6 @@ var PlayerPage = {
     this._showHitterLayout();
     this._renderHitterIdentity(data);
     this._platoonHand = 'all';
-    this._playerGameType = 'RS';
     this._currentData = data;
     this._sprayMode = 'all';
     this._sprayBatSide = (data.stands === 'S') ? 'L' : null; // null = not switch hitter
@@ -456,7 +420,6 @@ var PlayerPage = {
     this._platoonHand = 'all';
     this._resetPlatoonToggleUI('hitter-platoon-toggle');
     document.getElementById('player-percentiles').innerHTML = '';
-    // Clear hitter content sections
     var sections = ['player-hitter-stats-table', 'player-hitter-batted-ball-table',
                     'player-hitter-plate-discipline-table', 'player-hitter-bat-tracking-table'];
     for (var i = 0; i < sections.length; i++) {
@@ -469,7 +432,6 @@ var PlayerPage = {
       container.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No data available for this period.</p>';
       return;
     }
-    // Check if this is a ROC/AAA player (no run value, bat speed, or expected stats)
     var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
     var isROCPlayer = rocTeams.indexOf(data.team) !== -1;
     this._isROC = isROCPlayer;
@@ -478,7 +440,6 @@ var PlayerPage = {
       this._renderHitterRunValue(data);
     }
 
-    // Filter out stats unavailable for ROC players
     var hittingStats = this.HITTING_STATS;
     if (isROCPlayer) {
       hittingStats = hittingStats.filter(function (s) { return !s.rocHide; });
@@ -500,17 +461,14 @@ var PlayerPage = {
     var movementCol = document.querySelector('.player-col-movement');
     if (usageSection) usageSection.style.display = '';
     if (movementCol) movementCol.style.display = '';
-    // Reset section title
     var title = document.querySelector('.player-col-movement .section-title');
     if (title) title.textContent = 'Movement Profile';
-    // Show pitcher pitch table, hide spray elements
     var pitchTable = document.getElementById('player-pitch-usage-table');
     if (pitchTable) pitchTable.style.display = '';
     var sprayToggle = document.getElementById('spray-toggle-inline');
     if (sprayToggle) sprayToggle.style.display = 'none';
     var sprayLegend = document.getElementById('spray-legend-inline');
     if (sprayLegend) sprayLegend.style.display = 'none';
-    // Hide hitter-specific sections
     var hitterSections = ['player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section',
       'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
       'player-hitter-bat-tracking-section'];
@@ -518,7 +476,6 @@ var PlayerPage = {
       var el = document.getElementById(hitterSections[i]);
       if (el) el.style.display = 'none';
     }
-    // Show pitcher sections
     var pitcherSections = ['player-stats-section', 'player-expanded-pitch-section',
       'player-batted-ball-section', 'player-plate-discipline-section',
       'player-location-section', 'player-count-section'];
@@ -529,17 +486,14 @@ var PlayerPage = {
   },
 
   _showHitterLayout: function () {
-    // Hide pitcher-only sections
     var usageSection = document.querySelector('.player-usage-section');
     if (usageSection) usageSection.style.display = 'none';
     var aaLabel = document.getElementById('player-arm-angle');
     if (aaLabel) aaLabel.style.display = 'none';
-    // Show movement column — repurpose for spray chart
     var movementCol = document.querySelector('.player-col-movement');
     if (movementCol) movementCol.style.display = '';
     var title = document.querySelector('.player-col-movement .section-title');
     if (title) title.textContent = 'Spray Chart';
-    // Hide pitcher pitch table below chart, show spray toggle + legend
     var pitchTable = document.getElementById('player-pitch-usage-table');
     if (pitchTable) pitchTable.style.display = 'none';
     var sprayToggle = document.getElementById('spray-toggle-inline');
@@ -553,10 +507,8 @@ var PlayerPage = {
       var el = document.getElementById(pitcherSections[i]);
       if (el) el.style.display = 'none';
     }
-    // Hide game log for hitters
     var gameLog = document.getElementById('player-game-log');
     if (gameLog) gameLog.style.display = 'none';
-    // Show hitter-specific full-width sections
     var hitterSections = ['player-la-spray-section', 'player-hitter-stats-section',
       'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
       'player-hitter-bat-tracking-section'];
@@ -564,7 +516,6 @@ var PlayerPage = {
       var el2 = document.getElementById(hitterSections[j]);
       if (el2) el2.style.display = '';
     }
-    // Hide full-width spray section (it's in the column now)
     var spraySec = document.getElementById('player-spray-section');
     if (spraySec) spraySec.style.display = 'none';
   },
@@ -581,9 +532,7 @@ var PlayerPage = {
     this._unbindHandToggles();
     this._unbindPlatoonToggle();
     this._unbindGameLog();
-    this._playerGameType = null;
 
-    // Hide new sections
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-zone-profile-section', 'player-count-section',
       'player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
       'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
@@ -601,12 +550,10 @@ var PlayerPage = {
     }
   },
 
-  // Click outside player-page-inner to close
   _bindClickOutside: function () {
     var self = this;
     this._clickOutsideHandler = function (e) {
       var inner = document.querySelector('.player-page-inner');
-      // If click is on the player-page backdrop but NOT inside the inner content
       if (inner && !inner.contains(e.target)) {
         self.close();
       }
@@ -628,7 +575,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Data Lookup ---
 
   _findPitcherByMlbId: function (mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
@@ -651,33 +597,34 @@ var PlayerPage = {
         rows.push(pitchData[i]);
       }
     }
-    // Sort by usage descending
     rows.sort(function (a, b) { return (b.usagePct || 0) - (a.usagePct || 0); });
     return rows;
   },
 
-  // --- Render: Identity ---
 
-  _renderIdentity: function (data) {
-    // Headshot — request larger image for zoomed-out display
+  // Shared headshot + name rendering for both pitcher and hitter identity
+  _FALLBACK_HEADSHOT: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect fill="%23333" width="160" height="160"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>'),
+
+  _renderHeadshotAndName: function (mlbId, name) {
     var img = document.getElementById('player-headshot');
-    if (data.mlbId) {
-      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
-      img.alt = data.pitcher;
+    if (mlbId) {
+      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/' + mlbId + '/headshot/67/current';
+      img.alt = name;
     } else {
       img.src = '';
       img.alt = '';
     }
-    img.onerror = function () {
-      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect fill="%23333" width="160" height="160"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
-    };
+    var fallback = this._FALLBACK_HEADSHOT;
+    img.onerror = function () { this.src = fallback; };
 
-    // Name
-    var nameParts = data.pitcher.split(', ');
-    var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : data.pitcher;
+    var nameParts = name.split(', ');
+    var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : name;
     document.getElementById('player-name').textContent = displayName;
+  },
 
-    // Position (RHP/LHP) | Team | Age (fetched from MLB API)
+  _renderIdentity: function (data) {
+    this._renderHeadshotAndName(data.mlbId, data.pitcher);
+
     var pos = (data.throws === 'L' ? 'LHP' : 'RHP');
     var posEl = document.getElementById('player-position');
     var ageEl = document.getElementById('player-age');
@@ -698,25 +645,8 @@ var PlayerPage = {
   },
 
   _renderHitterIdentity: function (data) {
-    // Headshot
-    var img = document.getElementById('player-headshot');
-    if (data.mlbId) {
-      img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/' + data.mlbId + '/headshot/67/current';
-      img.alt = data.hitter;
-    } else {
-      img.src = '';
-      img.alt = '';
-    }
-    img.onerror = function () {
-      this.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect fill="%23333" width="160" height="160"/><text fill="%23888" font-size="40" x="50%" y="55%" text-anchor="middle" dominant-baseline="middle">?</text></svg>');
-    };
+    this._renderHeadshotAndName(data.mlbId, data.hitter);
 
-    // Name
-    var nameParts = data.hitter.split(', ');
-    var displayName = nameParts.length === 2 ? nameParts[1] + ' ' + nameParts[0] : data.hitter;
-    document.getElementById('player-name').textContent = displayName;
-
-    // Bats/Throws | Team | Age (fetched from MLB API)
     var batHand = data.stands === 'S' ? 'S' : (data.stands === 'L' ? 'L' : 'R');
     var posEl = document.getElementById('player-position');
     var ageEl = document.getElementById('player-age');
@@ -739,10 +669,8 @@ var PlayerPage = {
     }
   },
 
-  // --- Render: Pitch Usage (vs LHH / vs RHH) ---
 
   _renderUsage: function (data) {
-    // Use filtered pitch details (respects game date filter)
     var pitches = this._getFilteredDetails(data);
 
     var usageByHand = { L: {}, R: {} };
@@ -773,7 +701,6 @@ var PlayerPage = {
       return;
     }
 
-    // Sort by usage descending
     var entries = [];
     for (var pt in usageMap) {
       entries.push({ pt: pt, count: usageMap[pt], pct: usageMap[pt] / total });
@@ -787,12 +714,7 @@ var PlayerPage = {
 
       var label = document.createElement('span');
       label.className = 'usage-label';
-      var badge = document.createElement('span');
-      badge.className = 'pitch-badge-sm';
-      var _bc = Utils.getPitchColor(e.pt);
-      badge.style.backgroundColor = _bc;
-      badge.style.color = Utils.badgeTextColor(_bc);
-      badge.textContent = e.pt;
+      var badge = Utils.createPitchBadge(e.pt, true);
       label.appendChild(badge);
 
       var barWrap = document.createElement('div');
@@ -814,7 +736,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Render: Percentile Bars ---
 
   _renderPercentiles: function (data, statsDef, append) {
     var container = document.getElementById('player-percentiles');
@@ -829,25 +750,15 @@ var PlayerPage = {
     var tg = teamGames[data.team] || 0;
     var isQualified;
     if (isPitcher) {
-      // Parse IP string (e.g., "6.1" = 6⅓ innings) to float
-      var ipStr = data.ip;
-      var ipFloat = 0;
-      if (ipStr != null) {
-        var parts = String(ipStr).split('.');
-        ipFloat = parseInt(parts[0], 10) + (parts[1] ? parseInt(parts[1], 10) / 3 : 0);
-      }
-      // Starter (GS/G > 0.5) needs 1.0 IP/game, reliever needs 0.1 IP/game
-      var g = data.g || 0;
-      var gs = data.gs || 0;
-      var isStarter = g > 0 && (gs / g) > 0.5;
+      var ipFloat = Utils.parseIP(data.ip);
+      var isStarter = Utils.isStarter(data.g, data.gs);
       var ipThreshold = isStarter ? tg * 1.0 : tg / 3;
       isQualified = ipFloat >= ipThreshold;
     } else {
-      isQualified = (data.pa || 0) >= tg * 3.1;
+      isQualified = (data.pa || 0) >= tg * QUAL.PA_PER_GAME;
     }
     var alwaysColorKeys = isPitcher ? { ffVelo: true, siVelo: true } : { maxEV: true };
 
-    // Build dynamic velo rows for pitchers from pitch data
     var dynamicVeloStats = [];
     if (isPitcher) {
       var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
@@ -863,7 +774,6 @@ var PlayerPage = {
             _val: pr.velocity, _pctl: pr.velocity_pctl });
         }
       }
-      // Sort: FF/CF first, then SI
       dynamicVeloStats.sort(function(a, b) { return a.key === 'ffVelo' ? -1 : 1; });
     }
 
@@ -879,7 +789,6 @@ var PlayerPage = {
       xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true
     };
 
-    // Build effective stats list, replacing _veloPlaceholder with dynamic velo rows
     var effectiveStats = [];
     for (var si2 = 0; si2 < statsDef.length; si2++) {
       if (statsDef[si2]._dynamic) {
@@ -907,17 +816,14 @@ var PlayerPage = {
       var row = document.createElement('div');
       row.className = 'pctl-row';
 
-      // Label
       var labelEl = document.createElement('span');
       labelEl.className = 'pctl-label';
       labelEl.textContent = stat.label;
 
-      // Value
       var valEl = document.createElement('span');
       valEl.className = 'pctl-value';
       valEl.textContent = stat.format(val);
 
-      // Percentile circle
       var circleWrap = document.createElement('div');
       circleWrap.className = 'pctl-circle-wrap';
 
@@ -942,7 +848,6 @@ var PlayerPage = {
         circleWrap.appendChild(circle);
       }
 
-      // Bar
       var barTrack = document.createElement('div');
       barTrack.className = 'pctl-bar-track';
       var barFill = document.createElement('div');
@@ -969,7 +874,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Render: Pitch Run Values (per-pitch-type percentile bars) ---
 
   _renderPitchRunValues: function (data) {
     var container = document.getElementById('player-percentiles');
@@ -979,7 +883,6 @@ var PlayerPage = {
     var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
     if (pitchRows.length === 0) return;
 
-    // Section label
     var sectionLabel = document.createElement('div');
     sectionLabel.className = 'pctl-section-label';
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
@@ -998,7 +901,6 @@ var PlayerPage = {
       var row = document.createElement('div');
       row.className = 'pctl-row';
 
-      // Label
       var labelEl = document.createElement('span');
       labelEl.className = 'pctl-label';
       if (typeof labelContent === 'string') {
@@ -1007,19 +909,17 @@ var PlayerPage = {
         labelEl.appendChild(labelContent);
       }
 
-      // Value
       var valEl = document.createElement('span');
       valEl.className = 'pctl-value';
       valEl.textContent = (displayVal != null) ? displayVal.toFixed(1) : '—';
 
-      // Percentile circle
       // Determine if this row qualifies for coloring
       // Per-pitch: 50 pitches. Overall: 100 pitches.
       var rvQualified;
       if (pitchCount === null) {
         rvQualified = totalPitches >= 100; // overall
       } else {
-        rvQualified = (pitchCount || 0) >= 50; // per-pitch
+        rvQualified = (pitchCount || 0) >= QUAL.MIN_PITCH_PCTL; // per-pitch
       }
 
       var circleWrap = document.createElement('div');
@@ -1042,7 +942,6 @@ var PlayerPage = {
         circleWrap.appendChild(circle);
       }
 
-      // Bar
       var barTrack = document.createElement('div');
       barTrack.className = 'pctl-bar-track';
       var barFill = document.createElement('div');
@@ -1072,25 +971,15 @@ var PlayerPage = {
     container.appendChild(buildPctlRow('Overall', overallRV100, data.xRv100_pctl, null));
 
     // Per-pitch-type rows (fixed order)
-    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN'];
     var sortedPitchRows = pitchRows.slice().sort(function(a, b) {
-      var ai = PITCH_ORDER.indexOf(a.pitchType);
-      var bi = PITCH_ORDER.indexOf(b.pitchType);
-      if (ai === -1) ai = 999;
-      if (bi === -1) bi = 999;
-      return ai - bi;
+      return Utils.pitchTypeSortCompare(a.pitchType, b.pitchType);
     });
     for (var i = 0; i < sortedPitchRows.length; i++) {
       var pitch = sortedPitchRows[i];
       var displayVal = pitch.xRv100;
       var pctl = pitch.xRv100_pctl;
 
-      var badge = document.createElement('span');
-      badge.className = 'pitch-badge-sm';
-      var _bc = Utils.getPitchColor(pitch.pitchType);
-      badge.style.backgroundColor = _bc;
-      badge.style.color = Utils.badgeTextColor(_bc);
-      badge.textContent = pitch.pitchType;
+      var badge = Utils.createPitchBadge(pitch.pitchType, true);
 
       container.appendChild(buildPctlRow(badge, displayVal, pctl, pitch.count));
     }
@@ -1101,7 +990,6 @@ var PlayerPage = {
     container.appendChild(divider);
   },
 
-  // --- Render: Hitter Run Value (overall only) ---
 
   _renderHitterRunValue: function (data) {
     var container = document.getElementById('player-percentiles');
@@ -1121,7 +1009,6 @@ var PlayerPage = {
     var barWrap = document.createElement('div');
     barWrap.className = 'pctl-bar-track';
     barWrap.style.position = 'relative';
-    // Center marker
     var centerLine = document.createElement('div');
     centerLine.style.cssText = 'position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.3);z-index:1;';
     barWrap.appendChild(centerLine);
@@ -1157,7 +1044,6 @@ var PlayerPage = {
     container.appendChild(divider);
   },
 
-  // --- Render: Movement Chart ---
 
   _renderMovementChart: function (data) {
     this.destroyChart();
@@ -1216,18 +1102,13 @@ var PlayerPage = {
 
     var datasets = [];
     var expectedMeta = [];
-    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN','SC','CS'];
-    var pitchTypes = Object.keys(groups).sort(function(a, b) {
-      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
-      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
-      return ai - bi;
-    });
+    var pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
 
     for (var j = 0; j < pitchTypes.length; j++) {
       var pt = pitchTypes[j];
       var pts = groups[pt];
       var color = ScatterChart.getColor(pt);
-      var label = pt + ' - ' + (Utils.pitchTypeLabel(pt) || pt);
+      var label = pt + ' - ' + Utils.pitchTypeLabel(pt);
 
       datasets.push({
         label: label,
@@ -1442,7 +1323,6 @@ var PlayerPage = {
     });
   },
 
-  // --- Render: Pitch Usage Table (below chart) ---
 
   // Aggregate PITCH_DETAILS into per-pitch-type rows (same format as PITCH_DATA)
   _aggregateDetailsToRows: function (pitches) {
@@ -1543,12 +1423,7 @@ var PlayerPage = {
         var col = cols[c];
         var td = document.createElement('td');
         if (col.key === 'pitchType') {
-          var badge = document.createElement('span');
-          badge.className = 'pitch-badge-sm';
-          var _bc = Utils.getPitchColor(row.pitchType);
-          badge.style.backgroundColor = _bc;
-          badge.style.color = Utils.badgeTextColor(_bc);
-          badge.textContent = row.pitchType;
+          var badge = Utils.createPitchBadge(row.pitchType, true);
           td.appendChild(badge);
         } else {
           var val = row[col.key];
@@ -1562,7 +1437,6 @@ var PlayerPage = {
     container.appendChild(table);
   },
 
-  // --- Render: Expanded Pitch Table (full detail view) ---
 
   /**
    * Create a small SVG sparkline from an array of {date, avgVelo} points.
@@ -1759,12 +1633,7 @@ var PlayerPage = {
         var col = cols[c];
         var td = document.createElement('td');
         if (col.key === 'pitchType') {
-          var badge = document.createElement('span');
-          badge.className = 'pitch-badge-sm';
-          var _bc = Utils.getPitchColor(row.pitchType);
-          badge.style.backgroundColor = _bc;
-          badge.style.color = Utils.badgeTextColor(_bc);
-          badge.textContent = row.pitchType;
+          var badge = Utils.createPitchBadge(row.pitchType, true);
           td.appendChild(badge);
         } else {
           var val = row[col.key];
@@ -1790,7 +1659,6 @@ var PlayerPage = {
     container.appendChild(table);
   },
 
-  // --- Render: Stats Table (single pitcher row) ---
 
   _renderStatsTable: function (data) {
     var section = document.getElementById('player-stats-section');
@@ -1827,7 +1695,6 @@ var PlayerPage = {
     container.appendChild(table);
   },
 
-  // --- Render: Batted Ball Table (per pitch type + total) ---
 
   _renderBattedBallTable: function (data) {
     var section = document.getElementById('player-batted-ball-section');
@@ -1852,7 +1719,6 @@ var PlayerPage = {
     this._renderPerPitchTable(container, this.BATTED_BALL_COLS, pitchRows, totalRow);
   },
 
-  // --- Render: Plate Discipline Table (per pitch type + total) ---
 
   _renderPlateDisciplineTable: function (data) {
     var section = document.getElementById('player-plate-discipline-section');
@@ -1877,7 +1743,6 @@ var PlayerPage = {
     this._renderPerPitchTable(container, this.PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
   },
 
-  // --- Shared: Render per-pitch-type table with total row ---
 
   _renderPerPitchTable: function (container, cols, pitchRows, totalRow) {
     var isDark = document.body.classList.contains('dark');
@@ -1904,12 +1769,7 @@ var PlayerPage = {
         var col = cols[c];
         var td = document.createElement('td');
         if (col.key === 'pitchType') {
-          var badge = document.createElement('span');
-          badge.className = 'pitch-badge-sm';
-          var _bc = Utils.getPitchColor(row.pitchType);
-          badge.style.backgroundColor = _bc;
-          badge.style.color = Utils.badgeTextColor(_bc);
-          badge.textContent = row.pitchType;
+          var badge = Utils.createPitchBadge(row.pitchType, true);
           td.appendChild(badge);
         } else {
           var val = row[col.key];
@@ -1960,21 +1820,9 @@ var PlayerPage = {
     table.appendChild(tbody);
     container.appendChild(table);
 
-    // Horizontal scroll fade indicator
-    container.style.position = 'relative';
-    var fadeDiv = document.createElement('div');
-    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, var(--bg-card, #1a1d21));pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
-    container.appendChild(fadeDiv);
-    container.addEventListener('scroll', function() {
-      var maxScroll = container.scrollWidth - container.clientWidth;
-      fadeDiv.style.opacity = (container.scrollLeft >= maxScroll - 2) ? '0' : '1';
-    });
-    setTimeout(function() {
-      if (container.scrollWidth > container.clientWidth) fadeDiv.style.opacity = '1';
-    }, 100);
+    Utils.addScrollFade(container);
   },
 
-  // --- Render: Heat Maps (pitch location density) ---
 
   _renderHeatMaps: function(data) {
     var section = document.getElementById('player-location-section');
@@ -2010,13 +1858,7 @@ var PlayerPage = {
     }
 
     // Sort pitch types by fixed order
-    var PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN'];
-    var types = Object.keys(byType);
-    types.sort(function(a, b) {
-      var ai = PITCH_ORDER.indexOf(a); if (ai === -1) ai = 999;
-      var bi = PITCH_ORDER.indexOf(b); if (bi === -1) bi = 999;
-      return ai - bi;
-    });
+    var types = Utils.sortPitchTypes(Object.keys(byType));
 
     // Render each pitch type
     for (var t = 0; t < types.length; t++) {
@@ -2026,12 +1868,7 @@ var PlayerPage = {
 
       var label = document.createElement('div');
       label.className = 'heatmap-label';
-      var badge = document.createElement('span');
-      badge.className = 'pitch-badge-sm';
-      var _bc = Utils.getPitchColor(pt);
-      badge.style.backgroundColor = _bc;
-      badge.style.color = Utils.badgeTextColor(_bc);
-      badge.textContent = pt;
+      var badge = Utils.createPitchBadge(pt, true);
       label.appendChild(badge);
       cell.appendChild(label);
 
@@ -2145,7 +1982,6 @@ var PlayerPage = {
     return 'hsl(' + h + ',' + s + '%,' + l + '%)';
   },
 
-  // --- Render: Zone Profile (5×5 grid per pitch type: chase zones + strike zone) ---
 
   _renderZoneProfiles: function(data) {
     var section = document.getElementById('player-zone-profile-section');
@@ -2260,12 +2096,7 @@ var PlayerPage = {
       wrapper.className = 'zone-profile-card';
       var header = document.createElement('div');
       header.className = 'zone-profile-header';
-      var badge = document.createElement('span');
-      badge.className = 'pitch-badge-sm';
-      var bc = Utils.getPitchColor(pt);
-      badge.style.backgroundColor = bc;
-      badge.style.color = Utils.badgeTextColor(bc);
-      badge.textContent = pt;
+      var badge = Utils.createPitchBadge(pt, true);
       header.appendChild(badge);
       var countSpan = document.createElement('span');
       countSpan.className = 'zone-profile-count';
@@ -2394,7 +2225,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Render: Count Table (pitch usage by count group) ---
 
   _renderCountTable: function(data) {
     var section = document.getElementById('player-count-section');
@@ -2488,12 +2318,7 @@ var PlayerPage = {
 
       var tdLabel = document.createElement('td');
       tdLabel.style.textAlign = 'center';
-      var badge = document.createElement('span');
-      badge.className = 'pitch-badge-sm';
-      var _bc = Utils.getPitchColor(pt);
-      badge.style.backgroundColor = _bc;
-      badge.style.color = Utils.badgeTextColor(_bc);
-      badge.textContent = pt;
+      var badge = Utils.createPitchBadge(pt, true);
       tdLabel.appendChild(badge);
       tr.appendChild(tdLabel);
 
@@ -2538,7 +2363,6 @@ var PlayerPage = {
     container.appendChild(table);
   },
 
-  // --- Hand Toggle (for heat maps and count table) ---
 
   _bindHandToggles: function() {
     var self = this;
@@ -2626,7 +2450,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Platoon Split Toggle (vs L / vs R / All for stats tables) ---
 
   _bindPlatoonToggle: function(type) {
     var self = this;
@@ -2793,7 +2616,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Hitter lookup ---
 
   _findHitterByMlbId: function (mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
@@ -2808,7 +2630,6 @@ var PlayerPage = {
     return fallback;
   },
 
-  // --- Hitter: Spray Chart ---
 
   _renderSprayChart: function (data) {
     var canvas = document.getElementById('player-pitch-chart');
@@ -3006,7 +2827,7 @@ var PlayerPage = {
           continue;
         }
       } else if (mode === 'hard') {
-        if (ev != null && ev >= 95) {
+        if (ev != null && ev >= QUAL.HARD_HIT_MPH) {
           color = bbTypeColors[bbType] || '#888';
         } else {
           continue;
@@ -3154,7 +2975,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Hitter: LA × Spray Scatter Plot ---
 
   _laSprayChart: null,
   _laSprayMode: 'outcome',
@@ -3696,7 +3516,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Hitter: Small Stats (AVG/OBP/SLG/OPS/ISO below spray chart) ---
 
   _renderHitterSmallStats: function (data) {
     // Render into the movement col's table area (reuse player-pitch-usage-table)
@@ -3705,7 +3524,6 @@ var PlayerPage = {
     // Small stats not shown for hitters since we have full table; leave empty
   },
 
-  // --- Hitter: Full Stats Table ---
 
   _renderHitterStatsFullTable: function (data, isROC) {
     var section = document.getElementById('player-hitter-stats-section');
@@ -3748,7 +3566,6 @@ var PlayerPage = {
     container.appendChild(table);
   },
 
-  // --- Hitter: Get pitch rows from HITTER_PITCH_LB ---
 
   _getHitterPitchRows: function (hitterName, team) {
     var hpData = window.HITTER_PITCH_LB || [];
@@ -3765,7 +3582,6 @@ var PlayerPage = {
     return rows;
   },
 
-  // --- Hitter: Get category-level rows (Hard, Breaking, Offspeed) ---
   _getHitterCategoryRows: function (hitterName, team) {
     var hpData = window.HITTER_PITCH_LB || [];
     var CATEGORY_ORDER = ['Hard', 'Breaking', 'Offspeed'];
@@ -3783,7 +3599,6 @@ var PlayerPage = {
     return rows;
   },
 
-  // --- Hitter: Get individual pitch rows for a category ---
   _getHitterPitchRowsForCategory: function (hitterName, team, category) {
     var CATS = Aggregator.PITCH_CATEGORIES;
     var pitchTypes = CATS[category] || [];
@@ -3800,14 +3615,6 @@ var PlayerPage = {
     return rows;
   },
 
-  // Category badge colors
-  CATEGORY_COLORS: {
-    'Hard': '#d62728',
-    'Breaking': '#2ca02c',
-    'Offspeed': '#ff7f0e'
-  },
-
-  // --- Hitter: Render grouped pitch table with expand/collapse ---
   _renderGroupedPitchTable: function (container, cols, categoryRows, totalRow, hitterName, team) {
     var self = this;
     var table = document.createElement('table');
@@ -3845,12 +3652,7 @@ var PlayerPage = {
             indicator.className = 'expand-indicator';
             indicator.textContent = '\u25B6';
             td.appendChild(indicator);
-            var badge = document.createElement('span');
-            badge.className = 'pitch-badge-sm';
-            var catColor = self.CATEGORY_COLORS[catRow.pitchType] || '#888';
-            badge.style.backgroundColor = catColor;
-            badge.style.color = Utils.badgeTextColor(catColor);
-            badge.textContent = catRow.pitchType;
+            var badge = Utils.createCategoryBadge(catRow.pitchType, true);
             td.appendChild(badge);
           } else {
             var val = catRow[col.key];
@@ -3876,12 +3678,7 @@ var PlayerPage = {
                 var subTd = document.createElement('td');
                 if (subCol.key === 'pitchType') {
                   subTd.style.paddingLeft = '28px';
-                  var subBadge = document.createElement('span');
-                  subBadge.className = 'pitch-badge-sm';
-                  var _bc = Utils.getPitchColor(pitchRows[p].pitchType);
-                  subBadge.style.backgroundColor = _bc;
-                  subBadge.style.color = Utils.badgeTextColor(_bc);
-                  subBadge.textContent = pitchRows[p].pitchType;
+                  var subBadge = Utils.createPitchBadge(pitchRows[p].pitchType, true);
                   subTd.appendChild(subBadge);
                 } else {
                   var subVal = pitchRows[p][subCol.key];
@@ -3935,21 +3732,9 @@ var PlayerPage = {
     table.appendChild(tbody);
     container.appendChild(table);
 
-    // Horizontal scroll fade indicator
-    container.style.position = 'relative';
-    var fadeDiv = document.createElement('div');
-    fadeDiv.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right, transparent, var(--bg-card, #1a1d21));pointer-events:none;z-index:1;opacity:0;transition:opacity 0.2s;';
-    container.appendChild(fadeDiv);
-    container.addEventListener('scroll', function() {
-      var maxScroll = container.scrollWidth - container.clientWidth;
-      fadeDiv.style.opacity = (container.scrollLeft >= maxScroll - 2) ? '0' : '1';
-    });
-    setTimeout(function() {
-      if (container.scrollWidth > container.clientWidth) fadeDiv.style.opacity = '1';
-    }, 100);
+    Utils.addScrollFade(container);
   },
 
-  // --- Hitter: Batted Ball Table ---
 
   _renderHitterBattedBallTable: function (data, isROC) {
     var section = document.getElementById('player-hitter-batted-ball-section');
@@ -3993,7 +3778,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Hitter: Plate Discipline Table ---
 
   _renderHitterPlateDisciplineTable: function (data) {
     var section = document.getElementById('player-hitter-plate-discipline-section');
@@ -4030,7 +3814,6 @@ var PlayerPage = {
     }
   },
 
-  // --- Hitter: Bat Tracking Table (placeholder) ---
 
   _renderHitterBatTrackingTable: function (data) {
     var section = document.getElementById('player-hitter-bat-tracking-section');
@@ -4067,7 +3850,6 @@ var PlayerPage = {
     container.appendChild(table);
   },
 
-  // --- URL Routing ---
 
   checkURL: function () {
     var hash = window.location.hash.replace(/^#/, '');
