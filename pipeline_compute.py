@@ -412,7 +412,7 @@ def compute_hitter_stats(pitches):
     pull = sum(1 for d, _ in spray_data if d in ('pull', 'pull_side'))
     center = sum(1 for d, _ in spray_data if d in ('center_pull', 'center_oppo'))
     oppo = sum(1 for d, _ in spray_data if d in ('oppo_side', 'oppo'))
-    air_pull = sum(1 for d, bb in spray_data if d in ('pull', 'pull_side') and bb in ('line_drive', 'fly_ball', 'popup'))
+    air_pull = sum(1 for d, bb in spray_data if d in ('pull', 'pull_side') and bb in ('line_drive', 'fly_ball'))
 
     ev_valid = [safe_float(p.get('ExitVelo')) for p in bip]
     ev_valid = [v for v in ev_valid if v is not None]
@@ -500,7 +500,7 @@ def compute_hitter_stats(pitches):
         'pullPct': pull / n_spray if n_spray > 0 else None,
         'middlePct': center / n_spray if n_spray > 0 else None,
         'oppoPct': oppo / n_spray if n_spray > 0 else None,
-        'airPullPct': air_pull / (ld + fb + pu) if (ld + fb + pu) > 0 else None,
+        'airPullPct': air_pull / n_bip if n_bip > 0 else None,
         'swingPct': n_swings / total if total > 0 else None,
         'izSwingPct': iz_swing_pct,
         'chasePct': chase_pct,

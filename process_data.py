@@ -476,7 +476,7 @@ def generate_micro_data(all_pitches):
                 if sd in ('pull', 'pull_side'):    c[28] += 1
                 if sd in ('center_pull', 'center_oppo'):  c[29] += 1
                 if sd in ('oppo_side', 'oppo'):    c[30] += 1
-                if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball', 'popup'):
+                if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball'):
                     c[31] += 1  # airPull
 
             # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)
