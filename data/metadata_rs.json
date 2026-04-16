@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-16 17:43",
+  "generatedAt": "2026-04-16 18:35",
   "totalPitches": 81139,
   "totalPitchers": 473,
   "totalHitters": 432,
@@ -320,6 +320,8 @@
     "babip": 0.2879,
     "fpsPct": 0.5962,
     "twoStrikeWhiffPct": 0.2541,
+    "oneOneWinPct": 0.6407,
+    "earlyActionPct": 0.424,
     "relPosZ": 5.6516,
     "relPosX": -0.678,
     "extension": 6.4324,
@@ -367,7 +369,7 @@
     "pullPct": 0.45,
     "middlePct": 0.2875,
     "oppoPct": 0.2626,
-    "airPullPct": 0.3228,
+    "airPullPct": 0.1714,
     "swingPct": 0.4647,
     "izSwingPct": 0.6514,
     "chasePct": 0.2951,
@@ -389,6 +391,7 @@
     "sprintSpeed": 26.9035,
     "runValue": 0.1932,
     "xRunValue": 0.1575,
+    "hr": 1.7312,
     "count": 432
   },
   "vaaRegressions": {
