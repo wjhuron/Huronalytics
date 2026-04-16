@@ -1747,50 +1747,6 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   display: inline-block;
 }
 
-/* === Zone Profile Grid === */
-.zone-profiles-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-start;
-}
-.zone-profile-card {
-  text-align: center;
-}
-.zone-profile-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.zone-profile-count {
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-.zone-profile-labels {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-top: 22px;
-  height: 148px;
-  margin-right: -4px;
-  gap: 1px;
-}
-.zone-label-row {
-  font-size: 10px;
-  color: var(--text-secondary);
-  text-align: right;
-  line-height: 32px;
-}
-.zone-label-row.zone-label-chase {
-  line-height: 22px;
-  font-size: 9px;
-  opacity: 0.6;
-}
-
 /* === Utility classes === */
 .hidden { display: none; }
 

@@ -9,6 +9,9 @@ var PlayerPage = {
     { key: 'xSLG',              label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAsp',           label: 'xwOBAsp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
+    { key: 'xRv100',            label: 'xRV/100',          format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
     { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
     { key: 'strikePct',         label: 'Strike%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
@@ -17,7 +20,8 @@ var PlayerPage = {
     { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
-    { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
+    { key: 'avgEVAgainst',      label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
   ],
@@ -26,16 +30,20 @@ var PlayerPage = {
     { key: 'xBA',             label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAsp',         label: 'xwOBASp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAcon',        label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAsp',         label: 'xwOBAsp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'ev50',            label: 'EV50',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'maxEV',           label: 'Max EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'hardHitPct',      label: 'Hard-Hit%',       format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPct',       label: 'Barrel%',         format: function(v) { return Utils.formatPct(v); } },
+    { key: 'airPullPct',      label: 'Air Pull%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct',            label: 'K%',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',           label: 'BB%',             format: function(v) { return Utils.formatPct(v); } },
     { key: 'whiffPct',        label: 'Whiff%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',        label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izContactPct',    label: 'IZ Contact%',      format: function(v) { return Utils.formatPct(v); } },
     { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true, batSpeedQual: true },
     { key: 'blastPct',        label: 'Blast%',           format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
     { key: 'idealAAPct',      label: 'IdealAtkAngle%',         format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
@@ -236,8 +244,6 @@ var PlayerPage = {
     this._renderIdentity(data);
     this._heatMapHand = 'R';
     this._countHand = 'R';
-    this._zoneHand = 'R';
-    this._zoneMetric = 'usage';
     this._platoonHand = 'all';
     this._gameDate = null; // null = all games
     this._currentData = data;
@@ -270,7 +276,7 @@ var PlayerPage = {
     document.getElementById('player-percentiles').innerHTML = '';
     var sections = ['player-pitch-usage-table', 'player-stats-table', 'player-expanded-pitch-table',
                     'player-batted-ball-table', 'player-plate-discipline-table',
-                    'player-heat-maps', 'player-zone-profiles', 'player-count-table'];
+                    'player-heat-maps', 'player-count-table'];
     for (var i = 0; i < sections.length; i++) {
       var el = document.getElementById(sections[i]);
       if (el) el.innerHTML = '';
@@ -308,7 +314,6 @@ var PlayerPage = {
     this._renderPlateDisciplineTable(data); // will use _filteredPitchRows
     this._renderBattedBallTable(data); // will use _filteredPitchRows
     this._renderHeatMaps(data);
-    this._renderZoneProfiles(data);
     this._renderCountTable(data);
   },
 
@@ -532,7 +537,7 @@ var PlayerPage = {
     this._unbindPlatoonToggle();
     this._unbindGameLog();
 
-    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-zone-profile-section', 'player-count-section',
+    var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
       'player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
       'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var i = 0; i < sections.length; i++) {
@@ -784,8 +789,8 @@ var PlayerPage = {
       babip: true, hrFbPct: true, airPullPct: true
     };
     var PITCHER_BIP_STATS = {
-      barrelPctAgainst: true, gbPct: true,
-      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true
+      barrelPctAgainst: true, gbPct: true, avgEVAgainst: true, hardHitPct: true,
+      xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true
     };
 
     var effectiveStats = [];
@@ -1982,249 +1987,6 @@ var PlayerPage = {
   },
 
 
-  _renderZoneProfiles: function(data) {
-    var section = document.getElementById('player-zone-profile-section');
-    var container = document.getElementById('player-zone-profiles');
-    if (!section || !container) return;
-    container.innerHTML = '';
-
-    var pitches = this._getFilteredDetails(data);
-    if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
-
-    section.style.display = '';
-    var hand = this._zoneHand || 'R';
-    var metric = this._zoneMetric || 'usage';
-
-    // Compute average strike zone
-    var szTopSum = 0, szBotSum = 0, szCount = 0;
-    for (var i = 0; i < pitches.length; i++) {
-      if (pitches[i].szt != null && pitches[i].szb != null) {
-        szTopSum += pitches[i].szt;
-        szBotSum += pitches[i].szb;
-        szCount++;
-      }
-    }
-    var szTop = szCount > 0 ? szTopSum / szCount : 3.5;
-    var szBot = szCount > 0 ? szBotSum / szCount : 1.5;
-    var szHeight = szTop - szBot;
-    var szThird = szHeight / 3;
-
-    // 5×5 grid: inner 3×3 = strike zone, outer ring = chase/waste zones
-    // Horizontal: plate half-width = 0.83 ft, chase zone extends another ~0.55 ft (one plate-third)
-    var PX_EDGE = 0.83;
-    var PX_CHASE = 1.38;  // chase zone outer edge (~16.5 inches from center)
-    var pxThird = PX_EDGE * 2 / 3;
-
-    // Vertical chase zone extends one szThird above/below strike zone
-    var pzChaseTop = szTop + szThird;
-    var pzChaseBot = szBot - szThird;
-
-    // Group by pitch type, filter by hand
-    var byType = {};
-    var totalByType = {};
-    for (var i = 0; i < pitches.length; i++) {
-      var p = pitches[i];
-      if (p.bh !== hand) continue;
-      var pt = p.pt;
-      if (!pt) continue;
-      if (!totalByType[pt]) totalByType[pt] = 0;
-      totalByType[pt]++;
-      if (p.px == null || p.pz == null) continue;
-      if (!byType[pt]) byType[pt] = [];
-      byType[pt].push(p);
-    }
-
-    var ptOrder = Object.keys(totalByType).sort(function(a, b) { return totalByType[b] - totalByType[a]; });
-
-    for (var ti = 0; ti < ptOrder.length; ti++) {
-      var pt = ptOrder[ti];
-      var ptPitches = byType[pt] || [];
-      if (ptPitches.length < 5) continue;
-
-      // 5×5 grid: [row][col], row 0=high chase, 1=high, 2=mid, 3=low, 4=low chase
-      //            col 0=in chase, 1=in, 2=mid, 3=away, 4=away chase
-      var zones = [];
-      for (var r = 0; r < 5; r++) {
-        zones[r] = [];
-        for (var c = 0; c < 5; c++) {
-          zones[r][c] = { n: 0, swings: 0, whiffs: 0, csw: 0 };
-        }
-      }
-
-      for (var pi = 0; pi < ptPitches.length; pi++) {
-        var pp = ptPitches[pi];
-        var px = pp.px;
-        var pz = pp.pz;
-
-        // Determine column (0=chase-in, 1=in, 2=mid, 3=away, 4=chase-away)
-        var col;
-        if (px < -PX_EDGE) col = 0;
-        else if (px < -PX_EDGE + pxThird) col = 1;
-        else if (px < PX_EDGE - pxThird) col = 2;
-        else if (px <= PX_EDGE) col = 3;
-        else col = 4;
-
-        // Determine row (0=chase-high, 1=high, 2=mid, 3=low, 4=chase-low)
-        var row;
-        if (pz > szTop) row = 0;
-        else if (pz > szTop - szThird) row = 1;
-        else if (pz > szBot + szThird) row = 2;
-        else if (pz >= szBot) row = 3;
-        else row = 4;
-
-        // Clamp extreme outliers to chase zones
-        if (row < 0) row = 0;
-        if (row > 4) row = 4;
-        if (col < 0) col = 0;
-        if (col > 4) col = 4;
-
-        var z = zones[row][col];
-        z.n++;
-        var desc = pp.d;
-        if (desc === 'SS' || desc === 'F' || desc === 'IP') {
-          z.swings++;
-          if (desc === 'SS') z.whiffs++;
-        }
-        if (desc === 'CS' || desc === 'SS') {
-          z.csw++;
-        }
-      }
-
-      // Create zone grid SVG
-      var wrapper = document.createElement('div');
-      wrapper.className = 'zone-profile-card';
-      var header = document.createElement('div');
-      header.className = 'zone-profile-header';
-      var badge = Utils.createPitchBadge(pt, true);
-      header.appendChild(badge);
-      var countSpan = document.createElement('span');
-      countSpan.className = 'zone-profile-count';
-      countSpan.textContent = ' ' + ptPitches.length;
-      header.appendChild(countSpan);
-      wrapper.appendChild(header);
-
-      // SVG dimensions: inner cells = 32px, outer chase cells = 22px
-      var INNER = 32, OUTER = 22, GAP = 1;
-      var TOTAL_W = 2 * OUTER + 3 * INNER + 4 * GAP;
-      var TOTAL_H = TOTAL_W;
-      var SVG_PAD = 2;
-      var ns = 'http://www.w3.org/2000/svg';
-      var svg = document.createElementNS(ns, 'svg');
-      svg.setAttribute('width', TOTAL_W + 2 * SVG_PAD);
-      svg.setAttribute('height', TOTAL_H + 2 * SVG_PAD);
-      svg.setAttribute('viewBox', '0 0 ' + (TOTAL_W + 2 * SVG_PAD) + ' ' + (TOTAL_H + 2 * SVG_PAD));
-
-      // Compute cell positions
-      var colWidths = [OUTER, INNER, INNER, INNER, OUTER];
-      var rowHeights = [OUTER, INNER, INNER, INNER, OUTER];
-      var colX = [SVG_PAD];
-      for (var ci = 1; ci <= 4; ci++) colX[ci] = colX[ci - 1] + colWidths[ci - 1] + GAP;
-      var rowY = [SVG_PAD];
-      for (var ri = 1; ri <= 4; ri++) rowY[ri] = rowY[ri - 1] + rowHeights[ri - 1] + GAP;
-
-      // Find max value for color scaling
-      var maxVal = 0;
-      for (var r = 0; r < 5; r++) {
-        for (var c = 0; c < 5; c++) {
-          var val;
-          if (metric === 'usage') {
-            val = zones[r][c].n / ptPitches.length;
-          } else if (metric === 'whiff') {
-            val = zones[r][c].swings > 0 ? zones[r][c].whiffs / zones[r][c].swings : 0;
-          } else {
-            val = zones[r][c].n > 0 ? zones[r][c].csw / zones[r][c].n : 0;
-          }
-          if (val > maxVal) maxVal = val;
-        }
-      }
-
-      for (var r = 0; r < 5; r++) {
-        for (var c = 0; c < 5; c++) {
-          var z = zones[r][c];
-          var isChase = r === 0 || r === 4 || c === 0 || c === 4;
-          var val, displayVal;
-          if (metric === 'usage') {
-            val = z.n / ptPitches.length;
-            displayVal = (val * 100).toFixed(0) + '%';
-          } else if (metric === 'whiff') {
-            val = z.swings > 0 ? z.whiffs / z.swings : 0;
-            displayVal = z.swings > 2 ? (val * 100).toFixed(0) + '%' : '—';
-          } else {
-            val = z.n > 0 ? z.csw / z.n : 0;
-            displayVal = z.n > 2 ? (val * 100).toFixed(0) + '%' : '—';
-          }
-
-          var intensity = maxVal > 0 ? val / maxVal : 0;
-          var fillColor;
-          if (metric === 'usage') {
-            // Dark-to-red intensity scale for usage (matches heat map palette)
-            fillColor = this._heatColor(intensity);
-          } else {
-            // Blue-white-red diverging scale for rate metrics (whiff%, CSW%)
-            fillColor = this._heatColor(intensity);
-          }
-          // Dim chase zones slightly
-          if (isChase) {
-            fillColor = fillColor.replace(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/, function(m, h, s, l) {
-              return 'hsl(' + h + ',' + Math.round(s * 0.6) + '%,' + Math.round(l * 0.8) + '%)';
-            });
-          }
-
-          var rect = document.createElementNS(ns, 'rect');
-          rect.setAttribute('x', colX[c]);
-          rect.setAttribute('y', rowY[r]);
-          rect.setAttribute('width', colWidths[c]);
-          rect.setAttribute('height', rowHeights[r]);
-          rect.setAttribute('fill', fillColor);
-          rect.setAttribute('rx', isChase ? '2' : '0');
-          svg.appendChild(rect);
-
-          // Show text only if cell is large enough and has data
-          var cellW = colWidths[c];
-          var cellH = rowHeights[r];
-          if (z.n > 0 && (cellW >= 28 || !isChase)) {
-            var text = document.createElementNS(ns, 'text');
-            text.setAttribute('x', colX[c] + cellW / 2);
-            text.setAttribute('y', rowY[r] + cellH / 2 + (isChase ? 3 : 4));
-            text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('fill', intensity > 0.3 ? '#fff' : '#aaa');
-            text.setAttribute('font-size', isChase ? '9' : '11');
-            text.setAttribute('font-family', 'Barlow, sans-serif');
-            text.textContent = displayVal;
-            svg.appendChild(text);
-          }
-        }
-      }
-
-      // Strike zone border (around inner 3×3)
-      var szX = colX[1];
-      var szY = rowY[1];
-      var szW = colX[3] + colWidths[3] - colX[1];
-      var szH = rowY[3] + rowHeights[3] - rowY[1];
-      var szRect = document.createElementNS(ns, 'rect');
-      szRect.setAttribute('x', szX);
-      szRect.setAttribute('y', szY);
-      szRect.setAttribute('width', szW);
-      szRect.setAttribute('height', szH);
-      szRect.setAttribute('fill', 'none');
-      szRect.setAttribute('stroke', '#888');
-      szRect.setAttribute('stroke-width', '1.5');
-      svg.appendChild(szRect);
-
-      wrapper.appendChild(svg);
-      container.appendChild(wrapper);
-    }
-
-    // Add zone labels
-    if (ptOrder.length > 0) {
-      var labelDiv = document.createElement('div');
-      labelDiv.className = 'zone-profile-labels';
-      labelDiv.innerHTML = '<span class="zone-label-row zone-label-chase">Chase</span><span class="zone-label-row">High</span><span class="zone-label-row">Mid</span><span class="zone-label-row">Low</span><span class="zone-label-row zone-label-chase">Chase</span>';
-      container.insertBefore(labelDiv, container.firstChild);
-    }
-  },
-
-
   _renderCountTable: function(data) {
     var section = document.getElementById('player-count-section');
     var container = document.getElementById('player-count-table');
@@ -2394,36 +2156,6 @@ var PlayerPage = {
     };
     var countToggle = document.getElementById('count-hand-toggle');
     if (countToggle) countToggle.addEventListener('click', this._countToggleHandler);
-
-    // Zone profile hand toggle
-    this._zoneHandToggleHandler = function(e) {
-      var btn = e.target.closest('.hand-toggle-btn');
-      if (!btn) return;
-      var hand = btn.getAttribute('data-hand');
-      if (hand === self._zoneHand) return;
-      self._zoneHand = hand;
-      var btns = document.querySelectorAll('#zone-hand-toggle .hand-toggle-btn');
-      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
-      btn.classList.add('active');
-      if (self._currentData) self._renderZoneProfiles(self._currentData);
-    };
-    var zoneHandToggle = document.getElementById('zone-hand-toggle');
-    if (zoneHandToggle) zoneHandToggle.addEventListener('click', this._zoneHandToggleHandler);
-
-    // Zone profile metric toggle
-    this._zoneMetricToggleHandler = function(e) {
-      var btn = e.target.closest('.hand-toggle-btn');
-      if (!btn) return;
-      var metric = btn.getAttribute('data-metric');
-      if (metric === self._zoneMetric) return;
-      self._zoneMetric = metric;
-      var btns = document.querySelectorAll('#zone-metric-toggle .hand-toggle-btn');
-      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
-      btn.classList.add('active');
-      if (self._currentData) self._renderZoneProfiles(self._currentData);
-    };
-    var zoneMetricToggle = document.getElementById('zone-metric-toggle');
-    if (zoneMetricToggle) zoneMetricToggle.addEventListener('click', this._zoneMetricToggleHandler);
   },
 
   _unbindHandToggles: function() {
@@ -2436,16 +2168,6 @@ var PlayerPage = {
       var el = document.getElementById('count-hand-toggle');
       if (el) el.removeEventListener('click', this._countToggleHandler);
       this._countToggleHandler = null;
-    }
-    if (this._zoneHandToggleHandler) {
-      var el = document.getElementById('zone-hand-toggle');
-      if (el) el.removeEventListener('click', this._zoneHandToggleHandler);
-      this._zoneHandToggleHandler = null;
-    }
-    if (this._zoneMetricToggleHandler) {
-      var el = document.getElementById('zone-metric-toggle');
-      if (el) el.removeEventListener('click', this._zoneMetricToggleHandler);
-      this._zoneMetricToggleHandler = null;
     }
   },
 
@@ -2525,7 +2247,6 @@ var PlayerPage = {
         this._renderBattedBallTable(data);
         this._renderPlateDisciplineTable(data);
         this._renderHeatMaps(data);
-        this._renderZoneProfiles(data);
         this._renderCountTable(data);
       } else {
         this._renderHitterStatsFullTable(data, isROC);
@@ -2578,7 +2299,6 @@ var PlayerPage = {
       // Heat maps, zone profiles, count table use PITCH_DETAILS — filter by batter hand
       this._platoonDetailHand = hand;
       this._renderHeatMaps(data);
-      this._renderZoneProfiles(data);
       this._renderCountTable(data);
       this._platoonDetailHand = null;
 
@@ -3038,17 +2758,6 @@ var PlayerPage = {
       });
     }
 
-    // Show note if some BIP couldn't be plotted (e.g. missing hit coordinates)
-    var bipNote = document.getElementById('la-spray-bip-note');
-    if (bipNote) {
-      if (points.length < totalBip) {
-        bipNote.textContent = points.length + ' of ' + totalBip + ' BIP shown';
-        bipNote.style.display = '';
-      } else {
-        bipNote.style.display = 'none';
-      }
-    }
-
     // Get SACQ zones for overlay — prefer hand-specific for this batter, pooled as fallback
     var _allSacqZones = (window.METADATA && window.METADATA.sacqZones) || [];
     var sacqZones = [];
@@ -3239,13 +2948,6 @@ var PlayerPage = {
 
     // --- xwOBAsp annotation (HTML element, outside chart) ---
     var xwobaspNote = document.getElementById('la-spray-xwobasp-note');
-    if (!xwobaspNote) {
-      xwobaspNote = document.createElement('span');
-      xwobaspNote.id = 'la-spray-xwobasp-note';
-      xwobaspNote.style.cssText = 'font-size:12px;color:#888;margin-left:12px;';
-      var bipNote = document.getElementById('la-spray-bip-note');
-      if (bipNote) bipNote.parentElement.insertBefore(xwobaspNote, bipNote.nextSibling);
-    }
     if (xwOBAsp_val != null) {
       xwobaspNote.textContent = '';
       xwobaspNote.appendChild(document.createTextNode('xwOBAsp: '));
