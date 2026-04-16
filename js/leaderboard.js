@@ -135,7 +135,7 @@ const COLUMNS = {
     { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'baserunning' },
     { key: 'cs',          label: 'CS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
     { key: 'sbPct',       label: 'SB%',      format: function(v){ return v != null ? v.toFixed(1) + '%' : '—'; }, sortType: 'numeric', noPercentile: true, desc: 'Stolen base success rate', group: 'baserunning' },
-    { key: 'sprintSpeed', label: 'Sprint',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Sprint speed (ft/s) — avg of top running efforts', group: 'baserunning' },
+    { key: 'sprintSpeed', label: 'Sprint Speed', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Sprint speed (ft/s) — avg of top running efforts', group: 'baserunning' },
   ],
   hitterBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
