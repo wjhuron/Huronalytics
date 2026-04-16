@@ -21,7 +21,7 @@ const COLUMNS = {
     { key: 'extension',   label: 'Ext',      format: Utils.formatFeetInches, sortType: 'numeric', desc: 'Extension toward home plate at release (feet)', group: 'metrics' },
     { key: 'armAngle',    label: 'Arm Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Arm angle at release (degrees)', group: 'metrics' },
     { key: 'nVAA',        label: 'nVAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized VAA — location-independent (VAA minus expected VAA at that plate height)', group: 'metrics' },
-    { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
+    { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
     { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Vertical approach angle at the plate (degrees)', group: 'metrics' },
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Horizontal approach angle at the plate (degrees)', group: 'metrics' },
     { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', desc: 'Stuff+ quality score from physical characteristics only (100 = avg, higher = better for pitcher)', group: 'metrics' },
@@ -130,9 +130,9 @@ const COLUMNS = {
     // Counting
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
-    { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
+    { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', group: 'counting' },
     // Baserunning
-    { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'baserunning' },
+    { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, group: 'baserunning' },
     { key: 'cs',          label: 'CS',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'baserunning' },
     { key: 'sbPct',       label: 'SB%',      format: function(v){ return v != null ? v.toFixed(1) + '%' : '—'; }, sortType: 'numeric', noPercentile: true, desc: 'Stolen base success rate', group: 'baserunning' },
     { key: 'sprintSpeed', label: 'Sprint Speed', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Sprint speed (ft/s) — avg of top running efforts', group: 'baserunning' },
@@ -218,10 +218,10 @@ const COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Run value per 100 pitches of this type', group: 'info' },
-    { key: 'xRunValue',  label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Expected pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
-    { key: 'xRv100',     label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Expected run value per 100 pitches of this type', group: 'info' },
+    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches of this type', group: 'info' },
+    { key: 'xRunValue',  label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
+    { key: 'xRv100',     label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches of this type', group: 'info' },
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average vs this pitch type', group: 'stats' },
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Slugging vs this pitch type', group: 'stats' },
     { key: 'iso',         label: 'ISO',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Isolated power vs this pitch type (SLG − AVG)', group: 'stats' },
@@ -768,8 +768,9 @@ const Leaderboard = {
           const PITCH_SHAPE_ALWAYS_COLOR = {
             velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
             extension: true, effectiveVelo: true,
-            vaa: true, haa: true, nVAA: true, nHAA: true
+            vaa: true, haa: true, nVAA: true
           };
+          var NVAA_NO_PCTL_PITCHES = { FC: true, SL: true, ST: true, KN: true, EP: true };
           // Hitter stats that require ≥20 BIP
           const HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
@@ -788,7 +789,9 @@ const Leaderboard = {
 
           if (isPitcherPitchType) {
             // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
-            showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
+            var isShape = PITCH_SHAPE_ALWAYS_COLOR[col.key];
+            if (isShape && col.key === 'nVAA' && NVAA_NO_PCTL_PITCHES[row.pitchType]) isShape = false;
+            showColor = isShape || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
           } else if (isPitcherRow) {
             // Pitcher overall: IP-based qualification
             const ipFloat = Utils.parseIP(row.ip);

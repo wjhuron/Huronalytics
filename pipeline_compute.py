@@ -237,9 +237,15 @@ def compute_stats(pitches):
 def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False):
     """Compute expected run value (xRV).
 
-    For BIP pitches with xwOBA: uses (xwOBA - lgWOBA) / wOBAScale.
-    For all other pitches: uses actual RunExp.
-    negate=True for hitter context (positive = better for hitter).
+    For BIP pitches with xwOBA: uses (xwOBA - lgWOBA) / wOBAScale
+    (hitter perspective: positive = above-average contact).
+    For all other pitches: uses -RunExp to convert from pitcher perspective
+    (RunExp in sheets is positive = good for pitcher) to hitter perspective.
+
+    The raw total is hitter-perspective (positive = good for hitter).
+    negate=False (default, for pitchers): flips to pitcher perspective
+    (positive = good for pitcher, i.e. runs saved).
+    negate=True (for hitters): keeps hitter perspective (positive = good for hitter).
     """
     xrv_values = []
     has_guts = lg_woba is not None and woba_scale is not None and woba_scale != 0
@@ -251,11 +257,11 @@ def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False):
         else:
             rv = safe_float(p.get('RunExp'))
             if rv is not None:
-                xrv_values.append(rv)
+                xrv_values.append(-rv)
     if not xrv_values:
         return {'xRunValue': None}
     total = sum(xrv_values)
-    return {'xRunValue': -total if negate else total}
+    return {'xRunValue': -total if not negate else total}
 
 
 def compute_pitcher_batted_ball(pitches):
