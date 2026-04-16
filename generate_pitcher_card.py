@@ -4,7 +4,7 @@ Generates a dark-themed visual stat card for a pitcher's game performance.
 Uses Google Sheets data + MLB headshot API.
 
 Usage:
-    cd "ST Leaderboard" && python3 generate_pitcher_card.py
+    cd ~/Huronalytics && python3 generate_pitcher_card.py
 
 To modify for a different pitcher/game, change the CONFIGURATION section below.
 """

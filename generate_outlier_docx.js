@@ -3,7 +3,7 @@ const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         Header, Footer, AlignmentType, PageOrientation, HeadingLevel,
         BorderStyle, WidthType, ShadingType, PageNumber, PageBreak } = require('docx');
 
-const data = JSON.parse(fs.readFileSync('/Users/wallyhuron/Downloads/ST Leaderboard/outlier_results.json', 'utf8'));
+const data = JSON.parse(fs.readFileSync('/Users/wallyhuron/Huronalytics/outlier_results.json', 'utf8'));
 
 const border = { style: BorderStyle.SINGLE, size: 1, color: "BBBBBB" };
 const borders = { top: border, bottom: border, left: border, right: border };
@@ -316,7 +316,7 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-    fs.writeFileSync('/Users/wallyhuron/Downloads/ST Leaderboard/ST_2026_Outlier_Report.docx', buffer);
+    fs.writeFileSync('/Users/wallyhuron/Huronalytics/ST_2026_Outlier_Report.docx', buffer);
     console.log('Document created successfully!');
 }).catch(err => {
     console.error('Error:', err);
