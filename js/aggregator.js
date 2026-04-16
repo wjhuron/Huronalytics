@@ -1776,7 +1776,7 @@ const Aggregator = {
       const hpk = hpPreAgg[hpi].hitter + '|' + hpPreAgg[hpi].team + '|' + hpPreAgg[hpi].pitchType;
       hpPreMap[hpk] = hpPreAgg[hpi];
     }
-    const hpXKeys = ['wOBA', 'runValue', 'rv100', 'avgFbDist', 'avgHrDist', 'xwOBAsp'];
+    const hpXKeys = ['wOBA', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'avgFbDist', 'avgHrDist', 'xwOBAsp'];
     for (let hpmi = 0; hpmi < rows.length; hpmi++) {
       const hpmk = rows[hpmi].hitter + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType;
       const hpPre = hpPreMap[hpmk];
