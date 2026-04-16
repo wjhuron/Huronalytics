@@ -770,7 +770,6 @@ const Leaderboard = {
             extension: true, effectiveVelo: true,
             vaa: true, haa: true, nVAA: true
           };
-          var NVAA_NO_PCTL_PITCHES = { FC: true, SL: true, ST: true, KN: true, EP: true };
           // Hitter stats that require ≥20 BIP
           const HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
@@ -789,9 +788,7 @@ const Leaderboard = {
 
           if (isPitcherPitchType) {
             // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
-            var isShape = PITCH_SHAPE_ALWAYS_COLOR[col.key];
-            if (isShape && col.key === 'nVAA' && NVAA_NO_PCTL_PITCHES[row.pitchType]) isShape = false;
-            showColor = isShape || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
+            showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
           } else if (isPitcherRow) {
             // Pitcher overall: IP-based qualification
             const ipFloat = Utils.parseIP(row.ip);
