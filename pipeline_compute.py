@@ -589,11 +589,26 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
 
 
 def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count'):
-    """Compute percentiles from MLB-only pool, then interpolate AAA players."""
+    """Compute percentiles from an MLB pool of one row per player (combined 2TM/3TM
+    rows replace their per-team rows), then interpolate AAA rows and the per-team
+    rows of multi-team players against the pool."""
     pctl_key = metric_key + '_pctl'
 
-    mlb_rows = [r for r in rows if not r.get('_isROC')]
-    aaa_rows = [r for r in rows if r.get('_isROC')]
+    def _player_key(r):
+        return r.get('pitcher') or r.get('hitter')
+
+    combined_players = {_player_key(r) for r in rows if r.get('_isCombined')}
+
+    mlb_rows = []
+    interp_rows = []
+    for r in rows:
+        if r.get('_isROC'):
+            interp_rows.append(r)
+            continue
+        if not r.get('_isCombined') and _player_key(r) in combined_players:
+            interp_rows.append(r)
+            continue
+        mlb_rows.append(r)
 
     compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key)
 
@@ -603,7 +618,7 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
     n = len(mlb_values)
 
     import bisect
-    for row in aaa_rows:
+    for row in interp_rows:
         val = row.get(metric_key)
         if val is None:
             row[pctl_key] = None

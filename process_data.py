@@ -773,6 +773,165 @@ def generate_micro_data(all_pitches):
         ])
 
     # ==========================================================
+    #  Multi-team (2TM/3TM) synthesis
+    #  Players on ≥2 MLB teams (ROC excluded) get synthetic combined
+    #  micro records and duplicated BIP records so the "All Teams" view
+    #  aggregates naturally. Per-team records are left intact so specific-
+    #  team views still work.
+    # ==========================================================
+    aaa_team_indices = {tm_idx[t] for t in AAA_TEAMS if t in tm_idx}
+
+    # Find multi-team pitchers (keyed by (pi_idx, throws)) and hitters (by hi_idx)
+    pitcher_mlb_team_set_micro = defaultdict(set)
+    for (pi, ti, throws, _di, _bh) in pitcher_micro.keys():
+        if ti not in aaa_team_indices:
+            pitcher_mlb_team_set_micro[(pi, throws)].add(ti)
+
+    hitter_mlb_team_set_micro = defaultdict(set)
+    for (hi, ti, _bats, _di, _ph) in hitter_micro.keys():
+        if ti not in aaa_team_indices:
+            hitter_mlb_team_set_micro[hi].add(ti)
+
+    # Extend teams + tm_idx with combined labels we'll actually need
+    combined_pitcher_ti = {}  # (pi, throws) → combined tm_idx
+    combined_hitter_ti = {}   # hi → combined tm_idx
+    for (pi, throws), tset in pitcher_mlb_team_set_micro.items():
+        if len(tset) < 2:
+            continue
+        label = f"{len(tset)}TM"
+        if label not in tm_idx:
+            tm_idx[label] = len(teams)
+            teams.append(label)
+        combined_pitcher_ti[(pi, throws)] = tm_idx[label]
+    for hi, tset in hitter_mlb_team_set_micro.items():
+        if len(tset) < 2:
+            continue
+        label = f"{len(tset)}TM"
+        if label not in tm_idx:
+            tm_idx[label] = len(teams)
+            teams.append(label)
+        combined_hitter_ti[hi] = tm_idx[label]
+
+    def _sum_counts(accum, src, n):
+        for i in range(n):
+            accum[i] += src[i]
+
+    # --- Pitcher micro: sum counts across teams for same (di, bh) ---
+    if combined_pitcher_ti:
+        # Pre-index by (pi, throws) for O(1) grouping
+        pmicro_by_pitcher = defaultdict(list)
+        for key, c in pitcher_micro.items():
+            (pi, ti, throws, di, bh) = key
+            pmicro_by_pitcher[(pi, throws)].append((ti, di, bh, c))
+        for (pi, throws), combined_ti in combined_pitcher_ti.items():
+            teamset = pitcher_mlb_team_set_micro[(pi, throws)]
+            by_dibh = defaultdict(lambda: [0] * 31)
+            for (ti, di, bh, c) in pmicro_by_pitcher[(pi, throws)]:
+                if ti not in teamset:
+                    continue
+                _sum_counts(by_dibh[(di, bh)], c, 31)
+            for (di, bh), c in by_dibh.items():
+                pitcher_rows.append([pi, combined_ti, throws, di, bh] + c)
+
+    # --- Pitch micro: sum across teams for same (pt, di, bh) ---
+    if combined_pitcher_ti:
+        pitchmicro_by_pitcher = defaultdict(list)
+        for key, c in pitch_micro.items():
+            (pi, ti, throws, pti, di, bh) = key
+            pitchmicro_by_pitcher[(pi, throws)].append((ti, pti, di, bh, c))
+        for (pi, throws), combined_ti in combined_pitcher_ti.items():
+            teamset = pitcher_mlb_team_set_micro[(pi, throws)]
+            by_key = defaultdict(lambda: [0.0] * 51)
+            for (ti, pti, di, bh, c) in pitchmicro_by_pitcher[(pi, throws)]:
+                if ti not in teamset:
+                    continue
+                _sum_counts(by_key[(pti, di, bh)], c, 51)
+            for (pti, di, bh), c in by_key.items():
+                row = [pi, combined_ti, throws, pti, di, bh]
+                for i in range(51):
+                    v = c[i]
+                    row.append(round(v, 4) if isinstance(v, float) and v != int(v) else int(v))
+                pitch_rows.append(row)
+
+    # --- Hitter micro: sum across teams for same (bats, di, ph) ---
+    if combined_hitter_ti:
+        hmicro_by_hitter = defaultdict(list)
+        for key, c in hitter_micro.items():
+            (hi, ti, bats, di, ph) = key
+            hmicro_by_hitter[hi].append((ti, bats, di, ph, c))
+        for hi, combined_ti in combined_hitter_ti.items():
+            teamset = hitter_mlb_team_set_micro[hi]
+            by_key = defaultdict(lambda: [0.0] * 50)
+            for (ti, bats, di, ph, c) in hmicro_by_hitter[hi]:
+                if ti not in teamset:
+                    continue
+                _sum_counts(by_key[(bats, di, ph)], c, 49)
+            for (bats, di, ph), c in by_key.items():
+                row = [hi, combined_ti, bats, di, ph]
+                for i in range(49):
+                    v = c[i]
+                    row.append(round(v, 4) if isinstance(v, float) and v != int(v) else int(v))
+                hitter_rows.append(row)
+
+    # --- Hitter-pitch micro: sum across teams for same (bats, pt, di, ph) ---
+    if combined_hitter_ti:
+        hpmicro_by_hitter = defaultdict(list)
+        for key, c in hitter_pitch_micro.items():
+            (hi, ti, bats, pti, di, ph) = key
+            hpmicro_by_hitter[hi].append((ti, bats, pti, di, ph, c))
+        for hi, combined_ti in combined_hitter_ti.items():
+            teamset = hitter_mlb_team_set_micro[hi]
+            by_key = defaultdict(lambda: [0.0] * 49)
+            for (ti, bats, pti, di, ph, c) in hpmicro_by_hitter[hi]:
+                if ti not in teamset:
+                    continue
+                _sum_counts(by_key[(bats, pti, di, ph)], c, 49)
+            for (bats, pti, di, ph), c in by_key.items():
+                row = [hi, combined_ti, bats, pti, di, ph]
+                for i in range(49):
+                    v = c[i]
+                    row.append(round(v, 4) if isinstance(v, float) and v != int(v) else int(v))
+                hitter_pitch_rows.append(row)
+
+    # --- BIP records: duplicate with combined teamIdx for multi-team players ---
+    if combined_pitcher_ti:
+        extra_pitcher_bip = []
+        for rec in pitcher_bip_rows:
+            pi_v, ti_v = rec[0], rec[1]
+            # Need to find matching (pi, throws) — BIP row doesn't carry throws.
+            # Enumerate all throws options for this pitcher.
+            for (pi2, throws), ct_ti in combined_pitcher_ti.items():
+                if pi2 != pi_v:
+                    continue
+                if ti_v in pitcher_mlb_team_set_micro[(pi2, throws)]:
+                    new_rec = rec[:]
+                    new_rec[1] = ct_ti
+                    extra_pitcher_bip.append(new_rec)
+                    break
+        pitcher_bip_rows.extend(extra_pitcher_bip)
+
+    if combined_hitter_ti:
+        extra_hitter_bip = []
+        for rec in hitter_bip_rows:
+            hi_v, ti_v = rec[0], rec[1]
+            combined_ti = combined_hitter_ti.get(hi_v)
+            if combined_ti is not None and ti_v in hitter_mlb_team_set_micro[hi_v]:
+                new_rec = rec[:]
+                new_rec[1] = combined_ti
+                extra_hitter_bip.append(new_rec)
+        hitter_bip_rows.extend(extra_hitter_bip)
+
+        extra_hp_bip = []
+        for rec in hitter_pitch_bip_rows:
+            hi_v, ti_v = rec[0], rec[1]
+            combined_ti = combined_hitter_ti.get(hi_v)
+            if combined_ti is not None and ti_v in hitter_mlb_team_set_micro[hi_v]:
+                new_rec = rec[:]
+                new_rec[1] = combined_ti
+                extra_hp_bip.append(new_rec)
+        hitter_pitch_bip_rows.extend(extra_hp_bip)
+
+    # ==========================================================
     #  Velocity trend sparklines (sparse time-series)
     #  Key: (pitcherIdx, pitchTypeIdx, dateIdx)
     #  Values: [sumVelo, nVelo]
@@ -795,6 +954,24 @@ def generate_micro_data(all_pitches):
         key = (pi_idx[pitcher], tm_idx[team], pt_idx[pitch_type], dt_idx[date])
         velo_trend[key][0] += velo
         velo_trend[key][1] += 1
+
+    # Synthesize 2TM velocity-trend entries (sum across teams per pitch type/date)
+    if combined_pitcher_ti:
+        vt_by_pitcher = defaultdict(list)
+        for key, vals in velo_trend.items():
+            (pi, ti, pti, di) = key
+            vt_by_pitcher[pi].append((ti, pti, di, vals))
+        for (pi, throws), combined_ti in combined_pitcher_ti.items():
+            teamset = pitcher_mlb_team_set_micro[(pi, throws)]
+            by_key = defaultdict(lambda: [0.0, 0])
+            for (ti, pti, di, vals) in vt_by_pitcher.get(pi, []):
+                if ti not in teamset:
+                    continue
+                dst = by_key[(pti, di)]
+                dst[0] += vals[0]
+                dst[1] += vals[1]
+            for (pti, di), vals in by_key.items():
+                velo_trend[(pi, combined_ti, pti, di)] = vals
 
     velo_trend_rows = []
     for (pi, ti, pti, di), (s, n) in velo_trend.items():
@@ -1058,6 +1235,46 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             continue  # Skip AAA pitchers facing ROC hitters
         key = (p['Pitcher'], p['PTeam'], p['Pitch Type'], p.get('Throws'))
         pitch_groups[key].append(p)
+
+    # ─── Synthesize multi-team (2TM/3TM) combined groups ───
+    # A pitcher on ≥2 MLB teams (ROC excluded) gets synthetic combined entries.
+    # The same row-building loops below then emit 2TM/3TM rows naturally.
+    pitcher_mlb_teams = defaultdict(set)
+    for (pitcher, team, _pt, throws) in pitch_groups.keys():
+        if team not in AAA_TEAMS:
+            pitcher_mlb_teams[(pitcher, throws)].add(team)
+
+    combined_pitcher_labels = {}  # (pitcher, throws) → "2TM"/"3TM"
+    for (pitcher, throws), teams in pitcher_mlb_teams.items():
+        if len(teams) < 2:
+            continue
+        combined_team = f"{len(teams)}TM"
+        combined_pitcher_labels[(pitcher, throws)] = combined_team
+        # Propagate the pitcher's mlbId under the combined team key so get_mlb_id works
+        for t in teams:
+            mid = mlb_id_cache.get(f"{pitcher}|{t}")
+            if mid:
+                mlb_id_cache[f"{pitcher}|{combined_team}"] = mid
+                break
+
+    if combined_pitcher_labels:
+        # Augment pitch_groups (per pitch type)
+        pitch_groups_by_ptt = defaultdict(dict)
+        for (pitcher, team, pt, throws), pitches in list(pitch_groups.items()):
+            pitch_groups_by_ptt[(pitcher, team, throws)][pt] = pitches
+
+        for (pitcher, throws), combined_team in combined_pitcher_labels.items():
+            teams = pitcher_mlb_teams[(pitcher, throws)]
+            combined_pt_pitches = defaultdict(list)
+            for team in teams:
+                for pt, pitches in pitch_groups_by_ptt.get((pitcher, team, throws), {}).items():
+                    combined_pt_pitches[pt].extend(pitches)
+            for pt, combined in combined_pt_pitches.items():
+                pitch_groups[(pitcher, combined_team, pt, throws)] = combined
+            # Update pitcher_total so usagePct works for combined rows
+            pitcher_total[(pitcher, combined_team)] = sum(
+                pitcher_total[(pitcher, t)] for t in teams
+            )
 
     pitch_leaderboard = []
     for (pitcher, team, pitch_type, throws), pitches in pitch_groups.items():
@@ -1407,6 +1624,14 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         key = (p['Pitcher'], p['PTeam'], p.get('Throws'))
         pitcher_groups[key].append(p)
 
+    # Synthesize combined (2TM/3TM) pitcher groups — mirror of pitch_groups synthesis above
+    for (pitcher, throws), combined_team in combined_pitcher_labels.items():
+        teams = pitcher_mlb_teams[(pitcher, throws)]
+        combined = []
+        for team in teams:
+            combined.extend(pitcher_groups[(pitcher, team, throws)])
+        pitcher_groups[(pitcher, combined_team, throws)] = combined
+
     PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA']
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
     EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
@@ -1585,6 +1810,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if xhb_val is not None:
                 detail['xhb'] = round(xhb_val, 1)
             pitch_details[pitcher + '|' + (team or '')].append(detail)
+
+    # Synthesize combined (2TM/3TM) pitch details entries
+    for (pitcher, throws), combined_team in combined_pitcher_labels.items():
+        combined_details = []
+        for t in pitcher_mlb_teams[(pitcher, throws)]:
+            combined_details.extend(pitch_details.get(pitcher + '|' + t, []))
+        if combined_details:
+            pitch_details[pitcher + '|' + combined_team] = combined_details
+
     print(f"Pitch details: {sum(len(v) for v in pitch_details.values())} pitches for {len(pitch_details)} pitchers")
 
     # --- League Averages per pitch type (weighted by pitch count, MLB only) ---
@@ -1594,7 +1828,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     league_avgs = {}
     for pt, pt_rows_all in pt_groups.items():
-        pt_rows = [r for r in pt_rows_all if not r.get('_isROC')]  # Exclude ROC from league averages
+        pt_rows = [r for r in pt_rows_all if not r.get('_isROC') and not r.get('_isCombined')]  # Exclude ROC + combined rows
         avgs = {}
         total_count = sum(r.get('count', 0) for r in pt_rows)
         # Pitch metrics: weighted average by count
@@ -1619,8 +1853,20 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         avgs['count'] = len(pt_rows)
         league_avgs[pt] = avgs
 
-    # League averages for pitcher leaderboard (weighted by count/TBF, MLB only)
-    pitcher_lb_mlb = [r for r in pitcher_leaderboard if not r.get('_isROC')]
+    # Flag combined (2TM/3TM) rows so league-avg math excludes them (double-count avoidance).
+    # Per-team rows are the canonical league-avg source; combined rows duplicate their data.
+    def _is_combined_team(label):
+        return isinstance(label, str) and label.endswith('TM') and label[:-2].isdigit()
+
+    for row in pitcher_leaderboard:
+        if _is_combined_team(row.get('team')):
+            row['_isCombined'] = True
+    for row in pitch_leaderboard:
+        if _is_combined_team(row.get('team')):
+            row['_isCombined'] = True
+
+    # League averages for pitcher leaderboard (weighted by count/TBF, MLB only; exclude combined)
+    pitcher_lb_mlb = [r for r in pitcher_leaderboard if not r.get('_isROC') and not r.get('_isCombined')]
     pitcher_league_avgs = {}
     for stat in STAT_KEYS + PITCHER_METRIC_PCTL_KEYS:
         # Use TBF as weight for rate stats, count (pitches) for pitch metrics
@@ -1654,6 +1900,30 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         b_team = p.get('BTeam')
         if batter and b_team and b_team in ALL_TEAMS:
             hitter_groups[(batter, b_team)].append(p)
+
+    # ─── Synthesize multi-team (2TM/3TM) combined hitter groups ───
+    # Hitters on ≥2 MLB teams (ROC excluded) get a synthetic combined row.
+    hitter_mlb_teams = defaultdict(set)
+    for (batter, team) in hitter_groups.keys():
+        if team not in AAA_TEAMS:
+            hitter_mlb_teams[batter].add(team)
+
+    combined_hitter_labels = {}  # batter → "2TM"/"3TM"
+    for batter, teams in hitter_mlb_teams.items():
+        if len(teams) < 2:
+            continue
+        combined_team = f"{len(teams)}TM"
+        combined_hitter_labels[batter] = combined_team
+        combined = []
+        for team in teams:
+            combined.extend(hitter_groups[(batter, team)])
+        hitter_groups[(batter, combined_team)] = combined
+        # Propagate hitter's mlbId under the combined team key
+        for t in teams:
+            mid = mlb_id_cache.get(f"{batter}|{t}")
+            if mid:
+                mlb_id_cache[f"{batter}|{combined_team}"] = mid
+                break
 
     # --- Compute SACQ zone table (league-wide LA × spray → wOBA) ---
     LA_BINS = [(-999, 0), (0, 5), (5, 10), (10, 15), (15, 20), (20, 25),
@@ -2011,8 +2281,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
     print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
 
-    # Hitter league averages (weighted by PA for rate stats, nBip for batted ball stats, MLB only)
-    hitter_lb_mlb = [r for r in hitter_leaderboard if not r.get('_isROC')]
+    # Flag combined (2TM/3TM) hitter rows so league-avg math excludes them.
+    for row in hitter_leaderboard:
+        if _is_combined_team(row.get('team')):
+            row['_isCombined'] = True
+    for row in hitter_pitch_leaderboard:
+        if _is_combined_team(row.get('team')):
+            row['_isCombined'] = True
+
+    # Hitter league averages (weighted by PA for rate stats, nBip for batted ball stats, MLB only; exclude combined)
+    hitter_lb_mlb = [r for r in hitter_leaderboard if not r.get('_isROC') and not r.get('_isCombined')]
     hitter_league_avgs = {}
     # Rate stats weighted by PA
     pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'hrFbPct',
@@ -2101,6 +2379,57 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 hitter_box.update(mh)
                 pitcher_id_map.update(mpi)
                 hitter_id_map.update(mhi)
+
+        # Synthesize combined (2TM/3TM) boxscore entries by summing per-team entries,
+        # so the per-row merge below works uniformly. Boxscore dicts hold only summable
+        # integers (g, gs, outs, er, hr, w, l, sv, hld, tbf, etc.).
+        def _get_box(box_dict, id_map, name, team, mlb_id):
+            b = box_dict.get(f"{name}|{team}")
+            if not b and mlb_id:
+                alt = id_map.get(mlb_id)
+                if alt:
+                    b = box_dict.get(alt)
+            return b
+
+        for (pitcher, throws), combined_team in combined_pitcher_labels.items():
+            mlb_id = mlb_id_cache.get(f"{pitcher}|{combined_team}")
+            per_team_boxes = []
+            for t in pitcher_mlb_teams[(pitcher, throws)]:
+                b = _get_box(pitcher_box, pitcher_id_map, pitcher, t, mlb_id)
+                if b:
+                    per_team_boxes.append(b)
+            if per_team_boxes:
+                combined_box = {}
+                keys = set()
+                for b in per_team_boxes:
+                    keys.update(b.keys())
+                for k in keys:
+                    vals = [b.get(k, 0) or 0 for b in per_team_boxes]
+                    if all(isinstance(v, (int, float)) for v in vals):
+                        combined_box[k] = sum(vals)
+                    else:
+                        combined_box[k] = per_team_boxes[0].get(k)
+                pitcher_box[f"{pitcher}|{combined_team}"] = combined_box
+
+        for batter, combined_team in combined_hitter_labels.items():
+            mlb_id = mlb_id_cache.get(f"{batter}|{combined_team}")
+            per_team_boxes = []
+            for t in hitter_mlb_teams[batter]:
+                b = _get_box(hitter_box, hitter_id_map, batter, t, mlb_id)
+                if b:
+                    per_team_boxes.append(b)
+            if per_team_boxes:
+                combined_box = {}
+                keys = set()
+                for b in per_team_boxes:
+                    keys.update(b.keys())
+                for k in keys:
+                    vals = [b.get(k, 0) or 0 for b in per_team_boxes]
+                    if all(isinstance(v, (int, float)) for v in vals):
+                        combined_box[k] = sum(vals)
+                    else:
+                        combined_box[k] = per_team_boxes[0].get(k)
+                hitter_box[f"{batter}|{combined_team}"] = combined_box
 
         # Merge pitcher boxscore stats
         for row in pitcher_leaderboard:
@@ -2268,7 +2597,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                       if k.split('|')[-1] not in AAA_TEAMS)
     total_fb_lg = 0
     for row in pitcher_leaderboard:
-        if row.get('_isROC'):
+        if row.get('_isROC') or row.get('_isCombined'):
             continue
         n_bip = row.get('nBip', 0) or 0
         if n_bip > 0:
@@ -2340,7 +2669,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 + 0.367 * ip_sp_ratio
             )
             row['_siera_raw'] = raw_siera
-            if not row.get('_isROC'):
+            if not row.get('_isROC') and not row.get('_isCombined'):
                 siera_ip_pairs.append((raw_siera, ip_float))
         else:
             row['_siera_raw'] = None
@@ -2371,17 +2700,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         total_ip = total_outs / 3.0
         metadata['pitcherLeagueAverages']['era'] = round(total_er * 9 / total_ip, 2)
 
-    # HR/9 league average — weighted by IP (MLB only)
+    # HR/9 league average — weighted by IP (MLB only, exclude combined rows)
     hr9_pairs = [(r['hr9'], ip_str_to_float(r.get('ip'))) for r in pitcher_leaderboard
-                 if r.get('hr9') is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0 and not r.get('_isROC')]
+                 if r.get('hr9') is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0
+                 and not r.get('_isROC') and not r.get('_isCombined')]
     if hr9_pairs:
         total_w = sum(w for _, w in hr9_pairs)
         metadata['pitcherLeagueAverages']['hr9'] = round(sum(v * w for v, w in hr9_pairs) / total_w, 2) if total_w > 0 else None
 
-    # FIP, xFIP, SIERA league averages — weighted by IP (MLB only)
+    # FIP, xFIP, SIERA league averages — weighted by IP (MLB only, exclude combined rows)
     for stat in ['fip', 'xFIP', 'siera']:
         pairs = [(r[stat], ip_str_to_float(r.get('ip'))) for r in pitcher_leaderboard
-                 if r.get(stat) is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0 and not r.get('_isROC')]
+                 if r.get(stat) is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0
+                 and not r.get('_isROC') and not r.get('_isCombined')]
         if pairs:
             total_w = sum(w for _, w in pairs)
             metadata['pitcherLeagueAverages'][stat] = round(sum(v * w for v, w in pairs) / total_w, 2) if total_w > 0 else None

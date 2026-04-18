@@ -103,7 +103,7 @@ const Aggregator = {
       return Promise.resolve();
     }
     const self = this;
-    return fetch('data/micro_data.json')
+    return fetch('data/micro_data_rs.json')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         self.data = d;
@@ -249,6 +249,11 @@ const Aggregator = {
     return !!this._rocTeamSet[team];
   },
 
+  // Helper: combined multi-team label — "2TM", "3TM", etc.
+  _isCombinedTeam: function (team) {
+    return typeof team === 'string' && /^\d+TM$/.test(team);
+  },
+
   _bisectLeft: function (arr, val) {
     let lo = 0, hi = arr.length;
     while (lo < hi) {
@@ -297,7 +302,10 @@ const Aggregator = {
     }, useAbs, minCount > 0);
   },
 
-  // Percentile computation using _qualified flag instead of minCount (ROC-aware)
+  // Percentile computation using _qualified flag instead of minCount (ROC-aware).
+  // Rows with _inPool === false are kept qualified but interpolated against the
+  // pool rather than being members of it (used for per-team rows of multi-team
+  // players whose 2TM row is the pool representative).
   _computePercentilesQualified: function (rows, metricKey) {
     this._computePercentilesUnified(rows, metricKey, function (row) {
       return !!row._qualified;
@@ -310,12 +318,12 @@ const Aggregator = {
     const self = this;
 
     const mlbValid = [];
-    const rocValid = [];
+    const rocValid = [];  // interpolated (ROC + per-team rows of multi-team players)
     for (let i = 0; i < rows.length; i++) {
       const rawVal = rows[i][metricKey];
       if (rawVal !== null && rawVal !== undefined && rawVal === rawVal && qualifyFn(rows[i])) {
         const entry = { idx: i, val: useAbs ? Math.abs(rawVal) : rawVal };
-        if (self._isROCTeam(rows[i].team)) {
+        if (self._isROCTeam(rows[i].team) || rows[i]._inPool === false) {
           rocValid.push(entry);
         } else {
           mlbValid.push(entry);
@@ -639,13 +647,35 @@ const Aggregator = {
     // Compute percentiles with IP-based qualifying
     // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP (⅓ inning)/team game.
     const teamGames = this.getTeamGamesPlayed();
+
+    // Multi-team handling: players with a 2TM/3TM row. Per-team rows inherit the
+    // combined row's qualification (cumulative IP across teams) and its team-games
+    // denominator (sum of the per-team team games). Percentile pool uses combined
+    // rows only — per-team rows of multi-team players interpolate against it.
+    const combinedByPitcher = {};
+    for (let ci2 = 0; ci2 < rows.length; ci2++) {
+      if (Aggregator._isCombinedTeam(rows[ci2].team)) {
+        combinedByPitcher[rows[ci2].pitcher] = rows[ci2];
+      }
+    }
+    const cumTeamGames = {};
+    for (let cg = 0; cg < rows.length; cg++) {
+      const cr = rows[cg];
+      if (combinedByPitcher[cr.pitcher] && !Aggregator._isCombinedTeam(cr.team)) {
+        cumTeamGames[cr.pitcher] = (cumTeamGames[cr.pitcher] || 0) + (teamGames[cr.team] || 0);
+      }
+    }
+
     // Mark each row as qualified or not
     for (let qi = 0; qi < rows.length; qi++) {
       const r = rows[qi];
-      const tg = teamGames[r.team] || 0;
-      const ipFloat = Utils.parseIP(r.ip);
-      const isStarter = Utils.isStarter(r.g, r.gs);
+      const mtRow = combinedByPitcher[r.pitcher];
+      const tg = mtRow ? (cumTeamGames[r.pitcher] || 0) : (teamGames[r.team] || 0);
+      const ipFloat = Utils.parseIP(mtRow ? mtRow.ip : r.ip);
+      const isStarter = Utils.isStarter(mtRow ? mtRow.g : r.g, mtRow ? mtRow.gs : r.gs);
       r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
+      // Per-team row of a multi-team player: interpolate against the combined-row pool
+      r._inPool = mtRow && r !== mtRow ? false : true;
     }
     // Set bipQual flag BEFORE percentiles so BIP stats can use it
     const BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
@@ -704,13 +734,18 @@ const Aggregator = {
       }
     }
 
-    // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
-    // Always exclude ROC from "All Teams" view
+    // Apply view-narrowing filters AFTER percentiles (don't change comparison group).
+    // "All Teams": hide ROC; hide per-team rows of multi-team players (their 2TM row stands in).
+    // Specific team: hide the combined 2TM/3TM rows and show only the matching per-team row.
     const self = this;
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
     } else {
-      rows = rows.filter(function (r) { return !self._isROCTeam(r.team); });
+      rows = rows.filter(function (r) {
+        if (self._isROCTeam(r.team)) return false;
+        if (combinedByPitcher[r.pitcher] && !self._isCombinedTeam(r.team)) return false;
+        return true;
+      });
     }
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -1002,6 +1037,19 @@ const Aggregator = {
       }
     }
 
+    // Multi-team _inPool: per-team rows of players with a 2TM/3TM row interpolate
+    // against the combined-row pool rather than participating as pool members.
+    const combinedByPitchRowEarly = {};
+    for (let cpi = 0; cpi < rows.length; cpi++) {
+      if (Aggregator._isCombinedTeam(rows[cpi].team)) {
+        combinedByPitchRowEarly[rows[cpi].pitcher] = true;
+      }
+    }
+    for (let pi2 = 0; pi2 < rows.length; pi2++) {
+      const rp = rows[pi2];
+      rp._inPool = !(combinedByPitchRowEarly[rp.pitcher] && !Aggregator._isCombinedTeam(rp.team));
+    }
+
     // Percentiles per pitch type
     const ptGroups = {};
     rows.forEach(function (r) {
@@ -1101,7 +1149,17 @@ const Aggregator = {
       });
     }
 
-    // Apply IP-based qualification filter for pitch-type data (Qualified mode)
+    // Multi-team lookups (any row with team like "2TM"/"3TM" stands in for its player)
+    const combinedByPitchRow = {};
+    for (let cti = 0; cti < rows.length; cti++) {
+      if (Aggregator._isCombinedTeam(rows[cti].team)) {
+        combinedByPitchRow[rows[cti].pitcher] = true;
+      }
+    }
+
+    // Apply IP-based qualification filter for pitch-type data (Qualified mode).
+    // For multi-team players, qualification uses the combined 2TM/3TM row's IP and
+    // the sum of team games across their MLB teams (cumulative per-player view).
     if (filters.minIp === 'Q') {
       const teamGames = this.getTeamGamesPlayed();
       const ipLookup = {};
@@ -1109,7 +1167,28 @@ const Aggregator = {
       for (var ipi = 0; ipi < preAggIP.length; ipi++) {
         ipLookup[preAggIP[ipi].pitcher + '|' + preAggIP[ipi].team] = preAggIP[ipi];
       }
+      // Precompute cumulative team games per multi-team pitcher
+      const cumTeamGamesPitch = {};
+      for (var ckey in ipLookup) {
+        const ent = ipLookup[ckey];
+        if (combinedByPitchRow[ent.pitcher] && !Aggregator._isCombinedTeam(ent.team)) {
+          cumTeamGamesPitch[ent.pitcher] = (cumTeamGamesPitch[ent.pitcher] || 0) + (teamGames[ent.team] || 0);
+        }
+      }
       rows = rows.filter(function (r) {
+        // For multi-team players use their combined row's IP + cumulative team games
+        if (combinedByPitchRow[r.pitcher]) {
+          const numTeams = Object.keys(ipLookup).filter(function (k) {
+            return ipLookup[k].pitcher === r.pitcher && Aggregator._isCombinedTeam(ipLookup[k].team);
+          });
+          const combinedKey = numTeams[0];
+          const cp = combinedKey ? ipLookup[combinedKey] : null;
+          if (!cp) return false;
+          const tg = cumTeamGamesPitch[r.pitcher] || 0;
+          const ipFloat = Utils.parseIP(cp.ip);
+          const isStarter = Utils.isStarter(cp.g, cp.gs);
+          return ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
+        }
         var p = ipLookup[r.pitcher + '|' + r.team];
         if (!p) return false;
         var tg = teamGames[r.team] || 0;
@@ -1120,10 +1199,16 @@ const Aggregator = {
     }
 
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    // "All Teams": hide ROC; hide per-team rows of multi-team players (2TM/3TM row stands in).
+    // Specific team: hide combined rows; show only per-team rows for that team.
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
     } else {
-      rows = rows.filter(function (r) { return !self._isROCTeam(r.team); });
+      rows = rows.filter(function (r) {
+        if (self._isROCTeam(r.team)) return false;
+        if (combinedByPitchRow[r.pitcher] && !Aggregator._isCombinedTeam(r.team)) return false;
+        return true;
+      });
     }
     if (filters.search) {
       const searchLower2 = filters.search.toLowerCase();
@@ -1418,6 +1503,19 @@ const Aggregator = {
       }
     }
 
+    // Multi-team handling: mark per-team rows of hitters who have a 2TM row
+    // as non-pool, so percentile pool uses the combined row as the representative.
+    const combinedByHitter = {};
+    for (let hci = 0; hci < rows.length; hci++) {
+      if (Aggregator._isCombinedTeam(rows[hci].team)) {
+        combinedByHitter[rows[hci].hitter] = rows[hci];
+      }
+    }
+    for (let hpi = 0; hpi < rows.length; hpi++) {
+      const hr = rows[hpi];
+      hr._inPool = !(combinedByHitter[hr.hitter] && !Aggregator._isCombinedTeam(hr.team));
+    }
+
     // Compute percentiles — all players in pool, qualification handled by frontend
     const self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
@@ -1439,10 +1537,23 @@ const Aggregator = {
       }
     }
 
-    // Apply min PA qualified filter AFTER percentiles
+    // Apply min PA qualified filter AFTER percentiles.
+    // Multi-team hitters qualify on cumulative PA against the sum of team games.
     if (filters.minCount === 'Q') {
       const tgHitter = this.getTeamGamesPlayed();
+      const cumTgH = {};
+      for (let ht = 0; ht < rows.length; ht++) {
+        const hrr = rows[ht];
+        if (combinedByHitter[hrr.hitter] && !Aggregator._isCombinedTeam(hrr.team)) {
+          cumTgH[hrr.hitter] = (cumTgH[hrr.hitter] || 0) + (tgHitter[hrr.team] || 0);
+        }
+      }
       rows = rows.filter(function (r) {
+        const mt = combinedByHitter[r.hitter];
+        if (mt) {
+          const tg = cumTgH[r.hitter] || 0;
+          return (mt.pa || 0) >= tg * QUAL.PA_PER_GAME;
+        }
         var tg = tgHitter[r.team] || 0;
         return (r.pa || 0) >= tg * QUAL.PA_PER_GAME;
       });
@@ -1453,7 +1564,11 @@ const Aggregator = {
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
     } else {
-      rows = rows.filter(function (r) { return !self3._isROCTeam(r.team); });
+      rows = rows.filter(function (r) {
+        if (self3._isROCTeam(r.team)) return false;
+        if (combinedByHitter[r.hitter] && !Aggregator._isCombinedTeam(r.team)) return false;
+        return true;
+      });
     }
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -1800,6 +1915,19 @@ const Aggregator = {
       }
     }
 
+    // Multi-team pool handling: per-team rows of hitters with a 2TM row are
+    // marked non-pool so the combined row is the pool representative.
+    const combinedByHitterPT = {};
+    for (let hci = 0; hci < rows.length; hci++) {
+      if (Aggregator._isCombinedTeam(rows[hci].team)) {
+        combinedByHitterPT[rows[hci].hitter] = true;
+      }
+    }
+    for (let hpi2 = 0; hpi2 < rows.length; hpi2++) {
+      const rp = rows[hpi2];
+      rp._inPool = !(combinedByHitterPT[rp.hitter] && !Aggregator._isCombinedTeam(rp.team));
+    }
+
     // Compute percentiles per pitch type (output group name)
     const ptGroups = {};
     for (let ri = 0; ri < rows.length; ri++) {
@@ -1826,12 +1954,18 @@ const Aggregator = {
       }
     }
 
-    // Apply view-narrowing filters AFTER percentiles (don't change comparison group)
+    // Apply view-narrowing filters AFTER percentiles (don't change comparison group).
+    // All Teams: drop ROC + per-team rows of multi-team hitters. Specific team:
+    // drop combined rows and keep only the selected team's per-team rows.
     const self4 = this;
     if (filters.team !== 'all') {
       rows = rows.filter(function (r) { return r.team === filters.team; });
     } else {
-      rows = rows.filter(function (r) { return !self4._isROCTeam(r.team); });
+      rows = rows.filter(function (r) {
+        if (self4._isROCTeam(r.team)) return false;
+        if (combinedByHitterPT[r.hitter] && !Aggregator._isCombinedTeam(r.team)) return false;
+        return true;
+      });
     }
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
