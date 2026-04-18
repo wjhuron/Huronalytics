@@ -101,13 +101,17 @@ const DataStore = {
         if (pname) combinedByPlayer[pname] = drow;
       }
     }
+    // For multi-team players, the qualifier denominator is max(team games) across
+    // their MLB teams — approximates tenure span. Summing would double-count and
+    // inflate the threshold past what any traded player could realistically meet.
     var cumTeamGames = {};
     if (filters.minIp === 'Q' || filters.minCount === 'Q') {
       for (var di3 = 0; di3 < source.length; di3++) {
         var drow2 = source[di3];
         var pn = drow2.pitcher || drow2.hitter;
         if (pn && combinedByPlayer[pn] && !isCombinedRe.test(drow2.team)) {
-          cumTeamGames[pn] = (cumTeamGames[pn] || 0) + (_teamGames[drow2.team] || 0);
+          var tgv = _teamGames[drow2.team] || 0;
+          if (tgv > (cumTeamGames[pn] || 0)) cumTeamGames[pn] = tgv;
         }
       }
     }

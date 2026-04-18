@@ -658,11 +658,14 @@ const Aggregator = {
         combinedByPitcher[rows[ci2].pitcher] = rows[ci2];
       }
     }
+    // Multi-team qualifier denominator: max(team games) across the player's MLB
+    // teams — approximates tenure span. Summing over-inflates the threshold.
     const cumTeamGames = {};
     for (let cg = 0; cg < rows.length; cg++) {
       const cr = rows[cg];
       if (combinedByPitcher[cr.pitcher] && !Aggregator._isCombinedTeam(cr.team)) {
-        cumTeamGames[cr.pitcher] = (cumTeamGames[cr.pitcher] || 0) + (teamGames[cr.team] || 0);
+        const tgv = teamGames[cr.team] || 0;
+        if (tgv > (cumTeamGames[cr.pitcher] || 0)) cumTeamGames[cr.pitcher] = tgv;
       }
     }
 
@@ -1172,7 +1175,8 @@ const Aggregator = {
       for (var ckey in ipLookup) {
         const ent = ipLookup[ckey];
         if (combinedByPitchRow[ent.pitcher] && !Aggregator._isCombinedTeam(ent.team)) {
-          cumTeamGamesPitch[ent.pitcher] = (cumTeamGamesPitch[ent.pitcher] || 0) + (teamGames[ent.team] || 0);
+          const tgv = teamGames[ent.team] || 0;
+          if (tgv > (cumTeamGamesPitch[ent.pitcher] || 0)) cumTeamGamesPitch[ent.pitcher] = tgv;
         }
       }
       rows = rows.filter(function (r) {
@@ -1545,7 +1549,8 @@ const Aggregator = {
       for (let ht = 0; ht < rows.length; ht++) {
         const hrr = rows[ht];
         if (combinedByHitter[hrr.hitter] && !Aggregator._isCombinedTeam(hrr.team)) {
-          cumTgH[hrr.hitter] = (cumTgH[hrr.hitter] || 0) + (tgHitter[hrr.team] || 0);
+          const tgv = tgHitter[hrr.team] || 0;
+          if (tgv > (cumTgH[hrr.hitter] || 0)) cumTgH[hrr.hitter] = tgv;
         }
       }
       rows = rows.filter(function (r) {
