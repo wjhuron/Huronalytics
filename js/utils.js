@@ -104,11 +104,11 @@ const Utils = {
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   },
 
-  formatPct: function (value, sign) {
+  formatPct: function (value, _sign) {
+    // Convention: bare positives, "-" for negatives only. The sign argument is
+    // accepted for back-compat but ignored — negatives include "-" naturally.
     if (value === null || value === undefined) return '--';
-    var str = (value * 100).toFixed(1) + '%';
-    if (sign && value > 0) str = '+' + str;
-    return str;
+    return (value * 100).toFixed(1) + '%';
   },
 
   formatDecimal: function (places) {
