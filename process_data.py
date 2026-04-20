@@ -2334,6 +2334,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['bbPlus'] = None
     hitter_league_avgs['bbPlus'] = 100.0
 
+    # PD+ — composite plate-discipline index (50% Disc+ via IZSw-Ch%, 50% Exec+ via Contact%), 100 = league avg
+    PD_PLUS_W_DISC = 0.50
+    PD_PLUS_W_EXEC = 0.50
+    lg_izswchase_pd = hitter_league_avgs.get('izSwChase')
+    lg_contact_pd = hitter_league_avgs.get('contactPct')
+    for row in hitter_leaderboard:
+        disc = row.get('izSwChase')
+        exec_ = row.get('contactPct')
+        if disc is not None and exec_ is not None and lg_izswchase_pd and lg_contact_pd:
+            disc_plus = 100.0 * disc / lg_izswchase_pd
+            exec_plus = 100.0 * exec_ / lg_contact_pd
+            row['pdPlus'] = round(PD_PLUS_W_DISC * disc_plus + PD_PLUS_W_EXEC * exec_plus, 1)
+        else:
+            row['pdPlus'] = None
+    hitter_league_avgs['pdPlus'] = 100.0
+
     # --- Metadata ---
     metadata = {
         'teams': all_teams,

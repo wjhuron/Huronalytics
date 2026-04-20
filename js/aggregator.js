@@ -1284,7 +1284,7 @@ const Aggregator = {
       'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
-      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
+      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'pdPlus',
       'batSpeed', 'swingLength', 'blastPct', 'idealAAPct',
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
@@ -1458,6 +1458,17 @@ const Aggregator = {
         obj.bbPlus = Math.round((0.6 * conPlus + 0.4 * spPlus) * 10) / 10;
       } else {
         obj.bbPlus = null;
+      }
+
+      // PD+ composite: 50% Disc+ (IZSw-Ch%) + 50% Exec+ (Contact%), indexed so 100 = league avg
+      const lgDisc = hLgAvgs.izSwChase;
+      const lgExec = hLgAvgs.contactPct;
+      if (obj.izSwChase != null && obj.contactPct != null && lgDisc && lgExec) {
+        const discPlus = 100 * obj.izSwChase / lgDisc;
+        const execPlus = 100 * obj.contactPct / lgExec;
+        obj.pdPlus = Math.round((0.5 * discPlus + 0.5 * execPlus) * 10) / 10;
+      } else {
+        obj.pdPlus = null;
       }
 
       // Compute avgFbDist and avgHrDist from BIP records

@@ -41,7 +41,7 @@ HITTER_STAT_KEYS = [
     'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
-    'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct',
+    'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'pdPlus',
     'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
     'blastPct', 'idealAAPct',
     'twoStrikeWhiffPct', 'firstPitchSwingPct',
