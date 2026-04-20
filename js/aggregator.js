@@ -1289,7 +1289,7 @@ const Aggregator = {
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
       'sprintSpeed', 'runValue',
-      'wRCplus', 'xWRCplus',
+      'wRCplus', 'xWRCplus', 'hitterPlus',
       'hr', 'sb',
     ];
     const HITTER_INVERT = {
@@ -1469,6 +1469,13 @@ const Aggregator = {
         obj.pdPlus = Math.round((0.5 * discPlus + 0.5 * execPlus) * 10) / 10;
       } else {
         obj.pdPlus = null;
+      }
+
+      // Hitter+: BB+ × PD+ / 100 (multiplicative composite)
+      if (obj.bbPlus != null && obj.pdPlus != null) {
+        obj.hitterPlus = Math.round((obj.bbPlus * obj.pdPlus / 100) * 10) / 10;
+      } else {
+        obj.hitterPlus = null;
       }
 
       // Compute avgFbDist and avgHrDist from BIP records

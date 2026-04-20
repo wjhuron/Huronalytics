@@ -47,7 +47,7 @@ HITTER_STAT_KEYS = [
     'twoStrikeWhiffPct', 'firstPitchSwingPct',
     'avgFbDist', 'avgHrDist',
     'sprintSpeed',
-    'wRCplus', 'xWRCplus',
+    'wRCplus', 'xWRCplus', 'hitterPlus',
     'runValue', 'xRunValue',
     'hr', 'sb',
 ]

@@ -2350,6 +2350,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['pdPlus'] = None
     hitter_league_avgs['pdPlus'] = 100.0
 
+    # Hitter+ — multiplicative composite (BB+ × PD+ / 100), 100 = league avg.
+    # Form chosen because BB+ and PD+ are near-orthogonal (r ~ -0.1), so the
+    # product captures "quality of contact × frequency of productive PAs"
+    # without overstating extremes.
+    for row in hitter_leaderboard:
+        bbp = row.get('bbPlus')
+        pdp = row.get('pdPlus')
+        if bbp is not None and pdp is not None:
+            row['hitterPlus'] = round(bbp * pdp / 100.0, 1)
+        else:
+            row['hitterPlus'] = None
+    hitter_league_avgs['hitterPlus'] = 100.0
+
     # --- Metadata ---
     metadata = {
         'teams': all_teams,
