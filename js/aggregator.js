@@ -1280,7 +1280,7 @@ const Aggregator = {
 
     const HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
-      'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
+      'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'bbPlus',
       'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
@@ -1447,6 +1447,18 @@ const Aggregator = {
         xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
         xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
       };
+
+      // BB+ composite: 60% xwOBAcon+ + 40% xwOBAsp+, indexed so 100 = league avg
+      const hLgAvgs = (DataStore && DataStore.metadata && DataStore.metadata.hitterLeagueAverages) || {};
+      const lgXC = hLgAvgs.xwOBAcon;
+      const lgXS = hLgAvgs.xwOBAsp;
+      if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS) {
+        const conPlus = 100 * obj.xwOBAcon / lgXC;
+        const spPlus = 100 * obj.xwOBAsp / lgXS;
+        obj.bbPlus = Math.round((0.6 * conPlus + 0.4 * spPlus) * 10) / 10;
+      } else {
+        obj.bbPlus = null;
+      }
 
       // Compute avgFbDist and avgHrDist from BIP records
       if (bipRecords.length > 0 && bci.distance !== undefined) {

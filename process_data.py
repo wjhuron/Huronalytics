@@ -2318,6 +2318,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             hitter_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
+    # BB+ — composite batted-ball index (60% xwOBAcon, 40% xwOBAsp), indexed to 100 = league avg
+    BB_PLUS_W_CON = 0.60
+    BB_PLUS_W_SP = 0.40
+    lg_xwobacon_bb = hitter_league_avgs.get('xwOBAcon')
+    lg_xwobasp_bb = hitter_league_avgs.get('xwOBAsp')
+    for row in hitter_leaderboard:
+        xc = row.get('xwOBAcon')
+        xs = row.get('xwOBAsp')
+        if xc is not None and xs is not None and lg_xwobacon_bb and lg_xwobasp_bb:
+            con_plus = 100.0 * xc / lg_xwobacon_bb
+            sp_plus = 100.0 * xs / lg_xwobasp_bb
+            row['bbPlus'] = round(BB_PLUS_W_CON * con_plus + BB_PLUS_W_SP * sp_plus, 1)
+        else:
+            row['bbPlus'] = None
+    hitter_league_avgs['bbPlus'] = 100.0
+
     # --- Metadata ---
     metadata = {
         'teams': all_teams,

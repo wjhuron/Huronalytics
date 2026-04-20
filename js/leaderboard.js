@@ -163,6 +163,7 @@ const COLUMNS = {
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast, EV + LA)', group: 'expected' },
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
     { key: 'xwOBAsp',    label: 'xwOBAsp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted — avg zone wOBA by LA × spray direction', group: 'expected' },
+    { key: 'bbPlus',     label: 'BB+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Batted-ball composite: 60% xwOBAcon+ + 40% xwOBAsp+, indexed so 100 = league avg', group: 'expected' },
     // Composition
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'composition' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Line drive rate', group: 'composition' },
@@ -366,7 +367,7 @@ const Leaderboard = {
 
     // Stats that should recalculate when contextual filters are active.
     // Everything else (pitch metrics, plate discipline) keeps precomputed values.
-    var DYNAMIC_STATS = { runValue:1, rv100:1, xRunValue:1, xRv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1,
+    var DYNAMIC_STATS = { runValue:1, rv100:1, xRunValue:1, xRv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1, bbPlus:1,
                           era:1, fip:1, xFIP:1, siera:1,
                           avg:1, obp:1, slg:1, ops:1, iso:1 };
 
@@ -385,7 +386,7 @@ const Leaderboard = {
     // Weight mapping — matches process_data.py precomputed average methodology
     var IP_WEIGHTED = { era:1, fip:1, xFIP:1, siera:1 };
     var BIP_WEIGHTED = { avgEVAgainst:1, maxEVAgainst:1, hardHitPct:1, barrelPctAgainst:1,
-                          gbPct:1, ldPct:1, fbPct:1, hrFbPct:1, xwOBAsp:1,
+                          gbPct:1, ldPct:1, fbPct:1, hrFbPct:1, xwOBAsp:1, bbPlus:1,
                           avgEV:1, avgEVAll:1, ev50:1, maxEV:1, barrelPct:1, pullPct:1, airPullPct:1 };
     var PA_WEIGHTED = { wOBA:1, xBA:1, xSLG:1, xwOBA:1, xwOBAcon:1,
                          kPct:1, bbPct:1, kbbPct:1, babip:1,
@@ -776,7 +777,7 @@ const Leaderboard = {
           const HITTER_BIP_STATS = {
             avgEVAll: true, ev50: true, maxEV: true, medLA: true,
             hardHitPct: true, barrelPct: true,
-            xwOBAsp: true, airPullPct: true,
+            xwOBAsp: true, airPullPct: true, bbPlus: true,
             gbPct: true, ldPct: true, fbPct: true,
             pullPct: true, oppoPct: true
           };

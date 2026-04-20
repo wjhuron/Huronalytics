@@ -32,6 +32,7 @@ var PlayerPage = {
     { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBAcon',        label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBAsp',         label: 'xwOBAsp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'bbPlus',          label: 'BB+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'ev50',            label: 'EV50',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },

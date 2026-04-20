@@ -37,7 +37,7 @@ PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 
 HITTER_STAT_KEYS = [
     'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
-    'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp',
+    'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'bbPlus',
     'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
