@@ -811,6 +811,9 @@ var PlayerPage = {
     for (var i = 0; i < effectiveStats.length; i++) {
       var stat = effectiveStats[i];
       var val = stat._val !== undefined ? stat._val : data[stat.key];
+      if (stat.key === 'hitterPlus' && val == null && data.bbPlus != null && data.pdPlus != null) {
+        val = Math.round((data.bbPlus * data.pdPlus / 100) * 10) / 10;
+      }
       var pctl = stat._pctl !== undefined ? stat._pctl : data[stat.key + '_pctl'];
       // BIP qualification: <20 BIP → show gray outline
       var bipStats = isPitcher ? PITCHER_BIP_STATS : HITTER_BIP_STATS;
