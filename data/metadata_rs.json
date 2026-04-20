@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-20 21:40",
+  "generatedAt": "2026-04-20 22:44",
   "totalPitches": 98223,
   "totalPitchers": 490,
   "totalHitters": 440,
@@ -423,7 +423,8 @@
     "hr": 2.0595,
     "count": 440,
     "bbPlus": 100.0,
-    "pdPlus": 100.0
+    "pdPlus": 100.0,
+    "hitterPlus": 100.0
   },
   "vaaRegressions": {
     "CH": {
