@@ -775,18 +775,19 @@ const Leaderboard = {
             extension: true, effectiveVelo: true,
             vaa: true, haa: true, nVAA: true
           };
-          // Hitter stats that require ≥20 BIP
-          const HITTER_BIP_STATS = {
-            avgEVAll: true, ev50: true, maxEV: true, medLA: true,
+          // Hitter BIP-gated stats: none by design.
+          // Batted-ball tab stats all use PA qualification (3.1 PA/team game);
+          // Max Exit Velo (maxEV) bypasses qualification via the always-color override below.
+          const HITTER_BIP_STATS = {};
+          // Hitter stats that use PA qualifier (3.1 PA/team game)
+          const HITTER_PA_STATS = {
+            babip: true, hrFbPct: true,
+            xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true,
+            avgEVAll: true, ev50: true, medLA: true,
             hardHitPct: true, barrelPct: true,
             xwOBAsp: true, airPullPct: true, bbPlus: true, hitterPlus: true,
             gbPct: true, ldPct: true, fbPct: true,
             pullPct: true, oppoPct: true
-          };
-          // Hitter stats that use PA qualifier (3.1 PA/team game) — NOT BIP
-          const HITTER_PA_STATS = {
-            babip: true, hrFbPct: true,
-            xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true
           };
           // Hitter stats that require ≥10 competitive swings
           const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, blastPct: true, idealAAPct: true };
