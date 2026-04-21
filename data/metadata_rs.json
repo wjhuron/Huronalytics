@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-21 14:51",
+  "generatedAt": "2026-04-21 18:14",
   "totalPitches": 100966,
   "totalPitchers": 493,
   "totalHitters": 440,
@@ -420,11 +420,19 @@
     "sprintSpeed": 26.9804,
     "runValue": 0.294,
     "xRunValue": 0.2697,
-    "hr": 2.1287,
     "count": 440,
     "bbPlus": 100.0,
     "pdPlus": 100.0,
-    "hitterPlus": 100.0
+    "hitterPlus": 100.0,
+    "avg": 0.2385,
+    "obp": 0.3207,
+    "slg": 0.3844,
+    "ops": 0.7051,
+    "iso": 0.146,
+    "kPct": 0.2244,
+    "bbPct": 0.0946,
+    "wRCplus": 99.7046,
+    "xWRCplus": 102.7674
   },
   "vaaRegressions": {
     "CH": {
