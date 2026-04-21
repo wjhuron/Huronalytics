@@ -807,8 +807,11 @@ const Leaderboard = {
             // Hitter pitch-type: minimum pitches of that type seen
             showColor = (row.count || 0) >= QUAL.MIN_HITTER_PT;
           } else {
-            // Hitter overall: per-stat qualification gates
-            const paQual = (row.pa || 0) >= tg * QUAL.PA_PER_GAME;
+            // Hitter overall: per-stat qualification gates.
+            // Always use overall-season PA (paAll) so platoon/date splits honour
+            // overall qualification rather than requiring a split-specific minimum.
+            const overallPa = (row.paAll != null ? row.paAll : row.pa) || 0;
+            const paQual = overallPa >= tg * QUAL.PA_PER_GAME;
             if (HITTER_BIP_STATS[col.key]) {
               showColor = (row.nBip || 0) >= QUAL.MIN_BIP_PCTL;
             } else if (HITTER_PA_STATS[col.key]) {

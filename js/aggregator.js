@@ -1529,6 +1529,10 @@ const Aggregator = {
           const hbf = hBoxFields[hfi];
           if (hPre[hbf] !== undefined) rows[hmi][hbf] = hPre[hbf];
         }
+        // Always attach overall-season PA for qualification gates (platoon-split safe).
+        // row.pa stays as the filtered value used for display/computation; row.paAll
+        // is what qualification logic (Q-filter, percentile coloring) reads.
+        if (hPre.pa !== undefined) rows[hmi].paAll = hPre.pa;
         // Override PA/AB with boxscore values only when unfiltered
         if (!hasHitterContextFilter) {
           if (hPre.pa !== undefined) rows[hmi].pa = hPre.pa;
@@ -1572,6 +1576,8 @@ const Aggregator = {
     }
 
     // Apply min PA qualified filter AFTER percentiles.
+    // Qualification always uses overall-season PA (paAll), not the filtered row.pa,
+    // so that platoon/date filters don't drop overall-qualified hitters from the board.
     // Multi-team hitters qualify on cumulative PA against the sum of team games.
     if (filters.minCount === 'Q') {
       const tgHitter = this.getTeamGamesPlayed();
@@ -1587,10 +1593,12 @@ const Aggregator = {
         const mt = combinedByHitter[r.hitter];
         if (mt) {
           const tg = cumTgH[r.hitter] || 0;
-          return (mt.pa || 0) >= tg * QUAL.PA_PER_GAME;
+          const pa = (mt.paAll != null ? mt.paAll : mt.pa) || 0;
+          return pa >= tg * QUAL.PA_PER_GAME;
         }
         var tg = tgHitter[r.team] || 0;
-        return (r.pa || 0) >= tg * QUAL.PA_PER_GAME;
+        var pa = (r.paAll != null ? r.paAll : r.pa) || 0;
+        return pa >= tg * QUAL.PA_PER_GAME;
       });
     }
 
