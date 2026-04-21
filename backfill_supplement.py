@@ -49,14 +49,55 @@ SUPPLEMENT_MAP = {
     'wOBAval': 'woba_value',
     'wOBAdom': 'woba_denom',
     'Barrel': 'launch_speed_angle',
+    'Event': 'events',
 }
 
 # Columns that store raw integer values from Statcast (no rounding needed)
 INT_COLS = {'Barrel'}  # Raw launch_speed_angle value (1-6 scale)
 
+# Columns that store free-form strings (no numeric coercion, custom translator).
+STRING_COLS = {'Event'}
+
 # Columns where official Statcast data should always overwrite estimates
 # (even if the cell already has a value from the initial download)
 ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel'}
+
+# Columns that only ever OVERWRITE existing values; they are never used to
+# fill a blank cell. Intended for scoring-change corrections (e.g., official
+# scorer flips a play from hit to error), where the initial download already
+# populated the cell via the MLB Stats API feed.
+OVERWRITE_ONLY_COLS = {'Event'}
+
+# Statcast `events` code -> MLB Stats API event string (the format Wally's
+# sheet already stores, produced by Pitcher2026.py via play.result.event).
+# Only scoring-change-relevant codes are mapped. Statcast's generic
+# `field_out` is intentionally OMITTED: MLB Stats API keeps Groundout /
+# Flyout / Lineout / Pop Out as distinct events, and we have no way to
+# disambiguate from Statcast alone. A missing mapping means "skip; do not
+# overwrite the existing sheet value."
+STATCAST_TO_MLB_EVENT = {
+    'single': 'Single',
+    'double': 'Double',
+    'triple': 'Triple',
+    'home_run': 'Home Run',
+    'strikeout': 'Strikeout',
+    'strikeout_double_play': 'Strikeout Double Play',
+    'walk': 'Walk',
+    'intent_walk': 'Intent Walk',
+    'hit_by_pitch': 'Hit By Pitch',
+    'sac_fly': 'Sac Fly',
+    'sac_fly_double_play': 'Sac Fly Double Play',
+    'sac_bunt': 'Sac Bunt',
+    'sac_bunt_double_play': 'Sac Bunt Double Play',
+    'catcher_interf': 'Catcher Interference',
+    'field_error': 'Field Error',
+    'fielders_choice': 'Fielders Choice',
+    'fielders_choice_out': 'Fielders Choice Out',
+    'grounded_into_double_play': 'Grounded Into DP',
+    'double_play': 'Double Play',
+    'triple_play': 'Triple Play',
+    'force_out': 'Forceout',
+}
 
 # Per-column rounding (default is 1 decimal for anything not listed)
 ROUND_DECIMALS = {
@@ -162,6 +203,18 @@ def download_statcast(team_tab, date_min, date_max, session):
                 if csv_col in df.columns:
                     val = row[csv_col]
                     if pd.notna(val):
+                        # String columns (Event): translate Statcast code to
+                        # MLB Stats API format. Unmapped codes (including the
+                        # generic `field_out`) are skipped so downstream
+                        # overwrite leaves the existing sheet value alone.
+                        if sheet_col in STRING_COLS:
+                            if sheet_col == 'Event':
+                                mapped = STATCAST_TO_MLB_EVENT.get(str(val).strip())
+                                if mapped:
+                                    data[sheet_col] = mapped
+                            else:
+                                data[sheet_col] = str(val)
+                            continue
                         # Integer columns: store raw value (e.g., Barrel 1-6 scale)
                         if sheet_col in INT_COLS:
                             data[sheet_col] = str(int(float(val)))
@@ -303,15 +356,20 @@ def main():
                         continue
 
                 # Check which supplement columns need updating:
-                # - Empty columns always need filling
+                # - Empty columns need filling (but NOT for OVERWRITE_ONLY_COLS)
                 # - ALWAYS_OVERWRITE_COLS need updating even if they have a value
                 #   (the existing value may be an estimate that official data should replace)
+                # - OVERWRITE_ONLY_COLS update existing values only (for scoring
+                #   corrections like hit↔error); never used to fill a blank cell.
                 cols_to_update = []
                 for sheet_col, c_idx in supp_col_idx.items():
                     val = row[c_idx] if c_idx < len(row) else ''
-                    if val == '' or val is None:
+                    is_empty = (val == '' or val is None)
+                    if is_empty and sheet_col in OVERWRITE_ONLY_COLS:
+                        continue
+                    if is_empty:
                         cols_to_update.append(sheet_col)
-                    elif sheet_col in ALWAYS_OVERWRITE_COLS:
+                    elif sheet_col in ALWAYS_OVERWRITE_COLS or sheet_col in OVERWRITE_ONLY_COLS:
                         cols_to_update.append(sheet_col)
 
                 if cols_to_update:
@@ -371,7 +429,8 @@ def main():
                         val = statcast_row[sheet_col]
                         # Don't write empty values for overwrite cols —
                         # that would erase data when official data isn't ready yet
-                        if not val and sheet_col in ALWAYS_OVERWRITE_COLS:
+                        if not val and (sheet_col in ALWAYS_OVERWRITE_COLS
+                                        or sheet_col in OVERWRITE_ONLY_COLS):
                             continue
                         cell = gspread.Cell(
                             row=r_idx,
