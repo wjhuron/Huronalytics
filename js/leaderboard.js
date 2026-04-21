@@ -19,7 +19,7 @@ const COLUMNS = {
     { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Vertical release point (feet)', group: 'metrics' },
     { key: 'relPosX',     label: 'RelX',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Horizontal release point (feet, pitcher POV)', group: 'metrics' },
     { key: 'extension',   label: 'Ext',      format: Utils.formatFeetInches, sortType: 'numeric', desc: 'Extension toward home plate at release (feet)', group: 'metrics' },
-    { key: 'armAngle',    label: 'Arm Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Arm angle at release (degrees)', group: 'metrics' },
+    { key: 'armAngle',    label: 'Arm Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Arm angle at release (degrees)', group: 'metrics' },
     { key: 'nVAA',        label: 'nVAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized VAA — location-independent (VAA minus expected VAA at that plate height)', group: 'metrics' },
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
     { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Vertical approach angle at the plate (degrees)', group: 'metrics' },
@@ -122,7 +122,6 @@ const COLUMNS = {
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / PA)', group: 'stats' },
     // Supplemental
     { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average on balls in play', group: 'supplemental' },
-    { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', desc: 'Home runs per fly ball', group: 'supplemental' },
     // Expected Stats
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Expected BA (Statcast, EV + LA)', group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected SLG (Statcast, EV + LA)', group: 'expected' },
@@ -169,14 +168,16 @@ const COLUMNS = {
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'composition' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Line drive rate', group: 'composition' },
     { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Fly ball rate', group: 'composition' },
+    { key: 'puPct',       label: 'PU%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Popup rate (lower is better — popups almost always out)', group: 'composition' },
+    { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', desc: 'Home runs per fly ball', group: 'composition' },
     // Spray
     { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Pull rate (BIP to pull side)', group: 'spray' },
-    { key: 'middlePct',   label: 'Middle%',  format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Center rate (BIP up the middle)', group: 'spray' },
-    { key: 'oppoPct',     label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Oppo rate (BIP to opposite field)', group: 'spray' },
+    { key: 'middlePct',   label: 'Middle%',  format: Utils.formatPct, sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Center rate (BIP up the middle)', group: 'spray' },
+    { key: 'oppoPct',     label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Oppo rate (BIP to opposite field)', group: 'spray' },
     { key: 'airPullPct',  label: 'AirPull%', format: Utils.formatPct, sortType: 'numeric', desc: 'Air-pull rate — pulled (LD + FB + PU) / total air balls (LD + FB + PU)', group: 'spray' },
     // Distance
-    { key: 'avgFbDist',   label: 'Avg FB Dist', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, desc: 'Average fly ball distance (feet)', sectionStart: true, group: 'distance' },
-    { key: 'avgHrDist',   label: 'Avg HR Dist', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, desc: 'Average home run distance (feet)', group: 'distance' },
+    { key: 'avgFbDist',   label: 'Avg FB Dist', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Average fly ball distance (feet)', sectionStart: true, group: 'distance' },
+    { key: 'avgHrDist',   label: 'Avg HR Dist', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Average home run distance (feet)', group: 'distance' },
   ],
   hitterSwingDecisions: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -207,9 +208,9 @@ const COLUMNS = {
     // Bat Tracking
     { key: 'batSpeed',    label: 'Bat Speed', format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Avg bat speed on competitive swings (mph)', group: 'bat_tracking' },
     { key: 'swingLength', label: 'Swing Length', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Avg swing length — total bat-head distance from start to contact (feet)', group: 'bat_tracking' },
-    { key: 'attackAngle', label: 'Attack Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Avg attack angle — bat direction at contact (degrees, positive = upward)', group: 'bat_tracking' },
-    { key: 'attackDirection', label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Avg attack direction at contact (degrees, positive = pull side)', group: 'bat_tracking' },
-    { key: 'swingPathTilt', label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Avg swing path tilt — bat path angle over 40ms before contact (degrees)', group: 'bat_tracking' },
+    { key: 'attackAngle', label: 'Attack Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack angle — bat direction at contact (degrees, positive = upward)', group: 'bat_tracking' },
+    { key: 'attackDirection', label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack direction at contact (degrees, positive = pull side)', group: 'bat_tracking' },
+    { key: 'swingPathTilt', label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg swing path tilt — bat path angle over 40ms before contact (degrees)', group: 'bat_tracking' },
     { key: 'blastPct', label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — fast swing + squared up', group: 'bat_tracking' },
     { key: 'idealAAPct', label: 'IdealAtkAngle%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
   ],
@@ -267,7 +268,7 @@ const Leaderboard = {
     pitchMetrics:      ['maxVelo', 'relPosZ', 'relPosX'],
     pitcherStats:      ['w', 'l', 'sv', 'hld'],
     hitterStats:       ['ab', 'doubles', 'triples', 'cs', 'sbPct'],
-    hitterBattedBall:  ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist'],
+    hitterBattedBall:  ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct'],
     hitterPitch:       ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct']
   },
 
@@ -377,9 +378,14 @@ const Leaderboard = {
     const ABS_AVG_KEYS = { horzBrk: true, haa: true, relPosX: true };
     const numericKeys = [];
     for (let i = 0; i < columns.length; i++) {
-      if (columns[i].sortType === 'numeric' && !columns[i].noPercentile && columns[i].key !== '_rank') {
-        numericKeys.push(columns[i].key);
-      }
+      const col = columns[i];
+      if (col.sortType !== 'numeric' || col.key === '_rank') continue;
+      // Include columns that have a percentile OR columns explicitly flagged
+      // with showAvg: true (e.g., noPercentile columns like Arm Angle, Attack
+      // Angle/Dir, Path Tilt, spray %s, distance — we still want to display a
+      // league average row value for these).
+      if (col.noPercentile && !col.showAvg) continue;
+      numericKeys.push(col.key);
     }
 
     // IP parser for ERA/FIP-style stats (ip stored as string like "6.1")
@@ -789,8 +795,14 @@ const Leaderboard = {
             gbPct: true, ldPct: true, fbPct: true,
             pullPct: true, oppoPct: true
           };
-          // Hitter stats that require ≥10 competitive swings
-          const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true, blastPct: true, idealAAPct: true };
+          // Hitter stats that retain the ≥10 competitive swings gate (bat speed + swing length only).
+          // Blast% and IdealAtkAngle% now use PA qual like everything else.
+          const HITTER_BAT_TRACKING = { batSpeed: true, swingLength: true };
+          // Hitter stats that always color regardless of qualification.
+          // maxEV: single-BIP value, sample-size invariant.
+          // hr, sb: counting stats; sample-size moot.
+          // sprintSpeed: running skill; no PA threshold makes sense.
+          const HITTER_ALWAYS_COLOR = { maxEV: true, hr: true, sb: true, sprintSpeed: true };
 
           if (isPitcherPitchType) {
             // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
@@ -812,19 +824,17 @@ const Leaderboard = {
             // overall qualification rather than requiring a split-specific minimum.
             const overallPa = (row.paAll != null ? row.paAll : row.pa) || 0;
             const paQual = overallPa >= tg * QUAL.PA_PER_GAME;
-            if (HITTER_BIP_STATS[col.key]) {
+            if (HITTER_ALWAYS_COLOR[col.key]) {
+              showColor = true;
+            } else if (HITTER_BIP_STATS[col.key]) {
               showColor = (row.nBip || 0) >= QUAL.MIN_BIP_PCTL;
-            } else if (HITTER_PA_STATS[col.key]) {
-              showColor = paQual;
             } else if (HITTER_BAT_TRACKING[col.key]) {
               showColor = (row.nCompSwings || 0) >= QUAL.MIN_BAT_TRACKING;
-            } else if (col.key === 'sprintSpeed') {
-              showColor = (row.nCompRuns || 0) >= QUAL.MIN_SPRINT_RUNS;
+            } else if (HITTER_PA_STATS[col.key]) {
+              showColor = paQual;
             } else {
               showColor = paQual;
             }
-            // Hitter always-color: maxEV
-            if (!showColor && col.key === 'maxEV') showColor = true;
           }
 
           if (showColor) {

@@ -2304,7 +2304,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Bat tracking stats weighted by nCompSwings
     comp_swing_stats = {'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
                         'blastPct', 'idealAAPct'}
-    for stat in HITTER_STAT_KEYS:
+    # Counting stats that should NOT appear on the league-average row (meaningless
+    # weighted means of counting totals).
+    hitter_no_lg_avg = {'hr', 'sb'}
+
+    def _compute_hitter_lg_avg(stat):
+        if stat in hitter_no_lg_avg:
+            return
         if stat in pa_stats:
             weight_key = 'pa'
         elif stat in bip_stats:
@@ -2316,6 +2322,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         pairs = [(r[stat], r.get(weight_key, 0)) for r in hitter_lb_mlb if r.get(stat) is not None and r.get(weight_key, 0) > 0]
         if pairs:
             hitter_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
+
+    for stat in HITTER_STAT_KEYS:
+        _compute_hitter_lg_avg(stat)
     hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
     # BB+ — composite batted-ball index (60% xwOBAcon, 40% xwOBAsp), indexed to 100 = league avg
@@ -2618,6 +2627,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRC'] = None
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
+
+    # Pass 2: refresh hitter league averages for stats populated by the boxscore
+    # merge + wRC+ (kPct, bbPct, avg, obp, slg, ops, iso, wRCplus, xWRCplus). The
+    # first pass above runs before the boxscore merge, so these are None on every
+    # row at that point. Fill in anything still missing; leave the plus-metrics
+    # (bbPlus/pdPlus/hitterPlus = 100) and already-computed avgs alone.
+    for stat in HITTER_STAT_KEYS:
+        if hitter_league_avgs.get(stat) is not None:
+            continue
+        _compute_hitter_lg_avg(stat)
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)
