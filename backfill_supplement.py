@@ -20,8 +20,8 @@ import time
 
 # ── USER CONFIGURATION ──────────────────────────────────────────────────────
 # Set date range (inclusive). Leave both as None to backfill all dates.
-start_date = "2026-03-27"
-end_date   = "2026-04-05"
+start_date = None
+end_date   = None
 
 # Set specific teams, or None for all teams.  e.g. ["BOS", "NYY"]
 filter_teams = None
@@ -58,7 +58,7 @@ SUPPLEMENT_MAP = {
 }
 
 # Columns that store raw integer values from Statcast (no rounding needed)
-INT_COLS = {'Barrel', 'Distance'}
+INT_COLS = {'Barrel', 'Distance', 'LaunchAngle'}
 
 # Columns that store free-form strings (no numeric coercion, custom translator).
 STRING_COLS = {'Event', 'Description', 'BBType'}
@@ -160,7 +160,6 @@ ROUND_DECIMALS = {
     'wOBAval': 3,
     'wOBAdom': 3,
     'ExitVelo': 1,
-    'LaunchAngle': 1,
 }
 
 # Team abbreviation mapping: spreadsheet tab name -> Statcast Search abbreviation
