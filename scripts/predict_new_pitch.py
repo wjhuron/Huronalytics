@@ -42,7 +42,11 @@ DATA_DIR = ROOT / 'data'
 OUTPUT_DIR = Path.home() / 'Downloads'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-MIN_COUNT = 25
+MIN_COUNT = 25       # Conditioning / training / calibration threshold
+MIN_DISPLAY = 1      # Plot + arsenal table + skip-existing threshold. No real
+                     # floor — if the pitcher threw the pitch even once, it's
+                     # part of his arsenal and should display. The MVN math
+                     # still uses MIN_COUNT for shape reliability separately.
 TIER2_MIN_TRAIN = 30
 N_COMPS = 10
 
@@ -615,7 +619,7 @@ def print_report(target_key, arsenals, anchor, targets, results,
         if pt.startswith('_'):
             continue
         r = arsenal[pt]
-        if not isinstance(r, dict) or (r.get('count') or 0) < MIN_COUNT:
+        if not isinstance(r, dict) or (r.get('count') or 0) < MIN_DISPLAY:
             continue
         print(f"    {pt:3s}  {fmt_pitch(r)}")
 
@@ -749,7 +753,7 @@ def _plot_arsenal_panel(ax, target_arsenal, targets, results, panel_label):
     for pt, row in target_arsenal.items():
         if pt.startswith('_') or not isinstance(row, dict):
             continue
-        if (row.get('count') or 0) < MIN_COUNT:
+        if (row.get('count') or 0) < MIN_DISPLAY:
             continue
         ivb = row.get('indVertBrk')
         hb = row.get('horzBrk')
@@ -820,7 +824,7 @@ def plot_predictions(target_key, arsenal, targets, results, out_path,
     current_sorted = sorted(
         ((pt, r) for pt, r in arsenal.items()
          if not pt.startswith('_') and isinstance(r, dict)
-         and (r.get('count') or 0) >= MIN_COUNT),
+         and (r.get('count') or 0) >= MIN_DISPLAY),
         key=lambda kv: -(kv[1].get('count') or 0),
     )
     for pt, r in current_sorted:
@@ -994,6 +998,10 @@ def _draw_arsenal_table(ax, rows):
         ax.text(col_x[0], y, label, color=text_color, fontsize=10, fontweight='bold',
                 ha='center', va='center', transform=ax.transAxes,
                 bbox=dict(boxstyle='round,pad=0.35', fc=color, ec=color, lw=0))
+        # Italicize predicted-row values to visually distinguish them from
+        # the candidate's actual measured pitches in the same table.
+        is_predicted = (r['kind'] == 'predicted')
+        val_style = 'italic' if is_predicted else 'normal'
         for x, key in zip(col_x[1:], ['mph', 'ivb', 'hb']):
             val = r[key]
             if val is None:
@@ -1003,6 +1011,7 @@ def _draw_arsenal_table(ax, rows):
             else:
                 txt = f"{val:.1f}\""
             ax.text(x, y, txt, color=TEXT_COLOR, fontsize=10,
+                    fontstyle=val_style,
                     ha='center', va='center', transform=ax.transAxes)
 
 
@@ -1012,9 +1021,9 @@ def _draw_arsenal_table(ax, rows):
 
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    pitcher  = "Beeter, Clayton"   # Pitcher name, "Last, First" format
+    pitcher  = "Henry, Cole"   # Pitcher name, "Last, First" format
     team     = "WSH"                 # Team abbreviation
-    pitches  = []          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
+    pitches  = ["SI", "CH"]          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
 
     no_plot   = False                # True to skip plot generation
     plot_only = False                # True to write plot but skip printed text
@@ -1074,7 +1083,7 @@ def main():
         pt for pt, r in target_arsenal.items()
         if (not pt.startswith('_'))
         and isinstance(r, dict)
-        and (r.get('count') or 0) >= MIN_COUNT
+        and (r.get('count') or 0) >= MIN_DISPLAY
     ]
     other_existing_full = [pt for pt in existing if pt != anchor]
 
