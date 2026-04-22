@@ -20,8 +20,8 @@ import time
 
 # ── USER CONFIGURATION ──────────────────────────────────────────────────────
 # Set date range (inclusive). Leave both as None to backfill all dates.
-start_date = None
-end_date   = None
+start_date = "2026-03-27"
+end_date   = "2026-04-05"
 
 # Set specific teams, or None for all teams.  e.g. ["BOS", "NYY"]
 filter_teams = None
@@ -50,30 +50,22 @@ SUPPLEMENT_MAP = {
     'wOBAdom': 'woba_denom',
     'Barrel': 'launch_speed_angle',
     'Event': 'events',
-    'Description': 'description',
-    'ExitVelo': 'launch_speed',
-    'LaunchAngle': 'launch_angle',
-    'Distance': 'hit_distance_sc',
-    'BBType': 'bb_type',
 }
 
 # Columns that store raw integer values from Statcast (no rounding needed)
-INT_COLS = {'Barrel', 'Distance', 'LaunchAngle'}
+INT_COLS = {'Barrel'}  # Raw launch_speed_angle value (1-6 scale)
 
 # Columns that store free-form strings (no numeric coercion, custom translator).
-STRING_COLS = {'Event', 'Description', 'BBType'}
+STRING_COLS = {'Event'}
 
-# Columns where official Statcast data should always overwrite existing
-# values AND fill blanks. Use this mode when the initial MLB Stats API
-# download may have been missing the value (e.g., Statcast hadn't released
-# bat speed yet at ingestion) and Statcast is the authoritative source.
-ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel', 'Description', 'ExitVelo',
-                         'LaunchAngle', 'Distance', 'BBType'}
+# Columns where official Statcast data should always overwrite estimates
+# (even if the cell already has a value from the initial download)
+ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel'}
 
 # Columns that only ever OVERWRITE existing values; they are never used to
-# fill a blank cell. Intended for scoring-change corrections where the
-# initial MLB Stats API download already populated the cell for every
-# relevant pitch (Event is set on the final pitch of every PA).
+# fill a blank cell. Intended for scoring-change corrections (e.g., official
+# scorer flips a play from hit to error), where the initial download already
+# populated the cell via the MLB Stats API feed.
 OVERWRITE_ONLY_COLS = {'Event'}
 
 # Statcast `events` code -> MLB Stats API event string (the format Wally's
@@ -107,43 +99,6 @@ STATCAST_TO_MLB_EVENT = {
     'force_out': 'Forceout',
 }
 
-# Statcast `description` code -> MLB Stats API simplified description (the
-# format Pitcher2026.simplify_description produces). Only standard pitch
-# outcomes are mapped; unknown codes are skipped rather than overwritten.
-STATCAST_TO_MLB_DESCRIPTION = {
-    'ball': 'Ball',
-    'blocked_ball': 'Ball',
-    'automatic_ball': 'Ball',
-    'intent_ball': 'Intent Ball',
-    'pitchout': 'Pitchout',
-    'called_strike': 'Called Strike',
-    'automatic_strike': 'Called Strike',
-    'swinging_strike': 'Swinging Strike',
-    'swinging_strike_blocked': 'Swinging Strike',
-    'foul_tip': 'Swinging Strike',
-    'foul': 'Foul',
-    'hit_into_play': 'In Play',
-    'hit_by_pitch': 'Hit By Pitch',
-    'foul_bunt': 'Foul Bunt',
-    'bunt_foul_tip': 'Bunt Foul Tip',
-    'missed_bunt': 'Missed Bunt',
-    'swinging_pitchout': 'Swinging Pitchout',
-    'foul_pitchout': 'Foul Pitchout',
-}
-
-# Statcast `bb_type` code -> Wally's sheet BBType value. MLB Stats API
-# returns the same four trajectory labels, so the mapping is an identity
-# for the four Statcast values. Bunt variants (bunt_grounder, bunt_popup,
-# bunt_line_drive, bunt) are not present in Statcast — the CSV only
-# classifies bunts by their landed trajectory. The overwrite logic below
-# preserves existing bunt-* values rather than flattening them.
-STATCAST_TO_MLB_BBTYPE = {
-    'ground_ball': 'ground_ball',
-    'line_drive': 'line_drive',
-    'fly_ball': 'fly_ball',
-    'popup': 'popup',
-}
-
 # Per-column rounding (default is 1 decimal for anything not listed)
 ROUND_DECIMALS = {
     'ArmAngle': 1,
@@ -159,7 +114,6 @@ ROUND_DECIMALS = {
     'xwOBA': 3,
     'wOBAval': 3,
     'wOBAdom': 3,
-    'ExitVelo': 1,
 }
 
 # Team abbreviation mapping: spreadsheet tab name -> Statcast Search abbreviation
@@ -249,22 +203,13 @@ def download_statcast(team_tab, date_min, date_max, session):
                 if csv_col in df.columns:
                     val = row[csv_col]
                     if pd.notna(val):
-                        # String columns: translate Statcast code to Wally's
-                        # sheet format. Unmapped codes (generic `field_out`,
-                        # unknown pitch descriptions, etc.) are skipped so the
-                        # downstream overwrite leaves the existing sheet value
-                        # alone rather than clobbering it with something lossy.
+                        # String columns (Event): translate Statcast code to
+                        # MLB Stats API format. Unmapped codes (including the
+                        # generic `field_out`) are skipped so downstream
+                        # overwrite leaves the existing sheet value alone.
                         if sheet_col in STRING_COLS:
                             if sheet_col == 'Event':
                                 mapped = STATCAST_TO_MLB_EVENT.get(str(val).strip())
-                                if mapped:
-                                    data[sheet_col] = mapped
-                            elif sheet_col == 'Description':
-                                mapped = STATCAST_TO_MLB_DESCRIPTION.get(str(val).strip())
-                                if mapped:
-                                    data[sheet_col] = mapped
-                            elif sheet_col == 'BBType':
-                                mapped = STATCAST_TO_MLB_BBTYPE.get(str(val).strip())
                                 if mapped:
                                     data[sheet_col] = mapped
                             else:
@@ -416,8 +361,6 @@ def main():
                 #   (the existing value may be an estimate that official data should replace)
                 # - OVERWRITE_ONLY_COLS update existing values only (for scoring
                 #   corrections like hit↔error); never used to fill a blank cell.
-                # Entries are (sheet_col, existing_val) so the write loop can
-                # apply column-specific guards (e.g., preserve 'bunt' BBType).
                 cols_to_update = []
                 for sheet_col, c_idx in supp_col_idx.items():
                     val = row[c_idx] if c_idx < len(row) else ''
@@ -425,9 +368,9 @@ def main():
                     if is_empty and sheet_col in OVERWRITE_ONLY_COLS:
                         continue
                     if is_empty:
-                        cols_to_update.append((sheet_col, ''))
+                        cols_to_update.append(sheet_col)
                     elif sheet_col in ALWAYS_OVERWRITE_COLS or sheet_col in OVERWRITE_ONLY_COLS:
-                        cols_to_update.append((sheet_col, val))
+                        cols_to_update.append(sheet_col)
 
                 if cols_to_update:
                     needs_fill.append((r_idx, pid, cols_to_update))
@@ -481,24 +424,13 @@ def main():
                 statcast_row = lookup.get(key, {})
                 row_filled = False
 
-                for sheet_col, existing_val in cols_to_update:
+                for sheet_col in cols_to_update:
                     if sheet_col in statcast_row:
                         val = statcast_row[sheet_col]
                         # Don't write empty values for overwrite cols —
                         # that would erase data when official data isn't ready yet
                         if not val and (sheet_col in ALWAYS_OVERWRITE_COLS
                                         or sheet_col in OVERWRITE_ONLY_COLS):
-                            continue
-                        # BBType guard: preserve existing bunt-* values.
-                        # Pitcher2026 classifies bunts as 'bunt' / 'bunt_grounder' /
-                        # 'bunt_popup' / 'bunt_line_drive' using MLB Stats API
-                        # trajectory; Statcast's bb_type flattens those into the
-                        # landed trajectory (ground_ball, popup, etc.). Overwriting
-                        # would lose the bunt signal.
-                        if sheet_col == 'BBType' and existing_val and str(existing_val).startswith('bunt'):
-                            continue
-                        # Skip if overwrite value is identical to existing
-                        if existing_val and str(val) == str(existing_val):
                             continue
                         cell = gspread.Cell(
                             row=r_idx,
