@@ -63,17 +63,35 @@ DISPLAY_INDICES = [TARGET_METRICS.index(m) for m in DISPLAY_METRICS]
 BIOMECH = ['armAngle', 'extension']
 
 # Outcome metrics projected via shape-comp regression. Each entry is
-# (sheet_key, display_label, fmt) where fmt is 'pct' (rate, x100 → %) or
-# 'woba' (wOBA-scale, .XXX). Selected for shape-driven signal AND article
-# readability: Whiff/Chase/GB/Hard-Hit/xwOBAcon cover bat-missing,
-# expansion, contact direction, and contact quality (two views).
+# (key, display_label, fmt, getter) where:
+#   key        — string identifier (used for column ordering / dict keys)
+#   label      — display label
+#   fmt        — 'pct' (rate, x100 → %) or 'woba' (wOBA-scale, .XXX)
+#   getter     — None for `row.get(key)`, OR a function(row) → float|None
+#                for derived metrics like CSR = cswPct − swStrRate.
+def _csr(row):
+    """Called-strike rate per pitch = cswPct - swStrRate (called strikes / total pitches)."""
+    csw = row.get('cswPct'); sw_rate = row.get('swStrRate')
+    if csw is None or sw_rate is None:
+        return None
+    return csw - sw_rate
+
 OUTCOME_METRICS = [
-    ('swStrPct',   'Whiff%',    'pct'),
-    ('chasePct',   'Chase%',    'pct'),
-    ('gbPct',      'GB%',       'pct'),
-    ('hardHitPct', 'Hard-Hit%', 'pct'),
-    ('xwOBAcon',   'xwOBAcon',  'woba'),
+    ('swStrPct',   'Whiff%',     'pct',  None),
+    ('callStrPct', 'CalledStr%', 'pct',  _csr),
+    ('chasePct',   'Chase%',     'pct',  None),
+    ('gbPct',      'GB%',        'pct',  None),
+    ('hardHitPct', 'Hard-Hit%',  'pct',  None),
+    ('xwOBAcon',   'xwOBAcon',   'woba', None),
 ]
+
+
+def _outcome_getter(okey):
+    """Resolve OUTCOME_METRICS getter — fall back to row.get(key) when not provided."""
+    for k, _, _, getter in OUTCOME_METRICS:
+        if k == okey:
+            return getter if getter is not None else (lambda r, kk=k: r.get(kk))
+    return lambda r: None
 # Min comp-pitch sample to include in outcome projection. Below this the
 # comp's rates are too noisy to contribute meaningfully. Set low enough that
 # early-season comps still pass; the sqrt(n) weighting handles the rest.
@@ -165,9 +183,10 @@ def compute_pitch_population_stats(arsenals):
             )
         # League outcome avg, weighted by pitch count
         lg = {}
-        for okey, _, _ in OUTCOME_METRICS:
-            pairs = [(r.get(okey), r.get('count') or 0) for r in rows
-                     if r.get(okey) is not None and (r.get('count') or 0) > 0]
+        for okey, _, _, _ in OUTCOME_METRICS:
+            getter = _outcome_getter(okey)
+            pairs = [(getter(r), r.get('count') or 0) for r in rows
+                     if getter(r) is not None and (r.get('count') or 0) > 0]
             if pairs:
                 tw = sum(w for _, w in pairs)
                 lg[okey] = sum(v * w for v, w in pairs) / tw
@@ -448,7 +467,7 @@ def compute_calibration(arsenals, target_key, anchor, shape_pop_stats, outcome_l
         proj_outcomes = project_outcomes_from_shape(
             arsenals, pt, hand, mu_b, target_key, shape_pop_stats, outcome_lg,
         )
-        actual_outcomes = {okey: row.get(okey) for okey, _, _ in OUTCOME_METRICS}
+        actual_outcomes = {okey: _outcome_getter(okey)(row) for okey, _, _, _ in OUTCOME_METRICS}
         rows.append({
             'pitch': pt,
             'sample': row.get('count'),
@@ -489,14 +508,14 @@ def project_outcomes_from_shape(arsenals, target_pt, hand, predicted_shape,
     """
     pop_key = (target_pt, hand)
     if pop_key not in shape_pop_stats:
-        return {okey: None for okey, _, _ in OUTCOME_METRICS}
+        return {okey: None for okey, _, _, _ in OUTCOME_METRICS}
     _, pop_cov = shape_pop_stats[pop_key]
     lg = outcome_lg.get(pop_key, {})
 
     # Predicted shape in display dims (velo, IVB, HB)
     pred = np.array([predicted_shape[TARGET_METRICS.index(m)] for m in DISPLAY_METRICS])
 
-    contributors = {okey: [] for okey, _, _ in OUTCOME_METRICS}
+    contributors = {okey: [] for okey, _, _, _ in OUTCOME_METRICS}
     for ck, arsenal in arsenals.items():
         if ck == exclude_key:
             continue
@@ -524,8 +543,9 @@ def project_outcomes_from_shape(arsenals, target_pt, hand, predicted_shape,
         weight = np.exp(-0.5 * (d / OUTCOME_DIST_SIGMA) ** 2) * (n ** 0.5)
         if weight < 1e-9:
             continue
-        for okey, _, _ in OUTCOME_METRICS:
-            ov = row.get(okey)
+        for okey, _, _, _ in OUTCOME_METRICS:
+            getter = _outcome_getter(okey)
+            ov = getter(row)
             if ov is None:
                 continue
             # Shrink the comp's rate toward the league mean for that pitch type
@@ -539,7 +559,7 @@ def project_outcomes_from_shape(arsenals, target_pt, hand, predicted_shape,
             })
 
     out = {}
-    for okey, _, _ in OUTCOME_METRICS:
+    for okey, _, _, _ in OUTCOME_METRICS:
         items = contributors[okey]
         if not items:
             out[okey] = None
@@ -647,13 +667,13 @@ def print_report(target_key, arsenals, anchor, targets, results,
             shape_pop_stats, outcome_lg,
         )
         sample_summary = ''
-        for okey, _, _ in OUTCOME_METRICS:
+        for okey, _, _, _ in OUTCOME_METRICS:
             op = outcomes_proj.get(okey)
             if op is not None:
                 sample_summary = (f"  [{op['n_comps']} comps, {op['total_pitches']} pitches]")
                 break
         print(f"         projected outcomes:{sample_summary}")
-        for okey, olabel, fmt in OUTCOME_METRICS:
+        for okey, olabel, fmt, _ in OUTCOME_METRICS:
             op = outcomes_proj.get(okey)
             print(f"           {olabel:11s} {fmt_outcome_value(op, fmt)}")
 
@@ -694,7 +714,7 @@ def print_report(target_key, arsenals, anchor, targets, results,
             print(f"    {pt:5s} {n:4d}  {v_str:>22s}  {iv_str:>22s}  {hb_str:>22s}")
             # Outcome calibration row
             out_parts = []
-            for okey, olabel, fmt in OUTCOME_METRICS:
+            for okey, olabel, fmt, _ in OUTCOME_METRICS:
                 op = cr['projected_outcomes'].get(okey)
                 act = cr['actual_outcomes'].get(okey)
                 if op is None or act is None:
@@ -1021,9 +1041,9 @@ def _draw_arsenal_table(ax, rows):
 
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    pitcher  = "Henry, Cole"   # Pitcher name, "Last, First" format
+    pitcher  = "Varland, Gus"   # Pitcher name, "Last, First" format
     team     = "WSH"                 # Team abbreviation
-    pitches  = ["SI", "CH"]          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
+    pitches  = ["SI", "CU"]          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
 
     no_plot   = False                # True to skip plot generation
     plot_only = False                # True to write plot but skip printed text
