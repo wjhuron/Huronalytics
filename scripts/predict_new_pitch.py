@@ -595,7 +595,7 @@ def fmt_outcome_value(op, fmt):
     return str(op.get('mean'))
 
 
-def print_report(target_key, arsenals, anchor, other_existing, targets, tier_results,
+def print_report(target_key, arsenals, anchor, targets, results,
                   shape_pop_stats, outcome_lg, calibration_rows=None):
     name, team = target_key
     arsenal = arsenals[target_key]
@@ -619,51 +619,42 @@ def print_report(target_key, arsenals, anchor, other_existing, targets, tier_res
             continue
         print(f"    {pt:3s}  {fmt_pitch(r)}")
 
-    for tier_label, results in tier_results.items():
-        print()
-        desc = (f"anchored on {anchor}" if tier_label == 'Tier 1'
-                else f"{anchor} + {', '.join(other_existing)}" if other_existing
-                else f"anchored on {anchor}")
-        print(f"  {tier_label} predictions ({desc}):")
-        for t in targets:
-            res = results.get(t)
-            if res is None:
-                print(f"    {t:3s}  [skipped: target is the anchor pitch]")
-                continue
-            if res.get('insufficient'):
-                combo = ' + '.join([res['anchor']] + res.get('other_pitches', []) + [res['target']])
-                print(f"    {t:3s}  [skipped: only {res['n_train']} pitchers throw "
-                      f"{combo} (need {res['min_needed']})]")
-                continue
-            cond_suffix = ''
-            if tier_label == 'Tier 2':
-                cond = res.get('_t2_conditioning', [])
-                cond_suffix = f"   [cond: {anchor}+{','.join(cond) if cond else 'anchor only'}]"
-            line = (f"    {t:3s}  {fmt_prediction(res['mu_b'], res['cov_b'])}"
-                    f"   [n_train={res['n_train']}]{cond_suffix}")
-            print(line)
-            # Projected outcomes via shape-comp regression (Mahalanobis distance
-            # in (velo, IVB, HB) space using population covariance, then EB shrunk)
-            outcomes_proj = project_outcomes_from_shape(
-                arsenals, t, hand, res['mu_b'], target_key,
-                shape_pop_stats, outcome_lg,
-            )
-            sample_summary = ''
-            for okey, _, _ in OUTCOME_METRICS:
-                op = outcomes_proj.get(okey)
-                if op is not None:
-                    sample_summary = (f"  [{op['n_comps']} comps, {op['total_pitches']} pitches]")
-                    break
-            print(f"         projected outcomes:{sample_summary}")
-            for okey, olabel, fmt in OUTCOME_METRICS:
-                op = outcomes_proj.get(okey)
-                print(f"           {olabel:11s} {fmt_outcome_value(op, fmt)}")
-
-        has_any_comps = any(
-            r and not r.get('insufficient') for r in results.values()
-        )
-        if not has_any_comps:
+    print()
+    print(f"  Predicted pitches (full-arsenal conditioning, fall back to anchor-only when needed):")
+    for t in targets:
+        res = results.get(t)
+        if res is None:
+            print(f"    {t:3s}  [skipped: target is the anchor pitch]")
             continue
+        if res.get('insufficient'):
+            combo = ' + '.join([res['anchor']] + res.get('other_pitches', []) + [res['target']])
+            print(f"    {t:3s}  [skipped: only {res['n_train']} pitchers throw "
+                  f"{combo} (need {res['min_needed']})]")
+            continue
+        cond = res.get('_t2_conditioning', [])
+        cond_suffix = f"   [cond: {anchor}+{','.join(cond) if cond else 'anchor only'}]"
+        line = (f"    {t:3s}  {fmt_prediction(res['mu_b'], res['cov_b'])}"
+                f"   [n_train={res['n_train']}]{cond_suffix}")
+        print(line)
+        # Projected outcomes via shape-comp regression (Mahalanobis distance
+        # in (velo, IVB, HB) space using population covariance, then EB shrunk)
+        outcomes_proj = project_outcomes_from_shape(
+            arsenals, t, hand, res['mu_b'], target_key,
+            shape_pop_stats, outcome_lg,
+        )
+        sample_summary = ''
+        for okey, _, _ in OUTCOME_METRICS:
+            op = outcomes_proj.get(okey)
+            if op is not None:
+                sample_summary = (f"  [{op['n_comps']} comps, {op['total_pitches']} pitches]")
+                break
+        print(f"         projected outcomes:{sample_summary}")
+        for okey, olabel, fmt in OUTCOME_METRICS:
+            op = outcomes_proj.get(okey)
+            print(f"           {olabel:11s} {fmt_outcome_value(op, fmt)}")
+
+    has_any_comps = any(r and not r.get('insufficient') for r in results.values())
+    if has_any_comps:
         print(f"\n    Top {N_COMPS} Mahalanobis comps per target:")
         for t in targets:
             res = results.get(t)
@@ -801,37 +792,30 @@ def _plot_arsenal_panel(ax, target_arsenal, targets, results, panel_label):
                  loc='left', pad=8)
 
 
-def plot_predictions(target_key, arsenal, targets, tier_results, out_path):
-    """Two-panel plot plus shared metrics table, styled to match the site's
-    Movement Profile card (dark theme, -25..25 axes, dashed crosshair, legend
-    pills, pitch-type color coding).
+def plot_predictions(target_key, arsenal, targets, results, out_path,
+                      arsenals=None, shape_pop_stats=None, outcome_lg=None):
+    """Single-panel movement plot + shape table + projected-outcomes table.
+    Outcomes table renders only when arsenals/shape_pop_stats/outcome_lg are
+    provided (so the function still works for plot-only callers).
     """
-    fig = plt.figure(figsize=(14, 11), facecolor=BG_COLOR)
+    fig = plt.figure(figsize=(13, 13), facecolor=BG_COLOR)
     gs = fig.add_gridspec(
-        nrows=2, ncols=2, height_ratios=[3, 1.2],
-        hspace=0.25, wspace=0.15,
-        left=0.06, right=0.97, top=0.92, bottom=0.05,
+        nrows=3, ncols=1, height_ratios=[3, 1.1, 1.4],
+        hspace=0.32,
+        left=0.07, right=0.95, top=0.93, bottom=0.04,
     )
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax_table = fig.add_subplot(gs[1, :])
+    ax_panel = fig.add_subplot(gs[0])
+    ax_table = fig.add_subplot(gs[1])
+    ax_outcomes = fig.add_subplot(gs[2])
 
-    panel_descs = {
-        'Tier 1': 'Tier 1: anchor-only (FF or SI)',
-        'Tier 2': 'Tier 2: full-arsenal conditioning',
-    }
-    _plot_arsenal_panel(ax1, arsenal, targets, tier_results.get('Tier 1', {}),
-                        panel_descs['Tier 1'])
-    _plot_arsenal_panel(ax2, arsenal, targets, tier_results.get('Tier 2', {}),
-                        panel_descs['Tier 2'])
+    _plot_arsenal_panel(ax_panel, arsenal, targets, results,
+                        'Predicted pitches (full-arsenal conditioning, anchor-only fallback)')
 
-    if not any(r and not r.get('insufficient')
-               for r in tier_results.get('Tier 2', {}).values()):
-        ax2.text(0, 24, '(no predictions: insufficient training sample)',
-                 fontsize=9, color='#94a3b8', ha='center', va='top')
+    if not any(r and not r.get('insufficient') for r in results.values()):
+        ax_panel.text(0, 24, '(no predictions: insufficient training sample)',
+                       fontsize=9, color='#94a3b8', ha='center', va='top')
 
-    # Build table rows: current arsenal first (sorted by count desc), then
-    # predictions ordered by tier then input order of target pitches.
+    # Shape table: current arsenal first (sorted by count desc), then predictions
     table_rows = []
     current_sorted = sorted(
         ((pt, r) for pt, r in arsenal.items()
@@ -846,32 +830,38 @@ def plot_predictions(target_key, arsenal, targets, tier_results, out_path):
             'ivb': r.get('indVertBrk'),
             'hb': r.get('horzBrk'),
         })
-    # Prefer T2 (sharper estimate) when available; fall back to T1 if T2 is
-    # unavailable for that target. The two-panel plot above already shows the
-    # T1 vs T2 split visually, so the table only needs the best estimate per pitch.
-    t1_results = tier_results.get('Tier 1', {})
-    t2_results = tier_results.get('Tier 2', {})
     for t in targets:
-        t2 = t2_results.get(t)
-        t1 = t1_results.get(t)
-        if t2 and not t2.get('insufficient'):
-            res = t2
-            tier_suffix = ' (T2)'
-        elif t1 and not t1.get('insufficient'):
-            res = t1
-            tier_suffix = ' (T1)'
-        else:
+        res = results.get(t)
+        if res is None or res.get('insufficient'):
             continue
         mu = res['mu_b']
         table_rows.append({
             'pitch': t, 'kind': 'predicted',
-            'tier_suffix': tier_suffix,
+            'tier_suffix': '',
             'mph': mu[TARGET_METRICS.index('velocity')],
             'ivb': mu[TARGET_METRICS.index('indVertBrk')],
             'hb': mu[TARGET_METRICS.index('horzBrk')],
         })
 
     _draw_arsenal_table(ax_table, table_rows)
+
+    # Outcomes table (only if we have the data to compute it)
+    if arsenals is not None and shape_pop_stats is not None and outcome_lg is not None:
+        hand = arsenal.get('_throws')
+        outcome_rows = []
+        for t in targets:
+            res = results.get(t)
+            if res is None or res.get('insufficient'):
+                continue
+            outcomes_proj = project_outcomes_from_shape(
+                arsenals, t, hand, res['mu_b'], target_key,
+                shape_pop_stats, outcome_lg,
+            )
+            outcome_rows.append({'pitch': t, 'outcomes': outcomes_proj})
+        _draw_outcomes_table(ax_outcomes, outcome_rows)
+    else:
+        ax_outcomes.set_facecolor(BG_COLOR)
+        ax_outcomes.axis('off')
 
     name, team = target_key
     hand = arsenal.get('_throws')
@@ -894,6 +884,85 @@ def plot_predictions(target_key, arsenal, targets, tier_results, out_path):
 
     fig.savefig(out_path, dpi=140, facecolor=BG_COLOR)
     plt.close(fig)
+
+
+def _draw_outcomes_table(ax, rows):
+    """Render the projected-outcomes table (one row per predicted pitch).
+    Columns: PITCH | Whiff% | Chase% | GB% | Hard-Hit% | xwOBAcon
+    Each cell shows mean and (Δ vs lg) on a second sub-line.
+    """
+    ax.set_facecolor(BG_COLOR)
+    ax.axis('off')
+    if not rows:
+        ax.text(0.5, 0.5, '(no projected outcomes)',
+                color='#94a3b8', fontsize=10, ha='center', va='center',
+                transform=ax.transAxes)
+        return
+
+    # Section title
+    ax.text(0.0, 1.05, 'PROJECTED OUTCOMES', color='#67e8f9',
+            fontsize=12, fontweight='bold', ha='left', va='center',
+            transform=ax.transAxes)
+
+    headers = ['PITCH'] + [olabel for _, olabel, _ in OUTCOME_METRICS]
+    n_cols = len(headers)
+    # Even spacing across columns; pitch column slightly narrower
+    col_xs = [0.08] + [0.20 + i * (0.78 / max(len(OUTCOME_METRICS) - 1, 1))
+                       for i in range(len(OUTCOME_METRICS))]
+
+    y_header = 0.92
+    for x, h in zip(col_xs, headers):
+        ax.text(x, y_header, h, color='#67e8f9', fontsize=10, fontweight='bold',
+                ha='center', va='center', transform=ax.transAxes)
+    ax.plot([0.04, 0.96], [0.83, 0.83], color=GRID_COLOR, lw=0.7,
+            transform=ax.transAxes, clip_on=False)
+
+    n_rows = len(rows)
+    row_height = 0.78 / max(n_rows, 1)
+    for i, r in enumerate(rows):
+        y = 0.79 - (i + 0.5) * row_height
+        pt = r['pitch']
+        color = PITCH_COLORS.get(pt, '#999')
+        text_color = '#000000' if pt in ('SL', 'SI', 'FC') else '#ffffff'
+        ax.text(col_xs[0], y, pt + '*', color=text_color,
+                fontsize=10, fontweight='bold',
+                ha='center', va='center', transform=ax.transAxes,
+                bbox=dict(boxstyle='round,pad=0.35', fc=color, ec=color, lw=0))
+
+        for x, (okey, _, fmt) in zip(col_xs[1:], OUTCOME_METRICS):
+            op = (r['outcomes'] or {}).get(okey)
+            if op is None:
+                ax.text(x, y, '—', color=TEXT_COLOR, fontsize=10,
+                        ha='center', va='center', transform=ax.transAxes)
+                continue
+            if fmt == 'pct':
+                main_str = f"{op['mean']*100:.1f}%"
+                if op.get('lg') is not None:
+                    delta = op['mean']*100 - op['lg']*100
+                    sub_str = f"{'+' if delta>=0 else ''}{delta:.1f} vs lg"
+                else:
+                    sub_str = ''
+            else:  # woba
+                main_str = f".{int(round(op['mean']*1000)):03d}"
+                if op.get('lg') is not None:
+                    delta = (op['mean'] - op['lg']) * 1000
+                    sub_str = f"{'+' if delta>=0 else ''}{int(round(delta))} vs lg"
+                else:
+                    sub_str = ''
+            # Color the delta sub-line by sign convention. For Hard-Hit% and
+            # xwOBAcon, lower is better (pitcher); flip the green/red mapping.
+            higher_better = okey not in ('hardHitPct', 'xwOBAcon')
+            ax.text(x, y + 0.02, main_str, color=TEXT_COLOR, fontsize=10,
+                    fontweight='bold', ha='center', va='center',
+                    transform=ax.transAxes)
+            if sub_str:
+                if delta == 0:
+                    sub_color = '#94a3b8'
+                else:
+                    is_good = (delta > 0) if higher_better else (delta < 0)
+                    sub_color = '#22c55e' if is_good else '#ef4444'
+                ax.text(x, y - 0.04, sub_str, color=sub_color, fontsize=8,
+                        ha='center', va='center', transform=ax.transAxes)
 
 
 def _draw_arsenal_table(ax, rows):
@@ -943,11 +1012,10 @@ def _draw_arsenal_table(ax, rows):
 
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    pitcher  = "Parker, Mitchell"   # Pitcher name, "Last, First" format
+    pitcher  = "Beeter, Clayton"   # Pitcher name, "Last, First" format
     team     = "WSH"                 # Team abbreviation
     pitches  = []          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
 
-    tier      = "both"               # "1", "2", or "both"
     no_plot   = False                # True to skip plot generation
     plot_only = False                # True to write plot but skip printed text
     include_existing = False         # True to project pitches the pitcher already throws
@@ -964,8 +1032,6 @@ def main():
                         help='Team abbreviation, e.g. WSH')
     parser.add_argument('pitches', nargs='*',
                         help='Target pitch types to predict. Omit for auto (all common pitches he does not already throw).')
-    parser.add_argument('--tier', choices=['1', '2', 'both'], default=None,
-                        help='Which tier(s) to run')
     parser.add_argument('--no-plot', action='store_true', default=None,
                         help='Skip plot generation')
     parser.add_argument('--plot-only', action='store_true', default=None,
@@ -979,7 +1045,6 @@ def main():
     if args.pitcher is not None: pitcher = args.pitcher
     if args.team is not None: team = args.team
     if args.pitches: pitches = args.pitches
-    if args.tier is not None: tier = args.tier
     if args.no_plot: no_plot = True
     if args.plot_only: plot_only = True
     if args.include_existing: include_existing = True
@@ -1035,26 +1100,18 @@ def main():
     # Used by the new shape-comp regression (replaces the biomech-comp average path).
     shape_pop_stats, outcome_lg = compute_pitch_population_stats(arsenals)
 
-    tier_results = {}
-    for t_iter in (['1', '2'] if tier == 'both' else [tier]):
-        tier_label = f"Tier {t_iter}"
-        results = {}
-        for t in pitches:
-            if t == anchor:
-                print(f"Note: {t} is the anchor pitch; skipping prediction for it.",
-                      file=sys.stderr)
-                results[t] = None
-                continue
-            if t_iter == '1':
-                res = predict(arsenals, target_key, anchor, [], t)
-            else:
-                # Generalized Tier 2: use the candidate's full arsenal, fall back if too thin.
-                # Stash the conditioning set actually used onto the result for display.
-                res, conditioning_used = predict_tier2_with_fallback(arsenals, target_key, anchor, t)
-                if res is not None:
-                    res['_t2_conditioning'] = conditioning_used
-            results[t] = res
-        tier_results[tier_label] = results
+    # Single-tier predictions: full-arsenal conditioning with anchor-only fallback.
+    results = {}
+    for t in pitches:
+        if t == anchor:
+            print(f"Note: {t} is the anchor pitch; skipping prediction for it.",
+                  file=sys.stderr)
+            results[t] = None
+            continue
+        res, conditioning_used = predict_tier2_with_fallback(arsenals, target_key, anchor, t)
+        if res is not None:
+            res['_t2_conditioning'] = conditioning_used
+        results[t] = res
 
     # Self-calibration on existing pitches (skip if --no-calibrate or no existing pitches)
     calibration_rows = None
@@ -1064,15 +1121,18 @@ def main():
         )
 
     if not plot_only:
-        print_report(target_key, arsenals, anchor, other_existing_full,
-                     pitches, tier_results, shape_pop_stats, outcome_lg,
+        print_report(target_key, arsenals, anchor, pitches, results,
+                     shape_pop_stats, outcome_lg,
                      calibration_rows=calibration_rows)
 
     if not no_plot:
         name_slug = pitcher.replace(', ', '_').replace(' ', '_').replace("'", '')
         pitches_slug = '_'.join(pitches)
         out_path = OUTPUT_DIR / f"{name_slug}_{team}_{pitches_slug}.png"
-        plot_predictions(target_key, target_arsenal, pitches, tier_results, out_path)
+        plot_predictions(target_key, target_arsenal, pitches, results, out_path,
+                         arsenals=arsenals,
+                         shape_pop_stats=shape_pop_stats,
+                         outcome_lg=outcome_lg)
         if not plot_only:
             print(f"\n  plot: {out_path}")
 
