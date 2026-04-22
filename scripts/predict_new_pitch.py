@@ -58,6 +58,33 @@ DISPLAY_INDICES = [TARGET_METRICS.index(m) for m in DISPLAY_METRICS]
 # Biomechanics conditioning
 BIOMECH = ['armAngle', 'extension']
 
+# Outcome metrics projected via shape-comp regression. Each entry is
+# (sheet_key, display_label, fmt) where fmt is 'pct' (rate, x100 → %) or
+# 'woba' (wOBA-scale, .XXX). Selected for shape-driven signal AND article
+# readability: Whiff/Chase/GB/Hard-Hit/xwOBAcon cover bat-missing,
+# expansion, contact direction, and contact quality (two views).
+OUTCOME_METRICS = [
+    ('swStrPct',   'Whiff%',    'pct'),
+    ('chasePct',   'Chase%',    'pct'),
+    ('gbPct',      'GB%',       'pct'),
+    ('hardHitPct', 'Hard-Hit%', 'pct'),
+    ('xwOBAcon',   'xwOBAcon',  'woba'),
+]
+# Min comp-pitch sample to include in outcome projection. Below this the
+# comp's rates are too noisy to contribute meaningfully. Set low enough that
+# early-season comps still pass; the sqrt(n) weighting handles the rest.
+OUTCOME_MIN_PITCHES = 30
+# Empirical-Bayes shrinkage strength — pseudo-pitches added to (pitch_type, hand)
+# league mean to stabilize comp rates with small samples. With k=30, a comp
+# with 100 pitches is ~75% comp / 25% league. Light enough to preserve signal,
+# heavy enough to discount 30-pitch outliers.
+OUTCOME_SHRINK_K = 30
+# Distance-weight bandwidth (in pop-shape SDs). Smaller = sharper falloff,
+# more weight on the closest-shape comps. With sigma=1.0, a comp 1 SD away
+# in shape gets ~60% weight; at 2 SD, ~14%; at 3 SD, ~1%. This prevents
+# the average from being dominated by the long tail of dissimilar comps.
+OUTCOME_DIST_SIGMA = 1.0
+
 # Pitch colors matching js/utils.js site palette
 PITCH_COLORS = {
     'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#FFA500', 'SL': '#DDDDDD',
@@ -93,6 +120,57 @@ def load_arsenals():
         # Store throws once per pitcher
         arsenals[key]['_throws'] = r.get('throws')
     return dict(arsenals)
+
+
+def compute_pitch_population_stats(arsenals):
+    """For each (pitch_type, hand) pair, compute population shape mean+covariance
+    AND outcome league averages. Used by shape-comp regression for distance
+    weighting and by the report formatter for vs-league deltas.
+
+    Returns:
+        shape_stats: {(pt, hand): (mean_3vec, cov_3x3)} — over (velo, IVB, HB)
+        outcome_lg:  {(pt, hand): {okey: weighted_mean}} — pitch-count-weighted
+    """
+    groups = defaultdict(list)
+    for arsenal in arsenals.values():
+        hand = arsenal.get('_throws')
+        if not hand:
+            continue
+        for pt, row in arsenal.items():
+            if pt.startswith('_') or not isinstance(row, dict):
+                continue
+            if (row.get('count') or 0) < MIN_COUNT:
+                continue
+            groups[(pt, hand)].append(row)
+
+    shape_stats = {}
+    outcome_lg = {}
+    for (pt, hand), rows in groups.items():
+        # Shape mean + covariance over (velo, IVB, HB)
+        shape_vecs = []
+        for r in rows:
+            v = r.get('velocity'); iv = r.get('indVertBrk'); hb = r.get('horzBrk')
+            if v is None or iv is None or hb is None:
+                continue
+            shape_vecs.append([float(v), float(iv), float(hb)])
+        if len(shape_vecs) >= 5:
+            X = np.array(shape_vecs)
+            shape_stats[(pt, hand)] = (
+                X.mean(axis=0),
+                np.cov(X, rowvar=False, ddof=1) + 1e-3 * np.eye(3),
+            )
+        # League outcome avg, weighted by pitch count
+        lg = {}
+        for okey, _, _ in OUTCOME_METRICS:
+            pairs = [(r.get(okey), r.get('count') or 0) for r in rows
+                     if r.get(okey) is not None and (r.get('count') or 0) > 0]
+            if pairs:
+                tw = sum(w for _, w in pairs)
+                lg[okey] = sum(v * w for v, w in pairs) / tw
+            else:
+                lg[okey] = None
+        outcome_lg[(pt, hand)] = lg
+    return shape_stats, outcome_lg
 
 
 def extract_vec(row, fields):
@@ -281,7 +359,8 @@ def predict(arsenals, target_key, anchor, other_pitches, target_pt):
     for idx in order[:N_COMPS]:
         ck = train_keys[idx]
         carsenal = arsenals[ck]
-        tm = extract_vec(carsenal[target_pt], TARGET_METRICS)
+        target_row = carsenal[target_pt]
+        tm = extract_vec(target_row, TARGET_METRICS)
         comps.append({
             'pitcher': ck[0],
             'team': ck[1],
@@ -299,6 +378,85 @@ def predict(arsenals, target_key, anchor, other_pitches, target_pt):
     }
 
 
+def get_candidate_other_pitches(arsenal, anchor, target_pt):
+    """List of pitch types in candidate's arsenal (excluding anchor and target)
+    with sufficient sample, ordered by usage descending. Used by fallback Tier 2."""
+    others = []
+    for pt, row in arsenal.items():
+        if pt.startswith('_') or pt == anchor or pt == target_pt:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if (row.get('count') or 0) >= MIN_COUNT:
+            others.append((pt, row.get('count') or 0))
+    others.sort(key=lambda x: -x[1])
+    return [pt for pt, _ in others]
+
+
+def predict_tier2_with_fallback(arsenals, target_key, anchor, target_pt):
+    """Generalized Tier 2: auto-detect candidate's arsenal and try the largest
+    conditioning set that yields sufficient training sample. Drops the
+    least-used pitches first if the joint training pool is too thin.
+
+    Returns (result, conditioning_used). result may be None or have
+    {'insufficient': True} if even a single-other-pitch attempt fails.
+    """
+    candidate = arsenals[target_key]
+    others = get_candidate_other_pitches(candidate, anchor, target_pt)
+    last_result = None
+    for n_keep in range(len(others), -1, -1):
+        attempt = others[:n_keep]
+        result = predict(arsenals, target_key, anchor, attempt, target_pt)
+        last_result = result
+        if result and not result.get('insufficient'):
+            return result, attempt
+    return last_result, []
+
+
+def compute_calibration(arsenals, target_key, anchor, shape_pop_stats, outcome_lg):
+    """Self-calibration: project each existing pitch in the candidate's arsenal
+    as if it were new (excluding self from training), compare projected shape
+    and outcomes to the pitcher's actual values. Gives the article a defensible
+    "model is within X% on his existing pitches" line.
+    """
+    candidate = arsenals[target_key]
+    hand = candidate.get('_throws')
+    rows = []
+    for pt, row in candidate.items():
+        if pt.startswith('_') or pt == anchor or not isinstance(row, dict):
+            continue
+        if (row.get('count') or 0) < MIN_COUNT:
+            continue
+        result, others_used = predict_tier2_with_fallback(arsenals, target_key, anchor, pt)
+        # If even Tier 2 fallback all the way to anchor-only fails, try Tier 1
+        if result is None or result.get('insufficient'):
+            result = predict(arsenals, target_key, anchor, [], pt)
+            others_used = []
+        if result is None or result.get('insufficient'):
+            continue
+        mu_b = result['mu_b']
+        proj_shape = {
+            'velocity': mu_b[TARGET_METRICS.index('velocity')],
+            'indVertBrk': mu_b[TARGET_METRICS.index('indVertBrk')],
+            'horzBrk': mu_b[TARGET_METRICS.index('horzBrk')],
+        }
+        actual_shape = {m: row.get(m) for m in DISPLAY_METRICS}
+        proj_outcomes = project_outcomes_from_shape(
+            arsenals, pt, hand, mu_b, target_key, shape_pop_stats, outcome_lg,
+        )
+        actual_outcomes = {okey: row.get(okey) for okey, _, _ in OUTCOME_METRICS}
+        rows.append({
+            'pitch': pt,
+            'sample': row.get('count'),
+            'actual_shape': actual_shape,
+            'projected_shape': proj_shape,
+            'actual_outcomes': actual_outcomes,
+            'projected_outcomes': proj_outcomes,
+            'others_used': others_used,
+        })
+    return rows
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Pretty printing
 # ────────────────────────────────────────────────────────────────────────
@@ -309,6 +467,94 @@ def fmt_pitch(row):
     hb = row.get('horzBrk')
     n = row.get('count')
     return (f"{v:5.1f} mph  {iv:5.1f}\" IVB  {hb:5.1f}\" HB  (n={n})")
+
+
+def project_outcomes_from_shape(arsenals, target_pt, hand, predicted_shape,
+                                  exclude_key, shape_pop_stats, outcome_lg):
+    """Shape-comp regression for outcome projection.
+
+    For each pitcher (excluding self) throwing target_pt with sufficient
+    sample, weight their outcome rates by Mahalanobis distance from their
+    actual pitch shape to predicted_shape, using POPULATION-level shape
+    covariance (so the weighting is in natural units of pitcher-to-pitcher
+    pitch variation). Then apply empirical-Bayes shrinkage toward the
+    (pitch_type, hand) league mean before averaging.
+
+    Returns dict per metric: {mean, sd, min, max, n_comps, total_pitches, lg}
+    or None if no qualifying comps.
+    """
+    pop_key = (target_pt, hand)
+    if pop_key not in shape_pop_stats:
+        return {okey: None for okey, _, _ in OUTCOME_METRICS}
+    _, pop_cov = shape_pop_stats[pop_key]
+    lg = outcome_lg.get(pop_key, {})
+
+    # Predicted shape in display dims (velo, IVB, HB)
+    pred = np.array([predicted_shape[TARGET_METRICS.index(m)] for m in DISPLAY_METRICS])
+
+    contributors = {okey: [] for okey, _, _ in OUTCOME_METRICS}
+    for ck, arsenal in arsenals.items():
+        if ck == exclude_key:
+            continue
+        if arsenal.get('_throws') != hand:
+            continue
+        row = arsenal.get(target_pt)
+        if not row:
+            continue
+        n = row.get('count') or 0
+        if n < OUTCOME_MIN_PITCHES:
+            continue
+        v = row.get('velocity'); iv = row.get('indVertBrk'); hb = row.get('horzBrk')
+        if v is None or iv is None or hb is None:
+            continue
+        x = np.array([float(v), float(iv), float(hb)])
+        delta = x - pred
+        try:
+            d2 = float(delta @ np.linalg.solve(pop_cov, delta))
+        except np.linalg.LinAlgError:
+            continue
+        d = max(d2, 0.0) ** 0.5
+        # Gaussian distance weight (sharp falloff) × sqrt(sample size).
+        # Far-away-shape comps barely contribute, so the projection reflects
+        # pitchers whose actual pitch closely matches the predicted shape.
+        weight = np.exp(-0.5 * (d / OUTCOME_DIST_SIGMA) ** 2) * (n ** 0.5)
+        if weight < 1e-9:
+            continue
+        for okey, _, _ in OUTCOME_METRICS:
+            ov = row.get(okey)
+            if ov is None:
+                continue
+            # Shrink the comp's rate toward the league mean for that pitch type
+            ov_shrunk = float(ov)
+            lg_val = lg.get(okey)
+            if lg_val is not None and OUTCOME_SHRINK_K > 0:
+                ov_shrunk = (n / (n + OUTCOME_SHRINK_K)) * float(ov) + \
+                            (OUTCOME_SHRINK_K / (n + OUTCOME_SHRINK_K)) * float(lg_val)
+            contributors[okey].append({
+                'val': ov_shrunk, 'raw': float(ov), 'weight': weight, 'n': n,
+            })
+
+    out = {}
+    for okey, _, _ in OUTCOME_METRICS:
+        items = contributors[okey]
+        if not items:
+            out[okey] = None
+            continue
+        weights = np.array([it['weight'] for it in items])
+        vals = np.array([it['val'] for it in items])
+        wmean = float(np.sum(vals * weights) / np.sum(weights))
+        wvar = float(np.sum(weights * (vals - wmean) ** 2) / np.sum(weights))
+        wsd = wvar ** 0.5
+        out[okey] = {
+            'mean': wmean,
+            'sd': wsd,
+            'min': float(np.min(vals)),
+            'max': float(np.max(vals)),
+            'n_comps': len(items),
+            'total_pitches': int(sum(it['n'] for it in items)),
+            'lg': lg.get(okey),
+        }
+    return out
 
 
 def fmt_prediction(mu_b, cov_b):
@@ -324,7 +570,33 @@ def fmt_prediction(mu_b, cov_b):
             f"{hb:5.1f} +/- {shb:3.1f}\" HB")
 
 
-def print_report(target_key, arsenals, anchor, other_existing, targets, tier_results):
+def fmt_outcome_value(op, fmt):
+    """Format an outcome dict {mean, sd, lg} according to its display kind."""
+    if op is None:
+        return '—'
+    if fmt == 'pct':
+        mean = op['mean'] * 100
+        sd = op['sd'] * 100
+        s = f"{mean:5.1f}% \u00b1{sd:3.1f}"
+        if op.get('lg') is not None:
+            delta = mean - op['lg'] * 100
+            sign = '+' if delta >= 0 else ''
+            s += f" ({sign}{delta:.1f} vs lg)"
+        return s
+    if fmt == 'woba':
+        mean = op['mean']
+        sd = op['sd']
+        s = f".{int(round(mean*1000)):03d} \u00b1{int(round(sd*1000)):03d}"
+        if op.get('lg') is not None:
+            delta = mean - op['lg']
+            sign = '+' if delta >= 0 else ''
+            s += f" ({sign}{int(round(delta*1000))} vs lg)"
+        return s
+    return str(op.get('mean'))
+
+
+def print_report(target_key, arsenals, anchor, other_existing, targets, tier_results,
+                  shape_pop_stats, outcome_lg, calibration_rows=None):
     name, team = target_key
     arsenal = arsenals[target_key]
     hand = arsenal.get('_throws')
@@ -363,8 +635,29 @@ def print_report(target_key, arsenals, anchor, other_existing, targets, tier_res
                 print(f"    {t:3s}  [skipped: only {res['n_train']} pitchers throw "
                       f"{combo} (need {res['min_needed']})]")
                 continue
-            line = f"    {t:3s}  {fmt_prediction(res['mu_b'], res['cov_b'])}   [n_train={res['n_train']}]"
+            cond_suffix = ''
+            if tier_label == 'Tier 2':
+                cond = res.get('_t2_conditioning', [])
+                cond_suffix = f"   [cond: {anchor}+{','.join(cond) if cond else 'anchor only'}]"
+            line = (f"    {t:3s}  {fmt_prediction(res['mu_b'], res['cov_b'])}"
+                    f"   [n_train={res['n_train']}]{cond_suffix}")
             print(line)
+            # Projected outcomes via shape-comp regression (Mahalanobis distance
+            # in (velo, IVB, HB) space using population covariance, then EB shrunk)
+            outcomes_proj = project_outcomes_from_shape(
+                arsenals, t, hand, res['mu_b'], target_key,
+                shape_pop_stats, outcome_lg,
+            )
+            sample_summary = ''
+            for okey, _, _ in OUTCOME_METRICS:
+                op = outcomes_proj.get(okey)
+                if op is not None:
+                    sample_summary = (f"  [{op['n_comps']} comps, {op['total_pitches']} pitches]")
+                    break
+            print(f"         projected outcomes:{sample_summary}")
+            for okey, olabel, fmt in OUTCOME_METRICS:
+                op = outcomes_proj.get(okey)
+                print(f"           {olabel:11s} {fmt_outcome_value(op, fmt)}")
 
         has_any_comps = any(
             r and not r.get('insufficient') for r in results.values()
@@ -385,6 +678,43 @@ def print_report(target_key, arsenals, anchor, other_existing, targets, tier_res
                 chb = c['metrics'][TARGET_METRICS.index('horzBrk')]
                 print(f"        d={c['distance']:4.2f}  {c['pitcher']:<28s} ({c['team']})  "
                       f"{cv:5.1f} mph  {civ:5.1f}\" IVB  {chb:5.1f}\" HB")
+
+    # ── Self-calibration on existing pitches ────────────────────────────
+    if calibration_rows:
+        print()
+        print(f"  Self-calibration (each existing pitch projected as if new):")
+        print(f"    {'pitch':5s} {'n':>4s}  "
+              f"{'velo (proj/act/Δ)':>22s}  {'IVB (proj/act/Δ)':>22s}  {'HB (proj/act/Δ)':>22s}")
+        for cr in calibration_rows:
+            pt = cr['pitch']
+            ps = cr['projected_shape']; ash = cr['actual_shape']; n = cr['sample']
+            def _trio(p_val, a_val, unit):
+                if p_val is None or a_val is None:
+                    return f"{'—':>22s}"
+                d = p_val - a_val
+                return f"{p_val:5.1f}/{a_val:5.1f}/{d:+5.1f} {unit}"
+            v_str = _trio(ps['velocity'], ash['velocity'], 'mph')
+            iv_str = _trio(ps['indVertBrk'], ash['indVertBrk'], '"  ')
+            hb_str = _trio(ps['horzBrk'], ash['horzBrk'], '"  ')
+            print(f"    {pt:5s} {n:4d}  {v_str:>22s}  {iv_str:>22s}  {hb_str:>22s}")
+            # Outcome calibration row
+            out_parts = []
+            for okey, olabel, fmt in OUTCOME_METRICS:
+                op = cr['projected_outcomes'].get(okey)
+                act = cr['actual_outcomes'].get(okey)
+                if op is None or act is None:
+                    out_parts.append(f"{olabel} —")
+                    continue
+                if fmt == 'pct':
+                    proj_v = op['mean'] * 100
+                    act_v = act * 100
+                    out_parts.append(f"{olabel} {proj_v:.1f}/{act_v:.1f} ({proj_v-act_v:+.1f})")
+                else:  # woba
+                    out_parts.append(
+                        f"{olabel} .{int(round(op['mean']*1000)):03d}/"
+                        f".{int(round(act*1000)):03d} ({(op['mean']-act)*1000:+.0f})"
+                    )
+            print(f"          outcomes (proj/act/Δ):  {'   '.join(out_parts)}")
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -613,13 +943,15 @@ def _draw_arsenal_table(ax, rows):
 
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    pitcher  = "Beeter, Clayton"   # Pitcher name, "Last, First" format
+    pitcher  = "Parker, Mitchell"   # Pitcher name, "Last, First" format
     team     = "WSH"                 # Team abbreviation
-    pitches  = ["SI", "CU", "CH"]          # Target pitch types to predict (e.g., ["CU","SI","CH"])
+    pitches  = []          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
 
     tier      = "both"               # "1", "2", or "both"
     no_plot   = False                # True to skip plot generation
     plot_only = False                # True to write plot but skip printed text
+    include_existing = False         # True to project pitches the pitcher already throws
+    no_calibrate = False             # True to skip the self-calibration table
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
     parser = argparse.ArgumentParser(
@@ -631,13 +963,17 @@ def main():
     parser.add_argument('team', nargs='?', default=None,
                         help='Team abbreviation, e.g. WSH')
     parser.add_argument('pitches', nargs='*',
-                        help='Target pitch types to predict (e.g., CU SI CH)')
+                        help='Target pitch types to predict. Omit for auto (all common pitches he does not already throw).')
     parser.add_argument('--tier', choices=['1', '2', 'both'], default=None,
                         help='Which tier(s) to run')
     parser.add_argument('--no-plot', action='store_true', default=None,
                         help='Skip plot generation')
     parser.add_argument('--plot-only', action='store_true', default=None,
                         help='Write plot but skip printed text')
+    parser.add_argument('--include-existing', action='store_true', default=None,
+                        help='Also project pitches the pitcher already throws (default: skip)')
+    parser.add_argument('--no-calibrate', action='store_true', default=None,
+                        help='Skip the self-calibration table on existing pitches')
     args = parser.parse_args()
 
     if args.pitcher is not None: pitcher = args.pitcher
@@ -646,6 +982,8 @@ def main():
     if args.tier is not None: tier = args.tier
     if args.no_plot: no_plot = True
     if args.plot_only: plot_only = True
+    if args.include_existing: include_existing = True
+    if args.no_calibrate: no_calibrate = True
 
     arsenals = load_arsenals()
     target_key = (pitcher, team)
@@ -675,10 +1013,31 @@ def main():
     ]
     other_existing_full = [pt for pt in existing if pt != anchor]
 
+    # Auto-build target list when not specified: common pitch types the pitcher
+    # does not already throw. Skip-existing is the default; --include-existing overrides.
+    COMMON_TARGETS = ['FF', 'SI', 'FC', 'SL', 'ST', 'CU', 'SV', 'CH', 'FS']
+    if not pitches:
+        pitches = [pt for pt in COMMON_TARGETS if pt not in existing and pt != anchor]
+    elif not include_existing:
+        # Filter user-specified pitches to drop ones already in arsenal
+        skipped = [t for t in pitches if t in existing]
+        pitches = [t for t in pitches if t not in existing]
+        if skipped:
+            print(f"Note: skipping {', '.join(skipped)} (already in arsenal); "
+                  f"use --include-existing to override.", file=sys.stderr)
+
+    if not pitches:
+        print(f"No target pitches to project (arsenal already covers common types).",
+              file=sys.stderr)
+        sys.exit(0)
+
+    # Pre-compute population shape stats and league outcome averages by (pt, hand).
+    # Used by the new shape-comp regression (replaces the biomech-comp average path).
+    shape_pop_stats, outcome_lg = compute_pitch_population_stats(arsenals)
+
     tier_results = {}
     for t_iter in (['1', '2'] if tier == 'both' else [tier]):
         tier_label = f"Tier {t_iter}"
-        others = [] if t_iter == '1' else [p for p in other_existing_full if p not in pitches]
         results = {}
         for t in pitches:
             if t == anchor:
@@ -686,13 +1045,28 @@ def main():
                       file=sys.stderr)
                 results[t] = None
                 continue
-            res = predict(arsenals, target_key, anchor, others, t)
+            if t_iter == '1':
+                res = predict(arsenals, target_key, anchor, [], t)
+            else:
+                # Generalized Tier 2: use the candidate's full arsenal, fall back if too thin.
+                # Stash the conditioning set actually used onto the result for display.
+                res, conditioning_used = predict_tier2_with_fallback(arsenals, target_key, anchor, t)
+                if res is not None:
+                    res['_t2_conditioning'] = conditioning_used
             results[t] = res
         tier_results[tier_label] = results
 
+    # Self-calibration on existing pitches (skip if --no-calibrate or no existing pitches)
+    calibration_rows = None
+    if not no_calibrate and other_existing_full:
+        calibration_rows = compute_calibration(
+            arsenals, target_key, anchor, shape_pop_stats, outcome_lg,
+        )
+
     if not plot_only:
         print_report(target_key, arsenals, anchor, other_existing_full,
-                     pitches, tier_results)
+                     pitches, tier_results, shape_pop_stats, outcome_lg,
+                     calibration_rows=calibration_rows)
 
     if not no_plot:
         name_slug = pitcher.replace(', ', '_').replace(' ', '_').replace("'", '')
