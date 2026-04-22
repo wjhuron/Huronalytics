@@ -63,16 +63,18 @@ INT_COLS = {'Barrel', 'Distance'}
 # Columns that store free-form strings (no numeric coercion, custom translator).
 STRING_COLS = {'Event', 'Description', 'BBType'}
 
-# Columns where official Statcast data should always overwrite estimates
-# (even if the cell already has a value from the initial download)
-ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel'}
+# Columns where official Statcast data should always overwrite existing
+# values AND fill blanks. Use this mode when the initial MLB Stats API
+# download may have been missing the value (e.g., Statcast hadn't released
+# bat speed yet at ingestion) and Statcast is the authoritative source.
+ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel', 'Description', 'ExitVelo',
+                         'LaunchAngle', 'Distance', 'BBType'}
 
 # Columns that only ever OVERWRITE existing values; they are never used to
-# fill a blank cell. Intended for scoring-change corrections and other
-# "just in case" refreshes of play-level data the initial MLB Stats API
-# download already populated (hit to error, exit velo revision, etc.).
-OVERWRITE_ONLY_COLS = {'Event', 'Description', 'ExitVelo', 'LaunchAngle',
-                       'Distance', 'BBType'}
+# fill a blank cell. Intended for scoring-change corrections where the
+# initial MLB Stats API download already populated the cell for every
+# relevant pitch (Event is set on the final pitch of every PA).
+OVERWRITE_ONLY_COLS = {'Event'}
 
 # Statcast `events` code -> MLB Stats API event string (the format Wally's
 # sheet already stores, produced by Pitcher2026.py via play.result.event).
