@@ -1253,17 +1253,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pitcher_mlb_teams[(pitcher, throws)].add(team)
 
     combined_pitcher_labels = {}  # (pitcher, throws) → "2TM"/"3TM"
+    pitcher_name_collisions = []
     for (pitcher, throws), teams in pitcher_mlb_teams.items():
         if len(teams) < 2:
             continue
+        # Same collision guard as hitters — distinct MLB IDs across teams means
+        # different players who happen to share a name.
+        ids_by_team = {t: mlb_id_cache.get(f"{pitcher}|{t}") for t in teams}
+        unique_ids = {mid for mid in ids_by_team.values() if mid is not None}
+        if len(unique_ids) > 1:
+            pitcher_name_collisions.append((pitcher, throws, ids_by_team))
+            continue
         combined_team = f"{len(teams)}TM"
         combined_pitcher_labels[(pitcher, throws)] = combined_team
-        # Propagate the pitcher's mlbId under the combined team key so get_mlb_id works
-        for t in teams:
-            mid = mlb_id_cache.get(f"{pitcher}|{t}")
-            if mid:
-                mlb_id_cache[f"{pitcher}|{combined_team}"] = mid
-                break
+        if unique_ids:
+            mlb_id_cache[f"{pitcher}|{combined_team}"] = next(iter(unique_ids))
+    if pitcher_name_collisions:
+        print(f"  Skipped 2TM synthesis for {len(pitcher_name_collisions)} pitcher name collision(s):")
+        for pitcher, throws, ids in pitcher_name_collisions:
+            print(f"    {pitcher} ({throws}): {ids}")
 
     if combined_pitcher_labels:
         # Augment pitch_groups (per pitch type)
@@ -1917,8 +1925,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             hitter_mlb_teams[batter].add(team)
 
     combined_hitter_labels = {}  # batter → "2TM"/"3TM"
+    hitter_name_collisions = []
     for batter, teams in hitter_mlb_teams.items():
         if len(teams) < 2:
+            continue
+        # Detect name collisions: two different players sharing a name (e.g. the
+        # LAD and ATH Max Muncys) will have distinct MLB IDs per team. In that
+        # case, skip the 2TM synthesis so each player keeps their own team row.
+        ids_by_team = {t: mlb_id_cache.get(f"{batter}|{t}") for t in teams}
+        unique_ids = {mid for mid in ids_by_team.values() if mid is not None}
+        if len(unique_ids) > 1:
+            hitter_name_collisions.append((batter, ids_by_team))
             continue
         combined_team = f"{len(teams)}TM"
         combined_hitter_labels[batter] = combined_team
@@ -1926,12 +1943,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         for team in teams:
             combined.extend(hitter_groups[(batter, team)])
         hitter_groups[(batter, combined_team)] = combined
-        # Propagate hitter's mlbId under the combined team key
-        for t in teams:
-            mid = mlb_id_cache.get(f"{batter}|{t}")
-            if mid:
-                mlb_id_cache[f"{batter}|{combined_team}"] = mid
-                break
+        if unique_ids:
+            mlb_id_cache[f"{batter}|{combined_team}"] = next(iter(unique_ids))
+    if hitter_name_collisions:
+        print(f"  Skipped 2TM synthesis for {len(hitter_name_collisions)} hitter name collision(s):")
+        for batter, ids in hitter_name_collisions:
+            print(f"    {batter}: {ids}")
 
     # --- Compute SACQ zone table (league-wide LA × spray → wOBA) ---
     LA_BINS = [(-999, 0), (0, 5), (5, 10), (10, 15), (15, 20), (20, 25),

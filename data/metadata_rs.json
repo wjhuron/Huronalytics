@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-24 16:45",
+  "generatedAt": "2026-04-24 17:00",
   "totalPitches": 112517,
   "totalPitchers": 507,
   "totalHitters": 444,
@@ -5699,16 +5699,16 @@
   },
   "hitterPlusStandardization": {
     "bbPlus": {
-      "mean": 103.288,
-      "sd": 15.52
+      "mean": 103.163,
+      "sd": 15.471
     },
     "sdPlus": {
-      "mean": 101.345,
-      "sd": 10.616
+      "mean": 101.367,
+      "sd": 10.62
     },
     "ctPlus": {
-      "mean": 100.195,
-      "sd": 2.743
+      "mean": 100.202,
+      "sd": 2.737
     },
     "weights": {
       "bb": 0.65,
@@ -5716,7 +5716,7 @@
       "ct": 0.28
     },
     "scale": 40,
-    "nQualified": 184
+    "nQualified": 183
   },
   "sieraConstant": 6.0084
 }
