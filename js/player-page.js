@@ -588,14 +588,19 @@ var PlayerPage = {
   _findPitcherByMlbId: function (mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
     var pitcherData = window.PITCHER_DATA || [];
-    var fallback = null;
+    // Priority: multi-team aggregate (2TM/3TM) > preferTeam match > any match.
+    // Multi-team players always open on their combined row so the page shows
+    // the full season, not just games from whichever team filter was active.
+    var multiTeam = null, preferred = null, fallback = null;
+    var MULTI_RE = /^\d+TM$/;
     for (var i = 0; i < pitcherData.length; i++) {
-      if (pitcherData[i].mlbId === mlbId) {
-        if (preferTeam && pitcherData[i].team === preferTeam) return pitcherData[i];
-        if (!fallback) fallback = pitcherData[i];
-      }
+      if (pitcherData[i].mlbId !== mlbId) continue;
+      var t = pitcherData[i].team;
+      if (MULTI_RE.test(t)) multiTeam = pitcherData[i];
+      else if (preferTeam && t === preferTeam) preferred = pitcherData[i];
+      else if (!fallback) fallback = pitcherData[i];
     }
-    return fallback;
+    return multiTeam || preferred || fallback;
   },
 
   _getPitchRows: function (pitcherName, team) {
@@ -2347,14 +2352,18 @@ var PlayerPage = {
   _findHitterByMlbId: function (mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
     var hitterData = window.HITTER_DATA || [];
-    var fallback = null;
+    // Priority: multi-team aggregate (2TM/3TM) > preferTeam match > any match.
+    // Multi-team hitters always open on their combined row.
+    var multiTeam = null, preferred = null, fallback = null;
+    var MULTI_RE = /^\d+TM$/;
     for (var i = 0; i < hitterData.length; i++) {
-      if (hitterData[i].mlbId === mlbId) {
-        if (preferTeam && hitterData[i].team === preferTeam) return hitterData[i];
-        if (!fallback) fallback = hitterData[i];
-      }
+      if (hitterData[i].mlbId !== mlbId) continue;
+      var t = hitterData[i].team;
+      if (MULTI_RE.test(t)) multiTeam = hitterData[i];
+      else if (preferTeam && t === preferTeam) preferred = hitterData[i];
+      else if (!fallback) fallback = hitterData[i];
     }
-    return fallback;
+    return multiTeam || preferred || fallback;
   },
 
 
