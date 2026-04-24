@@ -2335,9 +2335,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         _compute_hitter_lg_avg(stat)
     hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
-    # BB+ — composite batted-ball index (60% xwOBAcon, 40% xwOBAsp), indexed to 100 = league avg
-    BB_PLUS_W_CON = 0.60
-    BB_PLUS_W_SP = 0.40
+    # BB+ — composite batted-ball index indexed to 100 = league avg.
+    # Weights derived from OLS regression of wRC+ on (xwOBAcon+, xwOBAsp+) —
+    # normalized coefficients come out at 58.5/41.5. Re-validate annually.
+    BB_PLUS_W_CON = 0.585
+    BB_PLUS_W_SP  = 0.415
     lg_xwobacon_bb = hitter_league_avgs.get('xwOBAcon')
     lg_xwobasp_bb = hitter_league_avgs.get('xwOBAsp')
     for row in hitter_leaderboard:
@@ -2351,37 +2353,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['bbPlus'] = None
     hitter_league_avgs['bbPlus'] = 100.0
 
-    # PD+ — composite plate-discipline index (50% Disc+ via IZSw-Ch%, 50% Exec+ via Contact%), 100 = league avg
-    PD_PLUS_W_DISC = 0.50
-    PD_PLUS_W_EXEC = 0.50
-    lg_izswchase_pd = hitter_league_avgs.get('izSwChase')
-    lg_contact_pd = hitter_league_avgs.get('contactPct')
-    for row in hitter_leaderboard:
-        disc = row.get('izSwChase')
-        exec_ = row.get('contactPct')
-        if disc is not None and exec_ is not None and lg_izswchase_pd and lg_contact_pd:
-            disc_plus = 100.0 * disc / lg_izswchase_pd
-            exec_plus = 100.0 * exec_ / lg_contact_pd
-            row['pdPlus'] = round(PD_PLUS_W_DISC * disc_plus + PD_PLUS_W_EXEC * exec_plus, 1)
-        else:
-            row['pdPlus'] = None
-    hitter_league_avgs['pdPlus'] = 100.0
-
-    # Hitter+ — multiplicative composite (BB+ × PD+ / 100), 100 = league avg.
-    # Form chosen because BB+ and PD+ are near-orthogonal (r ~ -0.1), so the
-    # product captures "quality of contact × frequency of productive PAs"
-    # without overstating extremes.
-    for row in hitter_leaderboard:
-        bbp = row.get('bbPlus')
-        pdp = row.get('pdPlus')
-        if bbp is not None and pdp is not None:
-            row['hitterPlus'] = round(bbp * pdp / 100.0, 1)
-        else:
-            row['hitterPlus'] = None
-    hitter_league_avgs['hitterPlus'] = 100.0
+    # PD+ is retired. Superseded by SD+ (decision) and CT+ (contact-frequency).
+    # Hitter+ now composites BB+, SD+, CT+ directly; see below.
 
     # SD+ — decision-only discipline index (xRV-weighted cells, dv_A formula,
-    # Bayesian-regressed to league, SD-scaled at k=30). See pipeline_sdplus.py.
+    # Bayesian-regressed to league, ratio-to-league). See pipeline_sdplus.py.
     from pipeline_sdplus import compute_sd_plus, compute_team_games_played
     # Include MLB teams AND multi-team aggregates (2TM/3TM/…); exclude AAA/ROC.
     # Matches the pdPlus pattern — multi-team hitters get a combined SD+.
@@ -2457,6 +2433,64 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     team_games_played = compute_team_games_played(all_pitches)
     print(f"  Team games played: {dict(sorted(team_games_played.items()))}")
 
+    # Hitter+ — composite of BB+ (contact quality), SD+ (decision quality),
+    # CT+ (contact frequency). Weights derived from OLS regression of wRC+ on
+    # z-standardized metrics against the 3.1 × TGP qualified sample: normalized
+    # coefficients come out at ~65/7/28. Hitter+ is standardized to have SD≈40
+    # so it's visually comparable to wRC+ on the leaderboard.
+    HITTER_PLUS_W_BB = 0.65
+    HITTER_PLUS_W_SD = 0.07
+    HITTER_PLUS_W_CT = 0.28
+    HITTER_PLUS_SCALE = 40  # multiplier on composite z-score
+
+    # Standardization uses 3.1 × TGP qualified hitters (the leaderboard gate).
+    _hplus_qual = []
+    for _row in hitter_leaderboard:
+        _team_g = team_games_played.get(_row.get('team'))
+        if _team_g is None and team_games_played:
+            _team_g = max(team_games_played.values())
+        if _team_g and _row.get('pa', 0) >= 3.1 * _team_g and \
+           _row.get('bbPlus') is not None and _row.get('sdPlus') is not None and _row.get('ctPlus') is not None:
+            _hplus_qual.append(_row)
+    if len(_hplus_qual) >= 10:
+        def _mean(vals): return sum(vals)/len(vals)
+        def _sd(vals):
+            m = _mean(vals)
+            return math.sqrt(sum((v-m)**2 for v in vals)/len(vals))
+        _m_bb = _mean([h['bbPlus'] for h in _hplus_qual]); _s_bb = _sd([h['bbPlus'] for h in _hplus_qual])
+        _m_sd = _mean([h['sdPlus'] for h in _hplus_qual]); _s_sd = _sd([h['sdPlus'] for h in _hplus_qual])
+        _m_ct = _mean([h['ctPlus'] for h in _hplus_qual]); _s_ct = _sd([h['ctPlus'] for h in _hplus_qual])
+    else:
+        # Defensive fallback — shouldn't trigger in any real season
+        _m_bb, _s_bb = 100.0, 15.0
+        _m_sd, _s_sd = 100.0, 10.0
+        _m_ct, _s_ct = 100.0,  3.0
+
+    hitter_plus_standardization = {
+        'bbPlus': {'mean': round(_m_bb, 3), 'sd': round(_s_bb, 3)},
+        'sdPlus': {'mean': round(_m_sd, 3), 'sd': round(_s_sd, 3)},
+        'ctPlus': {'mean': round(_m_ct, 3), 'sd': round(_s_ct, 3)},
+        'weights': {'bb': HITTER_PLUS_W_BB, 'sd': HITTER_PLUS_W_SD, 'ct': HITTER_PLUS_W_CT},
+        'scale': HITTER_PLUS_SCALE,
+        'nQualified': len(_hplus_qual),
+    }
+
+    for row in hitter_leaderboard:
+        bbp, sdp, ctp = row.get('bbPlus'), row.get('sdPlus'), row.get('ctPlus')
+        if bbp is None or sdp is None or ctp is None:
+            row['hitterPlus'] = None
+            continue
+        if _s_bb <= 0 or _s_sd <= 0 or _s_ct <= 0:
+            row['hitterPlus'] = None
+            continue
+        z_bb = (bbp - _m_bb) / _s_bb
+        z_sd = (sdp - _m_sd) / _s_sd
+        z_ct = (ctp - _m_ct) / _s_ct
+        composite_z = HITTER_PLUS_W_BB * z_bb + HITTER_PLUS_W_SD * z_sd + HITTER_PLUS_W_CT * z_ct
+        row['hitterPlus'] = round(100 + HITTER_PLUS_SCALE * composite_z, 1)
+    hitter_league_avgs['hitterPlus'] = 100.0
+    print(f"  Hitter+ computed (BB+/SD+/CT+ composite, weights 65/7/28).")
+
     # --- Metadata ---
     metadata = {
         'teams': all_teams,
@@ -2490,6 +2524,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'teamGamesPlayed': team_games_played,
         'sdPlusWeights': sd_weights,
         'ctPlusWeights': ct_weights,
+        'hitterPlusStandardization': hitter_plus_standardization,
     }
 
     # --- Generate micro-aggregate data ---

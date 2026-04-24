@@ -268,10 +268,17 @@ def compute_hitter_sd(pitches_by_hitter, table):
 
 
 def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
-                          min_n=MIN_HITTER_DECISIONS, scale_k=SD_SCALE_K):
-    """Bayesian regression to league mean, then sdPlus = 100 + scale_k × z.
-    Returns the same dict with sdPlus, raw_sd_adj, z added for eligible
-    hitters. Hitters below min_n are excluded."""
+                          min_n=MIN_HITTER_DECISIONS):
+    """Ratio-to-league scaling, matching BB+ convention:
+        sdPlus = 100 × hitter_raw_adj / league_mean_raw_adj
+    where raw_sd_adj is the Bayesian-regressed per-hitter mean decision
+    value, and league mean is computed across eligible hitters.
+
+    Because the raw metric is signed and centered near a small positive
+    league mean (~0.015), the ratio spread is wider than BB+'s. Hitters
+    below league mean produce values below 100; hitters with negative
+    raw_sd_adj produce negative sdPlus.
+    """
     eligible = {k: v for k, v in hitter_raw.items() if v['n_decisions'] >= min_n}
     if not eligible:
         return {}
@@ -283,15 +290,11 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
 
     adj_vals = [v['raw_sd_adj'] for v in eligible.values()]
     lg_mean = sum(adj_vals) / len(adj_vals)
-    lg_sd = math.sqrt(sum((x - lg_mean) ** 2 for x in adj_vals) / len(adj_vals))
 
     for v in eligible.values():
-        if lg_sd > 0:
-            z = (v['raw_sd_adj'] - lg_mean) / lg_sd
-            v['z'] = z
-            v['sdPlus'] = round(100 + scale_k * z, 1)
+        if abs(lg_mean) > 1e-6:
+            v['sdPlus'] = round(100.0 * v['raw_sd_adj'] / lg_mean, 1)
         else:
-            v['z'] = 0.0
             v['sdPlus'] = 100.0
     return eligible
 

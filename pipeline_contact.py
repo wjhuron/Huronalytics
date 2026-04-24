@@ -6,27 +6,26 @@ orthogonal three-axis view of plate performance:
     CT+  — did you make contact when you swung?          (this file)
     BB+  — how good was the contact when you made it?
 
-Structure mirrors SD+: same 60-cell (zone × count) table, same xRV-based
-leverage weights, same Bayesian shrinkage, same SD-scaled output. The
-only difference is the per-pitch "decision value" — for CT+, every swing
-contributes dv based on whether contact was made vs the league's
-expected contact rate in that cell, weighted by the RV gap between
-contact and whiff.
-
-Per-swing formula:
-    dv = (I[contact] - (1 - p_whiff[cell])) × leverage[cell]
-       = p_whiff[cell]        × leverage[cell]    if contact
-       = -(1 - p_whiff[cell]) × leverage[cell]    if whiff
+Raw metric: hitter's LEVERAGE-WEIGHTED CONTACT RATE across their
+eligible swings:
+    raw_ct = Σ (I[contact] × leverage[cell]) / Σ leverage[cell]
     leverage[cell] = rv_contact[cell] - rv_whiff[cell]
 
-Count and zone leverage are handled automatically through the RV gap:
-2-strike whiffs cost more because rv_whiff ≈ K ≈ large negative;
-heart whiffs cost more because rv_contact ≈ high xwOBA on contact.
+That is, contact = 1 / whiff = 0, weighted by the RV gap between making
+and missing contact in each (zone × count) cell. Always in [0, 1]. League
+mean is ~0.74. Matches BB+'s ratio-to-league convention:
+    ctPlus = 100 × hitter_raw_ct / league_raw_ct
+
+Why leverage weighting: 2-strike whiffs matter far more than 0-0 whiffs
+because rv_whiff ≈ K (very negative) at 2K while a 0-0 whiff is just a
+strike added. Heart-zone whiffs cost more than chase-zone whiffs because
+rv_contact ≈ high xwOBA on heart contact. The (rv_contact - rv_whiff)
+weighting makes high-stakes contact count more toward the hitter's score.
 
 Empirical validation confirmed the (zone × count) cell structure is
 approximately optimal at current sample sizes — pitch-type expansion
-adds <1% of residual variance, pitcher-identity adjustment is dominated
-by sampling noise. See scripts/ct_plus_analysis.py if/when needed.
+adds <1% of residual variance; pitcher-identity adjustment is dominated
+by sampling noise.
 """
 import math
 from collections import defaultdict
@@ -178,49 +177,63 @@ def shrink_contact_cells(raw, zone_means, k=CELL_SHRINK_K):
     return smoothed
 
 
-# ── Per-swing dv ────────────────────────────────────────────────────────
+# ── Per-swing leverage-weighted contact ─────────────────────────────────
 
-def compute_ct_dv(p, table):
-    """dv = (I[contact] - (1 - p_whiff)) × leverage. By construction, the
-    league-average hitter has mean dv = 0 across all swings."""
+def compute_ct_swing(p, table):
+    """Return (leverage_weight, contact_indicator) for aggregating into a
+    leverage-weighted contact rate. `contact_indicator` is 1 if the hitter
+    made contact, 0 if whiff."""
     zone = classify_zone(p)
     count = get_count(p)
     cell = table[(zone, count)]
-    p_whiff = cell['p_whiff']
     leverage = cell['rv_contact'] - cell['rv_whiff']
-    outcome = classify_contact_outcome(p)
-    if outcome == 'contact':
-        return p_whiff * leverage
-    else:  # whiff
-        return -(1 - p_whiff) * leverage
+    is_contact = 1 if classify_contact_outcome(p) == 'contact' else 0
+    return leverage, is_contact
 
 
 # ── Per-hitter aggregation ──────────────────────────────────────────────
 
 def compute_hitter_ct(pitches_by_hitter, table):
-    """Aggregate per-hitter. Returns {(hitter, team) -> {raw_ct, n_swings,
-    zone_dv}}."""
+    """Compute hitter's leverage-weighted contact rate.
+    raw_ct = Σ(I[contact] × leverage) / Σ(leverage)   ∈ [0, 1]
+    Returns {(hitter, team) -> {raw_ct, n_swings, zone_dv}} where
+    zone_dv[z] is the per-zone leverage-weighted contact rate (also [0, 1]).
+    """
     results = {}
     for key, pitches in pitches_by_hitter.items():
         swings = [p for p in pitches if is_ct_eligible(p)]
         if not swings:
             continue
-        dvs = [compute_ct_dv(p, table) for p in swings]
-        zone_dvs = defaultdict(list)
-        for p, dv in zip(swings, dvs):
-            zone_dvs[classify_zone(p)].append(dv)
+        num = 0.0
+        denom = 0.0
+        zone_accum = defaultdict(lambda: [0.0, 0.0])  # [num, denom] per zone
+        for p in swings:
+            lev, con = compute_ct_swing(p, table)
+            if lev <= 0:
+                # Should not happen if cells are sane — skip defensively
+                continue
+            num += lev * con
+            denom += lev
+            zone_accum[classify_zone(p)][0] += lev * con
+            zone_accum[classify_zone(p)][1] += lev
+        if denom <= 0:
+            continue
         results[key] = {
-            'raw_ct':    sum(dvs) / len(dvs),
-            'n_swings':  len(dvs),
-            'zone_dv':   {z: (sum(vs)/len(vs) if vs else None)
-                          for z, vs in zone_dvs.items()},
+            'raw_ct':   num / denom,
+            'n_swings': len(swings),
+            'zone_dv':  {z: (a/d if d > 0 else None)
+                         for z, (a, d) in zone_accum.items()},
         }
     return results
 
 
 def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
-                          min_n=MIN_HITTER_SWINGS, scale_k=CT_SCALE_K):
-    """Bayesian regression + SD scaling → ctPlus."""
+                          min_n=MIN_HITTER_SWINGS):
+    """Ratio-to-league scaling, matching BB+ convention:
+        ctPlus = 100 × hitter_raw_adj / league_mean_raw_adj
+    Same note on spread as SD+: signed, near-zero league mean produces
+    a wider spread than BB+.
+    """
     eligible = {k: v for k, v in hitter_raw.items() if v['n_swings'] >= min_n}
     if not eligible:
         return {}
@@ -232,15 +245,11 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
 
     adj_vals = [v['raw_ct_adj'] for v in eligible.values()]
     lg_mean = sum(adj_vals) / len(adj_vals)
-    lg_sd   = math.sqrt(sum((x - lg_mean) ** 2 for x in adj_vals) / len(adj_vals))
 
     for v in eligible.values():
-        if lg_sd > 0:
-            z = (v['raw_ct_adj'] - lg_mean) / lg_sd
-            v['z'] = z
-            v['ctPlus'] = round(100 + scale_k * z, 1)
+        if abs(lg_mean) > 1e-6:
+            v['ctPlus'] = round(100.0 * v['raw_ct_adj'] / lg_mean, 1)
         else:
-            v['z'] = 0.0
             v['ctPlus'] = 100.0
     return eligible
 

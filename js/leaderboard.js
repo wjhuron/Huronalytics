@@ -197,9 +197,8 @@ const COLUMNS = {
     { key: 'contactPct',  label: 'Contact%', format: Utils.formatPct, sortType: 'numeric', desc: 'Contact rate excluding bunts (contact / swings)', group: 'discipline' },
     { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone contact rate', group: 'discipline' },
     { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
-    { key: 'pdPlus',      label: 'PD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Plate-discipline composite: 50% Disc+ (IZSw-Ch%) + 50% Exec+ (Contact%), indexed so 100 = league avg', group: 'discipline' },
-    { key: 'sdPlus',      label: 'SD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Swing-Decisions+: per-pitch decision quality scored against an xRV-weighted (zone × count) table. Rewards correct swing/take choices, umpire-independent via true zone. 100 = league avg, +30 per SD.', group: 'discipline' },
-    { key: 'ctPlus',      label: 'CT+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Contact+: per-swing contact rate above expected, scored against the league whiff rate in each (zone × count) cell and weighted by the RV gap between contact and whiff. Frequency only — contact quality lives in BB+. 100 = league avg, +30 per SD.', group: 'discipline' },
+    { key: 'sdPlus',      label: 'SD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Swing-Decisions+: per-pitch decision quality scored against an xRV-weighted (zone × count) table. Rewards correct swing/take choices, umpire-independent via true zone. Ratio-to-league: 100 = league avg.', group: 'discipline' },
+    { key: 'ctPlus',      label: 'CT+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Contact+: leverage-weighted contact rate on swings. Frequency only — contact quality lives in BB+. Ratio-to-league: 100 = league avg.', group: 'discipline' },
   ],
   hitterBatTracking: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -372,7 +371,7 @@ const Leaderboard = {
 
     // Stats that should recalculate when contextual filters are active.
     // Everything else (pitch metrics, plate discipline) keeps precomputed values.
-    var DYNAMIC_STATS = { runValue:1, rv100:1, xRunValue:1, xRv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1, bbPlus:1, pdPlus:1, hitterPlus:1,
+    var DYNAMIC_STATS = { runValue:1, rv100:1, xRunValue:1, xRv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1, bbPlus:1,
                           era:1, fip:1, xFIP:1, siera:1,
                           avg:1, obp:1, slg:1, ops:1, iso:1 };
 
@@ -398,7 +397,7 @@ const Leaderboard = {
     var BIP_WEIGHTED = { avgEVAgainst:1, maxEVAgainst:1, hardHitPct:1, barrelPctAgainst:1,
                           gbPct:1, ldPct:1, fbPct:1, hrFbPct:1, xwOBAsp:1, bbPlus:1,
                           avgEV:1, avgEVAll:1, ev50:1, maxEV:1, barrelPct:1, pullPct:1, airPullPct:1 };
-    var PA_WEIGHTED = { wOBA:1, xBA:1, xSLG:1, xwOBA:1, xwOBAcon:1, pdPlus:1, hitterPlus:1,
+    var PA_WEIGHTED = { wOBA:1, xBA:1, xSLG:1, xwOBA:1, xwOBAcon:1,
                          kPct:1, bbPct:1, kbbPct:1, babip:1,
                          avg:1, obp:1, slg:1, ops:1, iso:1 };
 

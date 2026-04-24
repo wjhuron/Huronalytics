@@ -1284,7 +1284,7 @@ const Aggregator = {
       'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
-      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'pdPlus', 'sdPlus', 'ctPlus',
+      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'sdPlus', 'ctPlus',
       'batSpeed', 'swingLength', 'blastPct', 'idealAAPct',
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
@@ -1460,23 +1460,10 @@ const Aggregator = {
         obj.bbPlus = null;
       }
 
-      // PD+ composite: 50% Disc+ (IZSw-Ch%) + 50% Exec+ (Contact%), indexed so 100 = league avg
-      const lgDisc = hLgAvgs.izSwChase;
-      const lgExec = hLgAvgs.contactPct;
-      if (obj.izSwChase != null && obj.contactPct != null && lgDisc && lgExec) {
-        const discPlus = 100 * obj.izSwChase / lgDisc;
-        const execPlus = 100 * obj.contactPct / lgExec;
-        obj.pdPlus = Math.round((0.5 * discPlus + 0.5 * execPlus) * 10) / 10;
-      } else {
-        obj.pdPlus = null;
-      }
-
-      // Hitter+: BB+ × PD+ / 100 (multiplicative composite)
-      if (obj.bbPlus != null && obj.pdPlus != null) {
-        obj.hitterPlus = Math.round((obj.bbPlus * obj.pdPlus / 100) * 10) / 10;
-      } else {
-        obj.hitterPlus = null;
-      }
+      // Hitter+ is precomputed on the server (needs SD+ and CT+ which require
+      // per-pitch weight-table lookups not available client-side). Keep the
+      // season-long hitterPlus value from the boxscore merge — it flows through
+      // the hBoxAlways fields alongside sdPlus/ctPlus/wRCplus.
 
       // Compute avgFbDist and avgHrDist from BIP records
       if (bipRecords.length > 0 && bci.distance !== undefined) {
@@ -1512,12 +1499,14 @@ const Aggregator = {
                         'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
                         'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
-                        // SD+ and CT+ are precomputed against the full season
-                        // (need the 60-cell RV weight tables that aren't
-                        // available client-side), so always surface the season
-                        // value even under filters.
+                        // SD+, CT+, and Hitter+ are precomputed against the
+                        // full season (need the 60-cell RV weight tables and
+                        // hitter-standardization SDs that aren't available
+                        // client-side), so always surface the season values
+                        // even under filters.
                         'sdPlus', 'sdPlusN', 'sdPlusRaw',
-                        'ctPlus', 'ctPlusN', 'ctPlusRaw'];
+                        'ctPlus', 'ctPlusN', 'ctPlusRaw',
+                        'hitterPlus'];
     // Rate stats that micro data computes (skip when filtered)
     const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
                            'doubles', 'triples', 'hr', 'xbh'];
