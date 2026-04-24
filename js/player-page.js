@@ -35,6 +35,7 @@ var PlayerPage = {
     { key: 'bbPlus',          label: 'BB+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'pdPlus',          label: 'PD+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'sdPlus',          label: 'SD+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'ctPlus',          label: 'CT+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'hitterPlus',      label: 'Hitter+',          format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },

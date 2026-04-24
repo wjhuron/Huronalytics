@@ -199,6 +199,7 @@ const COLUMNS = {
     { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
     { key: 'pdPlus',      label: 'PD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Plate-discipline composite: 50% Disc+ (IZSw-Ch%) + 50% Exec+ (Contact%), indexed so 100 = league avg', group: 'discipline' },
     { key: 'sdPlus',      label: 'SD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Swing-Decisions+: per-pitch decision quality scored against an xRV-weighted (zone × count) table. Rewards correct swing/take choices, umpire-independent via true zone. 100 = league avg, +30 per SD.', group: 'discipline' },
+    { key: 'ctPlus',      label: 'CT+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Contact+: per-swing contact rate above expected, scored against the league whiff rate in each (zone × count) cell and weighted by the RV gap between contact and whiff. Frequency only — contact quality lives in BB+. 100 = league avg, +30 per SD.', group: 'discipline' },
   ],
   hitterBatTracking: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },

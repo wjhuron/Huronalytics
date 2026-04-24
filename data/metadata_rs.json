@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-24 14:45",
+  "generatedAt": "2026-04-24 15:38",
   "totalPitches": 112517,
   "totalPitchers": 507,
   "totalHitters": 444,
@@ -425,6 +425,7 @@
     "pdPlus": 100.0,
     "hitterPlus": 100.0,
     "sdPlus": 100.0,
+    "ctPlus": 100.0,
     "avg": 0.2405,
     "obp": 0.3218,
     "slg": 0.388,
@@ -5333,6 +5334,368 @@
     "waste|3-2|take": {
       "rv": 0.2559,
       "n": 429
+    }
+  },
+  "ctPlusWeights": {
+    "heart|0-0": {
+      "p_whiff": 0.13118,
+      "rv_contact": 0.02993,
+      "rv_whiff": -0.04252,
+      "n_swings": 1862
+    },
+    "heart|0-1": {
+      "p_whiff": 0.12644,
+      "rv_contact": 0.01437,
+      "rv_whiff": -0.05706,
+      "n_swings": 1119
+    },
+    "heart|0-2": {
+      "p_whiff": 0.10266,
+      "rv_contact": 0.02265,
+      "rv_whiff": -0.16614,
+      "n_swings": 406
+    },
+    "heart|1-0": {
+      "p_whiff": 0.12238,
+      "rv_contact": 0.03073,
+      "rv_whiff": -0.05302,
+      "n_swings": 929
+    },
+    "heart|1-1": {
+      "p_whiff": 0.12015,
+      "rv_contact": 0.01616,
+      "rv_whiff": -0.0659,
+      "n_swings": 1122
+    },
+    "heart|1-2": {
+      "p_whiff": 0.11129,
+      "rv_contact": 0.01415,
+      "rv_whiff": -0.18418,
+      "n_swings": 775
+    },
+    "heart|2-0": {
+      "p_whiff": 0.10074,
+      "rv_contact": 0.02355,
+      "rv_whiff": -0.06888,
+      "n_swings": 375
+    },
+    "heart|2-1": {
+      "p_whiff": 0.10821,
+      "rv_contact": 0.00417,
+      "rv_whiff": -0.0771,
+      "n_swings": 743
+    },
+    "heart|2-2": {
+      "p_whiff": 0.11304,
+      "rv_contact": 0.03068,
+      "rv_whiff": -0.21908,
+      "n_swings": 948
+    },
+    "heart|3-0": {
+      "p_whiff": 0.09597,
+      "rv_contact": 0.0331,
+      "rv_whiff": -0.08165,
+      "n_swings": 21
+    },
+    "heart|3-1": {
+      "p_whiff": 0.09486,
+      "rv_contact": 0.01437,
+      "rv_whiff": -0.08891,
+      "n_swings": 317
+    },
+    "heart|3-2": {
+      "p_whiff": 0.09934,
+      "rv_contact": 0.0563,
+      "rv_whiff": -0.31399,
+      "n_swings": 834
+    },
+    "shadow_in|0-0": {
+      "p_whiff": 0.22082,
+      "rv_contact": 0.00367,
+      "rv_whiff": -0.04179,
+      "n_swings": 4494
+    },
+    "shadow_in|0-1": {
+      "p_whiff": 0.20174,
+      "rv_contact": -0.00557,
+      "rv_whiff": -0.05606,
+      "n_swings": 3283
+    },
+    "shadow_in|0-2": {
+      "p_whiff": 0.17339,
+      "rv_contact": 0.01552,
+      "rv_whiff": -0.17027,
+      "n_swings": 1544
+    },
+    "shadow_in|1-0": {
+      "p_whiff": 0.19795,
+      "rv_contact": 0.00215,
+      "rv_whiff": -0.0519,
+      "n_swings": 2392
+    },
+    "shadow_in|1-1": {
+      "p_whiff": 0.20164,
+      "rv_contact": -0.00914,
+      "rv_whiff": -0.0637,
+      "n_swings": 2987
+    },
+    "shadow_in|1-2": {
+      "p_whiff": 0.17163,
+      "rv_contact": 0.02023,
+      "rv_whiff": -0.18583,
+      "n_swings": 2516
+    },
+    "shadow_in|2-0": {
+      "p_whiff": 0.18829,
+      "rv_contact": 0.00257,
+      "rv_whiff": -0.06453,
+      "n_swings": 839
+    },
+    "shadow_in|2-1": {
+      "p_whiff": 0.1736,
+      "rv_contact": -0.00349,
+      "rv_whiff": -0.07474,
+      "n_swings": 1761
+    },
+    "shadow_in|2-2": {
+      "p_whiff": 0.16392,
+      "rv_contact": 0.01718,
+      "rv_whiff": -0.22502,
+      "n_swings": 2661
+    },
+    "shadow_in|3-0": {
+      "p_whiff": 0.16722,
+      "rv_contact": 0.01791,
+      "rv_whiff": -0.08876,
+      "n_swings": 54
+    },
+    "shadow_in|3-1": {
+      "p_whiff": 0.17313,
+      "rv_contact": -0.00332,
+      "rv_whiff": -0.08702,
+      "n_swings": 732
+    },
+    "shadow_in|3-2": {
+      "p_whiff": 0.14277,
+      "rv_contact": 0.02354,
+      "rv_whiff": -0.31799,
+      "n_swings": 2054
+    },
+    "shadow_out|0-0": {
+      "p_whiff": 0.36976,
+      "rv_contact": -0.03757,
+      "rv_whiff": -0.04402,
+      "n_swings": 1091
+    },
+    "shadow_out|0-1": {
+      "p_whiff": 0.32349,
+      "rv_contact": -0.046,
+      "rv_whiff": -0.057,
+      "n_swings": 1044
+    },
+    "shadow_out|0-2": {
+      "p_whiff": 0.2417,
+      "rv_contact": -0.01361,
+      "rv_whiff": -0.16125,
+      "n_swings": 595
+    },
+    "shadow_out|1-0": {
+      "p_whiff": 0.3434,
+      "rv_contact": -0.03111,
+      "rv_whiff": -0.05396,
+      "n_swings": 602
+    },
+    "shadow_out|1-1": {
+      "p_whiff": 0.31088,
+      "rv_contact": -0.03016,
+      "rv_whiff": -0.06557,
+      "n_swings": 786
+    },
+    "shadow_out|1-2": {
+      "p_whiff": 0.26142,
+      "rv_contact": -0.00671,
+      "rv_whiff": -0.1827,
+      "n_swings": 948
+    },
+    "shadow_out|2-0": {
+      "p_whiff": 0.31603,
+      "rv_contact": -0.00461,
+      "rv_whiff": -0.0719,
+      "n_swings": 168
+    },
+    "shadow_out|2-1": {
+      "p_whiff": 0.28958,
+      "rv_contact": -0.02959,
+      "rv_whiff": -0.07758,
+      "n_swings": 440
+    },
+    "shadow_out|2-2": {
+      "p_whiff": 0.25151,
+      "rv_contact": -0.00812,
+      "rv_whiff": -0.2238,
+      "n_swings": 872
+    },
+    "shadow_out|3-0": {
+      "p_whiff": 0.289,
+      "rv_contact": 0.0003,
+      "rv_whiff": -0.10954,
+      "n_swings": 5
+    },
+    "shadow_out|3-1": {
+      "p_whiff": 0.24121,
+      "rv_contact": -0.04762,
+      "rv_whiff": -0.09355,
+      "n_swings": 161
+    },
+    "shadow_out|3-2": {
+      "p_whiff": 0.25996,
+      "rv_contact": -0.0092,
+      "rv_whiff": -0.31021,
+      "n_swings": 542
+    },
+    "chase|0-0": {
+      "p_whiff": 0.61924,
+      "rv_contact": -0.03488,
+      "rv_whiff": -0.0451,
+      "n_swings": 1006
+    },
+    "chase|0-1": {
+      "p_whiff": 0.55681,
+      "rv_contact": -0.04853,
+      "rv_whiff": -0.05755,
+      "n_swings": 1128
+    },
+    "chase|0-2": {
+      "p_whiff": 0.42129,
+      "rv_contact": -0.01265,
+      "rv_whiff": -0.16966,
+      "n_swings": 942
+    },
+    "chase|1-0": {
+      "p_whiff": 0.56279,
+      "rv_contact": -0.04432,
+      "rv_whiff": -0.05546,
+      "n_swings": 538
+    },
+    "chase|1-1": {
+      "p_whiff": 0.54656,
+      "rv_contact": -0.04585,
+      "rv_whiff": -0.0665,
+      "n_swings": 861
+    },
+    "chase|1-2": {
+      "p_whiff": 0.43933,
+      "rv_contact": -0.01061,
+      "rv_whiff": -0.18758,
+      "n_swings": 1443
+    },
+    "chase|2-0": {
+      "p_whiff": 0.56172,
+      "rv_contact": -0.04762,
+      "rv_whiff": -0.07383,
+      "n_swings": 135
+    },
+    "chase|2-1": {
+      "p_whiff": 0.52462,
+      "rv_contact": -0.05426,
+      "rv_whiff": -0.07754,
+      "n_swings": 434
+    },
+    "chase|2-2": {
+      "p_whiff": 0.42603,
+      "rv_contact": -0.01002,
+      "rv_whiff": -0.22332,
+      "n_swings": 1107
+    },
+    "chase|3-0": {
+      "p_whiff": 0.49842,
+      "rv_contact": -0.02862,
+      "rv_whiff": -0.11773,
+      "n_swings": 2
+    },
+    "chase|3-1": {
+      "p_whiff": 0.44048,
+      "rv_contact": -0.07146,
+      "rv_whiff": -0.09729,
+      "n_swings": 111
+    },
+    "chase|3-2": {
+      "p_whiff": 0.418,
+      "rv_contact": -0.01126,
+      "rv_whiff": -0.30401,
+      "n_swings": 512
+    },
+    "waste|0-0": {
+      "p_whiff": 0.85751,
+      "rv_contact": -0.05168,
+      "rv_whiff": -0.06602,
+      "n_swings": 138
+    },
+    "waste|0-1": {
+      "p_whiff": 0.89657,
+      "rv_contact": -0.0548,
+      "rv_whiff": -0.07029,
+      "n_swings": 209
+    },
+    "waste|0-2": {
+      "p_whiff": 0.78259,
+      "rv_contact": -0.05097,
+      "rv_whiff": -0.15679,
+      "n_swings": 248
+    },
+    "waste|1-0": {
+      "p_whiff": 0.89253,
+      "rv_contact": -0.05702,
+      "rv_whiff": -0.08584,
+      "n_swings": 69
+    },
+    "waste|1-1": {
+      "p_whiff": 0.86568,
+      "rv_contact": -0.00335,
+      "rv_whiff": -0.08177,
+      "n_swings": 142
+    },
+    "waste|1-2": {
+      "p_whiff": 0.75871,
+      "rv_contact": 0.00596,
+      "rv_whiff": -0.1796,
+      "n_swings": 376
+    },
+    "waste|2-0": {
+      "p_whiff": 0.85169,
+      "rv_contact": -0.02139,
+      "rv_whiff": -0.11701,
+      "n_swings": 16
+    },
+    "waste|2-1": {
+      "p_whiff": 0.81551,
+      "rv_contact": -0.0455,
+      "rv_whiff": -0.10729,
+      "n_swings": 41
+    },
+    "waste|2-2": {
+      "p_whiff": 0.82227,
+      "rv_contact": -0.02273,
+      "rv_whiff": -0.2013,
+      "n_swings": 202
+    },
+    "waste|3-0": {
+      "p_whiff": 0.82423,
+      "rv_contact": -0.02408,
+      "rv_whiff": -0.13436,
+      "n_swings": 0
+    },
+    "waste|3-1": {
+      "p_whiff": 0.82019,
+      "rv_contact": -0.02234,
+      "rv_whiff": -0.12467,
+      "n_swings": 10
+    },
+    "waste|3-2": {
+      "p_whiff": 0.81535,
+      "rv_contact": -0.02358,
+      "rv_whiff": -0.24636,
+      "n_swings": 68
     }
   },
   "sieraConstant": 6.0084

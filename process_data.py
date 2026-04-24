@@ -2419,6 +2419,40 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs['sdPlus'] = 100.0
     print(f"  SD+ computed for {len(sd_results)} qualified hitters.")
 
+    # CT+ — contact-execution index: per-swing contact rate above expected,
+    # RV-weighted via the same (zone × count) cell table structure as SD+.
+    # See pipeline_contact.py.
+    from pipeline_contact import compute_ct_plus
+    ct_results, ct_weights = compute_ct_plus(
+        all_pitches, sd_pitches_by_hitter,
+        lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+        woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+    )
+    for row in hitter_leaderboard:
+        key = (row['hitter'], row['team'])
+        r = ct_results.get(key)
+        if r is not None:
+            row['ctPlus'] = r['ctPlus']
+            row['ctPlusRaw'] = round(r['raw_ct_adj'], 5)
+            row['ctPlusN'] = r['n_swings']
+            zdv = r.get('zone_dv') or {}
+            row['ctPlusHeart']      = (round(zdv['heart'], 5)      if zdv.get('heart')      is not None else None)
+            row['ctPlusShadowIn']   = (round(zdv['shadow_in'], 5)  if zdv.get('shadow_in')  is not None else None)
+            row['ctPlusShadowOut']  = (round(zdv['shadow_out'], 5) if zdv.get('shadow_out') is not None else None)
+            row['ctPlusChase']      = (round(zdv['chase'], 5)      if zdv.get('chase')      is not None else None)
+            row['ctPlusWaste']      = (round(zdv['waste'], 5)      if zdv.get('waste')      is not None else None)
+        else:
+            row['ctPlus'] = None
+            row['ctPlusRaw'] = None
+            row['ctPlusN'] = 0
+            row['ctPlusHeart'] = None
+            row['ctPlusShadowIn'] = None
+            row['ctPlusShadowOut'] = None
+            row['ctPlusChase'] = None
+            row['ctPlusWaste'] = None
+    hitter_league_avgs['ctPlus'] = 100.0
+    print(f"  CT+ computed for {len(ct_results)} qualified hitters.")
+
     # team_games_played — used for 3.1 PA × TGP leaderboard qualification
     team_games_played = compute_team_games_played(all_pitches)
     print(f"  Team games played: {dict(sorted(team_games_played.items()))}")
@@ -2455,6 +2489,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         },
         'teamGamesPlayed': team_games_played,
         'sdPlusWeights': sd_weights,
+        'ctPlusWeights': ct_weights,
     }
 
     # --- Generate micro-aggregate data ---

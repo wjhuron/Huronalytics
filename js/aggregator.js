@@ -1284,7 +1284,7 @@ const Aggregator = {
       'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
-      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'pdPlus', 'sdPlus',
+      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'pdPlus', 'sdPlus', 'ctPlus',
       'batSpeed', 'swingLength', 'blastPct', 'idealAAPct',
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
@@ -1512,10 +1512,12 @@ const Aggregator = {
                         'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
                         'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
-                        // SD+ is precomputed against the full season (needs the
-                        // 60-cell RV weight table that isn't available client-side),
-                        // so always surface the season value even under filters.
-                        'sdPlus', 'sdPlusN', 'sdPlusRaw'];
+                        // SD+ and CT+ are precomputed against the full season
+                        // (need the 60-cell RV weight tables that aren't
+                        // available client-side), so always surface the season
+                        // value even under filters.
+                        'sdPlus', 'sdPlusN', 'sdPlusRaw',
+                        'ctPlus', 'ctPlusN', 'ctPlusRaw'];
     // Rate stats that micro data computes (skip when filtered)
     const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
                            'doubles', 'triples', 'hr', 'xbh'];
