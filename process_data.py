@@ -7,6 +7,7 @@ import json
 import math
 import os
 import pickle
+import re
 import sys
 import time as time_module
 from datetime import datetime
@@ -3033,6 +3034,31 @@ def write_embedded_js(rs_result):
     print("  Wrote data_embedded.js")
 
 
+def bump_asset_version(index_path=None):
+    """Rewrite every `?v=...` query in index.html to the current build
+    timestamp (YYYYMMDDHHMM). Forces browsers to bypass cached CSS/JS/data
+    whenever the pipeline regenerates output. Idempotent within the same
+    minute."""
+    if index_path is None:
+        index_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  'index.html')
+    if not os.path.exists(index_path):
+        print(f"  WARN: {index_path} not found; skipping version bump")
+        return
+    build_tag = datetime.now().strftime('%Y%m%d%H%M')
+    with open(index_path, 'r') as f:
+        html = f.read()
+    new_html, n = re.subn(r'\?v=[\w-]+', f'?v={build_tag}', html)
+    if n > 0 and new_html != html:
+        with open(index_path, 'w') as f:
+            f.write(new_html)
+        print(f"  Bumped {n} ?v= query params in index.html to {build_tag}")
+    elif n > 0:
+        print(f"  index.html already at ?v={build_tag} (no change)")
+    else:
+        print("  No ?v= query params found in index.html")
+
+
 def main():
     global WOBA_WEIGHTS, FIP_CONSTANT, GUTS_EXTRA, PARK_FACTORS
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -3098,6 +3124,7 @@ def main():
     print("\n--- Writing output files ---")
     write_json_outputs(rs_result, '_rs')
     write_embedded_js(rs_result)
+    bump_asset_version()
 
     print(f"\nOutput written to {DATA_DIR}/")
     print(f"  RS: {len(rs_result['pitcher_leaderboard'])} pitchers, "
