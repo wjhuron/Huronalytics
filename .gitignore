@@ -7,7 +7,9 @@ service_account.json
 mlb_id_cache.json
 outlier_results.json
 name_duplicates_report.txt
-data_embedded.js
+# data_embedded.js is served from GitHub Releases (rolling "data-latest"
+# tag), not committed to the repo — keeps git lean despite 50+ MB / 3× daily.
+data/data_embedded.js
 
 # Python
 .venv/
