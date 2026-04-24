@@ -1511,7 +1511,11 @@ const Aggregator = {
     const hBoxAlways = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
                         'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
-                        'wOBA', 'wRC', 'wRCplus', 'xWRCplus'];
+                        'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
+                        // SD+ is precomputed against the full season (needs the
+                        // 60-cell RV weight table that isn't available client-side),
+                        // so always surface the season value even under filters.
+                        'sdPlus', 'sdPlusN', 'sdPlusRaw'];
     // Rate stats that micro data computes (skip when filtered)
     const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
                            'doubles', 'triples', 'hr', 'xbh'];
