@@ -51,7 +51,7 @@ GUTS_EXTRA = None
 PARK_FACTORS = None
 
 
-def generate_micro_data(all_pitches):
+def generate_micro_data(all_pitches, mlb_id_cache=None):
     """Generate micro-aggregate data for client-side date and opponent-hand filtering.
 
     Groups pitches by (person, date, opponent_hand) with summable counts.
@@ -794,11 +794,27 @@ def generate_micro_data(all_pitches):
         if ti not in aaa_team_indices:
             hitter_mlb_team_set_micro[hi].add(ti)
 
+    # Helper: check whether the MLB IDs match across a player's teams. If
+    # different IDs appear, it's a name collision (two different players
+    # with the same name) and we must NOT synthesize a combined 2TM row.
+    def _ids_match_across_teams(player_name, team_indices):
+        if mlb_id_cache is None:
+            return True  # no ID info → assume no collision (legacy behavior)
+        ids = set()
+        for ti in team_indices:
+            team_name = teams[ti]
+            mid = mlb_id_cache.get(f"{player_name}|{team_name}")
+            if mid is not None:
+                ids.add(mid)
+        return len(ids) <= 1
+
     # Extend teams + tm_idx with combined labels we'll actually need
     combined_pitcher_ti = {}  # (pi, throws) → combined tm_idx
     combined_hitter_ti = {}   # hi → combined tm_idx
     for (pi, throws), tset in pitcher_mlb_team_set_micro.items():
         if len(tset) < 2:
+            continue
+        if not _ids_match_across_teams(pitchers[pi], tset):
             continue
         label = f"{len(tset)}TM"
         if label not in tm_idx:
@@ -807,6 +823,8 @@ def generate_micro_data(all_pitches):
         combined_pitcher_ti[(pi, throws)] = tm_idx[label]
     for hi, tset in hitter_mlb_team_set_micro.items():
         if len(tset) < 2:
+            continue
+        if not _ids_match_across_teams(hitters[hi], tset):
             continue
         label = f"{len(tset)}TM"
         if label not in tm_idx:
@@ -2546,7 +2564,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # --- Generate micro-aggregate data ---
     print(f"\n--- Generating micro-aggregate data ({label}) ---")
-    micro_data = generate_micro_data(all_pitches)
+    micro_data = generate_micro_data(all_pitches, mlb_id_cache=mlb_id_cache)
     print(f"  micro_data: {len(micro_data['pitcherMicro'])} pitcher, "
           f"{len(micro_data['pitchMicro'])} pitch, "
           f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "
