@@ -3,12 +3,15 @@ service_account.json
 
 # Local data / caches
 *.xlsx
+*.pkl
 mlb_id_cache.json
 outlier_results.json
 name_duplicates_report.txt
 data_embedded.js
 
 # Python
+.venv/
+venv/
 __pycache__/
 *.pyc
 

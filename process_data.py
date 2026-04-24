@@ -6,6 +6,7 @@ from google.oauth2.service_account import Credentials
 import json
 import math
 import os
+import pickle
 import sys
 import time as time_module
 from datetime import datetime
@@ -1144,6 +1145,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             roc_hitter_count += 1
     if roc_pitcher_count or roc_hitter_count:
         print(f"  Tagged {roc_pitcher_count} ROC pitcher pitches, {roc_hitter_count} ROC hitter pitches")
+
+    # --- Cache pitch-level data for downstream per-pitch analysis (SD+, etc.) ---
+    cache_path = os.path.join(DATA_DIR, f'all_pitches_{label.lower()}_cache.pkl')
+    with open(cache_path, 'wb') as f:
+        pickle.dump(all_pitches, f)
+    print(f"  Cached {len(all_pitches)} pitches to {cache_path}")
 
     # --- Reclassify CF (Cut-Fastball) → FF or FC ---
     # CF is not a real Statcast classification. Remap to FF by default,
@@ -2372,6 +2379,47 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['hitterPlus'] = None
     hitter_league_avgs['hitterPlus'] = 100.0
 
+    # SD+ — decision-only discipline index (xRV-weighted cells, dv_A formula,
+    # Bayesian-regressed to league, SD-scaled at k=30). See pipeline_sdplus.py.
+    from pipeline_sdplus import compute_sd_plus, compute_team_games_played
+    sd_pitches_by_hitter = {
+        key: pitches for key, pitches in hitter_groups.items()
+        if key[1] in MLB_TEAMS
+    }
+    sd_results, sd_weights = compute_sd_plus(
+        all_pitches, sd_pitches_by_hitter,
+        lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+        woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+    )
+    for row in hitter_leaderboard:
+        key = (row['hitter'], row['team'])
+        r = sd_results.get(key)
+        if r is not None:
+            row['sdPlus'] = r['sdPlus']
+            row['sdPlusRaw'] = round(r['raw_sd_adj'], 5)
+            row['sdPlusN'] = r['n_decisions']
+            zdv = r.get('zone_dv') or {}
+            row['sdPlusHeart']      = (round(zdv['heart'], 5)      if zdv.get('heart')      is not None else None)
+            row['sdPlusShadowIn']   = (round(zdv['shadow_in'], 5)  if zdv.get('shadow_in')  is not None else None)
+            row['sdPlusShadowOut']  = (round(zdv['shadow_out'], 5) if zdv.get('shadow_out') is not None else None)
+            row['sdPlusChase']      = (round(zdv['chase'], 5)      if zdv.get('chase')      is not None else None)
+            row['sdPlusWaste']      = (round(zdv['waste'], 5)      if zdv.get('waste')      is not None else None)
+        else:
+            row['sdPlus'] = None
+            row['sdPlusRaw'] = None
+            row['sdPlusN'] = 0
+            row['sdPlusHeart'] = None
+            row['sdPlusShadowIn'] = None
+            row['sdPlusShadowOut'] = None
+            row['sdPlusChase'] = None
+            row['sdPlusWaste'] = None
+    hitter_league_avgs['sdPlus'] = 100.0
+    print(f"  SD+ computed for {len(sd_results)} qualified hitters.")
+
+    # team_games_played — used for 3.1 PA × TGP leaderboard qualification
+    team_games_played = compute_team_games_played(all_pitches)
+    print(f"  Team games played: {dict(sorted(team_games_played.items()))}")
+
     # --- Metadata ---
     metadata = {
         'teams': all_teams,
@@ -2402,6 +2450,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             }
             for key, sub in mvn_models.items()
         },
+        'teamGamesPlayed': team_games_played,
+        'sdPlusWeights': sd_weights,
     }
 
     # --- Generate micro-aggregate data ---
