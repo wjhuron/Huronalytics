@@ -3242,12 +3242,17 @@ def main():
         if r.get('era') is not None and r['era'] < 0:
             warnings.append(f"Negative ERA: {r.get('pitcher')} = {r['era']}")
     for r in rs_result['hitter_leaderboard']:
+        pa = r.get('pa') or 0
         w = r.get('wOBA')
-        if w is not None and (w < 0 or w > 1.0):
-            warnings.append(f"wOBA out of bounds: {r.get('hitter')} = {w}")
+        # wOBA can exceed 1.0 in small samples (a single HR PA = 2.091).
+        # Only flag wOBA > 1.0 for hitters with enough PA that it's
+        # genuinely impossible (~30+); always flag negatives or absurd
+        # values regardless of sample.
+        if w is not None and (w < 0 or w > 2.5 or (w > 1.0 and pa >= 30)):
+            warnings.append(f"wOBA out of bounds: {r.get('hitter')} pa={pa} = {w}")
         a = r.get('avg')
         if a is not None and (a < 0 or a > 1.0):
-            warnings.append(f"AVG out of bounds: {r.get('hitter')} = {a}")
+            warnings.append(f"AVG out of bounds: {r.get('hitter')} pa={pa} = {a}")
     if warnings:
         print(f"\n*** DATA INTEGRITY WARNINGS ({len(warnings)}) ***")
         for w in warnings[:20]:
