@@ -492,9 +492,9 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
 
     import datetime as _dt
     _et = _today_et()
-    today = _et.isoformat()
-    yesterday = (_et - _dt.timedelta(days=1)).isoformat()
-    recent_dates = {today, yesterday}
+    # Always re-fetch the last 10 days so retroactive scoring changes
+    # (hits ↔ errors, earned/unearned reclassifications) propagate.
+    recent_dates = {(_et - _dt.timedelta(days=i)).isoformat() for i in range(10)}
 
     dates_to_fetch = []
     for d in sorted(game_dates):
@@ -586,9 +586,9 @@ def fetch_and_aggregate_boxscores(game_dates):
 
     import datetime as _dt
     _et = _today_et()
-    today = _et.isoformat()
-    yesterday = (_et - _dt.timedelta(days=1)).isoformat()
-    recent_dates = {today, yesterday}
+    # Always re-fetch the last 10 days so retroactive scoring changes
+    # (hits ↔ errors, earned/unearned reclassifications) propagate.
+    recent_dates = {(_et - _dt.timedelta(days=i)).isoformat() for i in range(10)}
 
     dates_to_fetch = []
     for d in sorted(game_dates):
