@@ -884,7 +884,8 @@ def main():
 
     # Step 1: Load pitch data from Google Sheets
     print("Step 1: Loading pitch data from Google Sheets...")
-    creds = Credentials.from_service_account_file('service_account.json',
+    creds = Credentials.from_service_account_file(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'service_account.json'),
         scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(sheet_key)

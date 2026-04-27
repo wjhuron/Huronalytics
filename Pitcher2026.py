@@ -1312,9 +1312,9 @@ def main():
     """Main function to download pitcher data"""
 
     # ── Settings (edit these directly or override via command line) ──
-    team_abbrev     = "SDP"
-    start_date      = "2026-04-25"
-    end_date        = "2026-04-25"
+    team_abbrev     = ""
+    start_date      = "2026-04-27"
+    end_date        = "2026-04-27"
     pitchers_only   = True
 
     game_id         = ""          # Game PK (e.g., "831437") — leave blank for team/date lookup

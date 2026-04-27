@@ -117,7 +117,7 @@ def get_second_closest(ivb, hb, hand, exclude_name):
 
 
 # ── Load data ─────────────────────────────────────────────────────────────
-with open('data/pitch_leaderboard.json') as f:
+with open('data/pitch_leaderboard_rs.json') as f:
     pitch_data = json.load(f)
 
 print(f"Loaded {len(pitch_data)} pitch rows")

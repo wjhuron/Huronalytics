@@ -24,7 +24,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 # ── Load data ──────────────────────────────────────────────────────────────
-with open('data/pitch_leaderboard.json') as f:
+with open('data/pitch_leaderboard_rs.json') as f:
     pitch_data = json.load(f)
 
 TARGET_TYPES = {'FF', 'FC', 'SL', 'ST', 'CU', 'SV'}

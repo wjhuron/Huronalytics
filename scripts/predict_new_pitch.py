@@ -1041,9 +1041,9 @@ def _draw_arsenal_table(ax, rows):
 
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    pitcher  = "Varland, Gus"   # Pitcher name, "Last, First" format
+    pitcher  = "Littell, Zack"   # Pitcher name, "Last, First" format
     team     = "WSH"                 # Team abbreviation
-    pitches  = ["SI", "CU"]          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
+    pitches  = ["CU"]          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
 
     no_plot   = False                # True to skip plot generation
     plot_only = False                # True to write plot but skip printed text

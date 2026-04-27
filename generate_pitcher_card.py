@@ -17,6 +17,7 @@ from matplotlib.patches import Ellipse, FancyBboxPatch, Rectangle
 from PIL import Image
 from io import BytesIO
 import urllib.request
+import os
 import numpy as np
 from collections import defaultdict
 from math import atan2, sin, cos
@@ -176,7 +177,8 @@ def is_barrel(ev, la):
 # DATA LOADING
 # ═══════════════════════════════════════════════════════════════
 print("Loading data...")
-creds = Credentials.from_service_account_file('service_account.json',
+creds = Credentials.from_service_account_file(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'service_account.json'),
     scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
 gc = gspread.authorize(creds)
 fried = [r for r in gc.open_by_key(SHEET_KEY).worksheet(WORKSHEET_NAME).get_all_records()

@@ -38,3 +38,6 @@ biomech/pose_landmarker_heavy.task
 # Stuff+ v10 model artifacts (only the training script is in git)
 stuff_plus_v10/pitcher_stuff_v10.csv
 stuff_plus_v10/model_summary_v10.txt
+
+# Logs
+*.log
