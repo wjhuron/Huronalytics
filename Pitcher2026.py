@@ -819,11 +819,7 @@ class BaseballSavantFocusedDownloader:
             numeric_round_2 = ['VAA', 'HAA', 'HC_X', 'HC_Y',
                                'RelPosZ', 'RelPosX', 'Extension']
             numeric_round_3 = ['PlateZ', 'PlateX', 'SzTop', 'SzBot',
-                               'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom']
-            # RunExp is summed across many pitches for xRV/100 — keep it at
-            # full Statcast precision so accumulated rounding doesn't shift
-            # the displayed result. Display rounding happens at render time.
-            numeric_round_10 = ['RunExp']
+                               'RunExp', 'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom']
             numeric_int = ['LaunchAngle', 'Distance']
 
             for col in numeric_round_1:
@@ -835,9 +831,6 @@ class BaseballSavantFocusedDownloader:
             for col in numeric_round_3:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').apply(lambda x: f"{x:.3f}" if pd.notna(x) else '')
-            for col in numeric_round_10:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce').apply(lambda x: f"{x:.10f}" if pd.notna(x) else '')
             for col in numeric_int:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
