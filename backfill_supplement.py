@@ -10,6 +10,7 @@ relevant team/date ranges from Baseball Savant and fills in the empty cells.
 Configuration: edit the variables below before running.
 """
 
+import argparse
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
@@ -17,14 +18,18 @@ import pandas as pd
 from io import StringIO
 import os
 import time
+from datetime import datetime
 
 # ── USER CONFIGURATION ──────────────────────────────────────────────────────
 # Set date range (inclusive). Leave both as None to backfill all dates.
-start_date = "2026-03-27"
-end_date   = "2026-04-05"
+start_date = None
+end_date   = None
 
 # Set specific teams, or None for all teams.  e.g. ["BOS", "NYY"]
 filter_teams = None
+
+# Produce an Excel report of all changes? "yes" or "no"
+produce_report = "no"
 # ─────────────────────────────────────────────────────────────────────────────
 
 SPREADSHEET_IDS = {
@@ -49,11 +54,12 @@ SUPPLEMENT_MAP = {
     'wOBAval': 'woba_value',
     'wOBAdom': 'woba_denom',
     'Barrel': 'launch_speed_angle',
+    'Outs': 'outs_when_up',
     'Event': 'events',
 }
 
 # Columns that store raw integer values from Statcast (no rounding needed)
-INT_COLS = {'Barrel'}  # Raw launch_speed_angle value (1-6 scale)
+INT_COLS = {'Barrel', 'Outs'}  # Raw integer values
 
 # Columns that store free-form strings (no numeric coercion, custom translator).
 STRING_COLS = {'Event'}
@@ -129,8 +135,9 @@ MLB_TEAMS = {
     'ARI', 'ATH', 'ATL', 'BAL', 'BOS', 'CHC', 'CIN', 'CLE', 'COL', 'CWS',
     'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY',
     'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
-    'ROC',
 }
+ROC_TEAMS = {'ROC'}  # MiLB/affiliate teams tracked alongside MLB
+ALL_TRACKED_TEAMS = MLB_TEAMS | ROC_TEAMS
 
 
 def date_in_range(date_str):
@@ -188,55 +195,79 @@ def download_statcast(team_tab, date_min, date_max, session):
                 return None
 
         # Build lookup dict keyed by PitchID components
-        lookup = {}
+        # Use vectorised pandas ops where possible, then convert to dict
         statcast_cols = list(SUPPLEMENT_MAP.values())
         available = [c for c in statcast_cols if c in df.columns]
 
-        for _, row in df.iterrows():
-            key = (
-                str(int(row['game_pk'])),
-                str(int(row['at_bat_number'])),
-                str(int(row['pitch_number'])),
-            )
+        # Build string keys once (vectorised)
+        keys_df = pd.DataFrame({
+            'k0': df['game_pk'].astype(int).astype(str),
+            'k1': df['at_bat_number'].astype(int).astype(str),
+            'k2': df['pitch_number'].astype(int).astype(str),
+        })
+
+        # Pre-format each supplement column into a string Series
+        formatted = {}
+        for sheet_col, csv_col in SUPPLEMENT_MAP.items():
+            if csv_col not in df.columns:
+                continue
+            series = df[csv_col]
+            if sheet_col in STRING_COLS:
+                # String column: custom translator. For Event, translate Statcast
+                # lowercase_underscore codes to MLB Stats API title-case strings
+                # that Wally's sheet uses. Unmapped codes (including `field_out`)
+                # are dropped so the downstream overwrite step leaves the cell
+                # alone.
+                if sheet_col == 'Event':
+                    mapped = series.map(STATCAST_TO_MLB_EVENT)
+                    formatted[sheet_col] = mapped.dropna()
+                else:
+                    formatted[sheet_col] = series.dropna().astype(str)
+            elif sheet_col in INT_COLS:
+                # Integer columns: raw int as string, NaN -> None
+                s = series.dropna().astype(float).astype(int).astype(str)
+                formatted[sheet_col] = s
+            else:
+                decimals = ROUND_DECIMALS.get(sheet_col, 1)
+                numeric = pd.to_numeric(series, errors='coerce')
+                # Filter out sub-50 bat speed (check swings / artifacts)
+                if sheet_col == 'BatSpeed':
+                    numeric = numeric.where(numeric >= 50)
+                rounded = numeric.round(decimals)
+                # Format to fixed decimal string; NaN rows excluded via dropna
+                fmt_func = (lambda d: lambda v: f"{v:.{d}f}")(decimals)
+                s = rounded.dropna().map(fmt_func)
+                formatted[sheet_col] = s
+
+        # Runners column (vectorised)
+        has_runners = all(c in df.columns for c in ['on_1b', 'on_2b', 'on_3b'])
+        if has_runners:
+            r1 = df['on_1b'].notna()
+            r2 = df['on_2b'].notna()
+            r3 = df['on_3b'].notna()
+            # Build runners string per row
+            runners = pd.Series('0', index=df.index)
+            # Assign combinations (most common first for speed)
+            mask_any = r1 | r2 | r3
+            if mask_any.any():
+                parts = []
+                for mask, label in [(r1, '1'), (r2, '2'), (r3, '3')]:
+                    parts.append(mask.map({True: label, False: ''}))
+                runners = (parts[0] + '+' + parts[1] + '+' + parts[2]).str.strip('+').str.replace(r'\++', '+', regex=True)
+                runners = runners.replace('', '0')
+
+        # Assemble lookup dict
+        lookup = {}
+        for i in df.index:
+            key = (keys_df.at[i, 'k0'], keys_df.at[i, 'k1'], keys_df.at[i, 'k2'])
             data = {}
-            for sheet_col, csv_col in SUPPLEMENT_MAP.items():
-                if csv_col in df.columns:
-                    val = row[csv_col]
-                    if pd.notna(val):
-                        # String columns (Event): translate Statcast code to
-                        # MLB Stats API format. Unmapped codes (including the
-                        # generic `field_out`) are skipped so downstream
-                        # overwrite leaves the existing sheet value alone.
-                        if sheet_col in STRING_COLS:
-                            if sheet_col == 'Event':
-                                mapped = STATCAST_TO_MLB_EVENT.get(str(val).strip())
-                                if mapped:
-                                    data[sheet_col] = mapped
-                            else:
-                                data[sheet_col] = str(val)
-                            continue
-                        # Integer columns: store raw value (e.g., Barrel 1-6 scale)
-                        if sheet_col in INT_COLS:
-                            data[sheet_col] = str(int(float(val)))
-                            continue
-                        fval = float(val)
-                        # Filter out sub-50 bat speed (check swings / artifacts)
-                        if sheet_col == 'BatSpeed' and fval < 50:
-                            continue
-                        decimals = ROUND_DECIMALS.get(sheet_col, 1)
-                        fval = round(fval, decimals)
-                        data[sheet_col] = f"{fval:.{decimals}f}"
-                    elif sheet_col in ALWAYS_OVERWRITE_COLS:
-                        # For overwrite cols, store empty to clear estimates
-                        # when official data says the value is blank/null
-                        data[sheet_col] = ''
-            # Build Runners from on_1b/on_2b/on_3b
-            if all(c in df.columns for c in ['on_1b', 'on_2b', 'on_3b']):
-                bases = []
-                if pd.notna(row.get('on_1b')): bases.append('1')
-                if pd.notna(row.get('on_2b')): bases.append('2')
-                if pd.notna(row.get('on_3b')): bases.append('3')
-                data['Runners'] = '+'.join(bases) if bases else '0'
+            for sheet_col in formatted:
+                if i in formatted[sheet_col].index:
+                    data[sheet_col] = formatted[sheet_col].at[i]
+                elif sheet_col in ALWAYS_OVERWRITE_COLS:
+                    data[sheet_col] = ''
+            if has_runners:
+                data['Runners'] = runners.at[i]
             if data:
                 lookup[key] = data
 
@@ -252,17 +283,64 @@ def download_statcast(team_tab, date_min, date_max, session):
         return None
 
 
-def read_sheet_with_retry(ws, max_retries=3):
+def read_sheet_with_retry(ws, max_retries=5):
+    """Retry on rate-limit (429) and transient backend errors (5xx)."""
+    transient_codes = ('429', '500', '502', '503', '504')
     for attempt in range(max_retries):
         try:
             return ws.get_all_values()
         except gspread.exceptions.APIError as e:
-            if '429' in str(e) and attempt < max_retries - 1:
-                wait = 30 * (attempt + 1)
-                print(f"    Rate limited, waiting {wait}s...")
+            msg = str(e)
+            code = next((c for c in transient_codes if c in msg), None)
+            if code and attempt < max_retries - 1:
+                wait = min(60, 5 * (2 ** attempt))  # 5, 10, 20, 40, 60 s
+                label = 'Rate limited' if code == '429' else f'Transient {code}'
+                print(f"    {label}, waiting {wait}s before retry "
+                      f"({attempt + 1}/{max_retries - 1})...")
                 time.sleep(wait)
             else:
                 raise
+
+
+def write_report(report_data, output_dir='/Users/wallyhuron/Downloads/'):
+    """Write an Excel report with one tab per team showing all changed rows.
+    Changed cells are bold; column header row shows which columns had changes."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    wb.remove(wb.active)  # remove default sheet
+
+    bold = Font(bold=True)
+    teams_with_data = sorted(t for t, rows in report_data.items() if rows)
+
+    if not teams_with_data:
+        print("  No changes to report.")
+        return None
+
+    for team in teams_with_data:
+        ws = wb.create_sheet(title=team)
+        entries = report_data[team]
+        header = entries[0]['header']
+
+        # Write header row (bold)
+        for c, col_name in enumerate(header, start=1):
+            cell = ws.cell(row=1, column=c, value=col_name)
+            cell.font = bold
+
+        # Write data rows
+        for r, entry in enumerate(entries, start=2):
+            row_vals = entry['row_values']
+            changes = entry['changes']  # {col_idx: 'new'|'overwrite'}
+            for c, val in enumerate(row_vals):
+                cell = ws.cell(row=r, column=c + 1, value=val)
+                if c in changes:
+                    cell.font = bold
+
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    path = os.path.join(output_dir, f'backfill_report_{stamp}.xlsx')
+    wb.save(path)
+    return path
 
 
 def main():
@@ -281,6 +359,8 @@ def main():
     })
 
     total_filled = 0
+    total_overwritten = 0
+    report_data = {}  # team -> list of {header, row_values, changes}
 
     for sheet_label, sheet_id in SPREADSHEET_IDS.items():
         sh = gc.open_by_key(sheet_id)
@@ -291,8 +371,8 @@ def main():
         for i, ws in enumerate(sh.worksheets()):
             tab_name = ws.title.upper()
 
-            # Skip WBC and non-MLB tabs
-            if tab_name not in MLB_TEAMS:
+            # Skip WBC and non-tracked tabs
+            if tab_name not in ALL_TRACKED_TEAMS:
                 continue
             if filter_teams and tab_name not in filter_teams:
                 continue
@@ -330,6 +410,7 @@ def main():
             # PitchID exists AND (at least one supplement column is empty
             # OR has an always-overwrite column that might contain an estimate)
             needs_fill = []  # (row_index_1based, pitch_id, cols_to_update)
+            # cols_to_update entries: (sheet_col, existing_value) — empty string means new fill
             legacy_barrel_fixes = []  # Cells to convert "yes" -> "6"
             game_dates = set()
             date_col = col_idx.get('Game Date')
@@ -368,9 +449,9 @@ def main():
                     if is_empty and sheet_col in OVERWRITE_ONLY_COLS:
                         continue
                     if is_empty:
-                        cols_to_update.append(sheet_col)
+                        cols_to_update.append((sheet_col, ''))
                     elif sheet_col in ALWAYS_OVERWRITE_COLS or sheet_col in OVERWRITE_ONLY_COLS:
-                        cols_to_update.append(sheet_col)
+                        cols_to_update.append((sheet_col, val))
 
                 if cols_to_update:
                     needs_fill.append((r_idx, pid, cols_to_update))
@@ -411,7 +492,9 @@ def main():
 
             # Match and prepare cell updates
             cells_to_update = []
-            filled_count = 0
+            new_fill_cells = 0
+            overwrite_cells = 0
+            team_report_rows = []
 
             for r_idx, pid, cols_to_update in needs_fill:
                 # Split PitchID: game_pk_atbat(zero-padded)_pitch(zero-padded)
@@ -422,9 +505,9 @@ def main():
                 key = (parts[0], str(int(parts[1])), str(int(parts[2])))
 
                 statcast_row = lookup.get(key, {})
-                row_filled = False
+                row_changes = {}  # col_idx -> 'new'|'overwrite'
 
-                for sheet_col in cols_to_update:
+                for sheet_col, existing_val in cols_to_update:
                     if sheet_col in statcast_row:
                         val = statcast_row[sheet_col]
                         # Don't write empty values for overwrite cols —
@@ -432,30 +515,85 @@ def main():
                         if not val and (sheet_col in ALWAYS_OVERWRITE_COLS
                                         or sheet_col in OVERWRITE_ONLY_COLS):
                             continue
+                        # Skip if overwrite value is identical to existing
+                        if existing_val and str(val) == str(existing_val):
+                            continue
                         cell = gspread.Cell(
                             row=r_idx,
                             col=supp_col_idx[sheet_col] + 1,  # 1-indexed
                             value=val,
                         )
                         cells_to_update.append(cell)
-                        row_filled = True
+                        c_idx = col_idx[sheet_col]
+                        if existing_val:
+                            overwrite_cells += 1
+                            row_changes[c_idx] = 'overwrite'
+                        else:
+                            new_fill_cells += 1
+                            row_changes[c_idx] = 'new'
 
-                if row_filled:
-                    filled_count += 1
+                # Collect report data for this row if anything changed
+                if row_changes and produce_report == 'yes':
+                    # Build row with new values applied
+                    row_vals = list(rows[r_idx - 1])
+                    for c_idx, change_type in row_changes.items():
+                        # Find the cell we're about to write for this column
+                        for cell in cells_to_update:
+                            if cell.row == r_idx and cell.col == c_idx + 1:
+                                row_vals[c_idx] = cell.value
+                                break
+                    team_report_rows.append({
+                        'header': header,
+                        'row_values': row_vals,
+                        'changes': row_changes,
+                    })
 
             if cells_to_update:
-                # Batch update (gspread handles chunking)
                 print(f"  Writing {len(cells_to_update)} cells "
-                      f"({filled_count} rows with new data)...")
+                      f"({new_fill_cells} new, {overwrite_cells} overwritten)...")
                 ws.update_cells(cells_to_update, value_input_option='RAW')
-                total_filled += filled_count
+                total_filled += new_fill_cells
+                total_overwritten += overwrite_cells
                 time.sleep(2)  # Rate limit buffer after write
             else:
-                print(f"  No matching Statcast data for empty rows "
-                      f"(data may not be processed yet)")
+                print(f"  No new data to fill, no overwrites changed.")
 
-    print(f"\nDone. Filled supplement data for {total_filled} rows total.")
+            if team_report_rows:
+                report_data[tab_name] = team_report_rows
+
+    parts = []
+    if total_filled:
+        parts.append(f"{total_filled} new cells filled")
+    if total_overwritten:
+        parts.append(f"{total_overwritten} cells overwritten")
+    if parts:
+        print(f"\nDone. {', '.join(parts)}.")
+    else:
+        print(f"\nDone. No new data added, no data overwritten.")
+
+    if produce_report == 'yes':
+        report_path = write_report(report_data)
+        if report_path:
+            print(f"Report saved to: {report_path}")
 
 
 if __name__ == '__main__':
+    # ── CLI overrides (optional — edit start_date/end_date at top of file as before) ──
+    parser = argparse.ArgumentParser(description='Backfill supplemental Statcast data into Google Sheet')
+    parser.add_argument('--start', default=None, help='Start date YYYY-MM-DD, or "none" for all dates')
+    parser.add_argument('--end', default=None, help='End date YYYY-MM-DD, or "none" for all dates')
+    parser.add_argument('--teams', default=None, help='Comma-separated team abbreviations (e.g., BOS,NYY)')
+    parser.add_argument('--report', default=None, help='"yes" to produce an Excel report of changes')
+    args = parser.parse_args()
+
+    # Only override module-level globals if CLI args were explicitly passed
+    if args.start is not None:
+        start_date = None if args.start.lower() == 'none' else args.start
+    if args.end is not None:
+        end_date = None if args.end.lower() == 'none' else args.end
+    if args.teams is not None:
+        filter_teams = [t.strip().upper() for t in args.teams.split(',') if t.strip()]
+    if args.report is not None:
+        produce_report = args.report.lower()
+
     main()

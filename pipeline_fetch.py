@@ -187,15 +187,21 @@ def fetch_park_factors(year=2026):
 
 # ── Google Sheets reading ────────────────────────────────────────────────
 
-def read_sheet_with_retry(ws, max_retries=3):
-    """Read a worksheet with retry logic for rate limiting (429 errors)."""
+def read_sheet_with_retry(ws, max_retries=5):
+    """Read a worksheet with retry logic for rate-limit (429) and transient
+    backend errors (500, 502, 503, 504). Backs off exponentially."""
+    transient_codes = ('429', '500', '502', '503', '504')
     for attempt in range(max_retries):
         try:
             return ws.get_all_values()
         except gspread.exceptions.APIError as e:
-            if '429' in str(e) and attempt < max_retries - 1:
-                wait = 30 * (attempt + 1)
-                print(f"    Rate limited, waiting {wait}s...")
+            msg = str(e)
+            code = next((c for c in transient_codes if c in msg), None)
+            if code and attempt < max_retries - 1:
+                wait = min(60, 5 * (2 ** attempt))  # 5, 10, 20, 40, 60 s
+                label = 'Rate limited' if code == '429' else f'Transient {code}'
+                print(f"    {label}, waiting {wait}s before retry "
+                      f"({attempt + 1}/{max_retries - 1})...")
                 time_module.sleep(wait)
             else:
                 raise
