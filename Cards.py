@@ -111,14 +111,28 @@ TABLE_LEFT_FIG=0.01; TABLE_RIGHT_FIG=0.99; PLOT_LEFT=0.585; PLOT_RIGHT=0.99
 USAGE_SHIFT=0.18; DIVIDER_COL=14; PLATE_HALF=17/12/2
 FIG_W=16; FIG_H=15; DPI=100; SAVE_DPI=150
 
-# Guts constants for xRV computation (approximate 2026 values)
-GUTS_LG_WOBA = 0.317
-GUTS_WOBA_SCALE = 1.25
 BG='#141619'; ACCENT='#00d4ff'; DARK_CELL='#1e2127'; DARKER='#0d0f12'
 
 MLB_ID_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mlb_id_cache.json')
 OUTPUT_DIR = '/Users/wallyhuron/Downloads/'
 METADATA_PATH = '/Users/wallyhuron/Huronalytics/data/metadata_rs.json'
+
+# Guts constants for xRV computation. Read live from metadata_rs.json so the
+# values match whatever process_data.py used on its last run; otherwise a
+# Cards-vs-leaderboard mismatch creeps back in as FanGraphs updates Guts.
+def _load_guts():
+    try:
+        with open(METADATA_PATH) as _f:
+            g = json.load(_f).get('gutsConstants') or {}
+        lg, sc = g.get('lgWOBA'), g.get('wOBAScale')
+        if lg and sc:
+            return float(lg), float(sc)
+    except Exception:
+        pass
+    # Fallback only if metadata is missing/incomplete (first run, network issue).
+    return 0.320, 1.252
+
+GUTS_LG_WOBA, GUTS_WOBA_SCALE = _load_guts()
 
 # Mapping: card column header → metadata league average key
 PCT_COLOR_COLS = {

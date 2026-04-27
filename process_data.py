@@ -2908,6 +2908,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     print(f"  SIERA constant: {siera_constant:.3f}")
     metadata['sieraConstant'] = round(siera_constant, 4)
 
+    # Persist live FanGraphs Guts constants so downstream tools (Cards.py)
+    # can use the same values that compute_xrv used here, instead of drifting
+    # against hardcoded fallbacks.
+    if GUTS_EXTRA:
+        metadata['gutsConstants'] = {
+            'lgWOBA': GUTS_EXTRA.get('lgWOBA'),
+            'wOBAScale': GUTS_EXTRA.get('wOBAScale'),
+            'lgRPA': GUTS_EXTRA.get('lgRPA'),
+        }
+
     # Second pass: apply SIERA constant and clean up
     for row in pitcher_leaderboard:
         if row.get('_siera_raw') is not None:
