@@ -283,23 +283,35 @@ def download_statcast(team_tab, date_min, date_max, session):
         return None
 
 
-def read_sheet_with_retry(ws, max_retries=5):
-    """Retry on rate-limit (429) and transient backend errors (5xx)."""
-    transient_codes = ('429', '500', '502', '503', '504')
+_TRANSIENT_SHEETS_CODES = ('429', '500', '502', '503', '504')
+
+
+def _retry_sheets_call(fn, label, max_retries=5):
+    """Retry a Sheets API call on rate-limit (429) and transient 5xx errors."""
     for attempt in range(max_retries):
         try:
-            return ws.get_all_values()
+            return fn()
         except gspread.exceptions.APIError as e:
             msg = str(e)
-            code = next((c for c in transient_codes if c in msg), None)
+            code = next((c for c in _TRANSIENT_SHEETS_CODES if c in msg), None)
             if code and attempt < max_retries - 1:
                 wait = min(60, 5 * (2 ** attempt))  # 5, 10, 20, 40, 60 s
-                label = 'Rate limited' if code == '429' else f'Transient {code}'
-                print(f"    {label}, waiting {wait}s before retry "
+                kind = 'Rate limited' if code == '429' else f'Transient {code}'
+                print(f"    {kind} during {label}, waiting {wait}s before retry "
                       f"({attempt + 1}/{max_retries - 1})...")
                 time.sleep(wait)
             else:
                 raise
+
+
+def read_sheet_with_retry(ws, max_retries=5):
+    return _retry_sheets_call(ws.get_all_values, 'sheet read', max_retries)
+
+
+def update_cells_with_retry(ws, cells, max_retries=5, **kwargs):
+    return _retry_sheets_call(
+        lambda: ws.update_cells(cells, **kwargs), 'cell write', max_retries,
+    )
 
 
 def write_report(report_data, output_dir='/Users/wallyhuron/Downloads/'):
@@ -464,7 +476,7 @@ def main():
             if legacy_barrel_fixes:
                 print(f"  Converting {len(legacy_barrel_fixes)} Barrel values "
                       f"from 'yes' to '6'...")
-                ws.update_cells(legacy_barrel_fixes, value_input_option='RAW')
+                update_cells_with_retry(ws, legacy_barrel_fixes, value_input_option='RAW')
                 total_filled += len(legacy_barrel_fixes)
                 time.sleep(2)
 
@@ -551,7 +563,7 @@ def main():
             if cells_to_update:
                 print(f"  Writing {len(cells_to_update)} cells "
                       f"({new_fill_cells} new, {overwrite_cells} overwritten)...")
-                ws.update_cells(cells_to_update, value_input_option='RAW')
+                update_cells_with_retry(ws, cells_to_update, value_input_option='RAW')
                 total_filled += new_fill_cells
                 total_overwritten += overwrite_cells
                 time.sleep(2)  # Rate limit buffer after write
