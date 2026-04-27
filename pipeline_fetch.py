@@ -342,9 +342,8 @@ def fetch_milb_game_pks_for_date(date_str, sport_id=11, team_filter=None):
     """Fetch MiLB game PKs for a given date, optionally filtered by team name substring."""
     url = f"https://statsapi.mlb.com/api/v1/schedule?date={date_str}&sportId={sport_id}&gameType=R"
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
+        body = _fetch_with_retry(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        data = json.loads(body)
         game_pks = []
         for date_data in data.get('dates', []):
             for game in date_data.get('games', []):
@@ -366,9 +365,8 @@ def fetch_game_pks_for_date(date_str):
     """Fetch all MLB game PKs for a given date from the schedule API."""
     url = f"https://statsapi.mlb.com/api/v1/schedule?date={date_str}&sportId=1&gameType=R,F,D,L,W"
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
+        body = _fetch_with_retry(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        data = json.loads(body)
         game_pks = []
         for date_data in data.get('dates', []):
             for game in date_data.get('games', []):
@@ -384,9 +382,8 @@ def fetch_boxscore(game_pk):
     """Fetch boxscore data for a single game. Returns dict with pitcher and hitter stats."""
     url = f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            box = json.loads(resp.read())
+        body = _fetch_with_retry(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        box = json.loads(body)
     except Exception as e:
         print(f"    Error fetching boxscore for game {game_pk}: {e}")
         return None

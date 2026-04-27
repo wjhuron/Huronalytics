@@ -172,12 +172,35 @@ def download_statcast(team_tab, date_min, date_max, session):
         'sort_order': 'desc',
     }
 
-    try:
-        response = session.get(url, params=params, timeout=120)
-        if response.status_code != 200:
+    # Retry transient Savant errors (timeouts, 5xx, connection resets)
+    # so a single hiccup doesn't drop a team's worth of supplement data.
+    response = None
+    for attempt in range(4):
+        try:
+            response = session.get(url, params=params, timeout=120)
+            if response.status_code == 200:
+                break
+            if response.status_code >= 500 and attempt < 3:
+                wait = 5 * (2 ** attempt)  # 5, 10, 20 s
+                print(f"    Savant returned {response.status_code}, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
             print(f"    Statcast returned status {response.status_code}")
             return None
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError) as e:
+            if attempt < 3:
+                wait = 5 * (2 ** attempt)
+                print(f"    Savant request failed ({type(e).__name__}), retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            print(f"    Timeout downloading Statcast data")
+            return None
 
+    if response is None or response.status_code != 200:
+        return None
+
+    try:
         csv_text = response.text
         if not csv_text or csv_text.strip() == '' or 'No Results' in csv_text[:100]:
             print(f"    No Statcast data available yet")
