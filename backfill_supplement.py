@@ -66,7 +66,8 @@ STRING_COLS = {'Event'}
 
 # Columns where official Statcast data should always overwrite estimates
 # (even if the cell already has a value from the initial download)
-ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel'}
+# RunExp is here so existing 3-decimal values get refreshed to 10 decimals.
+ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel', 'RunExp'}
 
 # Columns that only ever OVERWRITE existing values; they are never used to
 # fill a blank cell. Intended for scoring-change corrections (e.g., official
@@ -114,7 +115,9 @@ ROUND_DECIMALS = {
     'AttackAngle': 1,
     'AttackDirection': 1,
     'SwingPathTilt': 1,
-    'RunExp': 3,
+    # RunExp gets summed across pitches for xRV/100, so keep full Statcast
+    # precision — display-only rounding happens at render time.
+    'RunExp': 10,
     'xBA': 3,
     'xSLG': 3,
     'xwOBA': 3,
