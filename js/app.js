@@ -657,14 +657,18 @@
       if (isHitterTab(currentTab) && currentTab !== 'hitterPitch') {
         return 'Q';
       }
-      // Pitcher tabs: IP-based qualification handles the real filter (via minIp='Q')
+      // pitchMetrics (Arsenal): 25 pitches per pitch type — checked BEFORE
+      // the generic isPitcherTab branch because pitchMetrics IS a pitcher
+      // tab and would otherwise fall through to return 1.
+      if (currentTab === 'pitchMetrics') {
+        return 25;
+      }
+      // Other pitcher tabs: IP-based qualification handles the real filter (via minIp='Q')
       if (isPitcherTab(currentTab)) {
         return 1;
       }
-      // pitch-type tabs: pitchMetrics needs a stiffer cutoff (25 pitches per
-      // pitch type) so a pitcher's rarely-used pitch (e.g. Andrew Abbott's FC
-      // with 2 thrown) doesn't appear in the qualified view.
-      return currentTab === 'pitchMetrics' ? 25 : 10;
+      // hitterPitch (vs Pitches): per-pitch-type minimum.
+      return 10;
     }
     return parseInt(val) || 1;
   }
