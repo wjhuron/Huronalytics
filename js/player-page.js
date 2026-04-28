@@ -640,9 +640,15 @@ var PlayerPage = {
     this._renderHeadshotAndName(data.mlbId, data.pitcher);
 
     var pos = (data.throws === 'L' ? 'LHP' : 'RHP');
+    // Append SP / RP role suffix when game-appearance data is available so a
+    // closer's profile reads differently from a starter's at a glance.
+    var role = '';
+    if (data.g && data.g > 0) {
+      role = ' | ' + (Utils.isStarter(data.g, data.gs) ? 'SP' : 'RP');
+    }
     var posEl = document.getElementById('player-position');
     var ageEl = document.getElementById('player-age');
-    posEl.textContent = pos + ' | ' + (data.team || '');
+    posEl.textContent = pos + ' | ' + (data.team || '') + role;
     ageEl.textContent = '';
 
     if (data.mlbId) {
@@ -651,7 +657,7 @@ var PlayerPage = {
         .then(function (json) {
           var person = json.people && json.people[0];
           if (person && person.currentAge != null) {
-            posEl.textContent = pos + ' | ' + (data.team || '') + ' | Age: ' + person.currentAge;
+            posEl.textContent = pos + ' | ' + (data.team || '') + ' | Age: ' + person.currentAge + role;
           }
         })
         .catch(function () { /* silently ignore */ });
