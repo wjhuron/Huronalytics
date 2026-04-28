@@ -289,6 +289,11 @@ def _fetch_player_position(mlb_id, season=2026):
     A game where the player appeared at multiple positions counts +1 for
     each position (matches MLB's per-position games stat directly).
 
+    Position-player-pitching games ('P', e.g. blowout outings by a position
+    player like Dylan Moore) are excluded from the resolution since this
+    function is called from the hitter pipeline — the defensive position
+    is what matters here, not pitcher appearances.
+
     Returns: position abbreviation string ('3B', 'LF', 'CF', 'RF', 'DH', etc.)
     or None if no fielding records exist (rare; e.g., not yet called up)."""
     url = (f'https://statsapi.mlb.com/api/v1/people/{mlb_id}/stats'
@@ -301,12 +306,14 @@ def _fetch_player_position(mlb_id, season=2026):
             return None
         splits = stats_arr[0].get('splits') or []
         # Aggregate games per position (multi-team players have one split per
-        # team per position; sum across teams).
+        # team per position; sum across teams). Pitcher appearances dropped
+        # for hitter-side position resolution.
+        EXCLUDE_FROM_HITTER = {'P', 'TWP'}
         games_by_pos = {}
         for split in splits:
             pos_abbr = (split.get('position') or {}).get('abbreviation')
             games = (split.get('stat') or {}).get('games') or 0
-            if pos_abbr and games:
+            if pos_abbr and games and pos_abbr not in EXCLUDE_FROM_HITTER:
                 games_by_pos[pos_abbr] = games_by_pos.get(pos_abbr, 0) + games
         if not games_by_pos:
             return None
