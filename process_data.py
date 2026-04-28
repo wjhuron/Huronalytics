@@ -3025,40 +3025,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     print("  Percentiles computed and inversions applied.")
 
-    # Final rounding step for runValue/rv100/xRunValue/xRv100 — applied after
-    # percentiles so percentile ranks use exact values, but output uses display precision.
-    for row in pitch_leaderboard:
-        if row.get('runValue') is not None:
-            row['runValue'] = round(row['runValue'], 1)
-        if row.get('rv100') is not None:
-            row['rv100'] = round(row['rv100'], 2)
-        if row.get('xRunValue') is not None:
-            row['xRunValue'] = round(row['xRunValue'], 1)
-        if row.get('xRv100') is not None:
-            row['xRv100'] = round(row['xRv100'], 2)
-    for row in pitcher_leaderboard:
-        if row.get('runValue') is not None:
-            row['runValue'] = round(row['runValue'], 1)
-        if row.get('rv100') is not None:
-            row['rv100'] = round(row['rv100'], 2)
-        if row.get('xRunValue') is not None:
-            row['xRunValue'] = round(row['xRunValue'], 1)
-        if row.get('xRv100') is not None:
-            row['xRv100'] = round(row['xRv100'], 2)
-    for row in hitter_leaderboard:
-        if row.get('runValue') is not None:
-            row['runValue'] = round(row['runValue'], 1)
-        if row.get('xRunValue') is not None:
-            row['xRunValue'] = round(row['xRunValue'], 1)
-    for row in hitter_pitch_leaderboard:
-        if row.get('runValue') is not None:
-            row['runValue'] = round(row['runValue'], 1)
-        if row.get('rv100') is not None:
-            row['rv100'] = round(row['rv100'], 2)
-        if row.get('xRunValue') is not None:
-            row['xRunValue'] = round(row['xRunValue'], 1)
-        if row.get('xRv100') is not None:
-            row['xRv100'] = round(row['xRv100'], 2)
+    # runValue/rv100/xRunValue/xRv100 are kept at full (float) precision in the
+    # JSON output. Display rounding (1 decimal in the leaderboard, 2 decimals on
+    # the player page) happens in the JS layer at render time via toFixed().
+    # This avoids any intermediate rounding that could shift the displayed value
+    # vs rounding from full-precision inputs (e.g., 0.236 + 0.563 = 0.799 → 0.8,
+    # never 0.2 + 0.6 = 0.8). Percentile ranks are unaffected: they are computed
+    # earlier in the pipeline from exact values regardless of display precision.
 
     return {
         'pitcher_leaderboard': pitcher_leaderboard,

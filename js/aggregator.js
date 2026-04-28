@@ -1947,9 +1947,10 @@ const Aggregator = {
           if (hpPre[hpxk + '_pctl'] !== undefined) rows[hpmi][hpxk + '_pctl'] = hpPre[hpxk + '_pctl'];
         }
       }
-      // Compute rv100 client-side if not in pre-agg data
+      // Compute rv100 client-side if not in pre-agg data. Kept at full precision;
+      // display rounding (1 decimal) happens at render time via Utils.formatDecimal.
       if (rows[hpmi].runValue != null && rows[hpmi].rv100 == null && rows[hpmi].count > 0) {
-        rows[hpmi].rv100 = Math.round(rows[hpmi].runValue / rows[hpmi].count * 10000) / 100;
+        rows[hpmi].rv100 = rows[hpmi].runValue / rows[hpmi].count * 100;
       }
     }
 
