@@ -5,19 +5,19 @@ var PlayerPage = {
   _playerType: null, // 'pitcher' or 'hitter'
 
   PITCHING_STATS: [
-    { _section: 'Quality' },
-    { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
-    { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
-    { _section: 'Stuff & Bat-Missing' },
+    // Stuff foundation: velocity (dynamic — expands to FF and/or SI velo when present).
     { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
+    // Rate stats and their composite estimator.
+    { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
+    { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
+    // Command then bat-missing process.
+    { key: 'izPct',             label: 'Zone%',            format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'izWhiffPct',        label: 'IZ Whiff%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
-    { _section: 'Command' },
-    { key: 'izPct',             label: 'Zone%',            format: function(v) { return Utils.formatPct(v); } },
-    { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
-    { _section: 'Contact Allowed' },
+    // Contact allowed: expected outcomes, then quality, then composition.
     { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
