@@ -267,7 +267,7 @@ const Leaderboard = {
 
   _TAB_HIDDEN_DEFAULTS: {
     pitchMetrics:      ['maxVelo', 'relPosZ', 'relPosX'],
-    pitcherStats:      ['w', 'l', 'sv', 'hld'],
+    pitcherStats:      ['w', 'l', 'sv', 'hld', 'tbf', 'fip', 'xFIP'],
     hitterStats:       ['ab', 'doubles', 'triples', 'cs', 'sbPct'],
     hitterBattedBall:  ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct'],
     hitterPitch:       ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct']

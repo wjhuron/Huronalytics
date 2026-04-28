@@ -45,6 +45,17 @@
     hitterBatTracking: true
   };
 
+  // Per-tab default sort. Falls back to alphabetical by player name.
+  const TAB_DEFAULT_SORT = {
+    pitcherStats: { key: 'kbbPct', dir: 'desc' }
+  };
+
+  function defaultSortFor(tab) {
+    const def = TAB_DEFAULT_SORT[tab];
+    if (def) return { key: def.key, dir: def.dir };
+    return { key: isHitterTab(tab) ? 'hitter' : 'pitcher', dir: 'asc' };
+  }
+
   function isHitterTab(tab) {
     return TAB_SECTION[tab] === 'hitters';
   }
@@ -256,7 +267,7 @@
     if (activeTab) { activeTab.classList.add('active'); activeTab.setAttribute('aria-selected', 'true'); }
 
     Leaderboard.initHiddenColumns(currentTab);
-    Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
+    Leaderboard.currentSort = defaultSortFor(currentTab);
     Leaderboard.currentPage = 1;
     Leaderboard.keyboardFocusIndex = -1;
 
@@ -729,7 +740,7 @@
     data = applyRangeFilters(data, columns);
 
     if (!Leaderboard.currentSort.key) {
-      Leaderboard.currentSort = { key: isHitterTab(currentTab) ? 'hitter' : 'pitcher', dir: 'asc' };
+      Leaderboard.currentSort = defaultSortFor(currentTab);
     }
 
     const sortKey = Leaderboard.currentSort.key;
