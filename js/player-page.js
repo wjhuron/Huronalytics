@@ -124,6 +124,7 @@ var PlayerPage = {
     { key: 'breakTilt', label: 'OTilt', format: function(v) { return v || '—'; } },
     { key: 'indVertBrk', label: 'IVB',  format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
     { key: 'horzBrk',    label: 'HB',   format: function(v) { return v != null ? v.toFixed(1) + '"' : '—'; } },
+    { key: 'extension', label: 'Ext',   format: function(v) { return v != null ? Utils.formatFeetInches(v) : '—'; } },
     { key: 'armAngle',  label: 'Arm\u00B0', format: function(v) { return v != null ? v.toFixed(1) + '\u00B0' : '—'; }, rocHide: true },
   ],
 
@@ -945,8 +946,10 @@ var PlayerPage = {
       valEl.className = 'pctl-value';
       valEl.textContent = (displayVal != null) ? displayVal.toFixed(1) : '—';
 
-      // Determine if this row qualifies for coloring
-      // Per-pitch: 50 pitches. Overall: 100 pitches.
+      // Determine if this row qualifies for coloring.
+      // Per-pitch: QUAL.MIN_PITCH_PCTL (25 — matches the per-pitch percentile
+      // pool minimum used by the leaderboards and the pipeline). Overall: 100
+      // pitches across the whole arsenal.
       var rvQualified;
       if (pitchCount === null) {
         rvQualified = totalPitches >= 100; // overall
