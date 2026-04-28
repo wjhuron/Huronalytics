@@ -26,10 +26,14 @@ const COLUMNS = {
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Horizontal approach angle at the plate (degrees)', group: 'metrics' },
     { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', desc: 'Stuff+ quality score from physical characteristics only (100 = avg, higher = better for pitcher)', group: 'metrics' },
     // Outcomes
-    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (negative = better for pitcher)', group: 'outcomes' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches', group: 'outcomes' },
-    { key: 'xRunValue',   label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (negative = better for pitcher)', group: 'outcomes' },
-    { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches', group: 'outcomes' },
+    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'xRunValue',   label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on swings (whiffs / swings) for this pitch type', group: 'outcomes' },
+    { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate for this pitch type', group: 'outcomes' },
+    { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', desc: 'Called strikes + whiffs / total pitches for this pitch type', group: 'outcomes' },
+    { key: 'barrelPctAgainst', label: 'Barrel%', format: Utils.formatPct, sortType: 'numeric', desc: 'Barrel rate against on contact for this pitch type (denominator = BIP with valid EV)', group: 'outcomes' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected batting average (Statcast model, based on EV + LA)', group: 'outcomes' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected slugging (Statcast model, based on EV + LA)', group: 'outcomes' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast model, based on EV + LA)', group: 'outcomes' },
@@ -266,7 +270,7 @@ const Leaderboard = {
   _tabDefaultHidden: {},  // tracks which keys were hidden by tab defaults
 
   _TAB_HIDDEN_DEFAULTS: {
-    pitchMetrics:      ['maxVelo', 'relPosZ', 'relPosX'],
+    pitchMetrics:      ['maxVelo', 'relPosZ', 'relPosX', 'effectiveVelo', 'runValue', 'xRunValue', 'xBA', 'xSLG'],
     pitcherStats:      ['w', 'l', 'sv', 'hld', 'tbf', 'fip', 'xFIP'],
     hitterStats:       ['ab', 'doubles', 'triples', 'cs', 'sbPct'],
     hitterBattedBall:  ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct'],

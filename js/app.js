@@ -47,7 +47,8 @@
 
   // Per-tab default sort. Falls back to alphabetical by player name.
   const TAB_DEFAULT_SORT = {
-    pitcherStats: { key: 'kbbPct', dir: 'desc' }
+    pitcherStats: { key: 'kbbPct', dir: 'desc' },
+    pitchMetrics: { key: 'xRv100', dir: 'desc' }
   };
 
   function defaultSortFor(tab) {
@@ -653,7 +654,10 @@
       if (isPitcherTab(currentTab)) {
         return 1;
       }
-      return 10; // pitch tabs: just use 10 as reasonable default
+      // pitch-type tabs: pitchMetrics needs a stiffer cutoff (25 pitches per
+      // pitch type) so a pitcher's rarely-used pitch (e.g. Andrew Abbott's FC
+      // with 2 thrown) doesn't appear in the qualified view.
+      return currentTab === 'pitchMetrics' ? 25 : 10;
     }
     return parseInt(val) || 1;
   }
