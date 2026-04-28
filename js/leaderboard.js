@@ -239,25 +239,29 @@ const COLUMNS = {
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average vs this pitch type', group: 'stats' },
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Slugging vs this pitch type', group: 'stats' },
     { key: 'iso',         label: 'ISO',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Isolated power vs this pitch type (SLG − AVG)', group: 'stats' },
-    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average vs this pitch type', group: 'stats' },
+    { key: 'wOBA',        label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average vs this pitch type', group: 'stats' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected BA vs this pitch type (Statcast, EV + LA)', group: 'stats' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected SLG vs this pitch type (Statcast, EV + LA)', group: 'stats' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA vs this pitch type (Statcast, EV + LA)', group: 'stats' },
+    { key: 'xwOBAcon',    label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact vs this pitch type — avg xwOBA on BIP only', group: 'stats' },
+    { key: 'xwOBAsp',     label: 'xwOBAsp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted vs this pitch type — avg zone wOBA by LA × spray direction', group: 'stats' },
     { key: 'ev50',        label: 'EV50',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Avg EV of top 50% hardest-hit BIP (mph)', group: 'ev' },
     { key: 'maxEV',       label: 'Max EV',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Maximum exit velocity (mph)', group: 'ev' },
     { key: 'medLA',       label: 'Med LA',   format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, sectionStart: true, desc: 'Median launch angle (degrees)', group: 'batted_ball' },
+    { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of BIP with EV ≥ 95 mph vs this pitch type (denominator = BIP with valid EV)', group: 'batted_ball' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', desc: 'Barrel rate (denominator = BIP with valid EV)', group: 'batted_ball' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'batted_ball' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Line drive rate', group: 'batted_ball' },
     { key: 'fbPct',       label: 'FB%',      format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Fly ball rate', group: 'batted_ball' },
+    { key: 'hrFbPct',     label: 'HR/FB',    format: Utils.formatPct, sortType: 'numeric', desc: 'Home runs per fly ball vs this pitch type', group: 'batted_ball' },
     { key: 'pullPct',     label: 'Pull%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, sectionStart: true, desc: 'Pull rate', group: 'spray' },
     { key: 'oppoPct',     label: 'Oppo%',    format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Opposite field rate', group: 'spray' },
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Swing rate vs this pitch type', group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone swing rate', group: 'discipline' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate', group: 'discipline' },
+    { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
     { key: 'contactPct',  label: 'Contact%', format: Utils.formatPct, sortType: 'numeric', desc: 'Contact rate excluding bunts (contact / swings)', group: 'discipline' },
     { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone contact rate', group: 'discipline' },
-    { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
   ],
 };
 
@@ -278,7 +282,7 @@ const Leaderboard = {
     pitcherBattedBall:  ['xBA', 'xSLG', 'maxEVAgainst', 'xwOBAsp'],
     hitterStats:        ['g', 'ab', 'doubles', 'triples', 'cs', 'sbPct', 'xBA', 'xSLG'],
     hitterBattedBall:   ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct', 'xBA', 'xSLG'],
-    hitterPitch:        ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct']
+    hitterPitch:        ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct', 'runValue', 'xRunValue', 'xBA', 'xSLG', 'xwOBAsp', 'hrFbPct']
   },
 
   initHiddenColumns: function (tab) {

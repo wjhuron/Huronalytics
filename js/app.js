@@ -54,7 +54,8 @@
     hitterStats:           { key: 'hitterPlus', dir: 'desc' },
     hitterSwingDecisions:  { key: 'ctPlus',     dir: 'desc' },
     hitterBattedBall:      { key: 'bbPlus',     dir: 'desc' },
-    hitterBatTracking:     { key: 'batSpeed',   dir: 'desc' }
+    hitterBatTracking:     { key: 'batSpeed',   dir: 'desc' },
+    hitterPitch:           { key: 'xRv100',     dir: 'desc' }
   };
 
   function defaultSortFor(tab) {
