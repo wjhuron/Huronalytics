@@ -678,10 +678,13 @@ tbody td {
   padding: 5px 6px;
   text-align: center;
   border-bottom: 1px solid var(--border-light);
+  border-right: 1px solid var(--border);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   transition: background 0.1s;
 }
+
+tbody td:last-child { border-right: none; }
 
 tbody td.align-left {
   font-family: 'Barlow', -apple-system, BlinkMacSystemFont, sans-serif;
