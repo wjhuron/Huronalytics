@@ -276,7 +276,7 @@ const Leaderboard = {
     pitcherStats:       ['w', 'l', 'sv', 'hld', 'tbf', 'fip', 'xFIP'],
     pitcherBattedBall:  ['xBA', 'xSLG', 'maxEVAgainst', 'xwOBAsp'],
     hitterStats:        ['g', 'ab', 'doubles', 'triples', 'cs', 'sbPct', 'xBA', 'xSLG'],
-    hitterBattedBall:   ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct'],
+    hitterBattedBall:   ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct', 'xBA', 'xSLG'],
     hitterPitch:        ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct']
   },
 
