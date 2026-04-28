@@ -1339,12 +1339,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         velos = [v for v in velos if v is not None]
         row['maxVelo'] = round(max(velos), 1) if velos else None
 
-        # Break Tilt (circular mean)
+        # Observed (Break) Tilt — circular mean of OTilt clock-notation values.
         tilt_minutes = [break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt')) for p in pitches]
         tilt_minutes = [m for m in tilt_minutes if m is not None]
         avg_tilt = circular_mean_minutes(tilt_minutes)
         row['breakTilt'] = minutes_to_tilt_display(avg_tilt)
         row['breakTiltMinutes'] = avg_tilt
+
+        # Release Tilt — circular mean of RTilt clock-notation values from
+        # the spin-axis-derived release orientation. Sourced from the RTilt
+        # column written by Pitcher2026.py (release_tilt = spin_axis_to_tilt).
+        rtilt_minutes = [break_tilt_to_minutes(p.get('RTilt')) for p in pitches]
+        rtilt_minutes = [m for m in rtilt_minutes if m is not None]
+        avg_rtilt = circular_mean_minutes(rtilt_minutes)
+        row['releaseTilt'] = minutes_to_tilt_display(avg_rtilt)
+        row['releaseTiltMinutes'] = avg_rtilt
 
         row.update(compute_stats(pitches))
         row.update(compute_pitcher_batted_ball(pitches))

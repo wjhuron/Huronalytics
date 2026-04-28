@@ -1436,13 +1436,17 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   text-transform: uppercase;
   padding: 6px 8px;
   border-bottom: 2px solid var(--border);
-  border-right: none;
+  border-right: 1px solid var(--border);
   text-align: center;
   color: var(--text-th) !important;
   background: var(--bg-card) !important;
   cursor: default;
   position: static;
   letter-spacing: 0;
+}
+
+.player-pitch-stats-table thead th:last-child {
+  border-right: none;
 }
 
 .player-pitch-stats-table thead th:hover {
@@ -1463,7 +1467,12 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   padding: 5px 8px;
   text-align: center;
   border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   color: var(--text-primary) !important;
+}
+
+.player-pitch-stats-table tbody td:last-child {
+  border-right: none;
 }
 
 .player-pitch-stats-table tbody tr:last-child td {

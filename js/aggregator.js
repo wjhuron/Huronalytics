@@ -1032,6 +1032,10 @@ const Aggregator = {
         }
         // Max velo
         if (ppre.maxVelo !== undefined) rows[pmi].maxVelo = ppre.maxVelo;
+        // Release Tilt — pre-aggregated only (no micro-data for circular mean
+        // under filters). Filtered views fall back to the season value.
+        if (ppre.releaseTilt !== undefined) rows[pmi].releaseTilt = ppre.releaseTilt;
+        if (ppre.releaseTiltMinutes !== undefined) rows[pmi].releaseTiltMinutes = ppre.releaseTiltMinutes;
         // Stuff+ (pre-computed, always merge from JSON — not recomputable in browser)
         if (ppre.stuffScore !== undefined) rows[pmi].stuffScore = ppre.stuffScore;
         if (ppre.stuffScore_pctl !== undefined) rows[pmi].stuffScore_pctl = ppre.stuffScore_pctl;
