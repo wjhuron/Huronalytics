@@ -53,7 +53,8 @@
     pitcherBattedBall:     { key: 'xwOBAcon',   dir: 'asc'  },
     hitterStats:           { key: 'hitterPlus', dir: 'desc' },
     hitterSwingDecisions:  { key: 'ctPlus',     dir: 'desc' },
-    hitterBattedBall:      { key: 'bbPlus',     dir: 'desc' }
+    hitterBattedBall:      { key: 'bbPlus',     dir: 'desc' },
+    hitterBatTracking:     { key: 'batSpeed',   dir: 'desc' }
   };
 
   function defaultSortFor(tab) {

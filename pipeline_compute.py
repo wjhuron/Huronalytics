@@ -43,7 +43,7 @@ HITTER_STAT_KEYS = [
     'pullPct', 'middlePct', 'oppoPct', 'airPullPct',
     'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'sdPlus', 'ctPlus',
     'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
-    'blastPct', 'idealAAPct',
+    'blastPct', 'squaredUpPct', 'idealAAPct',
     'twoStrikeWhiffPct', 'firstPitchSwingPct',
     'avgFbDist', 'avgHrDist',
     'sprintSpeed',
@@ -479,6 +479,7 @@ def compute_hitter_stats(pitches):
             if spt is not None: spt_vals.append(spt)
 
     n_blasts = 0
+    n_squared_up = 0
     n_blast_eligible = 0
     n_ideal_aa = 0
     for p in pitches:
@@ -493,8 +494,13 @@ def compute_hitter_stats(pitches):
         if ev is not None and velo is not None:
             n_blast_eligible += 1
             max_ev = 0.2 * velo + 1.2 * bs
-            if bs >= 75 and ev >= 0.80 * max_ev:
-                n_blasts += 1
+            # Squared-up = >= 80% of max possible EV given bat speed + pitch velo.
+            # Blast = Squared-up AND bat speed >= 75 (i.e. Statcast's "elite contact"
+            # gate adds the swing-speed requirement on top of the energy-transfer one).
+            if max_ev > 0 and ev >= 0.80 * max_ev:
+                n_squared_up += 1
+                if bs >= 75:
+                    n_blasts += 1
 
     return {
         'pa': n_pa,
@@ -537,6 +543,7 @@ def compute_hitter_stats(pitches):
         'swingPathTilt': round(sum(spt_vals) / len(spt_vals), 1) if spt_vals else None,
         'nCompSwings': len(bs_vals),
         'blastPct': round(n_blasts / n_blast_eligible, 4) if n_blast_eligible > 0 else None,
+        'squaredUpPct': round(n_squared_up / n_blast_eligible, 4) if n_blast_eligible > 0 else None,
         'idealAAPct': round(n_ideal_aa / len(bs_vals), 4) if bs_vals else None,
         'twoStrikeWhiffPct': two_strike_whiff_pct,
         'firstPitchSwingPct': first_pitch_swing_pct,

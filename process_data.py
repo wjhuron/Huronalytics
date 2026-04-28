@@ -2346,7 +2346,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     # Bat tracking stats weighted by nCompSwings
     comp_swing_stats = {'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
-                        'blastPct', 'idealAAPct'}
+                        'blastPct', 'squaredUpPct', 'idealAAPct'}
     # Counting stats that should NOT appear on the league-average row (meaningless
     # weighted means of counting totals).
     hitter_no_lg_avg = {'hr', 'sb'}

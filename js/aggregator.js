@@ -1283,7 +1283,7 @@ const Aggregator = {
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
       'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct', 'sdPlus', 'ctPlus',
-      'batSpeed', 'swingLength', 'blastPct', 'idealAAPct',
+      'batSpeed', 'swingLength', 'blastPct', 'squaredUpPct', 'idealAAPct',
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
       'sprintSpeed', 'runValue',
@@ -1497,7 +1497,7 @@ const Aggregator = {
     // Stats that only boxscore/external data can provide (always merge)
     // wOBA/wRC/wRCplus/xWRCplus need FanGraphs weights + park factors, not computable from micro
     const hBoxAlways = ['g', 'tb', 'sb', 'cs', 'sbPct', 'runValue',
-                        'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct',
+                        'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'squaredUpPct', 'idealAAPct',
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
                         'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
                         // SD+, CT+, and Hitter+ are precomputed against the

@@ -218,7 +218,8 @@ const COLUMNS = {
     { key: 'attackAngle', label: 'Attack Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack angle — bat direction at contact (degrees, positive = upward)', group: 'bat_tracking' },
     { key: 'attackDirection', label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack direction at contact (degrees, positive = pull side)', group: 'bat_tracking' },
     { key: 'swingPathTilt', label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg swing path tilt — bat path angle over 40ms before contact (degrees)', group: 'bat_tracking' },
-    { key: 'blastPct', label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — fast swing + squared up', group: 'bat_tracking' },
+    { key: 'squaredUpPct', label: 'Squared-Up%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings where exit velo ≥80% of theoretical max given bat speed and pitch velo — energy-transfer efficiency, no swing-speed gate', group: 'bat_tracking' },
+    { key: 'blastPct', label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — squared-up contact on a fast swing', group: 'bat_tracking' },
     { key: 'idealAAPct', label: 'IdealAtkAngle%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
   ],
   hitterPitch: [
