@@ -317,6 +317,15 @@ def _fetch_player_position(mlb_id, season=2026):
                 games_by_pos[pos_abbr] = games_by_pos.get(pos_abbr, 0) + games
         if not games_by_pos:
             return None
+        # Resolve ties: when a fielding position is tied with DH, prefer the
+        # fielding position. Other ties (e.g., LF vs RF) fall through to
+        # whichever max() returns first — not strictly determined but rare.
+        max_games = max(games_by_pos.values())
+        top = [p for p in games_by_pos if games_by_pos[p] == max_games]
+        if len(top) > 1 and 'DH' in top:
+            non_dh = [p for p in top if p != 'DH']
+            if non_dh:
+                return non_dh[0]
         return max(games_by_pos, key=games_by_pos.get)
     except Exception:
         return None
