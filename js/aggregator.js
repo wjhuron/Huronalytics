@@ -11,10 +11,10 @@ var QUAL = {
   PA_PER_GAME:       3.1,   // Hitter qualified: PA >= teamGames * 3.1
   SP_GS_RATIO:       0.5,   // Starter if GS/G > 0.5
   HARD_HIT_MPH:      95,    // Exit velo >= 95 mph = hard hit
-  MIN_BIP_PCTL:      20,    // Minimum BIP for batted-ball percentile coloring
-  MIN_BAT_TRACKING:  10,    // Minimum competitive swings for bat tracking stats
-  MIN_SPRINT_RUNS:   10,    // Minimum competitive runs for sprint speed
-  MIN_PITCH_PCTL:    50,    // Minimum pitches for outcome-metric percentiles (pitch-type level)
+  MIN_BIP_PCTL:      25,    // Minimum BIP for batted-ball percentile coloring
+  MIN_BAT_TRACKING:  10,    // Minimum competitive swings for bat tracking stats (kept low: bat-tracking samples are naturally scarce)
+  MIN_SPRINT_RUNS:   10,    // Minimum competitive runs for sprint speed (kept low: sprint runs are naturally scarce)
+  MIN_PITCH_PCTL:    25,    // Minimum pitches for outcome-metric percentiles (pitch-type level)
   MIN_HITTER_PT:     25,    // Minimum pitches seen for hitter pitch-type percentile coloring
   MIN_SACQ:          20,    // Minimum zone count for SACQ wOBA lookup
   MIN_ELLIPSE_PTS:   6,     // Minimum points for scatter ellipse computation
@@ -302,14 +302,18 @@ const Aggregator = {
     }, useAbs, minCount > 0);
   },
 
-  // Percentile computation using _qualified flag instead of minCount (ROC-aware).
-  // Rows with _inPool === false are kept qualified but interpolated against the
-  // pool rather than being members of it (used for per-team rows of multi-team
-  // players whose 2TM row is the pool representative).
+  // Percentile computation using _qualified flag for pool membership.
+  // The qualified pool defines the distribution. Non-qualified rows are
+  // interpolated against that distribution (interpolateSubMinimum=true) so
+  // they carry an informational percentile rank for tooltip display while
+  // the rendering layer separately suppresses cell coloring for them.
+  // Rows with _inPool === false are kept qualified but interpolated against
+  // the pool rather than being members of it (used for per-team rows of
+  // multi-team players whose 2TM row is the pool representative).
   _computePercentilesQualified: function (rows, metricKey) {
     this._computePercentilesUnified(rows, metricKey, function (row) {
       return !!row._qualified;
-    }, false, false);
+    }, false, true);
   },
 
   // Shared implementation: O(n log n) percentile computation
@@ -714,19 +718,13 @@ const Aggregator = {
       }
     }
 
-    // Null out pre-aggregated boxFields pctls for unqualified pitchers.
-    // boxFields merges _pctl values from PITCHER_DATA for stats not in STAT_KEYS
-    // (era, fip, xFIP, siera, rv100, etc.). These must respect IP qualification.
-    // Exception: fbVelo_pctl — always shown regardless of qualification.
-    for (let uq = 0; uq < rows.length; uq++) {
-      if (!rows[uq]._qualified) {
-        for (var pkey in rows[uq]) {
-          if (pkey.endsWith('_pctl') && pkey !== 'fbVelo_pctl') {
-            rows[uq][pkey] = null;
-          }
-        }
-      }
-    }
+    // Note: previously this block nulled all _pctl values on unqualified
+    // pitchers so their cells would not display percentile colors. That role
+    // now belongs to the render layer (leaderboard.js showColor check) — the
+    // pre-aggregated _pctl values are computed against the qualified-pitcher
+    // pool in process_data.py, so unqualified pitchers carry an informational
+    // rank that the tooltip surfaces while the cell stays uncolored. Keeping
+    // the _pctl values intact mirrors the hitter-side behavior.
 
     // Apply min IP filter AFTER percentiles (don't change comparison group)
     if (filters.minIp) {
@@ -1552,10 +1550,53 @@ const Aggregator = {
       hr._inPool = !(combinedByHitter[hr.hitter] && !Aggregator._isCombinedTeam(hr.team));
     }
 
-    // Compute percentiles — all players in pool, qualification handled by frontend
+    // Mark each hitter row qualified for percentile-pool inclusion.
+    // Mirrors the display-filter logic at the bottom of this function: a row
+    // qualifies when overall-season PA >= 3.1 × team games played. Multi-team
+    // players are evaluated on their combined 2TM/3TM row's PA against the
+    // largest single-team games count among the teams they played for.
+    const hitterTg = this.getTeamGamesPlayed();
+    const _combinedRowByHitter = {};
+    for (let cbi = 0; cbi < rows.length; cbi++) {
+      if (Aggregator._isCombinedTeam(rows[cbi].team)) {
+        _combinedRowByHitter[rows[cbi].hitter] = rows[cbi];
+      }
+    }
+    const _cumTg = {};
+    for (let cti = 0; cti < rows.length; cti++) {
+      const cr = rows[cti];
+      if (_combinedRowByHitter[cr.hitter] && !Aggregator._isCombinedTeam(cr.team)) {
+        const tgv = hitterTg[cr.team] || 0;
+        if (tgv > (_cumTg[cr.hitter] || 0)) _cumTg[cr.hitter] = tgv;
+      }
+    }
+    for (let qi = 0; qi < rows.length; qi++) {
+      const r = rows[qi];
+      const mt = _combinedRowByHitter[r.hitter];
+      let _tg, _pa;
+      if (mt) {
+        _tg = _cumTg[r.hitter] || 0;
+        _pa = (mt.paAll != null ? mt.paAll : mt.pa) || 0;
+      } else {
+        _tg = hitterTg[r.team] || 0;
+        _pa = (r.paAll != null ? r.paAll : r.pa) || 0;
+      }
+      r._qualified = _tg > 0 && _pa >= _tg * QUAL.PA_PER_GAME;
+    }
+
+    // Compute percentiles. Rate stats use the qualified pool only — short-
+    // sample hitters get an interpolated rank for tooltip display but do not
+    // pollute the distribution. Counting stats (hr, sb) keep the unfiltered
+    // pool because their values do not need a sample-size gate to be
+    // meaningful (a 5-PA hitter has 0 HR, naturally bottom of the pool).
+    const HITTER_COUNTING_PCTL = { hr: true, sb: true };
     const self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
-      self._computePercentiles(rows, key);
+      if (HITTER_COUNTING_PCTL[key]) {
+        self._computePercentiles(rows, key);
+      } else {
+        self._computePercentilesQualified(rows, key);
+      }
     });
 
     // Set bipQual flag for each hitter
@@ -1982,7 +2023,9 @@ const Aggregator = {
     for (let ptKey in ptGroups) {
       const ptRows = ptGroups[ptKey];
       HITTER_PITCH_PCTL_KEYS.forEach(function (key) {
-        self._computePercentiles(ptRows, key);
+        // Pool: rows with at least MIN_HITTER_PT pitches of this type seen.
+        // Sub-minimum rows are interpolated automatically (minCount > 0 path).
+        self._computePercentiles(ptRows, key, QUAL.MIN_HITTER_PT);
       });
     }
 

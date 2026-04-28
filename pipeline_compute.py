@@ -547,51 +547,64 @@ def compute_hitter_stats(pitches):
 
 # ── Percentile computation ───────────────────────────────────────────────
 
-def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count'):
+def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None):
     """Compute percentile rank (0-100) for each row's metric value.
-    Uses the 'mean rank' method for ties.  O(n log n) via sort + bisect."""
+
+    Distribution is built from rows that:
+    - have a non-null metric value, AND
+    - pass min_count threshold (if min_count > 0), AND
+    - pass qualifier_fn (if qualifier_fn is provided).
+
+    Every row with a non-null metric value is ranked against that distribution,
+    regardless of whether the row itself contributes to the pool. Non-qualified
+    rows therefore still get a stored percentile rank (for tooltip display);
+    the rendering layer decides separately whether to apply percentile coloring.
+
+    Uses the 'mean rank' method for ties. O(n log n) via sort + bisect.
+    """
     import bisect
     pctl_key = metric_key + '_pctl'
-    valid = [(i, rows[i][metric_key]) for i in range(len(rows))
-             if rows[i].get(metric_key) is not None
-             and (min_count == 0 or (rows[i].get(count_key) or 0) >= min_count)]
 
-    if len(valid) < 2:
+    def _row_in_pool(row):
+        if row.get(metric_key) is None:
+            return False
+        if min_count > 0 and (row.get(count_key) or 0) < min_count:
+            return False
+        if qualifier_fn is not None and not qualifier_fn(row):
+            return False
+        return True
+
+    sorted_vals = sorted(rows[i][metric_key] for i in range(len(rows)) if _row_in_pool(rows[i]))
+    n = len(sorted_vals)
+
+    if n < 2:
         for row in rows:
             row[pctl_key] = 50 if row.get(metric_key) is not None else None
         return
 
-    sorted_vals = sorted(v for _, v in valid)
-    n = len(sorted_vals)
-
-    def _pctl_from_sorted(val, denom):
+    def _pctl_from_sorted(val):
         below = bisect.bisect_left(sorted_vals, val)
         above = bisect.bisect_right(sorted_vals, val)
         equal = above - below
-        return max(0, min(100, round((below + 0.5 * (equal - 1)) / max(1, denom - 1) * 100)))
-
-    for idx, val in valid:
-        rows[idx][pctl_key] = _pctl_from_sorted(val, n)
-
-    if min_count > 0:
-        for i, row in enumerate(rows):
-            if pctl_key in row:
-                continue
-            val = row.get(metric_key)
-            if val is None:
-                row[pctl_key] = None
-                continue
-            row[pctl_key] = _pctl_from_sorted(val, n)
+        return max(0, min(100, round((below + 0.5 * (equal - 1)) / max(1, n - 1) * 100)))
 
     for row in rows:
-        if pctl_key not in row:
-            row[pctl_key] = None
+        val = row.get(metric_key)
+        row[pctl_key] = _pctl_from_sorted(val) if val is not None else None
 
 
-def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count'):
+def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None):
     """Compute percentiles from an MLB pool of one row per player (combined 2TM/3TM
     rows replace their per-team rows), then interpolate AAA rows and the per-team
-    rows of multi-team players against the pool."""
+    rows of multi-team players against the pool.
+
+    qualifier_fn (optional): when provided, the MLB pool that defines the
+    distribution is restricted to rows where qualifier_fn(row) returns True.
+    All rows (qualified MLB, non-qualified MLB, multi-team per-team, AAA/ROC)
+    are still ranked against that distribution, so non-qualified rows have a
+    percentile rank stored for tooltip display even though the rendering layer
+    suppresses their cell coloring.
+    """
     pctl_key = metric_key + '_pctl'
 
     def _player_key(r):
@@ -610,11 +623,18 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
             continue
         mlb_rows.append(r)
 
-    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key)
+    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key, qualifier_fn=qualifier_fn)
 
-    mlb_values = sorted([r[metric_key] for r in mlb_rows
-                         if r.get(metric_key) is not None
-                         and (min_count == 0 or (r.get(count_key) or 0) >= min_count)])
+    def _mlb_in_pool(row):
+        if row.get(metric_key) is None:
+            return False
+        if min_count > 0 and (row.get(count_key) or 0) < min_count:
+            return False
+        if qualifier_fn is not None and not qualifier_fn(row):
+            return False
+        return True
+
+    mlb_values = sorted(r[metric_key] for r in mlb_rows if _mlb_in_pool(r))
     n = len(mlb_values)
 
     import bisect

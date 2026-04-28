@@ -2959,31 +2959,80 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # ==========================================================
     print("\n--- Computing percentiles (single pass) ---")
 
+    # ── Qualified-pool helpers ──
+    # Rate-stat percentile distributions are defined ONLY by qualified players
+    # (3.1 PA × team_games for hitters; IP × team_games role-adjusted for
+    # pitchers). All rows still get a percentile rank stored — non-qualified
+    # rows have ranks for tooltip display but are not colored at render time.
+    # Counting stats (hr, sb) keep the unfiltered pool.
+    def _hitter_qualified_for_pctl(row):
+        pa = row.get('pa', 0) or 0
+        tg = team_games_played.get(row.get('team'))
+        if tg is None and team_games_played:
+            tg = max(team_games_played.values())
+        return bool(tg) and pa >= 3.1 * tg
+
+    SP_GS_RATIO = 0.5  # mirrors aggregator.js QUAL.SP_GS_RATIO
+    def _pitcher_qualified_for_pctl(row):
+        ip_str = row.get('ip')
+        ip_f = ip_str_to_float(ip_str) if ip_str is not None else 0
+        tg = team_games_played.get(row.get('team'))
+        if tg is None and team_games_played:
+            tg = max(team_games_played.values())
+        if not tg:
+            return False
+        g = row.get('g') or 0
+        gs = row.get('gs') or 0
+        is_starter = g > 0 and (gs / g) > SP_GS_RATIO
+        threshold = tg * 1.0 if is_starter else tg / 3.0
+        return ip_f >= threshold
+
+    # Hitter counting stats — keep unfiltered pool, do not apply qualifier_fn.
+    HITTER_COUNTING_PCTL = {'hr', 'sb'}
+
+    # Pitch-type outcome stats — non-shape per-pitch stats use min_count=25
+    # so pitches thrown rarely (e.g., 5 sliders) don't pollute the per-pitch
+    # percentile pool. Shape metrics (velo, IVB, HB, etc.) need no minimum.
+    MIN_PITCH_TYPE_OUTCOME = 25
+    PITCH_SHAPE_KEYS = set(METRIC_KEYS.values()) | {'nVAA', 'nHAA'}
+
     # 1. Pitch-type percentiles (grouped by pitch type)
     pt_groups = defaultdict(list)
     for row in pitch_leaderboard:
         pt_groups[row['pitchType']].append(row)
     for metric in PITCH_PCTL_KEYS:
+        mc = 0 if metric in PITCH_SHAPE_KEYS else MIN_PITCH_TYPE_OUTCOME
         for pt, pt_rows in pt_groups.items():
-            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=0)
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc)
 
-    # 2. Pitcher percentiles (all stats including boxscore-derived)
+    # 2. Pitcher percentiles (all stats including boxscore-derived).
+    # All entries in PITCHER_ALL_PCTL are rate / shape / outcome metrics;
+    # there are no counting stats here, so every stat uses the qualified pool.
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
                         + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera'])
     for stat in PITCHER_ALL_PCTL:
-        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0,
+                                          qualifier_fn=_pitcher_qualified_for_pctl)
 
-    # 3. Hitter percentiles (all stats including boxscore-derived)
+    # 3. Hitter percentiles (all stats including boxscore-derived).
+    # Rate stats use the qualified pool; counting stats (hr, sb) keep the
+    # full pool so non-qualified hitters don't artificially appear at top.
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+        if stat in HITTER_COUNTING_PCTL:
+            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+        else:
+            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat,
+                                              qualifier_fn=_hitter_qualified_for_pctl)
 
-    # 4. Hitter pitch-type percentiles (grouped by pitch type)
+    # 4. Hitter pitch-type percentiles (grouped by pitch type) — min 25 pitches
+    # of that type; pitch-type-vs-hitter has no PA-style qualifier, just the
+    # per-pitch sample-size minimum.
     hpt_groups = defaultdict(list)
     for row in hitter_pitch_leaderboard:
         hpt_groups[row['pitchType']].append(row)
     for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
-            compute_percentile_ranks_with_aaa(pt_rows, stat)
+            compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=MIN_PITCH_TYPE_OUTCOME)
 
     # ==========================================================
     # CONSOLIDATED INVERSIONS
