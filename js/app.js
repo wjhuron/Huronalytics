@@ -690,7 +690,10 @@
       vsHand: vsHandSelect.value,
       minCount: currentTab === 'pitcherStats' ? 0 : _resolveMinCount(),
       minSwings: parseInt(minSwingsInput.value) || 1,
-      minIp: currentTab === 'pitcherStats' ? _resolveMinIp() : (isPitcherTab(currentTab) && minCountInput.value === 'Q' ? 'Q' : 0),
+      // Arsenal (pitchMetrics) qualification is per-pitch-type (>=25 pitches),
+      // NOT pitcher-level IP qualification — having thrown 25 of a pitch type
+      // is enough for that pitch row to qualify regardless of total IP.
+      minIp: currentTab === 'pitcherStats' ? _resolveMinIp() : (isPitcherTab(currentTab) && currentTab !== 'pitchMetrics' && minCountInput.value === 'Q' ? 'Q' : 0),
       minTbf: currentTab === 'pitcherStats' ? (parseInt(minTbfInput.value) || 1) : 0,
       minBip: (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall') ? (parseInt(minBipInput.value) || 1) : 0,
       minPitcherSwings: currentTab === 'pitcherSwingDecisions' ? (parseInt(minPitcherSwingsInput.value) || 1) : 0,
