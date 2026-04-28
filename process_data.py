@@ -38,7 +38,8 @@ from pipeline_compute import (
     compute_pitcher_batted_ball, compute_hitter_stats,
     compute_percentile_ranks, compute_percentile_ranks_with_aaa,
     METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
-    PITCH_PCTL_KEYS, PITCHER_INVERT_PCTL,
+    PITCH_PCTL_KEYS, PITCH_BB_PCTL_KEYS, PITCH_BB_INVERT,
+    PITCHER_INVERT_PCTL,
     HITTER_STAT_KEYS, HITTER_INVERT_PCTL,
     PITCHER_BB_KEYS, PITCHER_BB_INVERT,
 )
