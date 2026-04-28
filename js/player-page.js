@@ -5,22 +5,21 @@ var PlayerPage = {
   _playerType: null, // 'pitcher' or 'hitter'
 
   PITCHING_STATS: [
-    { key: 'xBA',               label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xSLG',              label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAsp',           label: 'xwOBAsp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { _section: 'Quality' },
     { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
-    { key: 'xRv100',            label: 'xRV/100',          format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
+    { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
+    { _section: 'Stuff & Bat-Missing' },
     { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
-    { key: 'strikePct',         label: 'Strike%',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'izWhiffPct',        label: 'IZ Whiff%',        format: function(v) { return Utils.formatPct(v); } },
+    { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
+    { _section: 'Command' },
+    { key: 'izPct',             label: 'Zone%',            format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
-    { key: 'avgEVAgainst',      label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { _section: 'Contact Allowed' },
+    { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
     { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
@@ -822,6 +821,16 @@ var PlayerPage = {
 
     for (var i = 0; i < effectiveStats.length; i++) {
       var stat = effectiveStats[i];
+
+      // Section header row — small uppercase divider between groups of stats
+      if (stat._section) {
+        var hdr = document.createElement('div');
+        hdr.className = 'pctl-section-header';
+        hdr.textContent = stat._section;
+        container.appendChild(hdr);
+        continue;
+      }
+
       var val = stat._val !== undefined ? stat._val : data[stat.key];
       if (stat.key === 'hitterPlus' && val == null && data.hitterPlus != null) {
         val = data.hitterPlus;
