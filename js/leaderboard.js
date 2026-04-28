@@ -193,15 +193,16 @@ const COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'pitchType',   label: 'Pitch',    format: function(v){ return v || ''; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isPitchType: true },
-    // Discipline
+    // Discipline — decisions, miss-rate stats, contact-rate stats, composites
     { key: 'swingPct',    label: 'Swing%',   format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Overall swing rate (swings / pitches seen)', group: 'discipline' },
     { key: 'izSwingPct',  label: 'IZSw%',    format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone swing rate', group: 'discipline' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate', group: 'discipline' },
     { key: 'izSwChase',   label: 'IZSw-Ch%',  format: Utils.formatPct, sortType: 'numeric', desc: 'Discipline spread (IZ Swing% − Chase%)', group: 'discipline' },
     { key: 'firstPitchSwingPct', label: 'FPSw%',  format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch swing rate (% of PAs swinging on 0-0)', group: 'discipline' },
+    { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on 2-strike swings — lower means better at battling with two strikes', group: 'discipline' },
     { key: 'contactPct',  label: 'Contact%', format: Utils.formatPct, sortType: 'numeric', desc: 'Contact rate excluding bunts (contact / swings)', group: 'discipline' },
     { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone contact rate', group: 'discipline' },
-    { key: 'whiffPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate (misses / swings)', group: 'discipline' },
     { key: 'sdPlus',      label: 'SD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Swing-Decisions+: per-pitch decision quality scored against an xRV-weighted (zone × count) table. Rewards correct swing/take choices, umpire-independent via true zone. Ratio-to-league: 100 = league avg.', group: 'discipline' },
     { key: 'ctPlus',      label: 'CT+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Contact+: leverage-weighted contact rate on swings. Frequency only — contact quality lives in BB+. Ratio-to-league: 100 = league avg.', group: 'discipline' },
   ],

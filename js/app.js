@@ -51,7 +51,8 @@
     pitchMetrics:          { key: 'xRv100',     dir: 'desc' },
     pitcherSwingDecisions: { key: 'swStrPct',   dir: 'desc' },
     pitcherBattedBall:     { key: 'xwOBAcon',   dir: 'asc'  },
-    hitterStats:           { key: 'hitterPlus', dir: 'desc' }
+    hitterStats:           { key: 'hitterPlus', dir: 'desc' },
+    hitterSwingDecisions:  { key: 'ctPlus',     dir: 'desc' }
   };
 
   function defaultSortFor(tab) {
