@@ -27,6 +27,7 @@ from pipeline_utils import (
 )
 from pipeline_fetch import (
     fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
+    fetch_hitter_positions,
     read_pitches_from_sheet,
     lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache,
     fetch_and_aggregate_boxscores, fetch_and_aggregate_milb_boxscores,
@@ -2188,6 +2189,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['nCompRuns'] = 0
             row['sprintQual'] = False
     print(f"  Sprint speed merged for {sprint_merged}/{len(hitter_leaderboard)} hitters")
+
+    # --- Determine primary MLB position per hitter (max games, MLB only) ---
+    # Source: MLB Stats API per-player season fielding stats. A player with
+    # games at multiple positions contributes +1 game to each position they
+    # appeared at. The position with the most games is recorded as their
+    # primary. Used in the hitter player-page bio line. Cached daily.
+    _pos_lookup = fetch_hitter_positions(
+        ((row.get('hitter'), row.get('mlbId')) for row in hitter_leaderboard if row.get('mlbId'))
+    )
+    for row in hitter_leaderboard:
+        mlb_id = row.get('mlbId')
+        row['position'] = _pos_lookup.get(mlb_id) if mlb_id else None
 
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:

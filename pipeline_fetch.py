@@ -262,6 +262,89 @@ def save_mlb_id_cache(cache, cache_path):
         json.dump(cache, f, indent=2)
 
 
+# ── Hitter primary position (max games per position, MLB only) ──────────
+
+HITTER_POSITION_CACHE_FILE = os.path.join(DATA_DIR, 'hitter_position_cache.json')
+
+
+def load_hitter_position_cache():
+    if os.path.exists(HITTER_POSITION_CACHE_FILE):
+        try:
+            with open(HITTER_POSITION_CACHE_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+    return {}
+
+
+def save_hitter_position_cache(cache):
+    os.makedirs(os.path.dirname(HITTER_POSITION_CACHE_FILE), exist_ok=True)
+    with open(HITTER_POSITION_CACHE_FILE, 'w') as f:
+        json.dump(cache, f, indent=2)
+
+
+def _fetch_player_position(mlb_id, season=2026):
+    """Determine a player's primary MLB position for the given season by
+    games played per position. MLB only (sportId=1); MiLB games excluded.
+    A game where the player appeared at multiple positions counts +1 for
+    each position (matches MLB's per-position games stat directly).
+
+    Returns: position abbreviation string ('3B', 'LF', 'CF', 'RF', 'DH', etc.)
+    or None if no fielding records exist (rare; e.g., not yet called up)."""
+    url = (f'https://statsapi.mlb.com/api/v1/people/{mlb_id}/stats'
+           f'?stats=season&group=fielding&season={season}&sportId=1')
+    try:
+        raw = _fetch_with_retry(url, timeout=15)
+        data = json.loads(raw)
+        stats_arr = data.get('stats') or []
+        if not stats_arr:
+            return None
+        splits = stats_arr[0].get('splits') or []
+        # Aggregate games per position (multi-team players have one split per
+        # team per position; sum across teams).
+        games_by_pos = {}
+        for split in splits:
+            pos_abbr = (split.get('position') or {}).get('abbreviation')
+            games = (split.get('stat') or {}).get('games') or 0
+            if pos_abbr and games:
+                games_by_pos[pos_abbr] = games_by_pos.get(pos_abbr, 0) + games
+        if not games_by_pos:
+            return None
+        return max(games_by_pos, key=games_by_pos.get)
+    except Exception:
+        return None
+
+
+def fetch_hitter_positions(hitters, season=2026):
+    """For each hitter, return primary MLB position (max games per position)
+    using a daily-refresh cache.
+
+    hitters: iterable of (name, mlb_id) tuples. Names are informational only;
+    mlb_id is the lookup key.
+
+    Returns: dict mlb_id (int) -> position abbreviation (str) or None.
+    """
+    cache = load_hitter_position_cache()
+    today = _today_et().strftime('%Y-%m-%d')
+    n_fetched = 0
+    n_cache_hit = 0
+    for _name, mlb_id in hitters:
+        if not mlb_id:
+            continue
+        key = str(mlb_id)
+        cached = cache.get(key)
+        if cached and cached.get('fetched') == today:
+            n_cache_hit += 1
+            continue
+        pos = _fetch_player_position(mlb_id, season)
+        cache[key] = {'position': pos, 'fetched': today}
+        n_fetched += 1
+        time_module.sleep(0.05)  # politeness — MLB API tolerates this rate
+    save_hitter_position_cache(cache)
+    print(f"  Hitter positions: {n_cache_hit} cached today, {n_fetched} fetched fresh")
+    return {int(k): (v.get('position') if v else None) for k, v in cache.items()}
+
+
 def lookup_mlb_id(player_name, team_abbrev, mlb_id_cache):
     """Look up MLB player ID using the MLB Stats API, matching by name and team."""
     cache_key = f"{player_name}|{team_abbrev}"

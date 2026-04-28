@@ -667,9 +667,12 @@ var PlayerPage = {
     this._renderHeadshotAndName(data.mlbId, data.hitter);
 
     var batHand = data.stands === 'S' ? 'S' : (data.stands === 'L' ? 'L' : 'R');
+    // Prepend primary MLB position (most games this season) to the bio line.
+    // Sourced from MLB Stats API in the pipeline; null when no MLB games yet.
+    var posPrefix = data.position ? data.position + ' | ' : '';
     var posEl = document.getElementById('player-position');
     var ageEl = document.getElementById('player-age');
-    posEl.textContent = 'Bats: ' + batHand + ' | ' + (data.team || '');
+    posEl.textContent = posPrefix + 'Bats: ' + batHand + ' | ' + (data.team || '');
     ageEl.textContent = '';
 
     if (data.mlbId) {
@@ -681,7 +684,7 @@ var PlayerPage = {
             var throwHand = person.pitchHand && person.pitchHand.code ? person.pitchHand.code : '';
             var btLabel = 'Bats/Throws: ' + batHand + '/' + throwHand;
             var agePart = person.currentAge != null ? ' | Age: ' + person.currentAge : '';
-            posEl.textContent = btLabel + ' | ' + (data.team || '') + agePart;
+            posEl.textContent = posPrefix + btLabel + ' | ' + (data.team || '') + agePart;
           }
         })
         .catch(function () { /* silently ignore */ });
