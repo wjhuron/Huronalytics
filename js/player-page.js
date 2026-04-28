@@ -189,6 +189,7 @@ var PlayerPage = {
     { key: 'cswPct', label: 'CSW%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'swStrPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izWhiffPct', label: 'IZ Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'fpsPct', label: 'FPS%', format: function(v) { return Utils.formatPct(v); } },
   ],
