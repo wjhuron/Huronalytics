@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-28 12:34",
+  "generatedAt": "2026-04-28 16:44",
   "totalPitches": 127979,
   "totalPitchers": 521,
   "totalHitters": 455,
@@ -371,11 +371,11 @@
     "xwOBA": 0.3238,
     "xwOBAcon": 0.3713,
     "count": 521,
-    "era": 4.2,
+    "era": 4.19,
     "hr9": 1.09,
     "fip": 4.18,
     "xFIP": 4.2,
-    "siera": 4.2
+    "siera": 4.19
   },
   "hitterLeagueAverages": {
     "babip": 0.2905,
@@ -427,12 +427,12 @@
     "hitterPlus": 100.0,
     "avg": 0.242,
     "obp": 0.3223,
-    "slg": 0.3934,
+    "slg": 0.3935,
     "ops": 0.7157,
     "iso": 0.1514,
     "kPct": 0.2217,
     "bbPct": 0.0931,
-    "wRCplus": 99.7926,
+    "wRCplus": 99.8111,
     "xWRCplus": 102.53
   },
   "vaaRegressions": {
@@ -5718,7 +5718,7 @@
     "scale": 40,
     "nQualified": 183
   },
-  "sieraConstant": 6.0439,
+  "sieraConstant": 6.0428,
   "gutsConstants": {
     "lgWOBA": 0.3201,
     "wOBAScale": 1.2515,
