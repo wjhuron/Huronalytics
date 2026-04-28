@@ -31,7 +31,16 @@ METRIC_KEYS = {
 PITCH_STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'twoStrikeWhiffPct', 'chasePct', 'gbPct', 'fpsPct']
 STAT_KEYS = ['strikePct', 'izPct', 'swStrRate', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'twoStrikeWhiffPct', 'oneOneWinPct', 'earlyActionPct']
 
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
+# Per-pitch-type batted-ball stats. These get percentiles computed per pitch
+# type and use a BIP-count qualifier (not pitch count) since their denominator
+# is BIP. Matches the leaderboard's posture for these stats.
+PITCH_BB_PCTL_KEYS = ['avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'puPct', 'babip']
+# Direction: lower is better for pitcher on these. PuPct stays default (higher
+# = better for pitcher; popups are auto-outs). gbPct also default (higher GB
+# = good for pitcher) and is already in PITCH_STAT_KEYS.
+PITCH_BB_INVERT = {'avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'babip'}
+
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + PITCH_BB_PCTL_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp']
 
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 

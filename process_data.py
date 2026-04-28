@@ -1820,6 +1820,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 detail['rx'] = round(rel_x, 2)
             if rel_z is not None:
                 detail['rz'] = round(rel_z, 2)
+            ext_val_d = safe_float(p.get('Extension'))
+            if ext_val_d is not None:
+                detail['ext'] = round(ext_val_d, 2)
             gd_val = normalize_date(p.get('Game Date'))
             if gd_val:
                 detail['gd'] = gd_val
@@ -3004,15 +3007,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # percentile pool. Shape metrics (velo, IVB, HB, etc.) need no minimum.
     MIN_PITCH_TYPE_OUTCOME = 25
     PITCH_SHAPE_KEYS = set(METRIC_KEYS.values()) | {'nVAA', 'nHAA'}
+    # Batted-ball stats use a BIP-count qualifier (>=25 BIPs of that pitch
+    # type) instead of pitch count, since their denominator is BIPs. Includes
+    # gbPct (which lives in PITCH_STAT_KEYS for historical reasons but is a
+    # BIP-rate stat).
+    PITCH_BB_QUAL_KEYS = set(PITCH_BB_PCTL_KEYS) | {'gbPct'}
 
     # 1. Pitch-type percentiles (grouped by pitch type)
     pt_groups = defaultdict(list)
     for row in pitch_leaderboard:
         pt_groups[row['pitchType']].append(row)
     for metric in PITCH_PCTL_KEYS:
-        mc = 0 if metric in PITCH_SHAPE_KEYS else MIN_PITCH_TYPE_OUTCOME
+        if metric in PITCH_SHAPE_KEYS:
+            mc, ck = 0, 'count'
+        elif metric in PITCH_BB_QUAL_KEYS:
+            mc, ck = MIN_PITCH_TYPE_OUTCOME, 'nBip'
+        else:
+            mc, ck = MIN_PITCH_TYPE_OUTCOME, 'count'
         for pt, pt_rows in pt_groups.items():
-            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc)
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc, count_key=ck)
 
     # 2. Pitcher percentiles (all stats including boxscore-derived).
     # All entries in PITCHER_ALL_PCTL are rate / shape / outcome metrics;
@@ -3058,6 +3071,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     row['nVAA_pctl'] = 100 - row['nVAA_pctl']
     for row in pitch_leaderboard:
         for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'):
+            pctl_key = stat + '_pctl'
+            if row.get(pctl_key) is not None:
+                row[pctl_key] = 100 - row[pctl_key]
+        # Batted-ball stats where lower = better for pitcher.
+        for stat in PITCH_BB_INVERT:
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]

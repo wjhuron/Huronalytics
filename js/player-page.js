@@ -169,14 +169,14 @@ var PlayerPage = {
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+    { key: 'xwOBAcon', label: 'xwOBAcon', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
     { key: 'avgEVAgainst', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
-    { key: 'maxEVAgainst', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
-    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
-    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
+    { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
   ],
 
@@ -1365,7 +1365,7 @@ var PlayerPage = {
     for (var i = 0; i < pitches.length; i++) {
       var p = pitches[i];
       if (!p.pt) continue;
-      if (!byType[p.pt]) byType[p.pt] = { count: 0, velos: [], spins: [], ivbs: [], hbs: [], tiltSins: [], tiltCoss: [], armAngles: [] };
+      if (!byType[p.pt]) byType[p.pt] = { count: 0, velos: [], spins: [], ivbs: [], hbs: [], tiltSins: [], tiltCoss: [], armAngles: [], exts: [] };
       var g = byType[p.pt];
       g.count++;
       if (p.v != null) g.velos.push(p.v);
@@ -1373,6 +1373,7 @@ var PlayerPage = {
       if (p.ivb != null) g.ivbs.push(p.ivb);
       if (p.hb != null) g.hbs.push(p.hb);
       if (p.aa != null) g.armAngles.push(p.aa);
+      if (p.ext != null) g.exts.push(p.ext);
       // Tilt: convert H:MM to angle for circular mean
       if (p.tl) {
         var parts = p.tl.split(':');
@@ -1414,6 +1415,7 @@ var PlayerPage = {
         indVertBrk: avg(g.ivbs),
         horzBrk: avg(g.hbs),
         armAngle: avg(g.armAngles),
+        extension: avg(g.exts),
       });
     }
     rows.sort(function(a, b) { return (b.usagePct || 0) - (a.usagePct || 0); });
