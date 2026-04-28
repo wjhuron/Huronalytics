@@ -1896,6 +1896,10 @@ var PlayerPage = {
     // Sort pitch types by fixed order
     var types = Utils.sortPitchTypes(Object.keys(byType));
 
+    // Total pitches against the selected hand — denominator for usage %.
+    var totalForHand = 0;
+    for (var totKey in byType) totalForHand += byType[totKey].length;
+
     // Render each pitch type
     for (var t = 0; t < types.length; t++) {
       var pt = types[t];
@@ -1906,6 +1910,14 @@ var PlayerPage = {
       label.className = 'heatmap-label';
       var badge = Utils.createPitchBadge(pt, true);
       label.appendChild(badge);
+      // Sample-size + usage meta: "[ST] · 112 (57.1%)" — count first as the
+      // trustworthiness cue, usage % in parens for context.
+      var meta = document.createElement('span');
+      meta.className = 'heatmap-label-meta';
+      var ptCount = byType[pt].length;
+      var ptPct = totalForHand > 0 ? (ptCount / totalForHand * 100) : 0;
+      meta.textContent = '· ' + ptCount + ' (' + ptPct.toFixed(1) + '%)';
+      label.appendChild(meta);
       cell.appendChild(label);
 
       var canvas = document.createElement('canvas');
