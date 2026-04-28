@@ -2336,7 +2336,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_lb_mlb = [r for r in hitter_leaderboard if not r.get('_isROC') and not r.get('_isCombined')]
     hitter_league_avgs = {}
     # Rate stats weighted by PA
-    pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'hrFbPct',
+    pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK', 'hrFbPct',
                 'wOBA', 'xBA', 'xSLG', 'xwOBA',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
@@ -2730,6 +2730,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 box_ubb = box_bb - box_ibb
                 row['kPct'] = round(box_so / box_pa, 4) if box_pa > 0 else None
                 row['bbPct'] = round(box_ubb / box_pa, 4) if box_pa > 0 else None
+                # BB/K (uses uBB to match bbPct denominator). Stored at full
+                # precision; display layer rounds to 2 decimals at render time.
+                row['bbToK'] = (box_ubb / box_so) if box_so > 0 else None
 
                 # BABIP = (H - HR) / (AB - K - HR + SF)
                 babip_denom = box_ab - box_so - box_hr + box_sf

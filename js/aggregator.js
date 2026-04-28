@@ -1279,7 +1279,7 @@ const Aggregator = {
     }
 
     const HITTER_STAT_KEYS = [
-      'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct',
+      'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct', 'bbToK',
       'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'bbPlus',
       'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
@@ -1335,6 +1335,8 @@ const Aggregator = {
 
       const kPct = pa > 0 ? k / pa : null;
       const bbPct = pa > 0 ? bb / pa : null;
+      // BB/K — full precision; display rounds to 2 decimals
+      const bbToK = k > 0 ? bb / k : null;
       const izSwingPct = izPitches > 0 ? izSwings / izPitches : null;
       const chasePct_val = oozPitches > 0 ? oozSwings / oozPitches : null;
       const izSwChase = (izSwingPct !== null && chasePct_val !== null)
@@ -1415,6 +1417,7 @@ const Aggregator = {
         xbh: xbh,
         kPct: kPct,
         bbPct: bbPct,
+        bbToK: bbToK,
         iso: iso_val,
         babip: babip_val,
         avgEVAll: avgEVAll,
@@ -1508,7 +1511,7 @@ const Aggregator = {
                         'ctPlus', 'ctPlusN', 'ctPlusRaw',
                         'hitterPlus'];
     // Rate stats that micro data computes (skip when filtered)
-    const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
+    const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK',
                            'doubles', 'triples', 'hr', 'xbh'];
     const hBoxFields = hasHitterContextFilter ? hBoxAlways : hBoxAlways.concat(hBoxRateStats);
     const hPreAgg = window.HITTER_DATA || [];

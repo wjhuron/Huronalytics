@@ -115,25 +115,25 @@ const COLUMNS = {
     { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'pa',          label: 'PA',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'ab',          label: 'AB',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    // Stats
+    // Stats — triple slash, discipline, luck, sabermetric outcome
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average', group: 'stats' },
     { key: 'obp',         label: 'OBP',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'On-base percentage', group: 'stats' },
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Slugging percentage', group: 'stats' },
     { key: 'ops',         label: 'OPS',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'OBP + SLG', group: 'stats' },
     { key: 'iso',         label: 'ISO',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Isolated power (SLG − AVG)', group: 'stats' },
-    { key: 'wOBA',         label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average — plate outcomes weighted by run value', group: 'stats' },
-    { key: 'wRCplus',     label: 'wRC+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Weighted runs created+ (100 = league avg, park-adjusted)', group: 'stats' },
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', desc: 'Strikeout rate (K / PA)', group: 'stats' },
-    { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / PA)', group: 'stats' },
-    // Supplemental
-    { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average on balls in play', group: 'supplemental' },
-    // Expected Stats
+    { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (uBB / PA, excludes IBB)', group: 'stats' },
+    { key: 'bbToK',       label: 'BB/K',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Walks per strikeout (uBB / K). Higher = more discipline.', group: 'stats' },
+    { key: 'babip',       label: 'BABIP',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Batting average on balls in play', group: 'stats' },
+    { key: 'wOBA',        label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average — plate outcomes weighted by run value', group: 'stats' },
+    // Expected — predictive / composite outcomes (wRC+ paired with xWRC+ for direct comparison)
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Expected BA (Statcast, EV + LA)', group: 'expected' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected SLG (Statcast, EV + LA)', group: 'expected' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast, EV + LA)', group: 'expected' },
-    { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
-    { key: 'xWRCplus',   label: 'xWRC+',    format: Utils.formatInt, sortType: 'numeric', desc: 'Expected wRC+ (derived from xwOBA, park-adjusted)', group: 'expected' },
-    { key: 'hitterPlus', label: 'Hitter+',  format: Utils.formatInt, sortType: 'numeric', desc: 'Hitter composite: BB+ × PD+ / 100 — quality of contact × frequency of productive PAs (100 = league avg)', group: 'expected' },
+    { key: 'xwOBAcon',    label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
+    { key: 'wRCplus',     label: 'wRC+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Weighted runs created+ (100 = league avg, park-adjusted, from actual wOBA)', group: 'expected' },
+    { key: 'xWRCplus',    label: 'xWRC+',    format: Utils.formatInt, sortType: 'numeric', desc: 'Expected wRC+ (derived from xwOBA, park-adjusted)', group: 'expected' },
+    { key: 'hitterPlus',  label: 'Hitter+',  format: Utils.formatInt, sortType: 'numeric', desc: 'Hitter composite: weighted blend of BB+ (contact quality), SD+ (swing decisions), CT+ (contact rate). 100 = league avg.', group: 'expected' },
     // Counting
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
@@ -274,7 +274,7 @@ const Leaderboard = {
     pitchMetrics:       ['maxVelo', 'relPosZ', 'relPosX', 'effectiveVelo', 'runValue', 'xRunValue', 'xBA', 'xSLG'],
     pitcherStats:       ['w', 'l', 'sv', 'hld', 'tbf', 'fip', 'xFIP'],
     pitcherBattedBall:  ['xBA', 'xSLG', 'maxEVAgainst', 'xwOBAsp'],
-    hitterStats:        ['ab', 'doubles', 'triples', 'cs', 'sbPct'],
+    hitterStats:        ['g', 'ab', 'doubles', 'triples', 'cs', 'sbPct', 'xBA', 'xSLG'],
     hitterBattedBall:   ['middlePct', 'oppoPct', 'avgFbDist', 'avgHrDist', 'puPct'],
     hitterPitch:        ['medLA', 'ldPct', 'fbPct', 'pullPct', 'oppoPct', 'izContactPct']
   },

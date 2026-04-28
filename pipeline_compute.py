@@ -36,7 +36,7 @@ PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEY
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 
 HITTER_STAT_KEYS = [
-    'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct',
+    'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK',
     'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'bbPlus',
     'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
     'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
