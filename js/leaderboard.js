@@ -101,6 +101,7 @@ const COLUMNS = {
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', desc: 'Called strikes + whiffs / total pitches', group: 'stats' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Swinging strikes / total swings', group: 'stats' },
     { key: 'izWhiffPct',  label: 'IZ Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on in-zone swings', group: 'stats' },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on 2-strike swings — putaway ability', group: 'stats' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate', group: 'stats' },
     { key: 'fpsPct',      label: 'FPS%',     format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch strike rate', group: 'stats' },
     { key: 'oneOneWinPct', label: '1-1 Win%', format: Utils.formatPct, sortType: 'numeric', desc: 'Strike rate on 1-1 counts (strikes + BIP / total 1-1 pitches)', group: 'stats' },
