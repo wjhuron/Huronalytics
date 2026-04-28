@@ -1574,6 +1574,14 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   letter-spacing: 0.02em;
 }
 
+.count-table-row-meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #8a8a8a);
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+}
+
 /* Count table */
 .count-table {
   width: 100%;

@@ -2107,28 +2107,42 @@ var PlayerPage = {
     var thUsage = document.createElement('th');
     thUsage.textContent = 'Usage%';
     headRow.appendChild(thUsage);
+    // Each bucket header gets its sample size appended: "Two-Strike (n=85)" so
+    // small-sample buckets are visible at a glance.
     for (var g = 0; g < groupNames.length; g++) {
       var th = document.createElement('th');
-      th.textContent = groupNames[g];
+      th.textContent = groupNames[g] + ' (n=' + groupTotals[groupNames[g]] + ')';
       headRow.appendChild(th);
     }
     thead.appendChild(headRow);
     table.appendChild(thead);
 
     var isDark = document.body.classList.contains('dark');
+    // Row-level coloring gate: a pitch type with fewer than 25 total throws is
+    // below the per-pitch sample-size threshold used elsewhere on the site, so
+    // its bucket-level deviation values are too noisy to color reliably.
+    var MIN_PITCH_TOTAL_FOR_COLOR = 25;
     var tbody = document.createElement('tbody');
     for (var t = 0; t < types.length; t++) {
       var pt = types[t];
       var tr = document.createElement('tr');
 
+      // First column: badge + total-count meta (e.g. "[ST] · 112"). The count
+      // is the pitch type's overall total against the selected hand — the
+      // sample anchor for the row's deviation pattern.
       var tdLabel = document.createElement('td');
       tdLabel.style.textAlign = 'center';
       var badge = Utils.createPitchBadge(pt, true);
       tdLabel.appendChild(badge);
+      var meta = document.createElement('span');
+      meta.className = 'count-table-row-meta';
+      meta.textContent = ' · ' + pitchTypes[pt].total;
+      tdLabel.appendChild(meta);
       tr.appendChild(tdLabel);
 
       // Baseline usage for this pitch type
       var baselinePct = overallTotal > 0 ? (pitchTypes[pt].total / overallTotal * 100) : 0;
+      var rowQualifiesForColor = pitchTypes[pt].total >= MIN_PITCH_TOTAL_FOR_COLOR;
 
       // Overall usage% column (no coloring — this is the reference)
       var tdUsage = document.createElement('td');
@@ -2147,8 +2161,10 @@ var PlayerPage = {
         if (total > 0) {
           var pct = (pitchTypes[pt][gn] / total * 100);
           td.textContent = pct.toFixed(1) + '%';
-          // Color based on deviation from pitcher's own baseline usage
-          if (baselinePct > 0) {
+          // Color based on deviation from pitcher's own baseline usage —
+          // suppressed for low-total pitch types whose deviation values are
+          // too small-sample to read.
+          if (baselinePct > 0 && rowQualifiesForColor) {
             var ratio = pct / baselinePct;
             // Map ratio to 0-100 scale: 0x=0, 1x=50, 2x=100
             var devPctl = Math.max(0, Math.min(100, 50 + (ratio - 1) * 50));
