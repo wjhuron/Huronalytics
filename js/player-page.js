@@ -693,7 +693,7 @@ var PlayerPage = {
           if (person) {
             var throwHand = person.pitchHand && person.pitchHand.code ? person.pitchHand.code : '';
             var btLabel = throwHand ? batHand + '/' + throwHand : batHand;
-            var agePart = person.currentAge != null ? ' | ' + person.currentAge : '';
+            var agePart = person.currentAge != null ? ' | Age: ' + person.currentAge : '';
             posEl.textContent = posPrefix + btLabel + ' | ' + (data.team || '') + agePart;
           }
         })
@@ -2633,6 +2633,27 @@ var PlayerPage = {
     var mode = this._sprayMode || 'all';
     var bbTypeColors = { 0: '#4e79a7', 1: '#59a14f', 2: '#f28e2b', 3: '#e15759' };
     var hitEventColors = { 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c' };
+
+    // Sample-size counts for toggle button labels — same denominator the
+    // user's currently-applied bat-side filter produced (filteredBips).
+    var allCount = filteredBips.length;
+    var hitsCount = 0;
+    var hardCount = 0;
+    for (var ci = 0; ci < filteredBips.length; ci++) {
+      var bipC = filteredBips[ci];
+      var evtC = bipC[eventIdx];
+      var evC = bipC[evIdx];
+      if (evtC >= 1 && evtC <= 4) hitsCount++;
+      if (evC != null && evC >= QUAL.HARD_HIT_MPH) hardCount++;
+    }
+    var sprayBtns = document.querySelectorAll('#spray-toggle-inline .spray-toggle-btn, #spray-toggle .spray-toggle-btn');
+    for (var bi2 = 0; bi2 < sprayBtns.length; bi2++) {
+      var btn = sprayBtns[bi2];
+      var bm = btn.getAttribute('data-mode');
+      if (bm === 'all') btn.textContent = 'All BIP (' + allCount + ')';
+      else if (bm === 'hits') btn.textContent = 'Hits (' + hitsCount + ')';
+      else if (bm === 'hard') btn.textContent = 'Hard Hit (' + hardCount + ')';
+    }
 
     // Plot BIP dots
     for (var di = 0; di < filteredBips.length; di++) {
