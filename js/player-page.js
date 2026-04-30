@@ -2373,7 +2373,7 @@ var PlayerPage = {
     // Re-aggregate with hand filter
     if (!Aggregator.loaded) return;
 
-    var baseFilters = { vsHand: hand, team: 'all', throws: 'all', search: '', role: 'all' };
+    var baseFilters = { vsHand: hand, team: 'all', throws: 'all', search: '', role: 'all', pitchTypes: ['all'] };
     var noDataMsg = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' +
       (type === 'pitcher' ? (hand === 'L' ? 'LHH' : 'RHH') : (hand === 'L' ? 'LHP' : 'RHP')) + '</p>';
 
