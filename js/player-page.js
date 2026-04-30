@@ -3115,7 +3115,7 @@ var PlayerPage = {
       xwobaspNote.appendChild(labelSpan);
       var valSpan = document.createElement('span');
       var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
-      valSpan.style.cssText = 'font-size:18px;font-weight:700;vertical-align:middle;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
+      valSpan.style.cssText = 'font-size:18px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
       valSpan.textContent = Utils.formatDecimal(3)(xwOBAsp_val);
       xwobaspNote.appendChild(valSpan);
       var countSpan = document.createElement('span');
@@ -3254,6 +3254,7 @@ var PlayerPage = {
         },
         scales: {
           x: {
+            type: 'linear',
             min: -50,
             max: 50,
             title: {
@@ -3262,8 +3263,13 @@ var PlayerPage = {
               color: '#ccc',
               font: { family: 'Barlow', size: 12 }
             },
+            // Tick at every actual spray bin boundary so the gridlines line up
+            // with the heatmap zones (no fake dividers at ±45°).
+            afterBuildTicks: function (axis) {
+              axis.ticks = [-50, -30, -15, 0, 15, 30, 50].map(function (v) { return { value: v }; });
+            },
             ticks: {
-              stepSize: 15,
+              autoSkip: false,
               color: '#ccc',
               font: { family: 'Barlow', size: 11 },
               callback: function (value) {

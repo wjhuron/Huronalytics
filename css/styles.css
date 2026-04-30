@@ -1698,20 +1698,25 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   margin-bottom: 0;
 }
 
-/* LA × Spray header — three-column grid so the center toggle is truly centered. */
+/* LA × Spray header — three-column grid: xwOBAsp annotation (left),
+   section title (center), color-mode + bat-side toggles (right). */
 .la-spray-section-header {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
 }
+.la-spray-section-header > #la-spray-xwobasp-note {
+  justify-self: start;
+}
 .la-spray-section-header .section-title {
   font-size: 24px;
-  justify-self: start;
+  justify-self: center;
+  margin: 0;
 }
 .la-spray-toggle-group {
   display: flex;
   gap: 8px;
-  justify-self: center;
+  justify-self: end;
 }
 
 .spray-toggle {
