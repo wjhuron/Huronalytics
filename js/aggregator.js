@@ -1851,11 +1851,12 @@ const Aggregator = {
       'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
       'pullPct', 'airPullPct',
-      'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
+      'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'firstPitchSwingPct',
+      'contactPct', 'izContactPct', 'whiffPct', 'twoStrikeWhiffPct',
       'runValue', 'rv100', 'xRunValue', 'xRv100',
     ];
     const HITTER_PITCH_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, twoStrikeWhiffPct: true
     };
 
     let rows = [];

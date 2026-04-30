@@ -2252,10 +2252,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
         'gbPct', 'ldPct', 'fbPct', 'hrFbPct',
         'pullPct', 'oppoPct',
-        'swingPct', 'izSwingPct', 'chasePct', 'contactPct', 'izContactPct', 'whiffPct',
+        'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'firstPitchSwingPct',
+        'contactPct', 'izContactPct', 'whiffPct', 'twoStrikeWhiffPct',
         'runValue', 'rv100', 'xRunValue', 'xRv100',
     ]
-    HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct'}
+    HITTER_PITCH_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'twoStrikeWhiffPct'}
 
     PITCH_CATEGORIES = {
         'Hard': ['FF', 'SI'],
