@@ -125,9 +125,14 @@ var PlayerPage = {
   HITTER_BAT_TRACKING_COLS: [
     { key: 'batSpeed', label: 'Bat Speed', format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'swingLength', label: 'Swing Length', format: function(v) { return v != null ? v.toFixed(1) + ' ft' : '—'; } },
-    { key: 'attackAngle', label: 'Attack Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
-    { key: 'attackDirection', label: 'Attack Dir', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
-    { key: 'swingPathTilt', label: 'Swing Path Tilt', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; } },
+    // Direction-ambiguous angles (no inherent better/worse) — show value, no color.
+    { key: 'attackAngle', label: 'Attack Angle', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; }, noPctl: true },
+    { key: 'attackDirection', label: 'Attack Dir', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; }, noPctl: true },
+    { key: 'swingPathTilt', label: 'Swing Path Tilt', format: function(v) { return v != null ? v.toFixed(1) + '°' : '—'; }, noPctl: true },
+    // Quality-of-contact rates (higher is better; percentile-colored).
+    { key: 'squaredUpPct', label: 'Squared-Up%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'blastPct', label: 'Blast%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'idealAAPct', label: 'IdealAtkAngle%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   PITCH_TABLE_COLS: [
@@ -3774,6 +3779,13 @@ var PlayerPage = {
       var td = document.createElement('td');
       var val = data[col.key];
       td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+      if (!col.noPctl) {
+        var pctl = data[col.key + '_pctl'];
+        if (pctl != null) {
+          var bg = Utils.percentileColorDark(pctl);
+          if (bg) td.style.backgroundColor = bg;
+        }
+      }
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
