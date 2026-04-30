@@ -136,7 +136,6 @@ GUTS_LG_WOBA, GUTS_WOBA_SCALE = _load_guts()
 
 # Mapping: card column header → metadata league average key
 PCT_COLOR_COLS = {
-    'Strike%': 'strikePct',
     'Zone%':   'izPct',
     'Whiff%':  'swStrPct',
     'Chase%':  'chasePct',
@@ -1053,7 +1052,6 @@ def render_card(config, pitches, output_file):
         armangles=[v for v in (sf(p.get('ArmAngle')) for p in pp) if v is not None]
         swings=[p for p in pp if p.get('Description') in SWING_DESC]
         whiffs=[p for p in pp if p.get('Description')=='Swinging Strike']
-        strikes=[p for p in pp if p.get('Description') in STRIKE_DESC]
         iz_n=0
         for p in pp:
             r = compute_iz(p)
@@ -1085,14 +1083,13 @@ def render_card(config, pitches, output_file):
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
-            f"{len(strikes)/n*100:.1f}%" if n else '—',f"{iz_n/n*100:.1f}%" if n else '—',
+            f"{iz_n/n*100:.1f}%" if n else '—',
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
             f"{chase_pct*100:.1f}%" if chase_pct is not None else '—',
             f"{xwobacon:.3f}".replace('0.', '.') if xwobacon is not None else '—',
             str(rv) if rv is not None else '—']
         pitch_stats.append((pt, row))
 
-    t_str=[p for p in pitches if p.get('Description') in STRIKE_DESC]
     t_sw=[p for p in pitches if p.get('Description') in SWING_DESC]
     t_wh=[p for p in pitches if p.get('Description')=='Swinging Strike']
     t_iz=sum(1 for p in pitches if compute_iz(p)==True)
@@ -1125,7 +1122,7 @@ def render_card(config, pitches, output_file):
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
         fmt_fi(sum(t_exts)/len(t_exts)) if t_exts else '—',
         f"{sum(t_armangles)/len(t_armangles):.1f}°" if t_armangles else '—',
-        f"{len(t_str)/tc*100:.1f}%" if tc else '—',f"{t_iz/tc*100:.1f}%" if tc else '—',
+        f"{t_iz/tc*100:.1f}%" if tc else '—',
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
         f"{t_chase*100:.1f}%" if t_chase is not None else '—',
         f"{t_xwobacon:.3f}".replace('0.', '.') if t_xwobacon is not None else '—',
@@ -1143,7 +1140,7 @@ def render_card(config, pitches, output_file):
     else:
         rv_header = 'PitchRV'
 
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','Arm Angle','Strike%','Zone%','Whiff%','Chase%','xwOBAcon',rv_header]
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','Arm Angle','Zone%','Whiff%','Chase%','xwOBAcon',rv_header]
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
     # Columns to force-exclude based on data availability and card type.
@@ -1179,8 +1176,9 @@ def render_card(config, pitches, output_file):
     cell_data = [[row[i] for i in cols_to_keep] for row in all_cell_data]
     pt_codes=[r[0] for r in pitch_stats]+[None]
 
-    # Recalculate divider column index (Strike% position in filtered columns)
-    divider_col = col_headers.index('Strike%') if 'Strike%' in col_headers else None
+    # Divider sits at the boundary between metrics (left) and rate stats
+    # (right). Zone% is the first rate-stat column now that Strike% is gone.
+    divider_col = col_headers.index('Zone%') if 'Zone%' in col_headers else None
 
     table = ax_table.table(cellText=cell_data, colLabels=col_headers, loc='upper center', cellLoc='center')
     table.auto_set_font_size(False); table.set_fontsize(10); table.scale(1, 1.6)
@@ -1200,7 +1198,7 @@ def render_card(config, pitches, output_file):
                 cell.set_facecolor(PITCH_COLORS.get(pc,'#999'))
                 cell.set_text_props(color=badge_text_color(PITCH_COLORS.get(pc,'#999')), fontweight='bold')
 
-    # Percentile-based coloring for Strike%, Zone%, Whiff%
+    # Percentile-based coloring for Zone%, Whiff%, Chase%
     league_avgs = config.get('league_avgs', {})
     overall_avgs = config.get('overall_avgs', {})
     for c, col_name in enumerate(col_headers):
