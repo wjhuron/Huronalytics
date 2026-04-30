@@ -805,6 +805,11 @@ def render_card(config, pitches, output_file):
     # Location plots
     LOC_TITLE_Y=0.595; LOC_BOTTOM=0.29; LOC_HEIGHT=0.29
     LOC_L_X=0.01; LOC_R_X=0.26; LOC_W=0.245
+    is_season_loc = bool(config.get('mvn_models'))
+    # Single-game zone plots use a lower 6-pitch ellipse minimum (matches the
+    # movement scatter rule). Season cards keep 10 to suppress ellipse noise
+    # when many pitch types are crammed into the same plot.
+    zone_ellipse_min = 10 if is_season_loc else 6
 
     # Fixed zone bounds — same size for every pitcher, every card
     def draw_zone(ax, hand):
@@ -824,7 +829,7 @@ def render_card(config, pitches, output_file):
         for pt in PITCH_ORDER:
             if pt not in locations[hand]: continue
             pts = locations[hand][pt]
-            if len(pts) >= 10:
+            if len(pts) >= zone_ellipse_min:
                 xs = np.array([p[0] for p in pts])
                 ys = np.array([p[1] for p in pts])
                 cov = np.cov(xs, ys)
@@ -867,7 +872,7 @@ def render_card(config, pitches, output_file):
         fontsize=8, color='#ccc', va='bottom', ha='left', fontfamily='Avenir Next', fontweight='bold')
     fig.text(LOC_R_X + LOC_W + 0.005, LOC_BOTTOM + 0.018, 'B = Barrel',
         fontsize=8, color='#ccc', va='bottom', ha='left', fontfamily='Avenir Next', fontweight='bold')
-    fig.text(LOC_R_X + LOC_W + 0.005, LOC_BOTTOM, 'Min. 10 pitches for ellipse',
+    fig.text(LOC_R_X + LOC_W + 0.005, LOC_BOTTOM, f'Min. {zone_ellipse_min} pitches for ellipse',
         fontsize=6.5, color='#888', va='bottom', ha='left', fontfamily='Avenir Next', fontstyle='italic')
 
     # ── Batted ball distribution (donut + stacked bars) ──
