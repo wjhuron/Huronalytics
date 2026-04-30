@@ -2206,6 +2206,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 20
 
+    # Per-100-PA run value for the hitter percentile panel's "Overall" row.
+    # Stored at full precision (no intermediate rounding) per the RV memory;
+    # display layer rounds at render time.
+    for row in hitter_leaderboard:
+        pa = row.get('pa') or 0
+        rv = row.get('runValue')
+        xrv = row.get('xRunValue')
+        row['rv100'] = (rv / pa * 100) if (rv is not None and pa > 0) else None
+        row['xRv100'] = (xrv / pa * 100) if (xrv is not None and pa > 0) else None
+
     hitter_leaderboard.sort(key=lambda r: r.get('pa', 0), reverse=True)
     print(f"Hitter leaderboard: {len(hitter_leaderboard)} rows")
 
@@ -2363,7 +2373,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs = {}
     # Rate stats weighted by PA
     pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK', 'hrFbPct',
-                'wOBA', 'xBA', 'xSLG', 'xwOBA',
+                'wOBA', 'xBA', 'xSLG', 'xwOBA', 'rv100', 'xRv100',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',

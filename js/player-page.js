@@ -26,31 +26,38 @@ var PlayerPage = {
   ],
 
   HITTING_STATS: [
-    { key: 'xBA',             label: 'xBA',              format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xSLG',            label: 'xSLG',             format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBA',           label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAcon',        label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAsp',         label: 'xwOBAsp',          format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'bbPlus',          label: 'BB+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'sdPlus',          label: 'SD+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'ctPlus',          label: 'CT+',              format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'hitterPlus',      label: 'Hitter+',          format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'xWRCplus',        label: 'xWRC+',            format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'avgEVAll',        label: 'Avg EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'ev50',            label: 'EV50',             format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'maxEV',           label: 'Max EV',           format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
-    { key: 'hardHitPct',      label: 'Hard-Hit%',       format: function(v) { return Utils.formatPct(v); } },
-    { key: 'barrelPct',       label: 'Barrel%',         format: function(v) { return Utils.formatPct(v); } },
-    { key: 'airPullPct',      label: 'Air Pull%',        format: function(v) { return Utils.formatPct(v); } },
-    { key: 'kPct',            label: 'K%',              format: function(v) { return Utils.formatPct(v); } },
-    { key: 'bbPct',           label: 'BB%',             format: function(v) { return Utils.formatPct(v); } },
-    { key: 'whiffPct',        label: 'Whiff%',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'chasePct',        label: 'Chase%',          format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izContactPct',    label: 'IZ Contact%',      format: function(v) { return Utils.formatPct(v); } },
-    { key: 'batSpeed',        label: 'Bat Speed',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true, batSpeedQual: true },
-    { key: 'blastPct',        label: 'Blast%',           format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
-    { key: 'idealAAPct',      label: 'IdealAtkAngle%',         format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
-    { key: 'sprintSpeed',   label: 'Sprint Speed',     format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
+    // Quality summary — headlines first
+    { key: 'hitterPlus',   label: 'Hitter+',     format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'xWRCplus',     label: 'xWRC+',       format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    // Hitter+ components (weights: BB+ 65%, CT+ 28%, SD+ 7%)
+    { key: 'bbPlus',       label: 'BB+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'ctPlus',       label: 'CT+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'sdPlus',       label: 'SD+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    // Expected outcomes (wOBA family)
+    { key: 'xwOBA',        label: 'xwOBA',       format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAcon',     label: 'xwOBAcon',    format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBAsp',      label: 'xwOBAsp',     format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    // Contact quality (EV)
+    { key: 'avgEVAll',     label: 'Avg EV',      format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    { key: 'maxEV',        label: 'Max EV',      format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    // Contact quality (rate)
+    { key: 'hardHitPct',   label: 'Hard-Hit%',   format: function(v) { return Utils.formatPct(v); } },
+    { key: 'barrelPct',    label: 'Barrel%',     format: function(v) { return Utils.formatPct(v); } },
+    // Discipline — PA-level rates
+    { key: 'kPct',         label: 'K%',          format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbPct',        label: 'BB%',         format: function(v) { return Utils.formatPct(v); } },
+    // Discipline — per-pitch process
+    { key: 'chasePct',     label: 'Chase%',      format: function(v) { return Utils.formatPct(v); } },
+    { key: 'whiffPct',     label: 'Whiff%',      format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
+    // Bat tracking
+    { key: 'batSpeed',     label: 'Bat Speed',   format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true, batSpeedQual: true },
+    { key: 'squaredUpPct', label: 'Squared-Up%', format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
+    { key: 'blastPct',     label: 'Blast%',      format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
+    // Spray
+    { key: 'airPullPct',   label: 'Air Pull%',   format: function(v) { return Utils.formatPct(v); } },
+    // Speed
+    { key: 'sprintSpeed',  label: 'Sprint Speed', format: function(v) { return v != null ? v.toFixed(1) + ' ft/s' : '—'; }, rocHide: true, sprintQual: true },
   ],
 
   HITTER_STATS_COLS: [
@@ -1032,51 +1039,83 @@ var PlayerPage = {
 
 
   _renderHitterRunValue: function (data) {
+    // "Overall" row at the top of the hitter percentile panel — mirrors the
+    // pitcher panel's xPitch Run Value / 100 row in style. Uses the standard
+    // pctl-row layout (label + bar + circle + value). Value is xRV/100 PAs;
+    // percentile comes from the qualified-hitter pool computed in
+    // process_data.py.
     var container = document.getElementById('player-percentiles');
+    var isDark = document.body.classList.contains('dark');
 
     var sectionLabel = document.createElement('div');
     sectionLabel.className = 'pctl-section-label';
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
-    sectionLabel.textContent = 'Batter Run Value';
+    sectionLabel.textContent = 'xRun Value / 100 PA';
     container.appendChild(sectionLabel);
 
-    var rv = data.runValue;
+    // Qualification (PA × team games × QUAL.PA_PER_GAME) — same gate the
+    // generic _renderPercentiles uses for hitter rate stats.
+    var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
+    var tg = teamGames[data.team] || 0;
+    var pa = data.pa || 0;
+    var isQualified = tg > 0 && pa >= tg * QUAL.PA_PER_GAME;
+
+    var xRv100 = data.xRv100;
+    var pctl = data.xRv100_pctl;
+
     var row = document.createElement('div');
     row.className = 'pctl-row';
-    var label = document.createElement('span');
-    label.className = 'pctl-label';
-    label.textContent = 'Overall';
-    var barWrap = document.createElement('div');
-    barWrap.className = 'pctl-bar-track';
-    barWrap.style.position = 'relative';
-    var centerLine = document.createElement('div');
-    centerLine.style.cssText = 'position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.3);z-index:1;';
-    barWrap.appendChild(centerLine);
-    // Fill bar
-    if (rv != null && rv !== 0) {
-      var bar = document.createElement('div');
-      bar.style.position = 'absolute';
-      bar.style.top = '0';
-      bar.style.bottom = '0';
-      bar.style.borderRadius = '3px';
-      var pct = Math.min(Math.abs(rv) / 15, 1) * 50;
-      if (rv > 0) {
-        bar.style.left = '50%';
-        bar.style.width = pct + '%';
-        bar.style.backgroundColor = 'rgba(0, 180, 100, 0.6)';
+
+    var labelEl = document.createElement('span');
+    labelEl.className = 'pctl-label';
+    labelEl.textContent = 'Overall';
+
+    var valEl = document.createElement('span');
+    valEl.className = 'pctl-value';
+    valEl.textContent = xRv100 != null ? xRv100.toFixed(1) : '—';
+
+    var circleWrap = document.createElement('div');
+    circleWrap.className = 'pctl-circle-wrap';
+    if (pctl != null) {
+      var circle = document.createElement('div');
+      circle.className = 'pctl-circle';
+      if (isQualified) {
+        var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+        var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+        circle.style.backgroundColor = bgColor;
+        circle.style.color = textColor;
+        circle.title = Utils.ordinal(Math.round(pctl)) + ' percentile among qualified hitters';
       } else {
-        bar.style.left = (50 - pct) + '%';
-        bar.style.width = pct + '%';
-        bar.style.backgroundColor = 'rgba(220, 60, 60, 0.6)';
+        circle.style.backgroundColor = 'transparent';
+        circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
+        circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
+        circle.title = 'Below minimum qualification threshold';
       }
-      barWrap.appendChild(bar);
+      circle.textContent = Math.round(pctl);
+      circleWrap.appendChild(circle);
     }
-    var valSpan = document.createElement('span');
-    valSpan.className = 'pctl-value';
-    valSpan.textContent = rv != null ? rv.toFixed(1) : '—';
-    row.appendChild(label);
-    row.appendChild(barWrap);
-    row.appendChild(valSpan);
+
+    var barTrack = document.createElement('div');
+    barTrack.className = 'pctl-bar-track';
+    var barFill = document.createElement('div');
+    barFill.className = 'pctl-bar-fill';
+    if (pctl != null) {
+      barFill.style.width = Math.round(pctl) + '%';
+      if (isQualified) {
+        var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+        barFill.style.background = barColor;
+      } else {
+        var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
+        var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+        barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
+      }
+    }
+    barTrack.appendChild(barFill);
+
+    row.appendChild(labelEl);
+    row.appendChild(barTrack);
+    row.appendChild(circleWrap);
+    row.appendChild(valEl);
     container.appendChild(row);
 
     var divider = document.createElement('div');
