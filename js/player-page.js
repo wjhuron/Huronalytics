@@ -2963,15 +2963,17 @@ var PlayerPage = {
       return OUTCOME_COLORS[pt.event] || '#666'; // outcome
     }
 
-    // EV-based dot sizing: 5px (weak) to 10px (barreled)
+    // EV-based dot sizing: 7px (weak) to 12px (barreled). Sized for the
+    // 700px-wide chart — a 24px max-diameter dot fits inside a 5° LA bin
+    // (~36px tall at this chart height) without overflowing zones.
     function evRadius(ev) {
-      if (ev == null) return 5;
-      if (ev < 80) return 5;
-      if (ev < 90) return 6;
-      if (ev < 95) return 7;
-      if (ev < 100) return 8;
-      if (ev < 105) return 9;
-      return 10;
+      if (ev == null) return 7;
+      if (ev < 80) return 7;
+      if (ev < 90) return 8;
+      if (ev < 95) return 9;
+      if (ev < 100) return 10;
+      if (ev < 105) return 11;
+      return 12;
     }
 
     // Build datasets
