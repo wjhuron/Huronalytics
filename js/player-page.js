@@ -2373,7 +2373,11 @@ var PlayerPage = {
     // Re-aggregate with hand filter
     if (!Aggregator.loaded) return;
 
-    var baseFilters = { vsHand: hand, team: 'all', throws: 'all', search: '', role: 'all', pitchTypes: ['all'] };
+    // Request both category rows (Hard/Breaking/Offspeed) and individual pitch
+    // types in one aggregation pass so the player-page tables can mirror the
+    // default-view's grouped/expandable layout in platoon mode too.
+    var HITTER_PT_REQUEST = ['Hard', 'Breaking', 'Offspeed', 'FF', 'SI', 'FC', 'SL', 'ST', 'CU', 'SV', 'CH', 'FS', 'KN'];
+    var baseFilters = { vsHand: hand, team: 'all', throws: 'all', search: '', role: 'all', pitchTypes: HITTER_PT_REQUEST };
     var noDataMsg = '<p style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px;">No data vs ' +
       (type === 'pitcher' ? (hand === 'L' ? 'LHH' : 'RHH') : (hand === 'L' ? 'LHP' : 'RHP')) + '</p>';
 
@@ -2432,21 +2436,42 @@ var PlayerPage = {
       }
       this._renderHitterStatsFullTable(found, isROC);
 
-      // Re-aggregate hitter pitch-type rows with hand filter — drop pitch
-      // types the hitter hasn't seen vs the active handedness.
+      // Re-aggregate hitter pitch-type rows with hand filter, then split into
+      // category rows (Hard/Breaking/Offspeed) for the main table view and a
+      // sub-rows map for category expansion. Pitch types the hitter hasn't
+      // seen vs this handedness are dropped (count == 0).
       var hpRows = Aggregator.aggregate('hitterPitch', baseFilters);
-      var myHPRows = [];
+      var CATS = Aggregator.PITCH_CATEGORIES;
+      var ptToCat = {};
+      for (var cn in CATS) {
+        for (var ci = 0; ci < CATS[cn].length; ci++) ptToCat[CATS[cn][ci]] = cn;
+      }
+      var CAT_ORDER = ['Hard', 'Breaking', 'Offspeed'];
+      var myCategoryRows = [];
+      var subRowsByCat = { Hard: [], Breaking: [], Offspeed: [] };
       for (var i = 0; i < hpRows.length; i++) {
-        if (hpRows[i].hitter === data.hitter && hpRows[i].team === data.team &&
-            hpRows[i].count != null && hpRows[i].count > 0) {
-          myHPRows.push(hpRows[i]);
+        var r = hpRows[i];
+        if (r.hitter !== data.hitter || r.team !== data.team) continue;
+        if (r.count == null || r.count === 0) continue;
+        if (CAT_ORDER.indexOf(r.pitchType) !== -1) {
+          myCategoryRows.push(r);
+        } else if (ptToCat[r.pitchType]) {
+          subRowsByCat[ptToCat[r.pitchType]].push(r);
         }
       }
-      this._filteredHitterPitchRows = myHPRows;
+      myCategoryRows.sort(function (a, b) {
+        return CAT_ORDER.indexOf(a.pitchType) - CAT_ORDER.indexOf(b.pitchType);
+      });
+      for (var ck = 0; ck < CAT_ORDER.length; ck++) {
+        subRowsByCat[CAT_ORDER[ck]].sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+      }
+      this._filteredHitterCategoryRows = myCategoryRows;
+      this._filteredHitterPitchSubRows = subRowsByCat;
       this._renderHitterBattedBallTable(found, isROC);
       this._renderHitterPlateDisciplineTable(found);
       if (!isROC) this._renderHitterBatTrackingTable(found);
-      this._filteredHitterPitchRows = null;
+      this._filteredHitterCategoryRows = null;
+      this._filteredHitterPitchSubRows = null;
     }
   },
 
@@ -3489,7 +3514,7 @@ var PlayerPage = {
     return rows;
   },
 
-  _renderGroupedPitchTable: function (container, cols, categoryRows, totalRow, hitterName, team) {
+  _renderGroupedPitchTable: function (container, cols, categoryRows, totalRow, hitterName, team, subRowsByCategory) {
     var self = this;
     var isDark = document.body.classList.contains('dark');
     var table = document.createElement('table');
@@ -3561,8 +3586,12 @@ var PlayerPage = {
           if (indicator) indicator.textContent = expanded ? '\u25BC' : '\u25B6';
 
           if (expanded && subRowEls.length === 0) {
-            // First expand: create sub-rows
-            var pitchRows = self._getHitterPitchRowsForCategory(hitterName, team, catRow.pitchType);
+            // First expand: create sub-rows. Use the pre-computed platoon-
+            // filtered subrow map when provided; otherwise fall back to the
+            // default-view source (window.HITTER_PITCH_LB).
+            var pitchRows = subRowsByCategory
+              ? (subRowsByCategory[catRow.pitchType] || [])
+              : self._getHitterPitchRowsForCategory(hitterName, team, catRow.pitchType);
             var nextSibling = tr.nextSibling;
             for (var p = 0; p < pitchRows.length; p++) {
               var subTr = document.createElement('tr');
@@ -3652,12 +3681,14 @@ var PlayerPage = {
       }
     }
 
-    // Use filtered platoon rows if available, otherwise grouped categories, otherwise individual pitch types
-    if (this._filteredHitterPitchRows) {
-      var pitchRows = this._filteredHitterPitchRows;
-      if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+    // Platoon mode: use the platoon-aggregated category rows + subrow map.
+    // Default mode: read directly from the embedded HITTER_PITCH_LB.
+    if (this._filteredHitterCategoryRows) {
+      var catRows = this._filteredHitterCategoryRows;
+      if (catRows.length === 0) { if (section) section.style.display = 'none'; return; }
       section.style.display = '';
-      this._renderPerPitchTable(container, cols, pitchRows, totalRow);
+      this._renderGroupedPitchTable(container, cols, catRows, totalRow,
+        data.hitter, data.team, this._filteredHitterPitchSubRows);
     } else {
       var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
       if (categoryRows.length > 0) {
@@ -3688,12 +3719,14 @@ var PlayerPage = {
       }
     }
 
-    // Use filtered platoon rows if available, otherwise grouped categories, otherwise individual pitch types
-    if (this._filteredHitterPitchRows) {
-      var pitchRows = this._filteredHitterPitchRows;
-      if (pitchRows.length === 0) { if (section) section.style.display = 'none'; return; }
+    // Platoon mode: use the platoon-aggregated category rows + subrow map.
+    // Default mode: read directly from the embedded HITTER_PITCH_LB.
+    if (this._filteredHitterCategoryRows) {
+      var catRows = this._filteredHitterCategoryRows;
+      if (catRows.length === 0) { if (section) section.style.display = 'none'; return; }
       section.style.display = '';
-      this._renderPerPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS, pitchRows, totalRow);
+      this._renderGroupedPitchTable(container, this.HITTER_PLATE_DISCIPLINE_COLS,
+        catRows, totalRow, data.hitter, data.team, this._filteredHitterPitchSubRows);
     } else {
       var categoryRows = this._getHitterCategoryRows(data.hitter, data.team);
       if (categoryRows.length > 0) {
