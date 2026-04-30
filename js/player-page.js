@@ -64,6 +64,7 @@ var PlayerPage = {
     { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
     { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
     { key: 'ab', label: 'AB', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
     { key: 'avg', label: 'AVG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'obp', label: 'OBP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'slg', label: 'SLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
@@ -77,7 +78,6 @@ var PlayerPage = {
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbToK', label: 'BB/K', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-    { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
   ],
 
   HITTER_BATTED_BALL_COLS: [
