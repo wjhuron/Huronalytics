@@ -1057,17 +1057,21 @@ def render_card(config, pitches, output_file):
             r = compute_iz(p)
             if r is None: continue
             if r: iz_n+=1
-        if use_xrv:
-            rvs = _compute_pitch_xrv(pp)
-        else:
-            rvs=[v for v in (sf(p.get('RunExp')) for p in pp) if v is not None]
-        # xRV always shown as per-100; PitchRV (MiLB) keeps cumulative single-game.
-        if use_xrv:
-            rv = round(sum(rvs) / len(pp) * 100, 1) if rvs else None
-        elif is_season:
-            rv = round(sum(rvs) / len(pp) * 100, 1) if rvs else None
-        else:
-            rv = round(sum(rvs), 1) if rvs else None
+        # PitchRV = actual outcome run value (RunExp-based on every pitch).
+        # xPitchRV = model-based on BIP (xwOBA), RunExp on non-BIP. The diff
+        # is the BIP-luck signal. Show both side-by-side on MLB cards; collapse
+        # to PitchRV alone on MiLB cards (no xwOBA available there).
+        rvs_actual = [v for v in (sf(p.get('RunExp')) for p in pp) if v is not None]
+        rvs_x = _compute_pitch_xrv(pp) if use_xrv else None
+        # Per-100 rate on season cards, cumulative on single-game cards.
+        def _fmt_rv(rvs):
+            if not rvs:
+                return None
+            if is_season:
+                return round(sum(rvs) / len(pp) * 100, 1)
+            return round(sum(rvs), 1)
+        rv_actual = _fmt_rv(rvs_actual)
+        rv_x = _fmt_rv(rvs_x) if use_xrv else None
         # Chase% — swings on out-of-zone pitches over OoZ pitches.
         oop_swings_n = sum(1 for p in pp if p.get('Description') in SWING_DESC and compute_iz(p) == False)
         oop_pitches_n = sum(1 for p in pp if compute_iz(p) == False)
@@ -1087,16 +1091,18 @@ def render_card(config, pitches, output_file):
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
             f"{chase_pct*100:.1f}%" if chase_pct is not None else '—',
             f"{xwobacon:.3f}".replace('0.', '.') if xwobacon is not None else '—',
-            str(rv) if rv is not None else '—']
+            str(rv_actual) if rv_actual is not None else '—']
+        if use_xrv:
+            row.append(str(rv_x) if rv_x is not None else '—')
         pitch_stats.append((pt, row))
 
     t_sw=[p for p in pitches if p.get('Description') in SWING_DESC]
     t_wh=[p for p in pitches if p.get('Description')=='Swinging Strike']
     t_iz=sum(1 for p in pitches if compute_iz(p)==True)
-    if use_xrv:
-        t_rv = _compute_pitch_xrv(pitches)
-    else:
-        t_rv=[v for v in (sf(p.get('RunExp')) for p in pitches) if v is not None]
+    # Both PitchRV (actual outcomes) and xPitchRV (model on BIP) for the
+    # Total row — only PitchRV exists on MiLB cards.
+    t_rvs_actual = [v for v in (sf(p.get('RunExp')) for p in pitches) if v is not None]
+    t_rvs_x = _compute_pitch_xrv(pitches) if use_xrv else None
     # Overall averages for RelZ, RelX, Ext
     t_relzs=[v for v in (sf(p.get('RelPosZ')) for p in pitches) if v is not None]
     t_relxs=[v for v in (sf(p.get('RelPosX')) for p in pitches) if v is not None]
@@ -1109,14 +1115,15 @@ def render_card(config, pitches, output_file):
     # xwOBAcon total — average xwOBA on BIPs.
     t_bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pitches if p.get('Description') == 'In Play') if v is not None]
     t_xwobacon = sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw else None
-    # xRV total — always per-100 for use_xrv; PitchRV (MiLB) keeps cumulative
-    # single-game / per-100 season behavior.
-    if use_xrv:
-        total_rv = round(sum(t_rv) / tc * 100, 1) if t_rv and tc else None
-    elif is_season:
-        total_rv = round(sum(t_rv) / tc * 100, 1) if t_rv and tc else None
-    else:
-        total_rv = round(sum(t_rv), 1) if t_rv else None
+    # RV totals — per-100 on season cards, cumulative on single-game.
+    def _fmt_total_rv(rvs):
+        if not rvs:
+            return None
+        if is_season:
+            return round(sum(rvs) / tc * 100, 1) if tc else None
+        return round(sum(rvs), 1)
+    total_rv_actual = _fmt_total_rv(t_rvs_actual)
+    total_rv_x = _fmt_total_rv(t_rvs_x) if use_xrv else None
     total_row=['Total',str(tc),'100.0%','—','—','—','—','—',
         fmt_fi(sum(t_relzs)/len(t_relzs)) if t_relzs else '—',
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
@@ -1126,26 +1133,30 @@ def render_card(config, pitches, output_file):
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
         f"{t_chase*100:.1f}%" if t_chase is not None else '—',
         f"{t_xwobacon:.3f}".replace('0.', '.') if t_xwobacon is not None else '—',
-        str(total_rv) if total_rv is not None else '—']
-
-    # Check if certain source columns are populated at all in the raw pitch data
+        str(total_rv_actual) if total_rv_actual is not None else '—']
     if use_xrv:
-        has_rv_data = any(sf(p.get('xwOBA')) is not None or (p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '') for p in pitches)
-    else:
-        has_rv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
+        total_row.append(str(total_rv_x) if total_rv_x is not None else '—')
 
-    # Column header for RV — always xRV/100 for use_xrv, PitchRV for MiLB.
+    # Source-data presence checks — PitchRV needs RunExp on at least one
+    # pitch; xPitchRV additionally wants xwOBA on at least one BIP.
+    has_pitchrv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
+    has_xrv_data = use_xrv and any(sf(p.get('xwOBA')) is not None for p in pitches if p.get('Description') == 'In Play')
+
+    # RV column headers — per-100 suffix on season cards; bare on single-game.
+    rv_suffix = '/100' if is_season else ''
+    pitchrv_header = 'PitchRV' + rv_suffix
+    xpitchrv_header = 'xPitchRV' + rv_suffix
+    rv_headers = [pitchrv_header]
     if use_xrv:
-        rv_header = 'xRV/100'
-    else:
-        rv_header = 'PitchRV'
+        rv_headers.append(xpitchrv_header)
 
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','Arm Angle','Zone%','Whiff%','Chase%','xwOBAcon',rv_header]
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','Arm Angle','Zone%','Whiff%','Chase%','xwOBAcon'] + rv_headers
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
     # Columns to force-exclude based on data availability and card type.
     force_exclude = set()
-    if not has_rv_data: force_exclude.add(rv_header)
+    if not has_pitchrv_data: force_exclude.add(pitchrv_header)
+    if use_xrv and not has_xrv_data: force_exclude.add(xpitchrv_header)
     # If no xwOBA on any BIP, xwOBAcon column drops too.
     has_xwoba_bip = any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' for p in pitches)
     if not has_xwoba_bip: force_exclude.add('xwOBAcon')
@@ -1263,20 +1274,20 @@ def render_card(config, pitches, output_file):
             if tinted:
                 table.get_celld()[(r, xwc_col_idx)].set_facecolor(tinted)
 
-    # xRV / PitchRV coloring (higher = better for pitcher, centered at 0)
-    rv_col_idx = None
+    # PitchRV / xPitchRV coloring — higher is better for pitcher, centered at 0.
+    # Per-100 columns get a wider scale (2.0) since rates are larger; cumulative
+    # single-game values get a tighter 1.5.
+    RV_COL_NAMES = ('PitchRV', 'PitchRV/100', 'xPitchRV', 'xPitchRV/100')
     for c, col_name in enumerate(col_headers):
-        if col_name in ('xRV/100', 'PitchRV'):
-            rv_col_idx = c
-            break
-    if rv_col_idx is not None:
-        rv_scale = 2.0 if col_headers[rv_col_idx] == 'xRV/100' else 1.5
+        if col_name not in RV_COL_NAMES:
+            continue
+        rv_scale = 2.0 if col_name.endswith('/100') else 1.5
         for r in range(1, len(cell_data) + 1):
             row_bg = DARKER if r == len(cell_data) else (DARK_CELL if r % 2 == 1 else '#252930')
-            val_str = cell_data[r - 1][rv_col_idx]
+            val_str = cell_data[r - 1][c]
             tinted = raw_cell_color(val_str, 0.0, rv_scale, True, row_bg)
             if tinted:
-                table.get_celld()[(r, rv_col_idx)].set_facecolor(tinted)
+                table.get_celld()[(r, c)].set_facecolor(tinted)
 
     # Divider + borders
     fig.canvas.draw()
