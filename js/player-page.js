@@ -2775,6 +2775,41 @@ var PlayerPage = {
       allBSBtns[i].classList.toggle('active', allBSBtns[i].getAttribute('data-side') === 'L');
     }
 
+    // Per-side BIP counts (switch hitters only) — append to button labels
+    var microData = window.MICRO_DATA;
+    if (microData && microData.hitterBip && microData.hitterBipCols) {
+      var bipCols = microData.hitterBipCols;
+      var hiIdx = bipCols.indexOf('hitterIdx');
+      var tiIdx = bipCols.indexOf('teamIdx');
+      var batSideIdx = bipCols.indexOf('batSide');
+      var lookups = microData.lookups;
+      var playerIdx = -1;
+      for (var pi = 0; pi < lookups.hitters.length; pi++) {
+        if (lookups.hitters[pi] === data.hitter) { playerIdx = pi; break; }
+      }
+      var teamIdx = (lookups.teams || []).indexOf(data.team);
+      var lCount = 0, rCount = 0;
+      if (playerIdx !== -1 && batSideIdx >= 0) {
+        var bipData = microData.hitterBip;
+        for (var bi = 0; bi < bipData.length; bi++) {
+          var row = bipData[bi];
+          if (row[hiIdx] !== playerIdx) continue;
+          if (teamIdx >= 0 && tiIdx >= 0 && row[tiIdx] !== teamIdx) continue;
+          var side = row[batSideIdx];
+          if (side === 'L') lCount++;
+          else if (side === 'R') rCount++;
+        }
+      }
+      var bothCount = lCount + rCount;
+      for (var ci = 0; ci < allBSBtns.length; ci++) {
+        var b = allBSBtns[ci];
+        var ds = b.getAttribute('data-side');
+        if (ds === 'L') b.textContent = 'as LHH (' + lCount + ')';
+        else if (ds === 'R') b.textContent = 'as RHH (' + rCount + ')';
+        else if (ds === 'both') b.textContent = 'Both (' + bothCount + ')';
+      }
+    }
+
     this._sprayBatSideHandler = function (e) {
       var btn = e.target.closest('.spray-toggle-btn');
       if (!btn) return;
@@ -2826,7 +2861,7 @@ var PlayerPage = {
 
 
   _laSprayChart: null,
-  _laSprayMode: 'outcome',
+  _laSprayMode: 'ev',
   _laSprayZoneMetric: 'xwobacon',
 
   _renderLASprayChart: function (data) {
@@ -2952,8 +2987,7 @@ var PlayerPage = {
     var datasets = [{
       data: points,
       backgroundColor: pointColors,
-      borderColor: 'rgba(0,0,0,0.5)',
-      borderWidth: 1.5,
+      borderWidth: 0,
       pointRadius: pointRadii,
       pointHoverRadius: pointHoverRadii,
     }];
@@ -3272,6 +3306,7 @@ var PlayerPage = {
           { color: '#7b68ee', label: '2B' },
           { color: '#20b2aa', label: '3B' },
           { color: '#dc143c', label: 'HR' },
+          { color: '#999', label: 'Error/FC' },
         ];
       } else if (mode === 'bbtype') {
         legendItems = [
@@ -3297,7 +3332,7 @@ var PlayerPage = {
         '<span class="spray-legend-dot" style="background:#888;width:10px;height:10px;border-radius:50%;"></span>' +
         '<span style="font-size:11px;color:var(--text-muted,#888);">Size = EV</span></span>';
       // Zone gradient legend bar
-      var zoneLabel = zoneMetric === 'xwobacon' ? 'Zone xwOBAcon:' : 'Zone wOBA:';
+      var zoneLabel = zoneMetric === 'xwobacon' ? 'MLB xwOBAcon:' : 'MLB wOBA:';
       html += '<div class="la-spray-gradient-legend">' +
         '<span class="la-spray-gradient-label">' + zoneLabel + '</span>' +
         '<span class="la-spray-gradient-low">.000</span>' +
