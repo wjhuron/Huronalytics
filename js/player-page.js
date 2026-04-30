@@ -81,20 +81,24 @@ var PlayerPage = {
   ],
 
   HITTER_BATTED_BALL_COLS: [
-    { key: 'pitchType', label: 'Pitch' },
-    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'pitchType', label: 'Pitch', noPctl: true },
+    { key: 'count', label: 'Pitches', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    // Outcome
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'xwOBAcon', label: 'xwOBAcon', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    // Quality
     { key: 'avgEVAll', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'ev50', label: 'EV50', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'maxEV', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPct', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
+    // Composition
     { key: 'gbPct', label: 'GB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'ldPct', label: 'LD%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
     { key: 'fbPct', label: 'FB%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
     { key: 'puPct', label: 'PU%', format: function(v) { return Utils.formatPct(v); }, noPctl: true },
-    { key: 'hrFbPct', label: 'HR/FB', format: function(v) { return Utils.formatPct(v); } },
+    // Spray
     { key: 'pullPct', label: 'Pull%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'middlePct', label: 'Mid%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'oppoPct', label: 'Oppo%', format: function(v) { return Utils.formatPct(v); } },
