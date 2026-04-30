@@ -2061,7 +2061,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             return pooled_info['woba']
         return None
 
-    # Build serializable zone data for frontend (hand-specific + pooled)
+    # Build serializable zone data for frontend (hand-specific + pooled).
+    # The "woba" field is mathematically wOBAcon (sum of wOBA event values / sum of
+    # wOBA denominator weights, restricted to BIPs in the zone). Emit it as "wobacon"
+    # going forward; keep "woba" as a transitional alias so older deployed JS still
+    # works between the pipeline rename and the JS rename rolling out.
     sacq_zones_output = []
     for (direction, la_bin_idx, bats_key), info in sorted(sacq_zone_hand.items(), key=lambda x: (x[0][2], x[0][0], x[0][1])):
         lo, hi = LA_BINS[la_bin_idx]
@@ -2071,7 +2075,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'laMax': hi if hi < 999 else None,
             'laBin': la_bin_idx,
             'bats': bats_key,
-            'woba': info['woba'],
+            'wobacon': info['woba'],
+            'woba': info['woba'],  # alias, remove after deploy stabilizes
             'xwobacon': info['xwobacon'],
             'quality': info['quality'],
             'count': info['count'],
@@ -2085,7 +2090,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'laMax': hi if hi < 999 else None,
             'laBin': la_bin_idx,
             'bats': None,
-            'woba': info['woba'],
+            'wobacon': info['woba'],
+            'woba': info['woba'],  # alias, remove after deploy stabilizes
             'xwobacon': info['xwobacon'],
             'quality': info['quality'],
             'count': info['count'],

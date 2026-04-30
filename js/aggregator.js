@@ -189,12 +189,20 @@ const Aggregator = {
     return { hand: hand, pooled: pooled };
   },
 
-  // Look up zone wOBA: try hand-specific first, fall back to pooled
+  // Look up zone wOBAcon: try hand-specific first, fall back to pooled.
+  // Field is "wobacon" going forward; "woba" alias kept for transition (older JSON).
   sacqLookup: function (maps, dir, laBin, bats) {
     var info = maps.hand[dir + '|' + laBin + '|' + bats];
-    if (info && info.count >= QUAL.MIN_SACQ && info.woba != null) return info.woba;
+    var v;
+    if (info && info.count >= QUAL.MIN_SACQ) {
+      v = info.wobacon != null ? info.wobacon : info.woba;
+      if (v != null) return v;
+    }
     info = maps.pooled[dir + '|' + laBin];
-    if (info && info.count >= QUAL.MIN_SACQ && info.woba != null) return info.woba;
+    if (info && info.count >= QUAL.MIN_SACQ) {
+      v = info.wobacon != null ? info.wobacon : info.woba;
+      if (v != null) return v;
+    }
     return null;
   },
 

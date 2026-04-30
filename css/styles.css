@@ -1713,9 +1713,6 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   gap: 8px;
   justify-self: center;
 }
-.la-spray-section-header > #la-spray-zone-toggle {
-  justify-self: end;
-}
 
 .spray-toggle {
   display: flex;

@@ -2848,11 +2848,6 @@ var PlayerPage = {
       if (el4) el4.removeEventListener('click', this._sprayBatSideHandler);
       this._sprayBatSideHandler = null;
     }
-    if (this._laSprayZoneToggleHandler) {
-      var el5 = document.getElementById('la-spray-zone-toggle');
-      if (el5) el5.removeEventListener('click', this._laSprayZoneToggleHandler);
-      this._laSprayZoneToggleHandler = null;
-    }
     if (this._laSprayChart) {
       this._laSprayChart.destroy();
       this._laSprayChart = null;
@@ -2862,7 +2857,6 @@ var PlayerPage = {
 
   _laSprayChart: null,
   _laSprayMode: 'ev',
-  _laSprayZoneMetric: 'xwobacon',
 
   _renderLASprayChart: function (data) {
     var canvas = document.getElementById('player-la-spray-chart');
@@ -2992,9 +2986,10 @@ var PlayerPage = {
       pointHoverRadius: pointHoverRadii,
     }];
 
-    // Zone overlay plugin — wOBA/xwOBAcon heatmap gradient
+    // Zone overlay plugin — MLB wOBAcon heatmap gradient (empirical wOBA on contact
+    // by spray + LA bin, restricted to MLB BIPs). Falls back to legacy `woba` field
+    // for older JSON where this hadn't been renamed yet.
     var SACQ_MIN_BIP = 20;
-    var zoneMetric = this._laSprayZoneMetric || 'xwobacon';
     var sprayBounds = {
       pull: [-50, -30], pull_side: [-30, -15], center_pull: [-15, 0],
       center_oppo: [0, 15], oppo_side: [15, 30], oppo: [30, 50]
@@ -3036,7 +3031,7 @@ var PlayerPage = {
         }
         for (var zi = 0; zi < sacqZones.length; zi++) {
           var zone = sacqZones[zi];
-          var zoneVal = zoneMetric === 'xwobacon' ? zone.xwobacon : zone.woba;
+          var zoneVal = zone.wobacon != null ? zone.wobacon : zone.woba;
           if (zoneVal == null) continue;
           var bounds = sprayBounds[zone.spray];
           if (!bounds) continue;
@@ -3149,7 +3144,6 @@ var PlayerPage = {
     var zoneHoverSprayBounds = sprayBounds; // capture for closure
     var zoneHoverSacqZones = sacqZones;
     var zoneHoverHitterCounts = hitterZoneCounts;
-    var zoneHoverMetric = zoneMetric;
     // LA bin label helper
     var LA_BIN_LABELS = ['< 0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
                          '25–30°', '30–35°', '35–40°', '40–50°', '50°+'];
@@ -3200,13 +3194,13 @@ var PlayerPage = {
       if (!foundZone) { zoneTooltipEl.style.display = 'none'; return; }
       var zKey = foundZone.spray + '|' + foundZone.laBin;
       var hCount = zoneHoverHitterCounts[zKey] || 0;
-      var zVal = zoneHoverMetric === 'xwobacon' ? foundZone.xwobacon : foundZone.woba;
+      var zoneWobacon = foundZone.wobacon != null ? foundZone.wobacon : foundZone.woba;
       var sprayLabel = SPRAY_LABELS[foundZone.spray] || foundZone.spray;
       var laLabel = LA_BIN_LABELS[foundZone.laBin] || '';
       var html = '<strong>' + sprayLabel + ', LA ' + laLabel + '</strong><br>';
-      html += 'MLB wOBA: ' + (foundZone.woba != null ? foundZone.woba.toFixed(3).replace(/^0/, '') : '—');
+      html += 'MLB wOBAcon: ' + (zoneWobacon != null ? zoneWobacon.toFixed(3).replace(/^0/, '') : '—');
       html += ' · xwOBAcon: ' + (foundZone.xwobacon != null ? foundZone.xwobacon.toFixed(3).replace(/^0/, '') : '—') + '<br>';
-      html += 'Lg BIP: ' + foundZone.count;
+      html += 'MLB BIP: ' + foundZone.count;
       html += ' · Hitter BIP: ' + hCount;
       zoneTooltipEl.innerHTML = html;
       zoneTooltipEl.style.display = 'block';
@@ -3330,9 +3324,8 @@ var PlayerPage = {
         '<span class="spray-legend-dot" style="background:#888;width:10px;height:10px;border-radius:50%;"></span>' +
         '<span style="font-size:11px;color:var(--text-muted,#888);">Size = EV</span></span>';
       // Zone gradient legend bar
-      var zoneLabel = zoneMetric === 'xwobacon' ? 'xwOBAcon:' : 'wOBA:';
       html += '<div class="la-spray-gradient-legend">' +
-        '<span class="la-spray-gradient-label">' + zoneLabel + '</span>' +
+        '<span class="la-spray-gradient-label">MLB wOBAcon:</span>' +
         '<span class="la-spray-gradient-low">.000</span>' +
         '<span class="la-spray-gradient-bar"></span>' +
         '<span class="la-spray-gradient-high">1.000+</span>' +
@@ -3344,10 +3337,6 @@ var PlayerPage = {
     var modeBtns = document.querySelectorAll('#la-spray-toggle .spray-toggle-btn');
     for (var mbi = 0; mbi < modeBtns.length; mbi++) {
       modeBtns[mbi].classList.toggle('active', modeBtns[mbi].getAttribute('data-mode') === self._laSprayMode);
-    }
-    var zoneBtns = document.querySelectorAll('#la-spray-zone-toggle .spray-toggle-btn');
-    for (var zbi = 0; zbi < zoneBtns.length; zbi++) {
-      zoneBtns[zbi].classList.toggle('active', zoneBtns[zbi].getAttribute('data-zone') === self._laSprayZoneMetric);
     }
 
     // Bind toggle buttons
@@ -3371,23 +3360,6 @@ var PlayerPage = {
     };
     var toggle = document.getElementById('la-spray-toggle');
     if (toggle) toggle.addEventListener('click', this._laSprayToggleHandler);
-
-    // Zone metric toggle (wOBA / xwOBAcon)
-    if (!this._laSprayZoneToggleHandler) {
-      this._laSprayZoneToggleHandler = function (e) {
-        var btn = e.target.closest('.spray-toggle-btn');
-        if (!btn) return;
-        var zm = btn.getAttribute('data-zone');
-        if (!zm || zm === self._laSprayZoneMetric) return;
-        self._laSprayZoneMetric = zm;
-        var btns = document.querySelectorAll('#la-spray-zone-toggle .spray-toggle-btn');
-        for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
-        btn.classList.add('active');
-        if (self._currentData) self._renderLASprayChart(self._currentData);
-      };
-      var zoneToggle = document.getElementById('la-spray-zone-toggle');
-      if (zoneToggle) zoneToggle.addEventListener('click', this._laSprayZoneToggleHandler);
-    }
   },
 
 
