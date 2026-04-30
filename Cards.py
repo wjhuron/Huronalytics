@@ -139,6 +139,7 @@ PCT_COLOR_COLS = {
     'Strike%': 'strikePct',
     'Zone%':   'izPct',
     'Whiff%':  'swStrPct',
+    'Chase%':  'chasePct',
 }
 
 # Raw-value columns that get percentile coloring (not percentages)
@@ -1062,10 +1063,20 @@ def render_card(config, pitches, output_file):
             rvs = _compute_pitch_xrv(pp)
         else:
             rvs=[v for v in (sf(p.get('RunExp')) for p in pp) if v is not None]
-        if is_season and use_xrv:
+        # xRV always shown as per-100; PitchRV (MiLB) keeps cumulative single-game.
+        if use_xrv:
+            rv = round(sum(rvs) / len(pp) * 100, 1) if rvs else None
+        elif is_season:
             rv = round(sum(rvs) / len(pp) * 100, 1) if rvs else None
         else:
-            rv=round(sum(rvs),1) if rvs else None
+            rv = round(sum(rvs), 1) if rvs else None
+        # Chase% — swings on out-of-zone pitches over OoZ pitches.
+        oop_swings_n = sum(1 for p in pp if p.get('Description') in SWING_DESC and compute_iz(p) == False)
+        oop_pitches_n = sum(1 for p in pp if compute_iz(p) == False)
+        chase_pct = oop_swings_n / oop_pitches_n if oop_pitches_n else None
+        # xwOBAcon — average xwOBA on BIPs only.
+        bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pp if p.get('Description') == 'In Play') if v is not None]
+        xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else None
         pt_name='Fastball' if pt=='FF' else PITCH_NAMES.get(pt,pt)
         row=[pt_name,str(n),f"{n/tc*100:.1f}%",
             f"{sum(velos)/len(velos):.1f}" if velos else '—',f"{max(velos):.1f}" if velos else '—',
@@ -1076,6 +1087,8 @@ def render_card(config, pitches, output_file):
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
             f"{len(strikes)/n*100:.1f}%" if n else '—',f"{iz_n/n*100:.1f}%" if n else '—',
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
+            f"{chase_pct*100:.1f}%" if chase_pct is not None else '—',
+            f"{xwobacon:.3f}".replace('0.', '.') if xwobacon is not None else '—',
             str(rv) if rv is not None else '—']
         pitch_stats.append((pt, row))
 
@@ -1092,6 +1105,21 @@ def render_card(config, pitches, output_file):
     t_relxs=[v for v in (sf(p.get('RelPosX')) for p in pitches) if v is not None]
     t_exts=[v for v in (sf(p.get('Extension')) for p in pitches) if v is not None]
     t_armangles=[v for v in (sf(p.get('ArmAngle')) for p in pitches) if v is not None]
+    # Chase% total
+    t_oop_sw = sum(1 for p in pitches if p.get('Description') in SWING_DESC and compute_iz(p) == False)
+    t_oop_n = sum(1 for p in pitches if compute_iz(p) == False)
+    t_chase = t_oop_sw / t_oop_n if t_oop_n else None
+    # xwOBAcon total — average xwOBA on BIPs.
+    t_bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pitches if p.get('Description') == 'In Play') if v is not None]
+    t_xwobacon = sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw else None
+    # xRV total — always per-100 for use_xrv; PitchRV (MiLB) keeps cumulative
+    # single-game / per-100 season behavior.
+    if use_xrv:
+        total_rv = round(sum(t_rv) / tc * 100, 1) if t_rv and tc else None
+    elif is_season:
+        total_rv = round(sum(t_rv) / tc * 100, 1) if t_rv and tc else None
+    else:
+        total_rv = round(sum(t_rv), 1) if t_rv else None
     total_row=['Total',str(tc),'100.0%','—','—','—','—','—',
         fmt_fi(sum(t_relzs)/len(t_relzs)) if t_relzs else '—',
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
@@ -1099,7 +1127,9 @@ def render_card(config, pitches, output_file):
         f"{sum(t_armangles)/len(t_armangles):.1f}°" if t_armangles else '—',
         f"{len(t_str)/tc*100:.1f}%" if tc else '—',f"{t_iz/tc*100:.1f}%" if tc else '—',
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
-        (str(round(sum(t_rv) / tc * 100, 1)) if t_rv else '—') if (is_season and use_xrv) else (str(round(sum(t_rv), 1)) if t_rv else '—')]
+        f"{t_chase*100:.1f}%" if t_chase is not None else '—',
+        f"{t_xwobacon:.3f}".replace('0.', '.') if t_xwobacon is not None else '—',
+        str(total_rv) if total_rv is not None else '—']
 
     # Check if certain source columns are populated at all in the raw pitch data
     if use_xrv:
@@ -1107,18 +1137,28 @@ def render_card(config, pitches, output_file):
     else:
         has_rv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
 
-    # Column header for RV depends on mode
+    # Column header for RV — always xRV/100 for use_xrv, PitchRV for MiLB.
     if use_xrv:
-        rv_header = 'xRV/100' if is_season else 'xPitchRV'
+        rv_header = 'xRV/100'
     else:
         rv_header = 'PitchRV'
 
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','ArmAngle','Strike%','Zone%','Whiff%',rv_header]
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','Arm Angle','Strike%','Zone%','Whiff%','Chase%','xwOBAcon',rv_header]
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
-    # Columns to force-exclude if source data doesn't exist yet
+    # Columns to force-exclude based on data availability and card type.
     force_exclude = set()
     if not has_rv_data: force_exclude.add(rv_header)
+    # If no xwOBA on any BIP, xwOBAcon column drops too.
+    has_xwoba_bip = any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' for p in pitches)
+    if not has_xwoba_bip: force_exclude.add('xwOBAcon')
+    # Conditional RelZ/RelX: always exclude on season cards. On single-game cards,
+    # exclude only when Arm Angle data exists (Arm Angle conveys the same release
+    # info more compactly); keep RelZ/RelX as a fallback when Arm Angle is missing.
+    has_arm_angle = any(sf(p.get('ArmAngle')) is not None for p in pitches)
+    if is_season or (not is_season and has_arm_angle):
+        force_exclude.add('RelZ')
+        force_exclude.add('RelX')
 
     # Drop columns where ALL pitch-type rows have '—' OR source data is missing
     pitch_rows_only = [r[1] for r in pitch_stats]  # exclude total row
@@ -1206,10 +1246,29 @@ def render_card(config, pitches, output_file):
             if tinted:
                 table.get_celld()[(r, c)].set_facecolor(tinted)
 
-    # xRV / PitchRV coloring (lower = better for pitcher, centered at 0)
+    # xwOBAcon coloring — lower is better for pitcher; scale ±0.05 from league avg.
+    if 'xwOBAcon' in col_headers:
+        xwc_col_idx = col_headers.index('xwOBAcon')
+        overall_xwc = overall_avgs.get('xwOBAcon')
+        for r in range(1, len(cell_data) + 1):
+            if r == len(cell_data):
+                la = overall_xwc
+                row_bg = DARKER
+            else:
+                pc = pt_codes[r - 1]
+                la = league_avgs.get(pc, {}).get('xwOBAcon') if pc else None
+                row_bg = DARK_CELL if r % 2 == 1 else '#252930'
+            if la is None:
+                continue
+            val_str = cell_data[r - 1][xwc_col_idx]
+            tinted = raw_cell_color(val_str, la, 0.05, False, row_bg)
+            if tinted:
+                table.get_celld()[(r, xwc_col_idx)].set_facecolor(tinted)
+
+    # xRV / PitchRV coloring (higher = better for pitcher, centered at 0)
     rv_col_idx = None
     for c, col_name in enumerate(col_headers):
-        if col_name in ('xPitchRV', 'xRV/100', 'PitchRV'):
+        if col_name in ('xRV/100', 'PitchRV'):
             rv_col_idx = c
             break
     if rv_col_idx is not None:
@@ -1265,10 +1324,10 @@ def render_card(config, pitches, output_file):
 # ═══════════════════════════════════════════════════════════════
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team            = "TOR"
+    team            = "WSH"
     start_date      = None     # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
-    filter_pitchers = "Gausman, Kevin"                 # Semicolon-separated "Last, First" names, or "" for all
+    filter_pitchers = "Griffin, Foster"                 # Semicolon-separated "Last, First" names, or "" for all
     game_pk         = ""                 # Optional game PK for live/in-progress games
     output_dir      = OUTPUT_DIR
 
@@ -1488,9 +1547,15 @@ def main():
         else:
             # Single-game stat line
             whiff_count = sum(1 for p in pitches if p.get('Description') == 'Swinging Strike')
-            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'H', 'K', 'BB', 'HR', 'Whiffs']
+            # Cumulative xRV — total expected run-value impact of the game (positive
+            # = pitcher contributed runs above league avg). Companion to the per-100
+            # rates in the per-pitch table.
+            game_xrvs = _compute_pitch_xrv(pitches)
+            cum_xrv = round(sum(game_xrvs), 2) if game_xrvs else None
+            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'H', 'K', 'BB', 'HR', 'Whiffs', 'xRV']
             stat_values = [ip_str, str(pitch_count), str(box['tbf']), str(box['r']), str(box['er']),
-                           str(box['h']), str(box['so']), str(box['bb']), str(box['hr']), str(whiff_count)]
+                           str(box['h']), str(box['so']), str(box['bb']), str(box['hr']), str(whiff_count),
+                           f"{cum_xrv:.2f}" if cum_xrv is not None else '—']
 
         print(f"  Stat line: {' | '.join(f'{h}:{v}' for h,v in zip(stat_headers, stat_values))}")
 
