@@ -18,8 +18,8 @@ var PlayerPage = {
     { key: 'izWhiffPct',        label: 'IZ Whiff%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
     // Contact allowed: expected outcomes, then quality, then composition.
-    { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
+    { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
     { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
@@ -34,9 +34,9 @@ var PlayerPage = {
     { key: 'ctPlus',       label: 'CT+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     { key: 'sdPlus',       label: 'SD+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     // Expected outcomes (wOBA family)
-    { key: 'xwOBA',        label: 'xwOBA',       format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAcon',     label: 'xwOBAcon',    format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
-    { key: 'xwOBAsp',      label: 'xwOBAsp',     format: function(v) { return v != null ? v.toFixed(3) : '—'; }, rocHide: true },
+    { key: 'xwOBA',        label: 'xwOBA',       format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
+    { key: 'xwOBAcon',     label: 'xwOBAcon',    format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
+    { key: 'xwOBAsp',      label: 'xwOBAsp',     format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
     // Contact quality (EV)
     { key: 'avgEVAll',     label: 'Avg EV',      format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'maxEV',        label: 'Max EV',      format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
@@ -84,7 +84,7 @@ var PlayerPage = {
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+    { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'avgEVAll', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'ev50', label: 'EV50', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'maxEV', label: 'Max EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
@@ -175,8 +175,8 @@ var PlayerPage = {
     { key: 'pitchType', label: 'Pitch' },
     { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
     { key: 'nBip', label: 'BIP', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
-    { key: 'xwOBAcon', label: 'xwOBAcon', format: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+    { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'xwOBAcon', label: 'xwOBAcon', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'avgEVAgainst', label: 'Avg EV', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
@@ -3114,15 +3114,20 @@ var PlayerPage = {
     var xwobaspNote = document.getElementById('la-spray-xwobasp-note');
     if (xwOBAsp_val != null) {
       xwobaspNote.textContent = '';
-      xwobaspNote.appendChild(document.createTextNode('xwOBAsp: '));
+      var labelSpan = document.createElement('span');
+      labelSpan.style.cssText = 'font-size:13px;color:#aaa;';
+      labelSpan.textContent = 'xwOBAsp: ';
+      xwobaspNote.appendChild(labelSpan);
       var valSpan = document.createElement('span');
       var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
-      valSpan.style.cssText = 'font-weight:600;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
-      valSpan.textContent = xwOBAsp_val.toFixed(3);
+      valSpan.style.cssText = 'font-size:18px;font-weight:700;vertical-align:middle;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
+      valSpan.textContent = Utils.formatDecimal(3)(xwOBAsp_val);
       xwobaspNote.appendChild(valSpan);
       var countSpan = document.createElement('span');
-      countSpan.style.color = '#666';
-      countSpan.textContent = ' (' + xwOBAsp_count + ' qualifying BIP)';
+      countSpan.style.cssText = 'font-size:12px;color:#666;margin-left:4px;';
+      countSpan.textContent = totalBip > xwOBAsp_count
+        ? '(' + xwOBAsp_count + ' of ' + totalBip + ' qualifying BIP)'
+        : '(' + xwOBAsp_count + ' qualifying BIP)';
       xwobaspNote.appendChild(countSpan);
       xwobaspNote.style.display = '';
     } else {
@@ -3199,8 +3204,8 @@ var PlayerPage = {
       var sprayLabel = SPRAY_LABELS[foundZone.spray] || foundZone.spray;
       var laLabel = LA_BIN_LABELS[foundZone.laBin] || '';
       var html = '<strong>' + sprayLabel + ', LA ' + laLabel + '</strong><br>';
-      html += 'Lg wOBA: ' + (foundZone.woba != null ? foundZone.woba.toFixed(3) : '—');
-      html += ' · xwOBAcon: ' + (foundZone.xwobacon != null ? foundZone.xwobacon.toFixed(3) : '—') + '<br>';
+      html += 'MLB wOBA: ' + (foundZone.woba != null ? foundZone.woba.toFixed(3).replace(/^0/, '') : '—');
+      html += ' · xwOBAcon: ' + (foundZone.xwobacon != null ? foundZone.xwobacon.toFixed(3).replace(/^0/, '') : '—') + '<br>';
       html += 'Lg BIP: ' + foundZone.count;
       html += ' · Hitter BIP: ' + hCount;
       zoneTooltipEl.innerHTML = html;

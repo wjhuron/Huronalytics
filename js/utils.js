@@ -114,7 +114,14 @@ const Utils = {
   formatDecimal: function (places) {
     return function (value) {
       if (value === null || value === undefined) return '--';
-      return Number(value).toFixed(places);
+      var s = Number(value).toFixed(places);
+      // Baseball convention: 3-decimal rate stats display as ".XXX" (no leading 0).
+      // 1- and 2-decimal stats (ERA, FIP, velo, etc.) keep the leading number.
+      if (places === 3) {
+        if (s.charAt(0) === '0' && s.charAt(1) === '.') return s.substring(1);
+        if (s.charAt(0) === '-' && s.charAt(1) === '0' && s.charAt(2) === '.') return '-' + s.substring(2);
+      }
+      return s;
     };
   },
 
