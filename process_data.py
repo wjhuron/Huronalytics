@@ -1898,6 +1898,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pairs = [(r[stat], r.get('pa', 0)) for r in pt_rows if r.get(stat) is not None and r.get('pa', 0) > 0]
             if pairs:
                 avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
+        # xwOBAcon: BIP-only stat, weighted by nBip rather than PA so bunts/etc. don't pull the avg.
+        xwc_pairs = [(r['xwOBAcon'], r.get('nBip', 0)) for r in pt_rows if r.get('xwOBAcon') is not None and r.get('nBip', 0) > 0]
+        if xwc_pairs:
+            avgs['xwOBAcon'] = round(sum(v * w for v, w in xwc_pairs) / sum(w for _, w in xwc_pairs), 4)
         avgs['count'] = len(pt_rows)
         league_avgs[pt] = avgs
 

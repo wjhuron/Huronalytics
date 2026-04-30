@@ -1339,9 +1339,9 @@ def render_card(config, pitches, output_file):
 def main():
     # ── Settings (edit these directly or override via command line) ──
     team            = "WSH"
-    start_date      = None     # Set to None for full season
+    start_date      = "2026-04-29"     # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
-    filter_pitchers = "Griffin, Foster"                 # Semicolon-separated "Last, First" names, or "" for all
+    filter_pitchers = "Cavalli, Cade"                 # Semicolon-separated "Last, First" names, or "" for all
     game_pk         = ""                 # Optional game PK for live/in-progress games
     output_dir      = OUTPUT_DIR
 
@@ -1559,17 +1559,13 @@ def main():
                 f"{gb_pct*100:.1f}%" if gb_pct is not None else '—',
             ]
         else:
-            # Single-game stat line
+            # Single-game stat line — xRV is now shown per-pitch-type as
+            # PitchRV/xPitchRV in the metrics table; no need to duplicate it
+            # in the box-score header.
             whiff_count = sum(1 for p in pitches if p.get('Description') == 'Swinging Strike')
-            # Cumulative xRV — total expected run-value impact of the game (positive
-            # = pitcher contributed runs above league avg). Companion to the per-100
-            # rates in the per-pitch table.
-            game_xrvs = _compute_pitch_xrv(pitches)
-            cum_xrv = round(sum(game_xrvs), 2) if game_xrvs else None
-            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'H', 'K', 'BB', 'HR', 'Whiffs', 'xRV']
+            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'H', 'K', 'BB', 'HR', 'Whiffs']
             stat_values = [ip_str, str(pitch_count), str(box['tbf']), str(box['r']), str(box['er']),
-                           str(box['h']), str(box['so']), str(box['bb']), str(box['hr']), str(whiff_count),
-                           f"{cum_xrv:.2f}" if cum_xrv is not None else '—']
+                           str(box['h']), str(box['so']), str(box['bb']), str(box['hr']), str(whiff_count)]
 
         print(f"  Stat line: {' | '.join(f'{h}:{v}' for h,v in zip(stat_headers, stat_values))}")
 
