@@ -3115,7 +3115,7 @@ var PlayerPage = {
     if (xwOBAsp_val != null) {
       xwobaspNote.textContent = '';
       var labelSpan = document.createElement('span');
-      labelSpan.style.cssText = 'font-size:13px;color:#aaa;';
+      labelSpan.style.cssText = 'font-size:18px;font-weight:600;color:#aaa;';
       labelSpan.textContent = 'xwOBAsp: ';
       xwobaspNote.appendChild(labelSpan);
       var valSpan = document.createElement('span');
@@ -3330,7 +3330,7 @@ var PlayerPage = {
         '<span class="spray-legend-dot" style="background:#888;width:10px;height:10px;border-radius:50%;"></span>' +
         '<span style="font-size:11px;color:var(--text-muted,#888);">Size = EV</span></span>';
       // Zone gradient legend bar
-      var zoneLabel = zoneMetric === 'xwobacon' ? 'MLB xwOBAcon:' : 'MLB wOBA:';
+      var zoneLabel = zoneMetric === 'xwobacon' ? 'xwOBAcon:' : 'wOBA:';
       html += '<div class="la-spray-gradient-legend">' +
         '<span class="la-spray-gradient-label">' + zoneLabel + '</span>' +
         '<span class="la-spray-gradient-low">.000</span>' +
