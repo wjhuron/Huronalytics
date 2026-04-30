@@ -2942,24 +2942,26 @@ var PlayerPage = {
     var mode = this._laSprayMode;
 
     // Color functions
-    var OUTCOME_COLORS = { 0: '#666', 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c', 5: '#999' };
+    var OUTCOME_COLORS = { 0: '#888', 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c', 5: '#888' };
 
+    // EV gradient — bright blue → neutral gray → bright red.
+    // Matches Utils.percentileColorDark so dots stay legible against the heatmap.
     function evColor(ev) {
       if (ev == null) return 'rgba(150,150,150,0.6)';
       var t = Math.max(0, Math.min(1, (ev - 70) / 45)); // 70–115 range
       var r, g, b;
       if (t < 0.5) {
         var s = t / 0.5;
-        r = Math.round(8 + (255 - 8) * s);
-        g = Math.round(48 + (255 - 48) * s);
-        b = Math.round(107 + (255 - 107) * s);
+        r = Math.round(0 + s * 140);
+        g = Math.round(100 + s * 40);
+        b = Math.round(255 - s * 115);
       } else {
         var s2 = (t - 0.5) / 0.5;
-        r = Math.round(255 + (215 - 255) * s2);
-        g = Math.round(255 + (48 - 255) * s2);
-        b = Math.round(255 + (39 - 255) * s2);
+        r = Math.round(140 + s2 * 115);
+        g = Math.round(140 - s2 * 120);
+        b = Math.round(140 - s2 * 120);
       }
-      return 'rgba(' + r + ',' + g + ',' + b + ',0.75)';
+      return 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
     }
 
     function getPointColor(pt) {
@@ -3300,18 +3302,17 @@ var PlayerPage = {
       var legendItems = [];
       if (mode === 'outcome') {
         legendItems = [
-          { color: '#666', label: 'Out' },
+          { color: '#888', label: 'Out/E/FC' },
           { color: '#ff8c00', label: '1B' },
           { color: '#7b68ee', label: '2B' },
           { color: '#20b2aa', label: '3B' },
           { color: '#dc143c', label: 'HR' },
-          { color: '#999', label: 'Error/FC' },
         ];
       } else if (mode === 'ev') {
         legendItems = [
-          { color: 'rgb(8,48,107)', label: '70 mph' },
-          { color: 'rgb(255,255,255)', label: '95 mph' },
-          { color: 'rgb(215,48,39)', label: '115 mph' },
+          { color: 'rgb(0,100,255)', label: '70 mph' },
+          { color: 'rgb(140,140,140)', label: '95 mph' },
+          { color: 'rgb(255,20,20)', label: '115 mph' },
         ];
       }
       var html = '';
