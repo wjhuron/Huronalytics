@@ -101,17 +101,21 @@ var PlayerPage = {
   ],
 
   HITTER_PLATE_DISCIPLINE_COLS: [
-    { key: 'pitchType', label: 'Pitch' },
-    { key: 'count', label: 'Count', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'pitchType', label: 'Pitch', noPctl: true },
+    { key: 'count', label: 'Pitches', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    // Swing decisions
     { key: 'swingPct', label: 'Swing%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izSwingPct', label: 'IZ Swing%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izSwChase', label: 'IZ Sw-Chase%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'firstPitchSwingPct', label: 'FPSw%', format: function(v) { return Utils.formatPct(v); } },
+    // Miss rates
+    { key: 'whiffPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
+    // Contact rates
     { key: 'contactPct', label: 'Contact%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'whiffPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   HITTER_BAT_TRACKING_COLS: [
@@ -2424,11 +2428,13 @@ var PlayerPage = {
       }
       this._renderHitterStatsFullTable(found, isROC);
 
-      // Re-aggregate hitter pitch-type rows with hand filter
+      // Re-aggregate hitter pitch-type rows with hand filter — drop pitch
+      // types the hitter hasn't seen vs the active handedness.
       var hpRows = Aggregator.aggregate('hitterPitch', baseFilters);
       var myHPRows = [];
       for (var i = 0; i < hpRows.length; i++) {
-        if (hpRows[i].hitter === data.hitter && hpRows[i].team === data.team) {
+        if (hpRows[i].hitter === data.hitter && hpRows[i].team === data.team &&
+            hpRows[i].count != null && hpRows[i].count > 0) {
           myHPRows.push(hpRows[i]);
         }
       }
@@ -3435,7 +3441,8 @@ var PlayerPage = {
       var r = hpData[i];
       if (r.hitter === hitterName && r.team === team &&
           r.pitchType !== 'All' && r.pitchType !== 'Hard' &&
-          r.pitchType !== 'Breaking' && r.pitchType !== 'Offspeed') {
+          r.pitchType !== 'Breaking' && r.pitchType !== 'Offspeed' &&
+          r.count != null && r.count > 0) {
         rows.push(r);
       }
     }
@@ -3450,7 +3457,8 @@ var PlayerPage = {
     for (var i = 0; i < hpData.length; i++) {
       var r = hpData[i];
       if (r.hitter === hitterName && r.team === team &&
-          CATEGORY_ORDER.indexOf(r.pitchType) !== -1) {
+          CATEGORY_ORDER.indexOf(r.pitchType) !== -1 &&
+          r.count != null && r.count > 0) {
         rows.push(r);
       }
     }
@@ -3468,7 +3476,8 @@ var PlayerPage = {
     for (var i = 0; i < hpData.length; i++) {
       var r = hpData[i];
       if (r.hitter === hitterName && r.team === team &&
-          pitchTypes.indexOf(r.pitchType) !== -1) {
+          pitchTypes.indexOf(r.pitchType) !== -1 &&
+          r.count != null && r.count > 0) {
         rows.push(r);
       }
     }
@@ -3478,6 +3487,7 @@ var PlayerPage = {
 
   _renderGroupedPitchTable: function (container, cols, categoryRows, totalRow, hitterName, team) {
     var self = this;
+    var isDark = document.body.classList.contains('dark');
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
 
@@ -3491,6 +3501,18 @@ var PlayerPage = {
     }
     thead.appendChild(headerRow);
     table.appendChild(thead);
+
+    // Helper: apply percentile coloring to a stat cell.
+    function applyPctlColor(td, col, row, val) {
+      var pctl = col.noPctl ? null : row[col.key + '_pctl'];
+      if (pctl != null && val != null) {
+        var bg = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+        var fg = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
+        td.style.backgroundColor = bg;
+        td.style.color = fg;
+        td.title = Math.round(pctl) + 'th percentile';
+      }
+    }
 
     // Body
     var tbody = document.createElement('tbody');
@@ -3518,6 +3540,7 @@ var PlayerPage = {
           } else {
             var val = catRow[col.key];
             td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+            applyPctlColor(td, col, catRow, val);
           }
           tr.appendChild(td);
         }
@@ -3544,6 +3567,7 @@ var PlayerPage = {
                 } else {
                   var subVal = pitchRows[p][subCol.key];
                   subTd.textContent = subCol.format ? subCol.format(subVal) : (subVal != null ? subVal : '—');
+                  applyPctlColor(subTd, subCol, pitchRows[p], subVal);
                 }
                 subTr.appendChild(subTd);
               }
@@ -3564,7 +3588,6 @@ var PlayerPage = {
 
     // Total row
     if (totalRow) {
-      var isDark = document.body.classList.contains('dark');
       var totalTr = document.createElement('tr');
       totalTr.style.fontWeight = '700';
       totalTr.style.borderTop = '2px solid #333840';
