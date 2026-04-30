@@ -3208,10 +3208,14 @@ def write_embedded_js(rs_result):
         # Strip internal _-prefixed keys from all leaderboard rows
         def strip_internal(rows):
             return [{k: v for k, v in row.items() if not k.startswith('_')} for row in rows]
-        # Strip _pctl keys from hitter pitch LB for embedding
+        # Keep _pctl keys on hitter pitch LB rows — needed by the player-page
+        # Plate Discipline / Batted Ball tables to color category rows and
+        # per-pitch sub-rows (the leaderboard's hitterPitch tab recomputes
+        # percentiles client-side via the aggregator, but the player page
+        # reads these rows directly).
         hitter_pitch_lb_slim = []
         for row in result['hitter_pitch_leaderboard']:
-            slim = {k: v for k, v in row.items() if not k.endswith('_pctl') and not k.startswith('_')}
+            slim = {k: v for k, v in row.items() if not k.startswith('_')}
             hitter_pitch_lb_slim.append(slim)
         return {
             'pitcherData': strip_internal(result['pitcher_leaderboard']),
