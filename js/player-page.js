@@ -2943,7 +2943,6 @@ var PlayerPage = {
 
     // Color functions
     var OUTCOME_COLORS = { 0: '#666', 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c', 5: '#999' };
-    var BBTYPE_COLORS = { 0: '#4e79a7', 1: '#59a14f', 2: '#f28e2b', 3: '#e15759' };
 
     function evColor(ev) {
       if (ev == null) return 'rgba(150,150,150,0.6)';
@@ -2965,8 +2964,7 @@ var PlayerPage = {
 
     function getPointColor(pt) {
       if (mode === 'ev') return evColor(pt.ev);
-      if (mode === 'bbtype') return BBTYPE_COLORS[pt.bbType] || '#999';
-      return OUTCOME_COLORS[pt.event] || '#666'; // outcome (default)
+      return OUTCOME_COLORS[pt.event] || '#666'; // outcome
     }
 
     // EV-based dot sizing: 5px (weak) to 10px (barreled)
@@ -3116,7 +3114,8 @@ var PlayerPage = {
       xwobaspNote.textContent = '';
       xwobaspNote.appendChild(document.createTextNode('xwOBAsp: '));
       var valSpan = document.createElement('span');
-      valSpan.style.cssText = 'color:#ccc;font-weight:600;';
+      var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
+      valSpan.style.cssText = 'font-weight:600;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
       valSpan.textContent = xwOBAsp_val.toFixed(3);
       xwobaspNote.appendChild(valSpan);
       var countSpan = document.createElement('span');
@@ -3308,13 +3307,6 @@ var PlayerPage = {
           { color: '#dc143c', label: 'HR' },
           { color: '#999', label: 'Error/FC' },
         ];
-      } else if (mode === 'bbtype') {
-        legendItems = [
-          { color: '#4e79a7', label: 'GB' },
-          { color: '#59a14f', label: 'LD' },
-          { color: '#f28e2b', label: 'FB' },
-          { color: '#e15759', label: 'PU' },
-        ];
       } else if (mode === 'ev') {
         legendItems = [
           { color: 'rgb(8,48,107)', label: '70 mph' },
@@ -3340,6 +3332,16 @@ var PlayerPage = {
         '<span class="la-spray-gradient-high">1.000+</span>' +
         '</div>';
       legendEl.innerHTML = html;
+    }
+
+    // Sync active class to current _laSprayMode (defends against stale HTML state)
+    var modeBtns = document.querySelectorAll('#la-spray-toggle .spray-toggle-btn');
+    for (var mbi = 0; mbi < modeBtns.length; mbi++) {
+      modeBtns[mbi].classList.toggle('active', modeBtns[mbi].getAttribute('data-mode') === self._laSprayMode);
+    }
+    var zoneBtns = document.querySelectorAll('#la-spray-zone-toggle .spray-toggle-btn');
+    for (var zbi = 0; zbi < zoneBtns.length; zbi++) {
+      zoneBtns[zbi].classList.toggle('active', zoneBtns[zbi].getAttribute('data-zone') === self._laSprayZoneMetric);
     }
 
     // Bind toggle buttons
