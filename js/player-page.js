@@ -2300,7 +2300,7 @@ var PlayerPage = {
     // All synced toggle IDs for pitchers
     var syncedIds = type === 'pitcher'
       ? ['pitcher-platoon-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
-      : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle'];
+      : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle', 'hitter-battracking-toggle'];
 
     this._platoonSyncedIds = syncedIds;
 

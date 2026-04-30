@@ -457,7 +457,14 @@
 
     <!-- Hitter Bat Tracking -->
     <div class="player-full-width" id="player-hitter-bat-tracking-section" style="display:none;">
-      <h3 class="section-title">BAT TRACKING</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">BAT TRACKING</h3>
+        <div class="hand-toggle" id="hitter-battracking-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHP</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHP</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper"><div id="player-hitter-bat-tracking-table"></div></div>
     </div>
 
