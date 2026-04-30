@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-04-30 13:17",
+  "generatedAt": "2026-04-30 16:34",
   "totalPitches": 136155,
   "totalPitchers": 528,
   "totalHitters": 462,
@@ -431,6 +431,8 @@
     "sprintSpeed": 27.0548,
     "runValue": 0.6426,
     "xRunValue": 0.3427,
+    "rv100": 0.0646,
+    "xRv100": -0.2827,
     "count": 462,
     "bbPlus": 100.0,
     "sdPlus": 100.0,
@@ -5730,7 +5732,7 @@
     "scale": 40,
     "nQualified": 183
   },
-  "sieraConstant": 6.0301,
+  "sieraConstant": 6.0312,
   "gutsConstants": {
     "lgWOBA": 0.3197,
     "wOBAScale": 1.2557,
