@@ -672,7 +672,10 @@ var PlayerPage = {
     var posPrefix = data.position ? data.position + ' | ' : '';
     var posEl = document.getElementById('player-position');
     var ageEl = document.getElementById('player-age');
-    posEl.textContent = posPrefix + 'Bats: ' + batHand + ' | ' + (data.team || '');
+    // Compact bio format so the line fits on one row of the player card.
+    // Initial render (sync): position + bats + team. Throws hand and age
+    // come in from the async MLB API call below.
+    posEl.textContent = posPrefix + batHand + ' | ' + (data.team || '');
     ageEl.textContent = '';
 
     if (data.mlbId) {
@@ -682,8 +685,8 @@ var PlayerPage = {
           var person = json.people && json.people[0];
           if (person) {
             var throwHand = person.pitchHand && person.pitchHand.code ? person.pitchHand.code : '';
-            var btLabel = 'Bats/Throws: ' + batHand + '/' + throwHand;
-            var agePart = person.currentAge != null ? ' | Age: ' + person.currentAge : '';
+            var btLabel = throwHand ? batHand + '/' + throwHand : batHand;
+            var agePart = person.currentAge != null ? ' | ' + person.currentAge : '';
             posEl.textContent = posPrefix + btLabel + ' | ' + (data.team || '') + agePart;
           }
         })
