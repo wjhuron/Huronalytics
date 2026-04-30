@@ -431,13 +431,27 @@
 
     <!-- Hitter Plate Discipline -->
     <div class="player-full-width" id="player-hitter-plate-discipline-section" style="display:none;">
-      <h3 class="section-title">PLATE DISCIPLINE</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">PLATE DISCIPLINE</h3>
+        <div class="hand-toggle" id="hitter-platedisc-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHP</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHP</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper"><div id="player-hitter-plate-discipline-table"></div></div>
     </div>
 
     <!-- Hitter Batted Ball -->
     <div class="player-full-width" id="player-hitter-batted-ball-section" style="display:none;">
-      <h3 class="section-title">BATTED BALL</h3>
+      <div class="location-section-header">
+        <h3 class="section-title">BATTED BALL</h3>
+        <div class="hand-toggle" id="hitter-battedball-toggle">
+          <button class="hand-toggle-btn active" data-hand="all">All</button>
+          <button class="hand-toggle-btn" data-hand="R">vs RHP</button>
+          <button class="hand-toggle-btn" data-hand="L">vs LHP</button>
+        </div>
+      </div>
       <div class="pitch-table-scroll-wrapper"><div id="player-hitter-batted-ball-table"></div></div>
     </div>
 

@@ -1849,6 +1849,7 @@ var PlayerPage = {
     var tbody = document.createElement('tbody');
     for (var r = 0; r < pitchRows.length; r++) {
       var row = pitchRows[r];
+      var rowInPool = (row.count || 0) >= QUAL.MIN_HITTER_PT;
       var tr = document.createElement('tr');
       for (var c = 0; c < cols.length; c++) {
         var col = cols[c];
@@ -1859,13 +1860,16 @@ var PlayerPage = {
         } else {
           var val = row[col.key];
           td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
-          // Apply percentile coloring if a _pctl value exists for this key
+          // Apply percentile coloring if a _pctl value exists for this key.
+          // Sub-minimum rows keep the tooltip rank but skip background color.
           var pctl = col.noPctl ? null : row[col.key + '_pctl'];
           if (pctl != null && val != null) {
-            var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-            var txtColor = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
-            td.style.backgroundColor = bgColor;
-            td.style.color = txtColor;
+            if (rowInPool) {
+              var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+              var txtColor = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
+              td.style.backgroundColor = bgColor;
+              td.style.color = txtColor;
+            }
             td.title = Math.round(pctl) + 'th percentile';
           }
         }
@@ -2287,7 +2291,7 @@ var PlayerPage = {
     // All synced toggle IDs for pitchers
     var syncedIds = type === 'pitcher'
       ? ['pitcher-platoon-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
-      : ['hitter-platoon-toggle'];
+      : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle'];
 
     this._platoonSyncedIds = syncedIds;
 
@@ -3502,14 +3506,20 @@ var PlayerPage = {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // Helper: apply percentile coloring to a stat cell.
+    // Helper: apply percentile coloring to a stat cell. Sub-minimum rows
+    // (count < QUAL.MIN_HITTER_PT) keep the tooltip rank but skip the
+    // background color — the percentile is informational, not load-bearing,
+    // since the sample is too small for stable estimation.
     function applyPctlColor(td, col, row, val) {
       var pctl = col.noPctl ? null : row[col.key + '_pctl'];
       if (pctl != null && val != null) {
-        var bg = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-        var fg = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
-        td.style.backgroundColor = bg;
-        td.style.color = fg;
+        var inPool = (row.count || 0) >= QUAL.MIN_HITTER_PT;
+        if (inPool) {
+          var bg = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          var fg = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
+          td.style.backgroundColor = bg;
+          td.style.color = fg;
+        }
         td.title = Math.round(pctl) + 'th percentile';
       }
     }
