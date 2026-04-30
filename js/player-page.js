@@ -44,8 +44,8 @@ var PlayerPage = {
     { key: 'hardHitPct',   label: 'Hard-Hit%',   format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPct',    label: 'Barrel%',     format: function(v) { return Utils.formatPct(v); } },
     // Discipline — PA-level rates
-    { key: 'kPct',         label: 'K%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',        label: 'BB%',         format: function(v) { return Utils.formatPct(v); } },
+    { key: 'kPct',         label: 'K%',          format: function(v) { return Utils.formatPct(v); } },
     // Discipline — per-pitch process
     { key: 'chasePct',     label: 'Chase%',      format: function(v) { return Utils.formatPct(v); } },
     { key: 'whiffPct',     label: 'Whiff%',      format: function(v) { return Utils.formatPct(v); } },
@@ -61,22 +61,22 @@ var PlayerPage = {
   ],
 
   HITTER_STATS_COLS: [
-    { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'ab', label: 'AB', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'g', label: 'G', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
+    { key: 'ab', label: 'AB', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
     { key: 'avg', label: 'AVG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'obp', label: 'OBP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'slg', label: 'SLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'ops', label: 'OPS', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'iso', label: 'ISO', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
+    { key: 'wOBA', label: 'wOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
     { key: 'hitterPlus', label: 'Hitter+', format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'doubles', label: '2B', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'triples', label: '3B', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'bbToK', label: 'BB/K', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'hr', label: 'HR', format: function(v) { return v != null ? v : '—'; } },
   ],
 
@@ -3413,6 +3413,13 @@ var PlayerPage = {
       var td = document.createElement('td');
       var val = data[col.key];
       td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+      if (!col.noPctl) {
+        var pctl = data[col.key + '_pctl'];
+        if (pctl != null) {
+          var bg = Utils.percentileColorDark(pctl);
+          if (bg) td.style.backgroundColor = bg;
+        }
+      }
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
