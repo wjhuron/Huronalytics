@@ -47,6 +47,8 @@ SUPPLEMENT_MAP = {
     'AttackAngle': 'attack_angle',
     'AttackDirection': 'attack_direction',
     'SwingPathTilt': 'swing_path_tilt',
+    'Int_X': 'intercept_ball_minus_batter_pos_x_inches',
+    'Int_Y': 'intercept_ball_minus_batter_pos_y_inches',
     'RunExp': 'delta_pitcher_run_exp',
     'xBA': 'estimated_ba_using_speedangle',
     'xSLG': 'estimated_slg_using_speedangle',
@@ -57,6 +59,11 @@ SUPPLEMENT_MAP = {
     'Outs': 'outs_when_up',
     'Event': 'events',
 }
+
+# Swing-tracking cluster: if BatSpeed is missing or sub-50, the entire
+# cluster is treated as invalid and dropped together (matches Pitcher2026).
+SWING_CLUSTER_COLS = {'BatSpeed', 'SwingLength', 'AttackAngle',
+                      'AttackDirection', 'SwingPathTilt', 'Int_X', 'Int_Y'}
 
 # Columns that store raw integer values from Statcast (no rounding needed)
 INT_COLS = {'Barrel', 'Outs'}  # Raw integer values
@@ -114,6 +121,8 @@ ROUND_DECIMALS = {
     'AttackAngle': 1,
     'AttackDirection': 1,
     'SwingPathTilt': 1,
+    'Int_X': 2,
+    'Int_Y': 2,
     'RunExp': 3,
     'xBA': 3,
     'xSLG': 3,
@@ -229,6 +238,14 @@ def download_statcast(team_tab, date_min, date_max, session):
             'k2': df['pitch_number'].astype(int).astype(str),
         })
 
+        # Swing-cluster invalidity mask: BatSpeed missing or <50 means the
+        # entire swing-tracking frame is unreliable; null all members together.
+        if 'bat_speed' in df.columns:
+            bs_numeric = pd.to_numeric(df['bat_speed'], errors='coerce')
+            swing_invalid = bs_numeric.isna() | (bs_numeric < 50)
+        else:
+            swing_invalid = pd.Series(False, index=df.index)
+
         # Pre-format each supplement column into a string Series
         formatted = {}
         for sheet_col, csv_col in SUPPLEMENT_MAP.items():
@@ -253,9 +270,8 @@ def download_statcast(team_tab, date_min, date_max, session):
             else:
                 decimals = ROUND_DECIMALS.get(sheet_col, 1)
                 numeric = pd.to_numeric(series, errors='coerce')
-                # Filter out sub-50 bat speed (check swings / artifacts)
-                if sheet_col == 'BatSpeed':
-                    numeric = numeric.where(numeric >= 50)
+                if sheet_col in SWING_CLUSTER_COLS:
+                    numeric = numeric.where(~swing_invalid)
                 rounded = numeric.round(decimals)
                 # Format to fixed decimal string; NaN rows excluded via dropna
                 fmt_func = (lambda d: lambda v: f"{v:.{d}f}")(decimals)

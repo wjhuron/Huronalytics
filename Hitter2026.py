@@ -241,24 +241,24 @@ class BaseballSavantHitterDownloader:
                 lambda x: f"{x:.3f}" if pd.notna(x) else ''
             )
 
-        # BatSpeed: drop sub-50 (check swings / artifacts), match Pitcher2026
-        bs = pd.to_numeric(self._safe_col(raw_df, 'bat_speed'), errors='coerce')
-        bs = bs.where(bs >= 50)
-        out['BatSpeed'] = bs.apply(lambda x: f"{x:.1f}" if pd.notna(x) else '')
+        # Swing-cluster validity: BatSpeed missing or <50 means the entire
+        # swing-tracking frame is unreliable; null all members together.
+        bs_numeric = pd.to_numeric(self._safe_col(raw_df, 'bat_speed'), errors='coerce')
+        swing_invalid = bs_numeric.isna() | (bs_numeric < 50)
+        bs_valid = bs_numeric.where(~swing_invalid)
+        out['BatSpeed'] = bs_valid.apply(lambda x: f"{x:.1f}" if pd.notna(x) else '')
 
         for col, src in [('SwingLength',     'swing_length'),
                          ('AttackAngle',     'attack_angle'),
                          ('AttackDirection', 'attack_direction'),
                          ('SwingPathTilt',   'swing_path_tilt')]:
-            out[col] = pd.to_numeric(self._safe_col(raw_df, src), errors='coerce').apply(
-                lambda x: f"{x:.1f}" if pd.notna(x) else ''
-            )
+            numeric = pd.to_numeric(self._safe_col(raw_df, src), errors='coerce').where(~swing_invalid)
+            out[col] = numeric.apply(lambda x: f"{x:.1f}" if pd.notna(x) else '')
 
         for col, src in [('Intercept_X', 'intercept_ball_minus_batter_pos_x_inches'),
                          ('Intercept_Y', 'intercept_ball_minus_batter_pos_y_inches')]:
-            out[col] = pd.to_numeric(self._safe_col(raw_df, src), errors='coerce').apply(
-                lambda x: f"{x:.2f}" if pd.notna(x) else ''
-            )
+            numeric = pd.to_numeric(self._safe_col(raw_df, src), errors='coerce').where(~swing_invalid)
+            out[col] = numeric.apply(lambda x: f"{x:.2f}" if pd.notna(x) else '')
 
         # PitchID: same scheme as Pitcher2026
         gp = self._safe_col(raw_df, 'game_pk').astype(str)
@@ -327,9 +327,9 @@ class BaseballSavantHitterDownloader:
 
 def main():
     # ── Settings (edit directly or override via CLI) ──
-    mlb_ids    = []                  # e.g., [665487, 624413]
-    start_date = "2026-03-01"
-    end_date   = "2026-11-01"
+    mlb_ids    = [682928, 671277, 691781, 678554, 683083, 677588, 678391, 686452, 660688, 695734, 686894, 695578, 696285]                  # e.g., [665487, 624413]
+    start_date = "2025-03-27"
+    end_date   = "2025-11-01"
 
     parser = argparse.ArgumentParser(description='Download pitch-level data for hitters from Baseball Savant')
     parser.add_argument('--mlb-ids', default=None,

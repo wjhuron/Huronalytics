@@ -910,6 +910,8 @@ class BaseballSavantFocusedDownloader:
                 'attack_angle',
                 'attack_direction',
                 'swing_path_tilt',
+                'intercept_ball_minus_batter_pos_x_inches',
+                'intercept_ball_minus_batter_pos_y_inches',
                 'delta_pitcher_run_exp',
                 'estimated_ba_using_speedangle',
                 'estimated_slg_using_speedangle',
@@ -963,6 +965,8 @@ class BaseballSavantFocusedDownloader:
             'attack_angle': 'AttackAngle',
             'attack_direction': 'AttackDirection',
             'swing_path_tilt': 'SwingPathTilt',
+            'intercept_ball_minus_batter_pos_x_inches': 'Int_X',
+            'intercept_ball_minus_batter_pos_y_inches': 'Int_Y',
             'delta_pitcher_run_exp': 'RunExp',
             'estimated_ba_using_speedangle': 'xBA',
             'estimated_slg_using_speedangle': 'xSLG',
@@ -1056,10 +1060,17 @@ class BaseballSavantFocusedDownloader:
         if 'Barrel' in merged.columns:
             merged['Barrel'] = pd.to_numeric(merged['Barrel'], errors='coerce').astype('Int64')
 
-        # Filter out sub-50 BatSpeed (check swings / artifacts)
+        # Swing-cluster integrity: BatSpeed is the validity anchor. If it's
+        # missing or sub-50 (check swings / artifacts), the rest of the swing
+        # frame is unreliable too — null the whole cluster together.
+        swing_cluster = ['BatSpeed', 'SwingLength', 'AttackAngle', 'AttackDirection',
+                         'SwingPathTilt', 'Int_X', 'Int_Y']
         if 'BatSpeed' in merged.columns:
             merged['BatSpeed'] = pd.to_numeric(merged['BatSpeed'], errors='coerce')
-            merged.loc[merged['BatSpeed'] < 50, 'BatSpeed'] = np.nan
+            invalid = merged['BatSpeed'].isna() | (merged['BatSpeed'] < 50)
+            for col in swing_cluster:
+                if col in merged.columns:
+                    merged.loc[invalid, col] = np.nan
 
         # Count successful merges
         supplement_value_cols = [c for c in supplement_display_cols if c in merged.columns]
@@ -1073,6 +1084,11 @@ class BaseballSavantFocusedDownloader:
         for col in supplement_round_1:
             if col in merged.columns:
                 merged[col] = pd.to_numeric(merged[col], errors='coerce').apply(lambda x: f"{x:.1f}" if pd.notna(x) else '')
+
+        # Int_X / Int_Y: bat-ball intercept distances in inches, 2 decimals
+        for col in ['Int_X', 'Int_Y']:
+            if col in merged.columns:
+                merged[col] = pd.to_numeric(merged[col], errors='coerce').apply(lambda x: f"{x:.2f}" if pd.notna(x) else '')
 
         # Drop merge keys so they don't appear in the final CSV
         merged = merged.drop(columns=merge_keys)
@@ -1203,6 +1219,7 @@ class BaseballSavantFocusedDownloader:
             'HC_X', 'HC_Y', 'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom', 'RunExp',
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
+            'Int_X', 'Int_Y',
             'PitchID',
             'Barrel',
         ]
@@ -1285,6 +1302,7 @@ class BaseballSavantFocusedDownloader:
             'HC_X', 'HC_Y', 'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom', 'RunExp',
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
+            'Int_X', 'Int_Y',
             'PitchID',
             'Barrel',
         ]
@@ -1313,8 +1331,8 @@ def main():
 
     # ── Settings (edit these directly or override via command line) ──
     team_abbrev     = ""
-    start_date      = "2026-04-27"
-    end_date        = "2026-04-27"
+    start_date      = "2026-05-02"
+    end_date        = "2026-05-02"
     pitchers_only   = True
 
     game_id         = ""          # Game PK (e.g., "831437") — leave blank for team/date lookup
