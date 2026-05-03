@@ -3162,10 +3162,12 @@ var PlayerPage = {
       mean_spray = sumSpray / points.length;
       mean_la = sumLA / points.length;
     }
-    // Resolve color once — same color drives the xwOBAsp value, the avg-
-    // placement values, and the chart marker dot.
+    // Resolve colors once. Percentile color drives the xwOBAsp value and the
+    // avg-placement value text (quality story). The marker dot uses the brand
+    // cyan accent so it never collides with the EV-gradient (blue→gray→red)
+    // dots in the BIP scatter — it reads as a system annotation, not data.
     var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
-    var markerColor = pctlColor || '#dab26b';
+    var markerColor = '#00d4ff';
 
     // --- xwOBAsp annotation (HTML element, outside chart) ---
     var xwobaspNote = document.getElementById('la-spray-xwobasp-note');
