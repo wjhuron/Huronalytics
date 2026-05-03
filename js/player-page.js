@@ -3151,25 +3151,70 @@ var PlayerPage = {
     }
     var xwOBAsp_val = xwOBAsp_count > 0 ? (xwOBAsp_sum / xwOBAsp_count) : null;
 
+    // --- Center-of-mass placement (mean spray + mean LA across all BIPs) ---
+    var mean_spray = null, mean_la = null;
+    if (points.length > 0) {
+      var sumSpray = 0, sumLA = 0;
+      for (var msi = 0; msi < points.length; msi++) {
+        sumSpray += points[msi].x;
+        sumLA += (points[msi].realLA != null ? points[msi].realLA : points[msi].y);
+      }
+      mean_spray = sumSpray / points.length;
+      mean_la = sumLA / points.length;
+    }
+    // Resolve color once — same color drives the xwOBAsp value, the avg-
+    // placement values, and the chart marker dot.
+    var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
+    var markerColor = pctlColor || '#dab26b';
+
     // --- xwOBAsp annotation (HTML element, outside chart) ---
     var xwobaspNote = document.getElementById('la-spray-xwobasp-note');
     if (xwOBAsp_val != null) {
       xwobaspNote.textContent = '';
+      // Line 1 — xwOBAsp value (percentile-colored)
+      var line1 = document.createElement('div');
       var labelSpan = document.createElement('span');
       labelSpan.style.cssText = 'font-size:18px;font-weight:600;color:#aaa;';
       labelSpan.textContent = 'xwOBAsp: ';
-      xwobaspNote.appendChild(labelSpan);
+      line1.appendChild(labelSpan);
       var valSpan = document.createElement('span');
-      var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
       valSpan.style.cssText = 'font-size:18px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
       valSpan.textContent = Utils.formatDecimal(3)(xwOBAsp_val);
-      xwobaspNote.appendChild(valSpan);
+      line1.appendChild(valSpan);
       var countSpan = document.createElement('span');
       countSpan.style.cssText = 'font-size:12px;color:#666;margin-left:4px;';
       countSpan.textContent = totalBip > xwOBAsp_count
         ? '(' + xwOBAsp_count + ' of ' + totalBip + ' qualifying BIP)'
         : '(' + xwOBAsp_count + ' qualifying BIP)';
-      xwobaspNote.appendChild(countSpan);
+      line1.appendChild(countSpan);
+      xwobaspNote.appendChild(line1);
+
+      // Line 2 — Avg Placement (color-matched to xwOBAsp percentile, links
+      // visually to the marker dot on the chart)
+      if (mean_spray != null && mean_la != null) {
+        var line2 = document.createElement('div');
+        line2.style.cssText = 'margin-top:2px;';
+        var apLabel = document.createElement('span');
+        apLabel.style.cssText = 'font-size:13px;font-weight:600;color:#aaa;';
+        apLabel.textContent = 'Avg Placement: ';
+        line2.appendChild(apLabel);
+        var sprayDir = (bats === 'L')
+          ? (mean_spray > 0 ? 'Pull' : 'Oppo')
+          : (mean_spray < 0 ? 'Pull' : 'Oppo');
+        var sprayValSpan = document.createElement('span');
+        sprayValSpan.style.cssText = 'font-size:14px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
+        sprayValSpan.textContent = Math.abs(mean_spray).toFixed(1) + '° ' + sprayDir;
+        line2.appendChild(sprayValSpan);
+        var sepSpan = document.createElement('span');
+        sepSpan.style.cssText = 'font-size:13px;color:#555;margin:0 6px;';
+        sepSpan.textContent = '|';
+        line2.appendChild(sepSpan);
+        var laValSpan = document.createElement('span');
+        laValSpan.style.cssText = 'font-size:14px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
+        laValSpan.textContent = mean_la.toFixed(1) + '° LA';
+        line2.appendChild(laValSpan);
+        xwobaspNote.appendChild(line2);
+      }
       xwobaspNote.style.display = '';
     } else {
       xwobaspNote.style.display = 'none';
@@ -3272,10 +3317,41 @@ var PlayerPage = {
       this._laSprayChart = null;
     }
 
+    // Center-of-mass marker plugin — single dot at (mean_spray, mean_la),
+    // colored by xwOBAsp percentile so the marker, the xwOBAsp value, and
+    // the avg-placement values all share one visual link.
+    var markerPlugin = null;
+    if (mean_spray != null && mean_la != null) {
+      var _mSpray = mean_spray;
+      var _mLA = Math.max(-20, Math.min(60, mean_la));
+      var _mColor = markerColor;
+      markerPlugin = {
+        id: 'centerOfMassMarker',
+        afterDatasetsDraw: function (chart) {
+          var ctx = chart.ctx;
+          var px = chart.scales.x.getPixelForValue(_mSpray);
+          var py = chart.scales.y.getPixelForValue(_mLA);
+          // White outer ring for contrast against any heatmap zone color
+          ctx.beginPath();
+          ctx.arc(px, py, 11, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.fill();
+          // Inner dot — percentile color, black border to anchor against light bg
+          ctx.beginPath();
+          ctx.arc(px, py, 8, 0, Math.PI * 2);
+          ctx.fillStyle = _mColor;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#000';
+          ctx.stroke();
+        }
+      };
+    }
+
     this._laSprayChart = new Chart(canvas, {
       type: 'scatter',
       data: { datasets: datasets },
-      plugins: [zonePlugin],
+      plugins: markerPlugin ? [zonePlugin, markerPlugin] : [zonePlugin],
       options: {
         responsive: true,
         maintainAspectRatio: true,
