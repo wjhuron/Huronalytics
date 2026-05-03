@@ -3178,8 +3178,11 @@ var PlayerPage = {
       labelSpan.textContent = 'xwOBAsp: ';
       line1.appendChild(labelSpan);
       var valSpan = document.createElement('span');
-      valSpan.style.cssText = 'font-size:18px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
+      valSpan.style.cssText = 'font-size:18px;font-weight:700;cursor:help;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
       valSpan.textContent = Utils.formatDecimal(3)(xwOBAsp_val);
+      if (data.xwOBAsp_pctl != null) {
+        valSpan.title = Math.round(data.xwOBAsp_pctl) + 'th percentile';
+      }
       line1.appendChild(valSpan);
       var countSpan = document.createElement('span');
       countSpan.style.cssText = 'font-size:12px;color:#666;margin-left:4px;';
@@ -3193,7 +3196,7 @@ var PlayerPage = {
       // visually to the marker dot on the chart)
       if (mean_spray != null && mean_la != null) {
         var line2 = document.createElement('div');
-        line2.style.cssText = 'margin-top:2px;';
+        line2.style.cssText = 'margin-top:8px;';
         var apLabel = document.createElement('span');
         apLabel.style.cssText = 'font-size:13px;font-weight:600;color:#aaa;';
         apLabel.textContent = 'Avg Placement: ';
