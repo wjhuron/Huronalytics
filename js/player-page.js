@@ -3200,7 +3200,7 @@ var PlayerPage = {
         var line2 = document.createElement('div');
         line2.style.cssText = 'margin-top:8px;';
         var apLabel = document.createElement('span');
-        apLabel.style.cssText = 'font-size:13px;font-weight:600;color:#aaa;';
+        apLabel.style.cssText = 'font-size:14px;font-weight:600;color:#aaa;';
         apLabel.textContent = 'Avg Placement: ';
         line2.appendChild(apLabel);
         var sprayDir = (bats === 'L')
@@ -3240,6 +3240,11 @@ var PlayerPage = {
     var zoneHoverSprayBounds = sprayBounds; // capture for closure
     var zoneHoverSacqZones = sacqZones;
     var zoneHoverHitterCounts = hitterZoneCounts;
+    // Marker hover: capture mean position + bats so the hover handler can
+    // detect proximity to the cyan center-of-mass dot and show its tooltip.
+    var hoverMeanSpray = mean_spray;
+    var hoverMeanLA = mean_la;
+    var hoverBats = bats;
     // LA bin label helper
     var LA_BIN_LABELS = ['< 0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
                          '25–30°', '30–35°', '35–40°', '40–50°', '50°+'];
@@ -3271,6 +3276,31 @@ var PlayerPage = {
           my < chart.chartArea.top || my > chart.chartArea.bottom) {
         zoneTooltipEl.style.display = 'none';
         return;
+      }
+      // Marker proximity check — if hovering near the avg-placement dot,
+      // show the marker tooltip and short-circuit the zone lookup.
+      if (hoverMeanSpray != null && hoverMeanLA != null) {
+        var clampedMeanLA = Math.max(-20, Math.min(60, hoverMeanLA));
+        var markerPx = chart.scales.x.getPixelForValue(hoverMeanSpray);
+        var markerPy = chart.scales.y.getPixelForValue(clampedMeanLA);
+        var ddx = mx - markerPx, ddy = my - markerPy;
+        if (ddx * ddx + ddy * ddy <= 144) { // within 12px of marker center
+          var msDir = (hoverBats === 'L')
+            ? (hoverMeanSpray > 0 ? 'Pull' : 'Oppo')
+            : (hoverMeanSpray < 0 ? 'Pull' : 'Oppo');
+          zoneTooltipEl.innerHTML = '<strong>Avg Placement</strong><br>' +
+            Math.abs(hoverMeanSpray).toFixed(1) + '° ' + msDir + ' &middot; ' +
+            hoverMeanLA.toFixed(1) + '° LA';
+          zoneTooltipEl.style.display = 'block';
+          var ttWm = zoneTooltipEl.offsetWidth;
+          var ttHm = zoneTooltipEl.offsetHeight;
+          var txm = mx + 12, tym = my - ttHm - 8;
+          if (txm + ttWm > rect.width) txm = mx - ttWm - 12;
+          if (tym < 0) tym = my + 16;
+          zoneTooltipEl.style.left = txm + 'px';
+          zoneTooltipEl.style.top = tym + 'px';
+          return;
+        }
       }
       // Find which zone the cursor is in
       var foundZone = null;
