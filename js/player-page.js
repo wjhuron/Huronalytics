@@ -3151,16 +3151,17 @@ var PlayerPage = {
     }
     var xwOBAsp_val = xwOBAsp_count > 0 ? (xwOBAsp_sum / xwOBAsp_count) : null;
 
-    // --- Center-of-mass placement (mean spray + mean LA across all BIPs) ---
-    var mean_spray = null, mean_la = null;
+    // --- Typical-placement marker (median spray + median LA across BIPs).
+    // Median (not mean) so a single 60° popup or extreme chopper doesn't pull
+    // the marker away from where the hitter typically places the ball.
+    // Surface label stays "Avg Placement" — most readers don't distinguish. ---
+    var med_spray = null, med_la = null;
     if (points.length > 0) {
-      var sumSpray = 0, sumLA = 0;
-      for (var msi = 0; msi < points.length; msi++) {
-        sumSpray += points[msi].x;
-        sumLA += (points[msi].realLA != null ? points[msi].realLA : points[msi].y);
-      }
-      mean_spray = sumSpray / points.length;
-      mean_la = sumLA / points.length;
+      var _sortedSprays = points.map(function (p) { return p.x; }).sort(function (a, b) { return a - b; });
+      var _sortedLAs = points.map(function (p) { return p.realLA != null ? p.realLA : p.y; }).sort(function (a, b) { return a - b; });
+      var _midIdx = Math.floor(points.length / 2);
+      med_spray = (points.length % 2 === 0) ? (_sortedSprays[_midIdx - 1] + _sortedSprays[_midIdx]) / 2 : _sortedSprays[_midIdx];
+      med_la = (points.length % 2 === 0) ? (_sortedLAs[_midIdx - 1] + _sortedLAs[_midIdx]) / 2 : _sortedLAs[_midIdx];
     }
     // Resolve colors once. Percentile color drives the xwOBAsp value and the
     // avg-placement value text (quality story). The marker dot uses the brand
@@ -3196,7 +3197,7 @@ var PlayerPage = {
 
       // Line 2 — Avg Placement (color-matched to xwOBAsp percentile, links
       // visually to the marker dot on the chart)
-      if (mean_spray != null && mean_la != null) {
+      if (med_spray != null && med_la != null) {
         var line2 = document.createElement('div');
         line2.style.cssText = 'margin-top:8px;';
         var apLabel = document.createElement('span');
@@ -3204,11 +3205,11 @@ var PlayerPage = {
         apLabel.textContent = 'Avg Placement: ';
         line2.appendChild(apLabel);
         var sprayDir = (bats === 'L')
-          ? (mean_spray > 0 ? 'Pull' : 'Oppo')
-          : (mean_spray < 0 ? 'Pull' : 'Oppo');
+          ? (med_spray > 0 ? 'Pull' : 'Oppo')
+          : (med_spray < 0 ? 'Pull' : 'Oppo');
         var sprayValSpan = document.createElement('span');
         sprayValSpan.style.cssText = 'font-size:14px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
-        sprayValSpan.textContent = Math.abs(mean_spray).toFixed(1) + '° ' + sprayDir;
+        sprayValSpan.textContent = Math.abs(med_spray).toFixed(1) + '° ' + sprayDir;
         line2.appendChild(sprayValSpan);
         var sepSpan = document.createElement('span');
         sepSpan.style.cssText = 'font-size:13px;color:#555;margin:0 6px;';
@@ -3216,7 +3217,7 @@ var PlayerPage = {
         line2.appendChild(sepSpan);
         var laValSpan = document.createElement('span');
         laValSpan.style.cssText = 'font-size:14px;font-weight:700;' + (pctlColor ? 'color:' + pctlColor + ';' : 'color:#ccc;');
-        laValSpan.textContent = mean_la.toFixed(1) + '° LA';
+        laValSpan.textContent = med_la.toFixed(1) + '° LA';
         line2.appendChild(laValSpan);
         xwobaspNote.appendChild(line2);
       }
@@ -3242,8 +3243,8 @@ var PlayerPage = {
     var zoneHoverHitterCounts = hitterZoneCounts;
     // Marker hover: capture mean position + bats so the hover handler can
     // detect proximity to the cyan center-of-mass dot and show its tooltip.
-    var hoverMeanSpray = mean_spray;
-    var hoverMeanLA = mean_la;
+    var hoverMedSpray = med_spray;
+    var hoverMedLA = med_la;
     var hoverBats = bats;
     // LA bin label helper
     var LA_BIN_LABELS = ['< 0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
@@ -3279,18 +3280,18 @@ var PlayerPage = {
       }
       // Marker proximity check — if hovering near the avg-placement dot,
       // show the marker tooltip and short-circuit the zone lookup.
-      if (hoverMeanSpray != null && hoverMeanLA != null) {
-        var clampedMeanLA = Math.max(-20, Math.min(60, hoverMeanLA));
-        var markerPx = chart.scales.x.getPixelForValue(hoverMeanSpray);
-        var markerPy = chart.scales.y.getPixelForValue(clampedMeanLA);
+      if (hoverMedSpray != null && hoverMedLA != null) {
+        var clampedMedLA = Math.max(-20, Math.min(60, hoverMedLA));
+        var markerPx = chart.scales.x.getPixelForValue(hoverMedSpray);
+        var markerPy = chart.scales.y.getPixelForValue(clampedMedLA);
         var ddx = mx - markerPx, ddy = my - markerPy;
         if (ddx * ddx + ddy * ddy <= 144) { // within 12px of marker center
           var msDir = (hoverBats === 'L')
-            ? (hoverMeanSpray > 0 ? 'Pull' : 'Oppo')
-            : (hoverMeanSpray < 0 ? 'Pull' : 'Oppo');
+            ? (hoverMedSpray > 0 ? 'Pull' : 'Oppo')
+            : (hoverMedSpray < 0 ? 'Pull' : 'Oppo');
           zoneTooltipEl.innerHTML = '<strong>Avg Placement</strong><br>' +
-            Math.abs(hoverMeanSpray).toFixed(1) + '° ' + msDir + ' &middot; ' +
-            hoverMeanLA.toFixed(1) + '° LA';
+            Math.abs(hoverMedSpray).toFixed(1) + '° ' + msDir + ' &middot; ' +
+            hoverMedLA.toFixed(1) + '° LA';
           zoneTooltipEl.style.display = 'block';
           var ttWm = zoneTooltipEl.offsetWidth;
           var ttHm = zoneTooltipEl.offsetHeight;
@@ -3352,13 +3353,13 @@ var PlayerPage = {
       this._laSprayChart = null;
     }
 
-    // Center-of-mass marker plugin — single dot at (mean_spray, mean_la),
+    // Typical-placement marker plugin — single dot at (med_spray, med_la),
     // colored by xwOBAsp percentile so the marker, the xwOBAsp value, and
     // the avg-placement values all share one visual link.
     var markerPlugin = null;
-    if (mean_spray != null && mean_la != null) {
-      var _mSpray = mean_spray;
-      var _mLA = Math.max(-20, Math.min(60, mean_la));
+    if (med_spray != null && med_la != null) {
+      var _mSpray = med_spray;
+      var _mLA = Math.max(-20, Math.min(60, med_la));
       var _mColor = markerColor;
       markerPlugin = {
         id: 'centerOfMassMarker',
