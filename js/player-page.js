@@ -339,6 +339,7 @@ var PlayerPage = {
     this._renderBattedBallTable(data); // will use _filteredPitchRows
     this._renderHeatMaps(data);
     this._renderCountTable(data);
+    this._addAllDownloadButtons(data);
   },
 
   // Get PITCH_DETAILS for this pitcher (already game-type-specific), optionally filtered by _gameDate and _platoonDetailHand
@@ -482,6 +483,7 @@ var PlayerPage = {
     if (!isROCPlayer) {
       this._renderHitterBatTrackingTable(data);
     }
+    this._addAllDownloadButtons(data);
   },
 
   _showPitcherLayout: function () {
@@ -3917,5 +3919,131 @@ var PlayerPage = {
       return true;
     }
     return false;
+  },
+
+  // ── Section downloads (PNG via html2canvas) ──────────────────────────────
+  // Each player-page section gets a small download icon in its header. Click
+  // captures the section element via html2canvas at 2× and triggers a PNG
+  // download. The button itself is excluded from the capture so the export
+  // matches what the user sees minus the affordance.
+
+  _DOWNLOAD_ICON_SVG:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"' +
+    ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>' +
+    '<polyline points="7 10 12 15 17 10"/>' +
+    '<line x1="12" y1="15" x2="12" y2="3"/></svg>',
+
+  _slugify: function (s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'section';
+  },
+
+  _addDownloadButton: function (sectionId, sectionSlug) {
+    var section = document.getElementById(sectionId);
+    if (!section) return;
+    if (section.querySelector(':scope .section-download-btn')) return; // already added
+
+    var slot;
+    if (sectionId === 'player-la-spray-section') {
+      // LA × Spray: header is a 3-col grid; toggle group on the right is the
+      // natural spot so the button doesn't break the grid alignment.
+      slot = section.querySelector('.la-spray-toggle-group');
+    } else {
+      slot = section.querySelector(':scope > .location-section-header, :scope > .spray-section-header');
+      if (!slot) {
+        // Bare-h3 section (e.g. ARSENAL). Promote the h3 into a flex header.
+        var bareH3 = section.querySelector(':scope > .section-title');
+        if (bareH3) {
+          slot = document.createElement('div');
+          slot.className = 'location-section-header';
+          section.insertBefore(slot, bareH3);
+          slot.appendChild(bareH3);
+        }
+      }
+    }
+    if (!slot) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'section-download-btn';
+    btn.title = 'Download as PNG';
+    btn.setAttribute('aria-label', 'Download section as PNG');
+    btn.innerHTML = this._DOWNLOAD_ICON_SVG;
+    btn.dataset.sectionSlug = sectionSlug;
+
+    var self = this;
+    btn.addEventListener('click', function () {
+      self._downloadSectionAsPng(section, btn, sectionSlug);
+    });
+    slot.appendChild(btn);
+  },
+
+  _downloadSectionAsPng: function (sectionEl, btn, sectionSlug) {
+    if (!window.html2canvas) {
+      console.warn('html2canvas not loaded yet');
+      return;
+    }
+    var data = this._currentData || {};
+    var playerName = data.hitter || data.pitcher || 'player';
+    var team = data.team || '';
+    var filename = this._slugify(playerName) + (team ? '-' + this._slugify(team) : '') +
+                   '-' + sectionSlug + '.png';
+
+    // Resolve background from the page so the captured image isn't transparent.
+    var bgColor = getComputedStyle(document.body).backgroundColor || '#1a1d23';
+
+    btn.disabled = true;
+    window.html2canvas(sectionEl, {
+      backgroundColor: bgColor,
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      ignoreElements: function (el) {
+        // Don't render the download button itself or any tooltip overlay.
+        return el.classList && (
+          el.classList.contains('section-download-btn') ||
+          el.id === 'la-spray-zone-tooltip'
+        );
+      }
+    }).then(function (canvas) {
+      var link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }).catch(function (err) {
+      console.error('Section download failed', err);
+    }).then(function () {
+      btn.disabled = false;
+    });
+  },
+
+  _addAllDownloadButtons: function (data) {
+    if (!data) return;
+    var isPitcher = !!data.pitcher;
+    var sections = isPitcher ? [
+      ['player-stats-section',             'stats'],
+      ['player-expanded-pitch-section',    'arsenal'],
+      ['player-plate-discipline-section',  'plate-discipline'],
+      ['player-batted-ball-section',       'batted-ball'],
+      ['player-location-section',          'pitch-locations'],
+      ['player-count-section',             'usage-by-count'],
+    ] : [
+      ['player-spray-section',                       'spray-chart'],
+      ['player-la-spray-section',                    'la-spray'],
+      ['player-hitter-stats-section',                'stats'],
+      ['player-hitter-plate-discipline-section',     'plate-discipline'],
+      ['player-hitter-batted-ball-section',          'batted-ball'],
+      ['player-hitter-bat-tracking-section',         'bat-tracking'],
+    ];
+    for (var i = 0; i < sections.length; i++) {
+      var sec = document.getElementById(sections[i][0]);
+      if (!sec || sec.style.display === 'none') continue;
+      this._addDownloadButton(sections[i][0], sections[i][1]);
+    }
   },
 };

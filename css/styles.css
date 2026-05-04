@@ -1717,6 +1717,45 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   display: flex;
   gap: 8px;
   justify-self: end;
+  align-items: center;
+}
+
+/* Per-section download button — sits inside section headers (and inside
+   .la-spray-toggle-group on the LA × Spray header). Subtle until hover so
+   it doesn't compete with the section's primary controls. */
+.section-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s, background 0.15s;
+  flex: 0 0 auto;
+}
+.section-download-btn:hover {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.03);
+}
+.section-download-btn:active {
+  transform: translateY(1px);
+}
+.section-download-btn:disabled {
+  opacity: 0.25;
+  cursor: progress;
+}
+.section-download-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .spray-toggle {
