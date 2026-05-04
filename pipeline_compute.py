@@ -550,8 +550,13 @@ def compute_hitter_stats(pitches):
         'izSwChase': round(iz_swing_pct - chase_pct, 4) if iz_swing_pct is not None and chase_pct is not None else None,
         'contactPct': contact_pct,
         'izContactPct': iz_contact_pct,
-        'whiffPct': whiffs / n_swings if n_swings > 0 else None,
-        'izWhiffPct': iz_whiffs / iz_swings if iz_swings > 0 else None,
+        # Whiff% denominator excludes bunt-contact swings to match contactPct,
+        # so whiffPct + contactPct = 1.0 cleanly. Bunt-attempt whiffs themselves
+        # are indistinguishable from regular whiffs in the data (no BBType on
+        # any swinging strike), so they remain counted in the numerator —
+        # negligible effect since they're rare.
+        'whiffPct': whiffs / swings_non_bunt if swings_non_bunt > 0 else None,
+        'izWhiffPct': iz_whiffs / iz_swings_non_bunt if iz_swings_non_bunt > 0 else None,
         'runValue': (lambda vals: -sum(vals) if vals else None)([v for v in (safe_float(p.get('RunExp')) for p in pitches) if v is not None]),
         'batSpeed': round(sum(bs_vals) / len(bs_vals), 1) if bs_vals else None,
         'swingLength': round(sum(sl_vals) / len(sl_vals), 1) if sl_vals else None,
