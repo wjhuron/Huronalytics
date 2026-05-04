@@ -825,7 +825,7 @@
     })();
 
     document.getElementById('export-csv-btn').addEventListener('click', function () {
-      const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab]).filter(function (c) {
+      const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab], allData).filter(function (c) {
         return c.key !== '_rank' && !c.isCompare;
       });
       const csv = Utils.toCSV(allData, visCols);
@@ -837,7 +837,7 @@
     });
 
     document.getElementById('copy-clipboard-btn').addEventListener('click', function () {
-      const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab]).filter(function (c) {
+      const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab], allData).filter(function (c) {
         return c.key !== '_rank' && !c.isCompare;
       });
       const tsv = Utils.toTSV(allData, visCols);

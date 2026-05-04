@@ -133,7 +133,7 @@ const COLUMNS = {
     { key: 'xwOBAcon',    label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
     { key: 'wRCplus',     label: 'wRC+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Weighted runs created+ (100 = league avg, park-adjusted, from actual wOBA)', group: 'expected' },
     { key: 'xWRCplus',    label: 'xWRC+',    format: Utils.formatInt, sortType: 'numeric', desc: 'Expected wRC+ (derived from xwOBA, park-adjusted)', group: 'expected' },
-    { key: 'hitterPlus',  label: 'Hitter+',  format: Utils.formatInt, sortType: 'numeric', desc: 'Hitter composite: weighted blend of BB+ (contact quality), SD+ (swing decisions), CT+ (contact rate). 100 = league avg.', group: 'expected' },
+    { key: 'hitterPlus',  label: 'Hitter+',  format: Utils.formatInt, sortType: 'numeric', desc: 'Hitter composite: weighted blend of BB+ (contact quality), SD+ (swing decisions), CT+ (contact rate). 100 = league avg.', group: 'expected', rocHide: true },
     // Counting
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
@@ -168,7 +168,7 @@ const COLUMNS = {
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast, EV + LA)', group: 'expected' },
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
     { key: 'xwOBAsp',    label: 'xwOBAsp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted — avg zone wOBA by LA × spray direction', group: 'expected' },
-    { key: 'bbPlus',     label: 'BB+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Batted-ball composite: 60% xwOBAcon+ + 40% xwOBAsp+, indexed so 100 = league avg', group: 'expected' },
+    { key: 'bbPlus',     label: 'BB+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Batted-ball composite: 60% xwOBAcon+ + 40% xwOBAsp+, indexed so 100 = league avg', group: 'expected', rocHide: true },
     // Composition
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'composition' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Line drive rate', group: 'composition' },
@@ -203,8 +203,8 @@ const COLUMNS = {
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on 2-strike swings — lower means better at battling with two strikes', group: 'discipline' },
     { key: 'contactPct',  label: 'Contact%', format: Utils.formatPct, sortType: 'numeric', desc: 'Contact rate excluding bunts (contact / swings)', group: 'discipline' },
     { key: 'izContactPct', label: 'IZCT%',   format: Utils.formatPct, sortType: 'numeric', desc: 'In-zone contact rate', group: 'discipline' },
-    { key: 'sdPlus',      label: 'SD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Swing-Decisions+: per-pitch decision quality scored against an xRV-weighted (zone × count) table. Rewards correct swing/take choices, umpire-independent via true zone. Ratio-to-league: 100 = league avg.', group: 'discipline' },
-    { key: 'ctPlus',      label: 'CT+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Contact+: leverage-weighted contact rate on swings. Frequency only — contact quality lives in BB+. Ratio-to-league: 100 = league avg.', group: 'discipline' },
+    { key: 'sdPlus',      label: 'SD+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Swing-Decisions+: per-pitch decision quality scored against an xRV-weighted (zone × count) table. Rewards correct swing/take choices, umpire-independent via true zone. Ratio-to-league: 100 = league avg.', group: 'discipline', rocHide: true },
+    { key: 'ctPlus',      label: 'CT+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Contact+: leverage-weighted contact rate on swings. Frequency only — contact quality lives in BB+. Ratio-to-league: 100 = league avg.', group: 'discipline', rocHide: true },
   ],
   hitterBatTracking: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -310,10 +310,20 @@ const Leaderboard = {
     }
   },
 
-  getVisibleColumns: function (columns) {
+  getVisibleColumns: function (columns, data) {
     const self = this;
+    // ROC-only view: hide columns flagged rocHide. Triggers when every visible
+    // row has team === 'ROC' (e.g. user filtered the team dropdown to ROC).
+    // For mixed views (All Teams), the column stays so non-ROC rows still
+    // display their values.
+    let allROC = false;
+    if (data && data.length > 0) {
+      allROC = data.every(function (r) { return r && r.team === 'ROC'; });
+    }
     return columns.filter(function (col) {
-      return !self.hiddenColumns[col.key];
+      if (self.hiddenColumns[col.key]) return false;
+      if (allROC && col.rocHide) return false;
+      return true;
     });
   },
 
@@ -469,7 +479,7 @@ const Leaderboard = {
   render: function (data, columns, opts) {
     opts = opts || {};
     const self = this;
-    const visCols = this.getVisibleColumns(columns);
+    const visCols = this.getVisibleColumns(columns, data);
     let headerRow = document.getElementById('table-header');
     const tbody = document.getElementById('table-body');
     const pinnedBody = document.getElementById('table-pinned-body');
