@@ -84,7 +84,9 @@ def compute_expected_stats(pitches, woba_weights=None):
     triples = 0
     hr = 0
     xba_sum = 0.0
+    xba_denom = 0   # AB-events with a Statcast xBA value
     xslg_sum = 0.0
+    xslg_denom = 0  # AB-events with a Statcast xSLG value
     xwoba_sum = 0.0
     xwoba_denom = 0
     xwobacon_sum = 0.0
@@ -133,8 +135,10 @@ def compute_expected_stats(pitches, woba_weights=None):
         xslg_val = safe_float(p.get('xSLG'))
         if xba_val is not None:
             xba_sum += xba_val
+            xba_denom += 1
         if xslg_val is not None:
             xslg_sum += xslg_val
+            xslg_denom += 1
 
         if event not in K_EVENTS:
             xwobacon_val = safe_float(p.get('xwOBA'))
@@ -153,8 +157,12 @@ def compute_expected_stats(pitches, woba_weights=None):
     else:
         result['wOBA'] = None
 
-    result['xBA'] = round(xba_sum / ab, 3) if ab > 0 else None
-    result['xSLG'] = round(xslg_sum / ab, 3) if ab > 0 else None
+    # xBA/xSLG are Statcast-only — denominator is AB to match the standard
+    # Statcast convention (Ks contribute implicit 0). Return None when no
+    # AB had any Statcast data, otherwise the result is 0.0 for AAA-only
+    # players (which then gets a 0th percentile, swamping the leaderboard).
+    result['xBA'] = round(xba_sum / ab, 3) if (ab > 0 and xba_denom > 0) else None
+    result['xSLG'] = round(xslg_sum / ab, 3) if (ab > 0 and xslg_denom > 0) else None
     result['xwOBA'] = round(xwoba_sum / xwoba_denom, 3) if xwoba_denom > 0 else None
     result['xwOBAcon'] = round(xwobacon_sum / xwobacon_denom, 3) if xwobacon_denom > 0 else None
     return result
