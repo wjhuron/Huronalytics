@@ -226,7 +226,11 @@ def compute_stats(pitches):
     fps_pct = fps_strikes / len(first_pitches) if first_pitches else None
 
     two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
-    two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
+    # Exclude bunt-contact swings from the 2-strike whiff denominator to match
+    # the regular whiff% / contact% convention.
+    two_strike_swings = sum(1 for p in two_strike_pitches
+                            if p['Description'] in SWING_DESCRIPTIONS
+                            and p.get('BBType') not in BUNT_BB_TYPES)
     two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
 
@@ -461,7 +465,11 @@ def compute_hitter_stats(pitches):
     hr_fb_pct = round(n_hr_fb / fb_for_hrfb, 4) if fb_for_hrfb > 0 else None
 
     two_strike_pitches = [p for p in pitches if '-' in p.get('Count', '') and p['Count'].split('-')[1] == '2']
-    two_strike_swings = sum(1 for p in two_strike_pitches if p['Description'] in SWING_DESCRIPTIONS)
+    # Exclude bunt-contact swings from the 2-strike whiff denominator to match
+    # the regular whiff% / contact% convention.
+    two_strike_swings = sum(1 for p in two_strike_pitches
+                            if p['Description'] in SWING_DESCRIPTIONS
+                            and p.get('BBType') not in BUNT_BB_TYPES)
     two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
 

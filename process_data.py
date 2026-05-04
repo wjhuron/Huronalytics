@@ -321,9 +321,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
         # 22 integer/float counts (0-21)
         for i in range(22):
             row.append(int(c[i]))
-        # 13 metric sum/count pairs
+        # 13 metric sum/count pairs. Round to 4 dec so source precisions up to
+        # 3 dec (PlateX/Z) are preserved through the sum — the frontend
+        # divides sum/count to get the average and rounds at display time.
         for col_name, offset in METRIC_OFFSETS:
-            row.append(round(c[offset], 2))       # metric sum
+            row.append(round(c[offset], 4))       # metric sum
             row.append(int(c[offset + 1]))         # metric count
         # Tilt sin/cos
         row.append(round(c[44], 6))  # sumTiltSin
@@ -1834,14 +1836,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             szb_val = safe_float(p.get('SzBot'))
             bh_val = p.get('Bats')
             cnt_val = p.get('Count')
+            # PlateX/Z, SzTop/SzBot source is 3 dec — preserve all of it so
+            # downstream zone classification matches what the pipeline used.
             if px_val is not None:
-                detail['px'] = round(px_val, 2)
+                detail['px'] = round(px_val, 3)
             if pz_val is not None:
-                detail['pz'] = round(pz_val, 2)
+                detail['pz'] = round(pz_val, 3)
             if szt_val is not None:
-                detail['szt'] = round(szt_val, 2)
+                detail['szt'] = round(szt_val, 3)
             if szb_val is not None:
-                detail['szb'] = round(szb_val, 2)
+                detail['szb'] = round(szb_val, 3)
             if bh_val:
                 detail['bh'] = bh_val
             if cnt_val:
