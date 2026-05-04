@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-05-04 15:13",
+  "generatedAt": "2026-05-04 18:49",
   "totalPitches": 152526,
   "totalPitchers": 549,
   "totalHitters": 468,
@@ -70,15 +70,15 @@
       "swStrRate": 0.1042,
       "swStrPct": 0.2142,
       "cswPct": 0.2794,
-      "izWhiffPct": 0.1706,
-      "twoStrikeWhiffPct": 0.2066,
+      "izWhiffPct": 0.1705,
+      "twoStrikeWhiffPct": 0.2067,
       "chasePct": 0.275,
       "gbPct": 0.3126,
       "fpsPct": 0.616,
       "breakTiltMinutes": 25,
       "breakTilt": "12:25",
-      "xBA": 0.2485,
-      "xSLG": 0.4453,
+      "xBA": 0.2488,
+      "xSLG": 0.4458,
       "xwOBA": 0.3523,
       "xwOBAcon": 0.3969,
       "count": 517
@@ -96,7 +96,7 @@
       "vaa": -5.82,
       "haa": 0.05,
       "strikePct": 0.6712,
-      "izPct": 0.5612,
+      "izPct": 0.561,
       "swStrRate": 0.0618,
       "swStrPct": 0.1365,
       "cswPct": 0.283,
@@ -107,8 +107,8 @@
       "fpsPct": 0.6267,
       "breakTiltMinutes": 73,
       "breakTilt": "1:13",
-      "xBA": 0.2872,
-      "xSLG": 0.4364,
+      "xBA": 0.2876,
+      "xSLG": 0.4371,
       "xwOBA": 0.3649,
       "xwOBAcon": 0.3632,
       "count": 407
@@ -126,7 +126,7 @@
       "vaa": -7.78,
       "haa": 1.05,
       "strikePct": 0.6248,
-      "izPct": 0.4513,
+      "izPct": 0.4512,
       "swStrRate": 0.1595,
       "swStrPct": 0.335,
       "cswPct": 0.3097,
@@ -137,8 +137,8 @@
       "fpsPct": 0.6128,
       "breakTiltMinutes": 615,
       "breakTilt": "10:15",
-      "xBA": 0.2327,
-      "xSLG": 0.3841,
+      "xBA": 0.2334,
+      "xSLG": 0.3852,
       "xwOBA": 0.3002,
       "xwOBAcon": 0.3766,
       "count": 345
@@ -156,19 +156,19 @@
       "vaa": -7.63,
       "haa": 1.35,
       "strikePct": 0.6067,
-      "izPct": 0.4367,
+      "izPct": 0.4366,
       "swStrRate": 0.1351,
       "swStrPct": 0.3076,
       "cswPct": 0.3008,
-      "izWhiffPct": 0.1719,
-      "twoStrikeWhiffPct": 0.2847,
+      "izWhiffPct": 0.1717,
+      "twoStrikeWhiffPct": 0.2849,
       "chasePct": 0.3019,
       "gbPct": 0.3485,
       "fpsPct": 0.5701,
       "breakTiltMinutes": 566,
       "breakTilt": "9:26",
-      "xBA": 0.1957,
-      "xSLG": 0.3162,
+      "xBA": 0.1969,
+      "xSLG": 0.3182,
       "xwOBA": 0.259,
       "xwOBAcon": 0.3304,
       "count": 268
@@ -197,8 +197,8 @@
       "fpsPct": 0.5508,
       "breakTiltMinutes": 126,
       "breakTilt": "2:06",
-      "xBA": 0.2128,
-      "xSLG": 0.3169,
+      "xBA": 0.214,
+      "xSLG": 0.3187,
       "xwOBA": 0.2556,
       "xwOBAcon": 0.3362,
       "count": 121
@@ -221,14 +221,14 @@
       "swStrPct": 0.3205,
       "cswPct": 0.2468,
       "izWhiffPct": 0.2202,
-      "twoStrikeWhiffPct": 0.2668,
+      "twoStrikeWhiffPct": 0.2671,
       "chasePct": 0.325,
       "gbPct": 0.5069,
       "fpsPct": 0.5414,
       "breakTiltMinutes": 103,
       "breakTilt": "1:43",
-      "xBA": 0.2341,
-      "xSLG": 0.3507,
+      "xBA": 0.2344,
+      "xSLG": 0.3511,
       "xwOBA": 0.2814,
       "xwOBAcon": 0.3397,
       "count": 339
@@ -246,19 +246,19 @@
       "vaa": -6.03,
       "haa": 1.18,
       "strikePct": 0.6497,
-      "izPct": 0.5198,
+      "izPct": 0.5197,
       "swStrRate": 0.1093,
       "swStrPct": 0.2264,
       "cswPct": 0.2763,
       "izWhiffPct": 0.1582,
-      "twoStrikeWhiffPct": 0.2321,
-      "chasePct": 0.2657,
+      "twoStrikeWhiffPct": 0.2322,
+      "chasePct": 0.2656,
       "gbPct": 0.379,
       "fpsPct": 0.6117,
       "breakTiltMinutes": 702,
       "breakTilt": "11:42",
-      "xBA": 0.267,
-      "xSLG": 0.453,
+      "xBA": 0.2672,
+      "xSLG": 0.4533,
       "xwOBA": 0.3567,
       "xwOBAcon": 0.3691,
       "count": 233
@@ -287,8 +287,8 @@
       "fpsPct": 0.5511,
       "breakTiltMinutes": 394,
       "breakTilt": "6:34",
-      "xBA": 0.2183,
-      "xSLG": 0.3617,
+      "xBA": 0.219,
+      "xSLG": 0.3629,
       "xwOBA": 0.285,
       "xwOBAcon": 0.379,
       "count": 235
@@ -306,19 +306,19 @@
       "vaa": -8.87,
       "haa": 2.94,
       "strikePct": 0.6066,
-      "izPct": 0.4258,
+      "izPct": 0.4254,
       "swStrRate": 0.1506,
       "swStrPct": 0.3451,
       "cswPct": 0.3215,
       "izWhiffPct": 0.1744,
       "twoStrikeWhiffPct": 0.3074,
-      "chasePct": 0.3216,
+      "chasePct": 0.3214,
       "gbPct": 0.4554,
       "fpsPct": 0.5822,
       "breakTiltMinutes": 468,
       "breakTilt": "7:48",
-      "xBA": 0.2154,
-      "xSLG": 0.3207,
+      "xBA": 0.2162,
+      "xSLG": 0.3219,
       "xwOBA": 0.2699,
       "xwOBAcon": 0.369,
       "count": 36
@@ -356,11 +356,11 @@
   },
   "pitcherLeagueAverages": {
     "strikePct": 0.6323,
-    "izPct": 0.4826,
+    "izPct": 0.4825,
     "swStrRate": 0.1183,
     "swStrPct": 0.2534,
     "cswPct": 0.2831,
-    "izWhiffPct": 0.1663,
+    "izWhiffPct": 0.1662,
     "chasePct": 0.2913,
     "gbPct": 0.4232,
     "kPct": 0.2223,
@@ -400,7 +400,7 @@
   "hitterLeagueAverages": {
     "babip": 0.2921,
     "wOBA": 0.3203,
-    "xBA": 0.244,
+    "xBA": 0.2441,
     "xSLG": 0.4015,
     "xwOBA": 0.3226,
     "xwOBAcon": 0.37,
@@ -422,10 +422,10 @@
     "swingPct": 0.4677,
     "izSwingPct": 0.6537,
     "chasePct": 0.2937,
-    "izSwChase": 0.36,
+    "izSwChase": 0.3601,
     "contactPct": 0.7477,
     "izContactPct": 0.8349,
-    "whiffPct": 0.2511,
+    "whiffPct": 0.2523,
     "batSpeed": 71.1129,
     "swingLength": 7.303,
     "attackAngle": 9.77,
@@ -461,14 +461,14 @@
   },
   "vaaRegressions": {
     "CH": {
-      "slope": 1.069959,
-      "intercept": -9.391823,
-      "leagueAvgPlateZ": 1.790974
+      "slope": 1.069967,
+      "intercept": -9.391832,
+      "leagueAvgPlateZ": 1.790969
     },
     "CU": {
-      "slope": 0.974324,
-      "intercept": -11.579197,
-      "leagueAvgPlateZ": 1.783062
+      "slope": 0.974336,
+      "intercept": -11.579204,
+      "leagueAvgPlateZ": 1.783048
     },
     "EP": {
       "slope": 0.522502,
@@ -476,19 +476,19 @@
       "leagueAvgPlateZ": 2.746003
     },
     "FC": {
-      "slope": 1.123096,
-      "intercept": -8.810374,
-      "leagueAvgPlateZ": 2.481105
+      "slope": 1.123107,
+      "intercept": -8.810383,
+      "leagueAvgPlateZ": 2.481088
     },
     "FF": {
-      "slope": 1.058027,
-      "intercept": -7.650442,
-      "leagueAvgPlateZ": 2.826667
+      "slope": 1.058033,
+      "intercept": -7.650449,
+      "leagueAvgPlateZ": 2.826658
     },
     "FS": {
-      "slope": 1.050852,
-      "intercept": -9.539157,
-      "leagueAvgPlateZ": 1.726565
+      "slope": 1.05086,
+      "intercept": -9.539154,
+      "leagueAvgPlateZ": 1.72655
     },
     "KN": {
       "slope": 1.074667,
@@ -496,36 +496,36 @@
       "leagueAvgPlateZ": 2.313171
     },
     "SI": {
-      "slope": 1.089667,
-      "intercept": -8.428308,
-      "leagueAvgPlateZ": 2.397311
+      "slope": 1.089665,
+      "intercept": -8.428295,
+      "leagueAvgPlateZ": 2.397302
     },
     "SL": {
-      "slope": 1.086668,
-      "intercept": -9.847213,
-      "leagueAvgPlateZ": 1.897629
+      "slope": 1.08667,
+      "intercept": -9.847203,
+      "leagueAvgPlateZ": 1.897617
     },
     "ST": {
-      "slope": 1.123257,
+      "slope": 1.123261,
       "intercept": -9.876074,
-      "leagueAvgPlateZ": 2.002001
+      "leagueAvgPlateZ": 2.001994
     },
     "SV": {
-      "slope": 1.107437,
-      "intercept": -10.881745,
-      "leagueAvgPlateZ": 1.812748
+      "slope": 1.107422,
+      "intercept": -10.881702,
+      "leagueAvgPlateZ": 1.812733
     }
   },
   "haaRegressions": {
     "CH": {
-      "slope": 0.740719,
-      "intercept": 0.086717,
-      "leagueAvgPlateX": -0.067188
+      "slope": 0.740718,
+      "intercept": 0.086715,
+      "leagueAvgPlateX": -0.067185
     },
     "CU": {
-      "slope": 1.265514,
-      "intercept": 1.264201,
-      "leagueAvgPlateX": 0.055526
+      "slope": 1.265526,
+      "intercept": 1.264205,
+      "leagueAvgPlateX": 0.055522
     },
     "EP": {
       "slope": 1.199106,
@@ -533,19 +533,19 @@
       "leagueAvgPlateX": -0.078569
     },
     "FC": {
-      "slope": 1.808811,
-      "intercept": 0.913875,
+      "slope": 1.808837,
+      "intercept": 0.913873,
       "leagueAvgPlateX": 0.146424
     },
     "FF": {
-      "slope": 1.081046,
-      "intercept": 0.499768,
-      "leagueAvgPlateX": -0.006682
+      "slope": 1.08106,
+      "intercept": 0.499771,
+      "leagueAvgPlateX": -0.006685
     },
     "FS": {
-      "slope": 0.824432,
-      "intercept": 0.497517,
-      "leagueAvgPlateX": -0.118634
+      "slope": 0.82443,
+      "intercept": 0.497514,
+      "leagueAvgPlateX": -0.118631
     },
     "KN": {
       "slope": 1.216959,
@@ -553,24 +553,24 @@
       "leagueAvgPlateX": 0.106098
     },
     "SI": {
-      "slope": 0.833385,
-      "intercept": 0.106296,
-      "leagueAvgPlateX": -0.06711
+      "slope": 0.833397,
+      "intercept": 0.106301,
+      "leagueAvgPlateX": -0.067115
     },
     "SL": {
-      "slope": 1.904532,
-      "intercept": 0.761189,
-      "leagueAvgPlateX": 0.150292
+      "slope": 1.904567,
+      "intercept": 0.761193,
+      "leagueAvgPlateX": 0.150287
     },
     "ST": {
-      "slope": 2.329567,
-      "intercept": 0.938879,
-      "leagueAvgPlateX": 0.180842
+      "slope": 2.329612,
+      "intercept": 0.93888,
+      "leagueAvgPlateX": 0.180838
     },
     "SV": {
-      "slope": 1.473555,
-      "intercept": 2.675983,
-      "leagueAvgPlateX": 0.183112
+      "slope": 1.473639,
+      "intercept": 2.675961,
+      "leagueAvgPlateX": 0.183117
     }
   },
   "sacqZones": [
@@ -5077,7 +5077,7 @@
   },
   "sdPlusWeights": {
     "heart|0-0|swing": {
-      "rv": 0.02012,
+      "rv": 0.02013,
       "n": 2532
     },
     "heart|0-0|take": {
@@ -5097,7 +5097,7 @@
       "n": 566
     },
     "heart|0-2|take": {
-      "rv": -0.11652,
+      "rv": -0.11654,
       "n": 55
     },
     "heart|1-0|swing": {
@@ -5113,15 +5113,15 @@
       "n": 1508
     },
     "heart|1-1|take": {
-      "rv": -0.0624,
-      "n": 275
+      "rv": -0.06238,
+      "n": 276
     },
     "heart|1-2|swing": {
-      "rv": -0.00858,
-      "n": 1078
+      "rv": -0.00834,
+      "n": 1079
     },
     "heart|1-2|take": {
-      "rv": -0.14123,
+      "rv": -0.14124,
       "n": 92
     },
     "heart|2-0|swing": {
@@ -5129,7 +5129,7 @@
       "n": 500
     },
     "heart|2-0|take": {
-      "rv": -0.06303,
+      "rv": -0.06304,
       "n": 316
     },
     "heart|2-1|swing": {
@@ -5137,7 +5137,7 @@
       "n": 1036
     },
     "heart|2-1|take": {
-      "rv": -0.0705,
+      "rv": -0.07051,
       "n": 182
     },
     "heart|2-2|swing": {
@@ -5145,15 +5145,15 @@
       "n": 1316
     },
     "heart|2-2|take": {
-      "rv": -0.16384,
-      "n": 85
+      "rv": -0.16424,
+      "n": 86
     },
     "heart|3-0|swing": {
-      "rv": 0.01991,
+      "rv": 0.01992,
       "n": 28
     },
     "heart|3-0|take": {
-      "rv": -0.06974,
+      "rv": -0.06975,
       "n": 288
     },
     "heart|3-1|swing": {
@@ -5165,28 +5165,28 @@
       "n": 126
     },
     "heart|3-2|swing": {
-      "rv": 0.01927,
+      "rv": 0.01928,
       "n": 1119
     },
     "heart|3-2|take": {
-      "rv": -0.19656,
+      "rv": -0.19658,
       "n": 56
     },
     "shadow_in|0-0|swing": {
-      "rv": -0.00718,
-      "n": 6256
+      "rv": -0.00717,
+      "n": 6255
     },
     "shadow_in|0-0|take": {
-      "rv": -0.03284,
-      "n": 8773
+      "rv": -0.03286,
+      "n": 8771
     },
     "shadow_in|0-1|swing": {
       "rv": -0.01593,
       "n": 4531
     },
     "shadow_in|0-1|take": {
-      "rv": -0.04034,
-      "n": 1982
+      "rv": -0.04033,
+      "n": 1981
     },
     "shadow_in|0-2|swing": {
       "rv": -0.01393,
@@ -5201,20 +5201,20 @@
       "n": 3302
     },
     "shadow_in|1-0|take": {
-      "rv": -0.03899,
-      "n": 2803
+      "rv": -0.03906,
+      "n": 2800
     },
     "shadow_in|1-1|swing": {
       "rv": -0.0168,
       "n": 4104
     },
     "shadow_in|1-1|take": {
-      "rv": -0.04477,
-      "n": 1432
+      "rv": -0.04483,
+      "n": 1430
     },
     "shadow_in|1-2|swing": {
-      "rv": -0.01859,
-      "n": 3484
+      "rv": -0.01867,
+      "n": 3482
     },
     "shadow_in|1-2|take": {
       "rv": -0.13033,
@@ -5233,16 +5233,16 @@
       "n": 2381
     },
     "shadow_in|2-1|take": {
-      "rv": -0.04756,
+      "rv": -0.04757,
       "n": 907
     },
     "shadow_in|2-2|swing": {
-      "rv": -0.0194,
-      "n": 3605
+      "rv": -0.01935,
+      "n": 3604
     },
     "shadow_in|2-2|take": {
-      "rv": -0.16703,
-      "n": 571
+      "rv": -0.16695,
+      "n": 570
     },
     "shadow_in|3-0|swing": {
       "rv": -0.00287,
@@ -5270,19 +5270,19 @@
     },
     "shadow_out|0-0|swing": {
       "rv": -0.03897,
-      "n": 1485
+      "n": 1486
     },
     "shadow_out|0-0|take": {
-      "rv": 0.01965,
-      "n": 4144
+      "rv": 0.01968,
+      "n": 4146
     },
     "shadow_out|0-1|swing": {
       "rv": -0.051,
       "n": 1437
     },
     "shadow_out|0-1|take": {
-      "rv": 0.01826,
-      "n": 1368
+      "rv": 0.01821,
+      "n": 1369
     },
     "shadow_out|0-2|swing": {
       "rv": -0.0507,
@@ -5297,20 +5297,20 @@
       "n": 798
     },
     "shadow_out|1-0|take": {
-      "rv": 0.04018,
-      "n": 1413
+      "rv": 0.04016,
+      "n": 1417
     },
     "shadow_out|1-1|swing": {
       "rv": -0.04935,
       "n": 1085
     },
     "shadow_out|1-1|take": {
-      "rv": 0.03585,
-      "n": 1103
+      "rv": 0.03587,
+      "n": 1104
     },
     "shadow_out|1-2|swing": {
-      "rv": -0.05397,
-      "n": 1309
+      "rv": -0.05391,
+      "n": 1311
     },
     "shadow_out|1-2|take": {
       "rv": 0.0202,
@@ -5333,15 +5333,15 @@
       "n": 588
     },
     "shadow_out|2-2|swing": {
-      "rv": -0.05909,
-      "n": 1213
+      "rv": -0.05921,
+      "n": 1214
     },
     "shadow_out|2-2|take": {
-      "rv": 0.06835,
-      "n": 585
+      "rv": 0.06842,
+      "n": 586
     },
     "shadow_out|3-0|swing": {
-      "rv": -0.0244,
+      "rv": -0.02441,
       "n": 8
     },
     "shadow_out|3-0|take": {
@@ -5366,10 +5366,10 @@
     },
     "chase|0-0|swing": {
       "rv": -0.04158,
-      "n": 1319
+      "n": 1318
     },
     "chase|0-0|take": {
-      "rv": 0.03418,
+      "rv": 0.03417,
       "n": 7570
     },
     "chase|0-1|swing": {
@@ -5386,15 +5386,15 @@
     },
     "chase|0-2|take": {
       "rv": 0.01911,
-      "n": 1687
+      "n": 1686
     },
     "chase|1-0|swing": {
       "rv": -0.04772,
       "n": 705
     },
     "chase|1-0|take": {
-      "rv": 0.05931,
-      "n": 2734
+      "rv": 0.05932,
+      "n": 2732
     },
     "chase|1-1|swing": {
       "rv": -0.05729,
@@ -5405,8 +5405,8 @@
       "n": 2528
     },
     "chase|1-2|swing": {
-      "rv": -0.09013,
-      "n": 1972
+      "rv": -0.09017,
+      "n": 1971
     },
     "chase|1-2|take": {
       "rv": 0.03904,
@@ -5421,7 +5421,7 @@
       "n": 927
     },
     "chase|2-1|swing": {
-      "rv": -0.06698,
+      "rv": -0.06699,
       "n": 551
     },
     "chase|2-1|take": {
@@ -5433,15 +5433,15 @@
       "n": 1459
     },
     "chase|2-2|take": {
-      "rv": 0.09441,
-      "n": 1758
+      "rv": 0.0944,
+      "n": 1757
     },
     "chase|3-0|swing": {
-      "rv": -0.07253,
+      "rv": -0.07254,
       "n": 3
     },
     "chase|3-0|take": {
-      "rv": 0.11389,
+      "rv": 0.11388,
       "n": 364
     },
     "chase|3-1|swing": {
@@ -5453,7 +5453,7 @@
       "n": 555
     },
     "chase|3-2|swing": {
-      "rv": -0.13175,
+      "rv": -0.13176,
       "n": 687
     },
     "chase|3-2|take": {
@@ -5461,8 +5461,8 @@
       "n": 943
     },
     "waste|0-0|swing": {
-      "rv": -0.0593,
-      "n": 182
+      "rv": -0.05921,
+      "n": 183
     },
     "waste|0-0|take": {
       "rv": 0.03531,
@@ -5477,23 +5477,23 @@
       "n": 2638
     },
     "waste|0-2|swing": {
-      "rv": -0.13591,
+      "rv": -0.1359,
       "n": 323
     },
     "waste|0-2|take": {
       "rv": 0.0188,
-      "n": 2397
+      "n": 2398
     },
     "waste|1-0|swing": {
-      "rv": -0.07642,
+      "rv": -0.07641,
       "n": 84
     },
     "waste|1-0|take": {
-      "rv": 0.05981,
-      "n": 1267
+      "rv": 0.0598,
+      "n": 1268
     },
     "waste|1-1|swing": {
-      "rv": -0.06874,
+      "rv": -0.06873,
       "n": 182
     },
     "waste|1-1|take": {
@@ -5501,7 +5501,7 @@
       "n": 1655
     },
     "waste|1-2|swing": {
-      "rv": -0.14074,
+      "rv": -0.14073,
       "n": 482
     },
     "waste|1-2|take": {
@@ -5509,7 +5509,7 @@
       "n": 2632
     },
     "waste|2-0|swing": {
-      "rv": -0.10209,
+      "rv": -0.10206,
       "n": 20
     },
     "waste|2-0|take": {
@@ -5517,7 +5517,7 @@
       "n": 372
     },
     "waste|2-1|swing": {
-      "rv": -0.09713,
+      "rv": -0.09711,
       "n": 46
     },
     "waste|2-1|take": {
@@ -5533,7 +5533,7 @@
       "n": 1588
     },
     "waste|3-0|swing": {
-      "rv": -0.11674,
+      "rv": -0.1167,
       "n": 0
     },
     "waste|3-0|take": {
@@ -5541,7 +5541,7 @@
       "n": 102
     },
     "waste|3-1|swing": {
-      "rv": -0.10796,
+      "rv": -0.10793,
       "n": 11
     },
     "waste|3-1|take": {
@@ -5549,7 +5549,7 @@
       "n": 183
     },
     "waste|3-2|swing": {
-      "rv": -0.21961,
+      "rv": -0.21959,
       "n": 86
     },
     "waste|3-2|take": {
@@ -5571,7 +5571,7 @@
       "n_swings": 1551
     },
     "heart|0-2": {
-      "p_whiff": 0.10353,
+      "p_whiff": 0.10352,
       "rv_contact": 0.02175,
       "rv_whiff": -0.16637,
       "n_swings": 566
@@ -5589,10 +5589,10 @@
       "n_swings": 1508
     },
     "heart|1-2": {
-      "p_whiff": 0.10884,
-      "rv_contact": 0.01293,
-      "rv_whiff": -0.18485,
-      "n_swings": 1078
+      "p_whiff": 0.10874,
+      "rv_contact": 0.01318,
+      "rv_whiff": -0.18486,
+      "n_swings": 1079
     },
     "heart|2-0": {
       "p_whiff": 0.10868,
@@ -5613,8 +5613,8 @@
       "n_swings": 1316
     },
     "heart|3-0": {
-      "p_whiff": 0.08682,
-      "rv_contact": 0.03036,
+      "p_whiff": 0.08681,
+      "rv_contact": 0.03037,
       "rv_whiff": -0.07557,
       "n_swings": 28
     },
@@ -5631,10 +5631,10 @@
       "n_swings": 1119
     },
     "shadow_in|0-0": {
-      "p_whiff": 0.22318,
+      "p_whiff": 0.22305,
       "rv_contact": 0.00267,
       "rv_whiff": -0.04155,
-      "n_swings": 6256
+      "n_swings": 6255
     },
     "shadow_in|0-1": {
       "p_whiff": 0.19785,
@@ -5643,7 +5643,7 @@
       "n_swings": 4531
     },
     "shadow_in|0-2": {
-      "p_whiff": 0.16568,
+      "p_whiff": 0.16567,
       "rv_contact": 0.01738,
       "rv_whiff": -0.17184,
       "n_swings": 2113
@@ -5661,15 +5661,15 @@
       "n_swings": 4104
     },
     "shadow_in|1-2": {
-      "p_whiff": 0.17384,
-      "rv_contact": 0.01682,
+      "p_whiff": 0.17394,
+      "rv_contact": 0.01675,
       "rv_whiff": -0.18695,
-      "n_swings": 3484
+      "n_swings": 3482
     },
     "shadow_in|2-0": {
       "p_whiff": 0.18451,
       "rv_contact": 0.0059,
-      "rv_whiff": -0.06407,
+      "rv_whiff": -0.06406,
       "n_swings": 1128
     },
     "shadow_in|2-1": {
@@ -5679,19 +5679,19 @@
       "n_swings": 2381
     },
     "shadow_in|2-2": {
-      "p_whiff": 0.1596,
+      "p_whiff": 0.15937,
       "rv_contact": 0.01987,
-      "rv_whiff": -0.22651,
-      "n_swings": 3605
+      "rv_whiff": -0.22653,
+      "n_swings": 3604
     },
     "shadow_in|3-0": {
-      "p_whiff": 0.14568,
+      "p_whiff": 0.14567,
       "rv_contact": 0.01179,
-      "rv_whiff": -0.08665,
+      "rv_whiff": -0.08664,
       "n_swings": 76
     },
     "shadow_in|3-1": {
-      "p_whiff": 0.17677,
+      "p_whiff": 0.17676,
       "rv_contact": -0.00764,
       "rv_whiff": -0.08689,
       "n_swings": 959
@@ -5703,10 +5703,10 @@
       "n_swings": 2782
     },
     "shadow_out|0-0": {
-      "p_whiff": 0.35494,
+      "p_whiff": 0.35536,
       "rv_contact": -0.03672,
       "rv_whiff": -0.04349,
-      "n_swings": 1485
+      "n_swings": 1486
     },
     "shadow_out|0-1": {
       "p_whiff": 0.31865,
@@ -5715,7 +5715,7 @@
       "n_swings": 1437
     },
     "shadow_out|0-2": {
-      "p_whiff": 0.25209,
+      "p_whiff": 0.2521,
       "rv_contact": -0.01295,
       "rv_whiff": -0.16337,
       "n_swings": 826
@@ -5733,52 +5733,52 @@
       "n_swings": 1085
     },
     "shadow_out|1-2": {
-      "p_whiff": 0.26772,
-      "rv_contact": -0.00627,
+      "p_whiff": 0.26733,
+      "rv_contact": -0.00628,
       "rv_whiff": -0.18482,
-      "n_swings": 1309
+      "n_swings": 1311
     },
     "shadow_out|2-0": {
-      "p_whiff": 0.29976,
+      "p_whiff": 0.29977,
       "rv_contact": -0.01738,
       "rv_whiff": -0.06968,
       "n_swings": 233
     },
     "shadow_out|2-1": {
-      "p_whiff": 0.30767,
+      "p_whiff": 0.30768,
       "rv_contact": -0.03019,
       "rv_whiff": -0.07662,
       "n_swings": 593
     },
     "shadow_out|2-2": {
-      "p_whiff": 0.23898,
+      "p_whiff": 0.23959,
       "rv_contact": -0.00774,
-      "rv_whiff": -0.2239,
-      "n_swings": 1213
+      "rv_whiff": -0.22386,
+      "n_swings": 1214
     },
     "shadow_out|3-0": {
-      "p_whiff": 0.27296,
+      "p_whiff": 0.27304,
       "rv_contact": 0.00246,
-      "rv_whiff": -0.10932,
+      "rv_whiff": -0.10933,
       "n_swings": 8
     },
     "shadow_out|3-1": {
-      "p_whiff": 0.25301,
+      "p_whiff": 0.25303,
       "rv_contact": -0.04332,
       "rv_whiff": -0.09296,
       "n_swings": 226
     },
     "shadow_out|3-2": {
       "p_whiff": 0.2643,
-      "rv_contact": -0.01173,
+      "rv_contact": -0.01172,
       "rv_whiff": -0.31253,
       "n_swings": 725
     },
     "chase|0-0": {
-      "p_whiff": 0.61928,
+      "p_whiff": 0.619,
       "rv_contact": -0.03834,
       "rv_whiff": -0.04424,
-      "n_swings": 1319
+      "n_swings": 1318
     },
     "chase|0-1": {
       "p_whiff": 0.55614,
@@ -5794,7 +5794,7 @@
     },
     "chase|1-0": {
       "p_whiff": 0.55735,
-      "rv_contact": -0.0402,
+      "rv_contact": -0.04021,
       "rv_whiff": -0.05431,
       "n_swings": 705
     },
@@ -5805,10 +5805,10 @@
       "n_swings": 1156
     },
     "chase|1-2": {
-      "p_whiff": 0.43907,
-      "rv_contact": -0.01423,
+      "p_whiff": 0.43929,
+      "rv_contact": -0.01424,
       "rv_whiff": -0.18736,
-      "n_swings": 1972
+      "n_swings": 1971
     },
     "chase|2-0": {
       "p_whiff": 0.55517,
@@ -5830,92 +5830,92 @@
     },
     "chase|3-0": {
       "p_whiff": 0.48672,
-      "rv_contact": -0.02868,
-      "rv_whiff": -0.11728,
+      "rv_contact": -0.02869,
+      "rv_whiff": -0.1173,
       "n_swings": 3
     },
     "chase|3-1": {
       "p_whiff": 0.45754,
       "rv_contact": -0.07517,
-      "rv_whiff": -0.0944,
+      "rv_whiff": -0.09441,
       "n_swings": 155
     },
     "chase|3-2": {
       "p_whiff": 0.41628,
-      "rv_contact": -0.00744,
+      "rv_contact": -0.00745,
       "rv_whiff": -0.30897,
       "n_swings": 687
     },
     "waste|0-0": {
-      "p_whiff": 0.85821,
-      "rv_contact": -0.05024,
-      "rv_whiff": -0.06193,
-      "n_swings": 182
+      "p_whiff": 0.85884,
+      "rv_contact": -0.05027,
+      "rv_whiff": -0.06183,
+      "n_swings": 183
     },
     "waste|0-1": {
-      "p_whiff": 0.88677,
+      "p_whiff": 0.88678,
       "rv_contact": -0.06445,
-      "rv_whiff": -0.06826,
+      "rv_whiff": -0.06825,
       "n_swings": 267
     },
     "waste|0-2": {
-      "p_whiff": 0.78312,
+      "p_whiff": 0.78314,
       "rv_contact": -0.04693,
       "rv_whiff": -0.16057,
       "n_swings": 323
     },
     "waste|1-0": {
-      "p_whiff": 0.88885,
+      "p_whiff": 0.88888,
       "rv_contact": -0.05931,
-      "rv_whiff": -0.08245,
+      "rv_whiff": -0.08243,
       "n_swings": 84
     },
     "waste|1-1": {
-      "p_whiff": 0.86683,
+      "p_whiff": 0.86685,
       "rv_contact": -0.00534,
-      "rv_whiff": -0.07899,
+      "rv_whiff": -0.07898,
       "n_swings": 182
     },
     "waste|1-2": {
-      "p_whiff": 0.77087,
+      "p_whiff": 0.77088,
       "rv_contact": -0.00055,
-      "rv_whiff": -0.1829,
+      "rv_whiff": -0.18289,
       "n_swings": 482
     },
     "waste|2-0": {
-      "p_whiff": 0.84436,
+      "p_whiff": 0.84443,
       "rv_contact": -0.04371,
-      "rv_whiff": -0.11538,
+      "rv_whiff": -0.11534,
       "n_swings": 20
     },
     "waste|2-1": {
-      "p_whiff": 0.8136,
+      "p_whiff": 0.81365,
       "rv_contact": -0.05244,
-      "rv_whiff": -0.10674,
+      "rv_whiff": -0.10671,
       "n_swings": 46
     },
     "waste|2-2": {
-      "p_whiff": 0.79521,
+      "p_whiff": 0.79522,
       "rv_contact": -0.01161,
-      "rv_whiff": -0.20611,
+      "rv_whiff": -0.2061,
       "n_swings": 262
     },
     "waste|3-0": {
-      "p_whiff": 0.82211,
+      "p_whiff": 0.8222,
       "rv_contact": -0.02618,
-      "rv_whiff": -0.13634,
+      "rv_whiff": -0.13628,
       "n_swings": 0
     },
     "waste|3-1": {
-      "p_whiff": 0.8214,
+      "p_whiff": 0.82147,
       "rv_contact": -0.02403,
-      "rv_whiff": -0.12618,
+      "rv_whiff": -0.12613,
       "n_swings": 11
     },
     "waste|3-2": {
-      "p_whiff": 0.83166,
+      "p_whiff": 0.83169,
       "rv_contact": -0.0324,
-      "rv_whiff": -0.25674,
+      "rv_whiff": -0.25671,
       "n_swings": 86
     }
   },
@@ -5925,11 +5925,11 @@
       "sd": 13.645
     },
     "sdPlus": {
-      "mean": 101.685,
-      "sd": 12.275
+      "mean": 101.683,
+      "sd": 12.276
     },
     "ctPlus": {
-      "mean": 100.344,
+      "mean": 100.343,
       "sd": 3.107
     },
     "weights": {
