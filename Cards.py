@@ -1196,7 +1196,25 @@ def render_card(config, pitches, output_file):
     # (right). Zone% is the first rate-stat column now that Strike% is gone.
     divider_col = col_headers.index('Zone%') if 'Zone%' in col_headers else None
 
-    table = ax_table.table(cellText=cell_data, colLabels=col_headers, loc='upper center', cellLoc='center')
+    # Proportional column widths: each column gets enough space for its widest
+    # entry (header or any cell) plus a small padding floor. Without this,
+    # matplotlib defaults to equal widths, which wastes space on short columns
+    # (Count, Usage) and lets long ones (PitchRV/100, xPitchRV/100) collide.
+    PAD_CHARS = 2
+    MIN_CHARS = 4
+    col_char_widths = []
+    for _ci in range(len(col_headers)):
+        _max_len = len(str(col_headers[_ci]))
+        for _row in cell_data:
+            _v = str(_row[_ci]) if _ci < len(_row) else ''
+            if len(_v) > _max_len:
+                _max_len = len(_v)
+        col_char_widths.append(max(MIN_CHARS, _max_len + PAD_CHARS))
+    _total = sum(col_char_widths)
+    col_widths = [c / _total for c in col_char_widths]
+
+    table = ax_table.table(cellText=cell_data, colLabels=col_headers,
+                            loc='upper center', cellLoc='center', colWidths=col_widths)
     table.auto_set_font_size(False); table.set_fontsize(10); table.scale(1, 1.6)
 
     for (r,c), cell in table.get_celld().items():
@@ -1338,10 +1356,10 @@ def render_card(config, pitches, output_file):
 # ═══════════════════════════════════════════════════════════════
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team            = "WSH"
-    start_date      = "2026-04-29"     # Set to None for full season
+    team            = "TOR"
+    start_date      = None     # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
-    filter_pitchers = "Cavalli, Cade"                 # Semicolon-separated "Last, First" names, or "" for all
+    filter_pitchers = "Gausman, Kevin"                 # Semicolon-separated "Last, First" names, or "" for all
     game_pk         = ""                 # Optional game PK for live/in-progress games
     output_dir      = OUTPUT_DIR
 
