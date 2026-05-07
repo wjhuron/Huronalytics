@@ -477,6 +477,7 @@ var PlayerPage = {
     this._renderSprayChart(data);
     this._renderLASprayChart(data);
     this._renderHitterSmallStats(data);
+    this._renderHitterSwingHeatMaps(data);
     this._renderHitterStatsFullTable(data, isROCPlayer);
     this._renderHitterPlateDisciplineTable(data);
     this._renderHitterBattedBallTable(data, isROCPlayer);
@@ -499,9 +500,9 @@ var PlayerPage = {
     if (sprayToggle) sprayToggle.style.display = 'none';
     var sprayLegend = document.getElementById('spray-legend-inline');
     if (sprayLegend) sprayLegend.style.display = 'none';
-    var hitterSections = ['player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section',
-      'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
-      'player-hitter-bat-tracking-section'];
+    var hitterSections = ['player-spray-section', 'player-la-spray-section', 'player-swing-heatmaps-section',
+      'player-hitter-stats-section', 'player-hitter-batted-ball-section',
+      'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var i = 0; i < hitterSections.length; i++) {
       var el = document.getElementById(hitterSections[i]);
       if (el) el.style.display = 'none';
@@ -539,9 +540,9 @@ var PlayerPage = {
     }
     var gameLog = document.getElementById('player-game-log');
     if (gameLog) gameLog.style.display = 'none';
-    var hitterSections = ['player-la-spray-section', 'player-hitter-stats-section',
-      'player-hitter-batted-ball-section', 'player-hitter-plate-discipline-section',
-      'player-hitter-bat-tracking-section'];
+    var hitterSections = ['player-la-spray-section', 'player-swing-heatmaps-section',
+      'player-hitter-stats-section', 'player-hitter-batted-ball-section',
+      'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var j = 0; j < hitterSections.length; j++) {
       var el2 = document.getElementById(hitterSections[j]);
       if (el2) el2.style.display = '';
@@ -564,7 +565,8 @@ var PlayerPage = {
     this._unbindGameLog();
 
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
-      'player-spray-section', 'player-la-spray-section', 'player-hitter-stats-section', 'player-hitter-batted-ball-section',
+      'player-spray-section', 'player-la-spray-section', 'player-swing-heatmaps-section',
+      'player-hitter-stats-section', 'player-hitter-batted-ball-section',
       'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
     for (var i = 0; i < sections.length; i++) {
       var el = document.getElementById(sections[i]);
@@ -2113,6 +2115,203 @@ var PlayerPage = {
   },
 
 
+  // ────────────────────────────────────────────────────────────────────
+  // Hitter swing heat maps — three modes (Swings / Whiffs / Damage) in a
+  // single row, platoon-toggleable. Reads per-pitch swing records from
+  // window.HITTER_SWING_LOCATIONS (populated by the pipeline).
+  // ────────────────────────────────────────────────────────────────────
+  _renderHitterSwingHeatMaps: function (data) {
+    var section = document.getElementById('player-swing-heatmaps-section');
+    var grid = document.getElementById('player-swing-heatmaps-grid');
+    if (!section || !grid) return;
+
+    var locs = window.HITTER_SWING_LOCATIONS || {};
+    var key = data.hitter + '|' + data.team;
+    var hd = locs[key];
+    if (!hd || !hd.records || hd.records.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    grid.innerHTML = '';
+
+    var hand = this._platoonHand || 'all';
+    var szTop = hd.szTop != null ? hd.szTop : 3.5;
+    var szBot = hd.szBot != null ? hd.szBot : 1.5;
+
+    // Apply platoon filter
+    var filteredSwings = [];
+    for (var i = 0; i < hd.records.length; i++) {
+      var r = hd.records[i];
+      if (hand !== 'all' && r[4] !== hand) continue;
+      filteredSwings.push(r);
+    }
+
+    // Total pitches faced for this platoon (denominator for Swings %)
+    var totalPitches = hand === 'L' ? hd.nL : (hand === 'R' ? hd.nR : hd.nAll);
+    var totalSwings = filteredSwings.length;
+
+    // Damage: BIPs with xwOBA only
+    var damagePts = [];
+    var dmgXwSum = 0;
+    var whiffPts = [];
+    for (var j = 0; j < filteredSwings.length; j++) {
+      var rec = filteredSwings[j];
+      if (rec[2] === 2) whiffPts.push(rec);
+      if (rec[2] === 3 && rec[3] != null && rec[3] > 0) {
+        damagePts.push(rec);
+        dmgXwSum += rec[3];
+      }
+    }
+    var dmgAvgXwoba = damagePts.length > 0 ? dmgXwSum / damagePts.length : null;
+
+    // Mode definitions — badge color, points, weighting, subtitle
+    var modes = [
+      {
+        label: 'SWINGS',
+        badgeBg: '#00d4ff', badgeFg: '#0a1118',
+        points: filteredSwings,
+        weighted: false,
+        subtitle: totalPitches > 0
+          ? totalSwings + ' (' + (totalSwings / totalPitches * 100).toFixed(1) + '%)'
+          : String(totalSwings)
+      },
+      {
+        label: 'WHIFFS',
+        badgeBg: '#cccccc', badgeFg: '#0a1118',
+        points: whiffPts,
+        weighted: false,
+        subtitle: totalSwings > 0
+          ? whiffPts.length + ' (' + (whiffPts.length / totalSwings * 100).toFixed(1) + '%)'
+          : String(whiffPts.length)
+      },
+      {
+        label: 'DAMAGE',
+        badgeBg: '#f04040', badgeFg: '#fff',
+        points: damagePts,
+        weighted: true,
+        subtitle: dmgAvgXwoba != null
+          ? '.' + Math.round(dmgAvgXwoba * 1000).toString().padStart(3, '0') + ' (' + damagePts.length + ' BIP)'
+          : '— (' + damagePts.length + ' BIP)'
+      }
+    ];
+
+    for (var mi = 0; mi < modes.length; mi++) {
+      var m = modes[mi];
+      var cell = document.createElement('div');
+      cell.className = 'swing-heatmap-cell';
+      // Header (badge + subtitle)
+      var labelDiv = document.createElement('div');
+      labelDiv.className = 'swing-heatmap-label';
+      var badge = document.createElement('span');
+      badge.className = 'swing-heatmap-badge';
+      badge.style.backgroundColor = m.badgeBg;
+      badge.style.color = m.badgeFg;
+      badge.textContent = m.label;
+      labelDiv.appendChild(badge);
+      var meta = document.createElement('span');
+      meta.className = 'swing-heatmap-meta';
+      meta.textContent = '· ' + m.subtitle;
+      labelDiv.appendChild(meta);
+      cell.appendChild(labelDiv);
+      // Canvas
+      var canvas = document.createElement('canvas');
+      canvas.width = 320;
+      canvas.height = 320;
+      cell.appendChild(canvas);
+      grid.appendChild(cell);
+      this._renderSwingHeatCanvas(canvas, m.points, m.weighted, szTop, szBot);
+    }
+  },
+
+  // KDE-based density rendering on canvas. Same color palette as the pitcher
+  // heat maps, but with alpha-blending so low-density areas fade to the panel
+  // background (organic "bleed" look matching the pitcher aesthetic).
+  _renderSwingHeatCanvas: function (canvas, points, weighted, szTop, szBot) {
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width;
+    var H = canvas.height;
+
+    // Plot bounds — match pitcher heat maps
+    var xMin = -2.0, xMax = 2.0;
+    var zMin = 0.5, zMax = 4.5;
+
+    var gridX = 60, gridZ = 60;
+    var cellW = W / gridX;
+    var cellH = H / gridZ;
+    var bw = 0.32; // bandwidth in feet
+    var bw2 = 2 * bw * bw;
+
+    // Clear
+    ctx.fillStyle = '#1a1d23';
+    ctx.fillRect(0, 0, W, H);
+
+    if (points && points.length >= 5) {
+      var density = new Array(gridX * gridZ);
+      var maxDensity = 0;
+      for (var gx = 0; gx < gridX; gx++) {
+        for (var gz = 0; gz < gridZ; gz++) {
+          var cx = xMin + (gx + 0.5) * (xMax - xMin) / gridX;
+          var cz = zMax - (gz + 0.5) * (zMax - zMin) / gridZ; // flip Z (top = high Z)
+          var d = 0;
+          for (var p = 0; p < points.length; p++) {
+            var dx = cx - points[p][0];
+            var dz = cz - points[p][1];
+            var w = weighted ? points[p][3] : 1;
+            d += w * Math.exp(-(dx * dx + dz * dz) / bw2);
+          }
+          var idx = gx + gz * gridX;
+          density[idx] = d;
+          if (d > maxDensity) maxDensity = d;
+        }
+      }
+      if (maxDensity > 0) {
+        for (var gx2 = 0; gx2 < gridX; gx2++) {
+          for (var gz2 = 0; gz2 < gridZ; gz2++) {
+            var norm = density[gx2 + gz2 * gridX] / maxDensity;
+            if (norm < 0.04) continue;
+            // Alpha curve: density^0.45 — fades low values to panel bg, keeps
+            // hot spots saturated. Matches the matplotlib bleed in the mockup.
+            var alpha = Math.pow(norm, 0.45);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = this._heatColor(norm);
+            ctx.fillRect(gx2 * cellW, gz2 * cellH, cellW + 0.5, cellH + 0.5);
+          }
+        }
+        ctx.globalAlpha = 1.0;
+      }
+    } else {
+      ctx.fillStyle = '#666';
+      ctx.font = '12px Avenir Next, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('n = ' + (points ? points.length : 0) + ' (insufficient)', W / 2, H / 2);
+    }
+
+    // Strike zone (white outline + subtle thirds)
+    var zoneLeft = ((-0.708 - xMin) / (xMax - xMin)) * W;
+    var zoneRight = ((0.708 - xMin) / (xMax - xMin)) * W;
+    var zoneTop = ((zMax - szTop) / (zMax - zMin)) * H;
+    var zoneBottom = ((zMax - szBot) / (zMax - zMin)) * H;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.6;
+    ctx.strokeRect(zoneLeft, zoneTop, zoneRight - zoneLeft, zoneBottom - zoneTop);
+    ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+    ctx.lineWidth = 1;
+    var thirdW = (zoneRight - zoneLeft) / 3;
+    var thirdH = (zoneBottom - zoneTop) / 3;
+    for (var ti = 1; ti < 3; ti++) {
+      ctx.beginPath();
+      ctx.moveTo(zoneLeft + ti * thirdW, zoneTop);
+      ctx.lineTo(zoneLeft + ti * thirdW, zoneBottom);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(zoneLeft, zoneTop + ti * thirdH);
+      ctx.lineTo(zoneRight, zoneTop + ti * thirdH);
+      ctx.stroke();
+    }
+  },
+
+
   _renderCountTable: function(data) {
     var section = document.getElementById('player-count-section');
     var container = document.getElementById('player-count-table');
@@ -2320,7 +2519,8 @@ var PlayerPage = {
     // All synced toggle IDs for pitchers
     var syncedIds = type === 'pitcher'
       ? ['pitcher-platoon-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
-      : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle', 'hitter-battracking-toggle'];
+      : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle',
+         'hitter-battracking-toggle', 'hitter-swingheat-toggle'];
 
     this._platoonSyncedIds = syncedIds;
 
@@ -2392,6 +2592,7 @@ var PlayerPage = {
         this._renderCountTable(data);
       } else {
         this._renderHitterStatsFullTable(data, isROC);
+        this._renderHitterSwingHeatMaps(data);
         this._renderHitterBattedBallTable(data, isROC);
         this._renderHitterPlateDisciplineTable(data);
         if (!isROC) this._renderHitterBatTrackingTable(data);
@@ -2501,6 +2702,10 @@ var PlayerPage = {
       if (!isROC) this._renderHitterBatTrackingTable(found);
       this._filteredHitterCategoryRows = null;
       this._filteredHitterPitchSubRows = null;
+      // Swing heat maps don't go through the aggregator — they read raw
+      // pitch-level records from window.HITTER_SWING_LOCATIONS and apply
+      // the platoon filter inline based on this._platoonHand.
+      this._renderHitterSwingHeatMaps(data);
     }
   },
 

@@ -1122,6 +1122,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             },
             'pitch_details': {},
             'hitter_pitch_details': {},
+            'hitter_swing_locations': {},
         }
 
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
@@ -2253,6 +2254,62 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         details.sort(key=lambda x: x['count'], reverse=True)
         hitter_pitch_details[hitter + '|' + (team or '')] = details
 
+    # --- Hitter swing locations (for swing heat maps on player pages) ---
+    # Per-pitch records for each pitch the hitter swung at. Powers the
+    # Swings / Whiffs / Damage heat maps with platoon filtering. Compact
+    # per-row format: [plateX, plateZ, eventCode, xwOBA, pitcherHand]
+    #   eventCode: 1 = swing-other (foul, foul tip, contact-not-bip)
+    #              2 = whiff (Swinging Strike)
+    #              3 = BIP (In Play)
+    #   xwOBA: only stored for BIPs; null otherwise
+    #   pitcherHand: 'R' / 'L' single char
+    SWING_DESC_FULL = {'Swinging Strike', 'Foul', 'Foul Tip', 'In Play', 'Foul Bunt'}
+    hitter_swing_locations = {}
+    for (hitter, team), pitches in hitter_groups.items():
+        sz_tops, sz_bots = [], []
+        records = []
+        # Total pitches faced per platoon (denominator for "% of pitches" swing
+        # rate when the platoon toggle is active).
+        n_all = 0; n_r = 0; n_l = 0
+        for p in pitches:
+            n_all += 1
+            ph = p.get('Throws') or ''
+            if ph == 'R': n_r += 1
+            elif ph == 'L': n_l += 1
+            sz_t = safe_float(p.get('SzTop'))
+            sz_b = safe_float(p.get('SzBot'))
+            if sz_t is not None: sz_tops.append(sz_t)
+            if sz_b is not None: sz_bots.append(sz_b)
+            desc = p.get('Description', '')
+            if desc not in SWING_DESC_FULL:
+                continue
+            px = safe_float(p.get('PlateX'))
+            pz = safe_float(p.get('PlateZ'))
+            if px is None or pz is None:
+                continue
+            if desc == 'Swinging Strike':
+                evt = 2  # whiff
+            elif desc == 'In Play':
+                evt = 3  # BIP
+            else:
+                evt = 1  # other swing (foul, foul tip)
+            xw = safe_float(p.get('xwOBA')) if evt == 3 else None
+            records.append([round(px, 3), round(pz, 3), evt, xw, ph])
+        if not records:
+            continue
+        # SzTop/SzBot are typically constant per hitter (height-formula) but
+        # average defensively in case of edge cases.
+        sz_top = round(sum(sz_tops) / len(sz_tops), 3) if sz_tops else None
+        sz_bot = round(sum(sz_bots) / len(sz_bots), 3) if sz_bots else None
+        hitter_swing_locations[hitter + '|' + (team or '')] = {
+            'szTop': sz_top,
+            'szBot': sz_bot,
+            'nAll': n_all,
+            'nR': n_r,
+            'nL': n_l,
+            'records': records,
+        }
+
     # --- Hitter pitch-type leaderboard ---
     HITTER_PITCH_PCTL_KEYS = [
         'avg', 'slg', 'iso',
@@ -3160,6 +3217,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'micro_data': micro_data,
         'pitch_details': pitch_details,
         'hitter_pitch_details': hitter_pitch_details,
+        'hitter_swing_locations': hitter_swing_locations,
     }
 
 
@@ -3234,6 +3292,7 @@ def write_embedded_js(rs_result):
             'microData': result['micro_data'],
             'pitchDetails': result['pitch_details'],
             'hitterPitchDetails': result['hitter_pitch_details'],
+            'hitterSwingLocations': result.get('hitter_swing_locations', {}),
         }
 
     with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'w') as f:

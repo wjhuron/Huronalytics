@@ -16,6 +16,7 @@ const DataStore = {
         microData: window.RS_DATA.microData || null,
         pitchDetails: window.RS_DATA.pitchDetails || {},
         hitterPitchDetails: window.RS_DATA.hitterPitchDetails || {},
+        hitterSwingLocations: window.RS_DATA.hitterSwingLocations || {},
       };
     }
 
@@ -41,6 +42,7 @@ const DataStore = {
     window.MICRO_DATA = d.microData;
     window.PITCH_DETAILS = d.pitchDetails;
     window.HITTER_PITCH_DETAILS = d.hitterPitchDetails;
+    window.HITTER_SWING_LOCATIONS = d.hitterSwingLocations;
 
     this.metadata = d.metadata;
     this.pitcherData = d.pitcherData;
