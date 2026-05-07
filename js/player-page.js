@@ -2151,21 +2151,28 @@ var PlayerPage = {
     var totalPitches = hand === 'L' ? hd.nL : (hand === 'R' ? hd.nR : hd.nAll);
     var totalSwings = filteredSwings.length;
 
-    // Damage: BIPs with xwOBA only
+    // Damage: every BIP with a non-null xwOBA (zeros are legitimate weak
+    // contact and DO contribute to the league xwOBAcon — must not filter).
     var damagePts = [];
     var dmgXwSum = 0;
     var whiffPts = [];
     for (var j = 0; j < filteredSwings.length; j++) {
       var rec = filteredSwings[j];
       if (rec[2] === 2) whiffPts.push(rec);
-      if (rec[2] === 3 && rec[3] != null && rec[3] > 0) {
+      if (rec[2] === 3 && rec[3] != null) {
         damagePts.push(rec);
         dmgXwSum += rec[3];
       }
     }
     var dmgAvgXwoba = damagePts.length > 0 ? dmgXwSum / damagePts.length : null;
+    var dmgFmt = dmgAvgXwoba != null
+      ? Number(dmgAvgXwoba).toFixed(3).replace(/^0/, '')
+      : '—';
 
-    // Mode definitions — badge color, points, weighting, subtitle
+    // Mode definitions — badge color, points, weighting, subtitle.
+    // Subtitles call out their denominator explicitly so % values aren't
+    // ambiguous (swings = % of pitches; whiffs = % of swings; damage = the
+    // xwOBAcon stat itself, BIP count in parens).
     var modes = [
       {
         label: 'SWINGS',
@@ -2173,7 +2180,7 @@ var PlayerPage = {
         points: filteredSwings,
         weighted: false,
         subtitle: totalPitches > 0
-          ? totalSwings + ' (' + (totalSwings / totalPitches * 100).toFixed(1) + '%)'
+          ? totalSwings + ' (' + (totalSwings / totalPitches * 100).toFixed(1) + '% of pitches)'
           : String(totalSwings)
       },
       {
@@ -2182,7 +2189,7 @@ var PlayerPage = {
         points: whiffPts,
         weighted: false,
         subtitle: totalSwings > 0
-          ? whiffPts.length + ' (' + (whiffPts.length / totalSwings * 100).toFixed(1) + '%)'
+          ? whiffPts.length + ' (' + (whiffPts.length / totalSwings * 100).toFixed(1) + '% of swings)'
           : String(whiffPts.length)
       },
       {
@@ -2190,9 +2197,7 @@ var PlayerPage = {
         badgeBg: '#f04040', badgeFg: '#fff',
         points: damagePts,
         weighted: true,
-        subtitle: dmgAvgXwoba != null
-          ? '.' + Math.round(dmgAvgXwoba * 1000).toString().padStart(3, '0') + ' (' + damagePts.length + ' BIP)'
-          : '— (' + damagePts.length + ' BIP)'
+        subtitle: 'xwOBAcon: ' + dmgFmt + ' (' + damagePts.length + ' BIP)'
       }
     ];
 
