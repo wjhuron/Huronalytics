@@ -2058,6 +2058,24 @@ var PlayerPage = {
     ctx.lineWidth = 2;
     ctx.strokeRect(zoneLeft, zoneTop, zoneRight - zoneLeft, zoneBottom - zoneTop);
 
+    // Inner zone thirds — quick "did this pitch hit the up-and-in / down-the-
+    // middle / etc." quadrant read without counting pixels. Subtle alpha so
+    // the gridlines don't compete with the heat data.
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    var thirdW = (zoneRight - zoneLeft) / 3;
+    var thirdH = (zoneBottom - zoneTop) / 3;
+    for (var ti = 1; ti < 3; ti++) {
+      ctx.beginPath();
+      ctx.moveTo(zoneLeft + ti * thirdW, zoneTop);
+      ctx.lineTo(zoneLeft + ti * thirdW, zoneBottom);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(zoneLeft, zoneTop + ti * thirdH);
+      ctx.lineTo(zoneRight, zoneTop + ti * thirdH);
+      ctx.stroke();
+    }
+
     // Draw home plate at bottom
     var plateY = ((zMax - 0.5) / (zMax - zMin)) * H; // approximate bottom
     var plateCX = W / 2;
