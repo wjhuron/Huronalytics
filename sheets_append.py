@@ -143,9 +143,19 @@ def push_team_data(df, team, gc=None, verbose=True):
     range_name = f"A{next_row}:{end_col}{end_row}"
 
     ws.update(range_name, rows, value_input_option='USER_ENTERED')
+    # Match the existing data rows in the sheet:
+    #   font Helvetica Neue 8, center horiz, top vert, SOLID 1px borders all sides.
+    _SOLID = {'style': 'SOLID', 'width': 1}
     ws.format(range_name, {
         'textFormat': {'fontFamily': 'Helvetica Neue', 'fontSize': 8},
         'horizontalAlignment': 'CENTER',
+        'verticalAlignment': 'TOP',
+        'borders': {
+            'top':    _SOLID,
+            'bottom': _SOLID,
+            'left':   _SOLID,
+            'right':  _SOLID,
+        },
     })
 
     if verbose:
