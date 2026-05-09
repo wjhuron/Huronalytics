@@ -1388,6 +1388,8 @@ def main():
     filter_team     = None        # Optional team filter for game ID mode (e.g., "CAN")
     output_name     = ""          # Optional custom filename (without .csv)
 
+    push_to_sheets  = False       # True → also append to AL/NL 2026 Google Sheets after CSV save
+
     # ── CLI overrides (optional — values above are used if no args passed) ──
     parser = argparse.ArgumentParser(description='Download pitch data from Baseball Savant')
     parser.add_argument('--team', default=None, help='Team abbreviation')
@@ -1398,10 +1400,11 @@ def main():
     parser.add_argument('--game-id', default=None, help='Game PK (e.g., 831437)')
     parser.add_argument('--filter-team', default=None, help='Team filter for game ID mode')
     parser.add_argument('--output-name', default=None, help='Custom filename (without .csv)')
-    parser.add_argument('--push-to-sheets', dest='push_to_sheets', action='store_true', default=False,
+    parser.add_argument('--push-to-sheets', dest='push_to_sheets', action='store_true', default=None,
                         help='After saving the CSV, append the data into the matching tab '
                              'in the AL 2026 / NL 2026 Google Sheets workbook (auth one-time '
                              'via ~/.config/gspread/credentials.json).')
+    parser.add_argument('--no-push-to-sheets', dest='push_to_sheets', action='store_false')
     args = parser.parse_args()
 
     if args.team is not None: team_abbrev = args.team
@@ -1410,6 +1413,7 @@ def main():
     if args.pitchers_only is not None: pitchers_only = args.pitchers_only
     if args.game_id is not None: game_id = args.game_id
     if args.filter_team is not None: filter_team = args.filter_team
+    if args.push_to_sheets is not None: push_to_sheets = args.push_to_sheets
     if args.output_name is not None: output_name = args.output_name
 
     downloader = BaseballSavantFocusedDownloader()
@@ -1443,7 +1447,7 @@ def main():
     # Push to Google Sheets if requested. The dataframe is grouped by PTeam,
     # so a ROC download (PTeam ∈ {ROC, AAA}) splits across the ROC and AAA
     # tabs of NL 2026; an MLB download goes to its single matching tab.
-    if args.push_to_sheets and getattr(downloader, '_last_combined_df', None) is not None:
+    if push_to_sheets and getattr(downloader, '_last_combined_df', None) is not None:
         try:
             from sheets_append import push_csv_to_sheets
             print("\nPushing to Google Sheets...")
