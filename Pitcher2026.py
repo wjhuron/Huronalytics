@@ -242,6 +242,43 @@ class BaseballSavantFocusedDownloader:
         """
         return self.team_name_to_abbrev.get(team_name, team_name)
 
+    @staticmethod
+    def normalize_aaa_labels(df):
+        """If the download involves Rochester Red Wings, collapse all team
+        labels into the {'ROC', 'AAA'} pair.
+
+        The ROC tab in NL 2026 expects PTeam='ROC' for Rochester pitchers and
+        BTeam='AAA' for any opponent batter (regardless of which AAA team they
+        actually play for). Same logic for the AAA tab in mirror.
+
+        Detection: triggered when 'Rochester Red Wings' appears in PTeam or
+        BTeam. AAA games never involve MLB teams, so it's safe to map every
+        non-Rochester team in the download to 'AAA'.
+
+        No-op for MLB downloads (Rochester won't appear in the data).
+        """
+        if df is None or len(df) == 0:
+            return df
+        if 'PTeam' not in df.columns or 'BTeam' not in df.columns:
+            return df
+
+        ROCHESTER = 'Rochester Red Wings'
+        has_rochester = (
+            (df['PTeam'] == ROCHESTER).any()
+            or (df['BTeam'] == ROCHESTER).any()
+        )
+        if not has_rochester:
+            return df
+
+        def remap(team):
+            if team is None:
+                return team
+            return 'ROC' if team == ROCHESTER else 'AAA'
+
+        df['PTeam'] = df['PTeam'].map(remap)
+        df['BTeam'] = df['BTeam'].map(remap)
+        return df
+
     def get_team_id(self, team_abbrev):
         """
         Get the MLB team ID from the team abbreviation
@@ -1228,12 +1265,18 @@ class BaseballSavantFocusedDownloader:
         final_columns = [c for c in final_columns if c in combined_df.columns]
         combined_df = combined_df[final_columns]
 
+        # ROC/AAA normalization (no-op for MLB downloads)
+        combined_df = self.normalize_aaa_labels(combined_df)
+
         # Save the combined data directly to the team file
         output_filename = os.path.join(self.download_dir, f"{team_abbrev}.csv")
         combined_df.to_csv(output_filename, index=False)
 
         print(f"\nCombined {len(all_dfs)} games with {len(combined_df)} total pitches")
         print(f"Combined data saved to: {output_filename}")
+
+        # Stash for downstream Sheets push (caller passes flag to main)
+        self._last_combined_df = combined_df
 
         return output_filename
 
@@ -1309,6 +1352,9 @@ class BaseballSavantFocusedDownloader:
         final_columns = [c for c in final_columns if c in combined_df.columns]
         combined_df = combined_df[final_columns]
 
+        # ROC/AAA normalization (no-op for MLB downloads)
+        combined_df = self.normalize_aaa_labels(combined_df)
+
         # Determine output filename
         if output_name:
             stem = output_name
@@ -1323,6 +1369,9 @@ class BaseballSavantFocusedDownloader:
         print(f"\nCombined {len(all_dfs)} games with {len(combined_df)} total pitches")
         print(f"Data saved to: {output_filename}")
 
+        # Stash for downstream Sheets push (caller passes flag to main)
+        self._last_combined_df = combined_df
+
         return output_filename
 
 
@@ -1331,11 +1380,11 @@ def main():
 
     # ── Settings (edit these directly or override via command line) ──
     team_abbrev     = ""
-    start_date      = "2026-05-02"
-    end_date        = "2026-05-02"
+    start_date      = "2026-05-09"
+    end_date        = "2026-05-09"
     pitchers_only   = True
 
-    game_id         = ""          # Game PK (e.g., "831437") — leave blank for team/date lookup
+    game_id         = "815678"          # Game PK (e.g., "831437") — leave blank for team/date lookup
     filter_team     = None        # Optional team filter for game ID mode (e.g., "CAN")
     output_name     = ""          # Optional custom filename (without .csv)
 
@@ -1349,6 +1398,10 @@ def main():
     parser.add_argument('--game-id', default=None, help='Game PK (e.g., 831437)')
     parser.add_argument('--filter-team', default=None, help='Team filter for game ID mode')
     parser.add_argument('--output-name', default=None, help='Custom filename (without .csv)')
+    parser.add_argument('--push-to-sheets', dest='push_to_sheets', action='store_true', default=False,
+                        help='After saving the CSV, append the data into the matching tab '
+                             'in the AL 2026 / NL 2026 Google Sheets workbook (auth one-time '
+                             'via ~/.config/gspread/credentials.json).')
     args = parser.parse_args()
 
     if args.team is not None: team_abbrev = args.team
@@ -1385,6 +1438,18 @@ def main():
 
     else:
         print("Error: Please set either game_id or team_abbrev")
+        return
+
+    # Push to Google Sheets if requested. The dataframe is grouped by PTeam,
+    # so a ROC download (PTeam ∈ {ROC, AAA}) splits across the ROC and AAA
+    # tabs of NL 2026; an MLB download goes to its single matching tab.
+    if args.push_to_sheets and getattr(downloader, '_last_combined_df', None) is not None:
+        try:
+            from sheets_append import push_csv_to_sheets
+            print("\nPushing to Google Sheets...")
+            push_csv_to_sheets(downloader._last_combined_df)
+        except Exception as e:
+            print(f"\nSheets push failed: {e}")
 
 
 if __name__ == "__main__":
