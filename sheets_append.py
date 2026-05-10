@@ -150,8 +150,9 @@ def push_team_data(df, team, gc=None, verbose=True):
     ws.update(range_name, rows, value_input_option='USER_ENTERED')
     # Match the existing data rows in the sheet:
     #   font Helvetica Neue 8, center horiz, top vert, SOLID 1px borders all sides.
+    #   Column A (Game Date) is additionally bold.
     _SOLID = {'style': 'SOLID', 'width': 1}
-    ws.format(range_name, {
+    base_fmt = {
         'textFormat': {'fontFamily': 'Helvetica Neue', 'fontSize': 8},
         'horizontalAlignment': 'CENTER',
         'verticalAlignment': 'TOP',
@@ -161,6 +162,14 @@ def push_team_data(df, team, gc=None, verbose=True):
             'left':   _SOLID,
             'right':  _SOLID,
         },
+    }
+    ws.format(range_name, base_fmt)
+    # Bold pass on column A (Game Date) — second call overrides textFormat
+    # for that column while preserving the rest of base_fmt.
+    col_a_range = f'A{next_row}:A{end_row}'
+    ws.format(col_a_range, {
+        **base_fmt,
+        'textFormat': {**base_fmt['textFormat'], 'bold': True},
     })
 
     if verbose:
