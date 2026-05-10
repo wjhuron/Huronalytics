@@ -86,7 +86,9 @@ def _col_letter(n):
 
 def _df_to_rows(df):
     """Convert a dataframe to a list-of-lists suitable for gspread. NaN /
-    NaT / pd.NA become empty strings (Sheets shows blank rather than '#N/A')."""
+    NaT / pd.NA become empty strings (Sheets shows blank rather than '#N/A').
+    numpy scalar types (int64/float64/bool_) are converted to Python natives
+    so the result is JSON-serializable for gspread's API call."""
     out = []
     for row in df.itertuples(index=False, name=None):
         cleaned = []
@@ -97,6 +99,9 @@ def _df_to_rows(df):
                 cleaned.append('')
             elif pd.isna(v):
                 cleaned.append('')
+            elif hasattr(v, 'item'):
+                # numpy scalar (int64, float64, bool_, etc.) → Python native
+                cleaned.append(v.item())
             else:
                 cleaned.append(v)
         out.append(cleaned)
