@@ -1944,6 +1944,40 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     pitcher_league_avgs['count'] = len(pitcher_lb_mlb)
 
+    # Loc+ — pitcher location-quality index. xRV-weighted (zone × count ×
+    # pitch_type × batter_hand × pitcher_hand) cell table, Bayesian-regressed
+    # per pitcher, z-score normalized to 100 ± 10. See pipeline_locplus.py.
+    from pipeline_locplus import compute_loc_plus
+    loc_results, loc_weights = compute_loc_plus(
+        all_pitches, pitcher_groups,
+        lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
+        woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+    )
+    for row in pitcher_leaderboard:
+        key = (row['pitcher'], row['team'], row.get('throws'))
+        r = loc_results.get(key)
+        if r is not None:
+            row['locPlus'] = r['locPlus']
+            row['locPlusRaw'] = round(r['raw_loc_adj'], 5)
+            row['locPlusN'] = r['n_pitches']
+            zloc = r.get('zone_loc') or {}
+            row['locPlusHeart']      = (round(zloc['heart'], 5)      if zloc.get('heart')      is not None else None)
+            row['locPlusShadowIn']   = (round(zloc['shadow_in'], 5)  if zloc.get('shadow_in')  is not None else None)
+            row['locPlusShadowOut']  = (round(zloc['shadow_out'], 5) if zloc.get('shadow_out') is not None else None)
+            row['locPlusChase']      = (round(zloc['chase'], 5)      if zloc.get('chase')      is not None else None)
+            row['locPlusWaste']      = (round(zloc['waste'], 5)      if zloc.get('waste')      is not None else None)
+        else:
+            row['locPlus'] = None
+            row['locPlusRaw'] = None
+            row['locPlusN'] = 0
+            row['locPlusHeart'] = None
+            row['locPlusShadowIn'] = None
+            row['locPlusShadowOut'] = None
+            row['locPlusChase'] = None
+            row['locPlusWaste'] = None
+    pitcher_league_avgs['locPlus'] = 100.0
+    print(f"  Loc+ computed for {len(loc_results)} pitchers.")
+
     # ======================================================================
     #  HITTER LEADERBOARD
     # ======================================================================
@@ -2667,6 +2701,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'teamGamesPlayed': team_games_played,
         'sdPlusWeights': sd_weights,
         'ctPlusWeights': ct_weights,
+        'locPlusWeights': loc_weights,
         'hitterPlusStandardization': hitter_plus_standardization,
     }
 
@@ -3127,7 +3162,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # All entries in PITCHER_ALL_PCTL are rate / shape / outcome metrics;
     # there are no counting stats here, so every stat uses the qualified pool.
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
-                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera'])
+                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera', 'locPlus'])
     for stat in PITCHER_ALL_PCTL:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0,
                                           qualifier_fn=_pitcher_qualified_for_pctl)

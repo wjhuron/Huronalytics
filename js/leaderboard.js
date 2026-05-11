@@ -106,6 +106,7 @@ const COLUMNS = {
     { key: 'fpsPct',      label: 'FPS%',     format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch strike rate', group: 'stats' },
     { key: 'oneOneWinPct', label: '1-1 Win%', format: Utils.formatPct, sortType: 'numeric', desc: 'Strike rate on 1-1 counts (strikes + BIP / total 1-1 pitches)', group: 'stats' },
     { key: 'earlyActionPct', label: 'EarlyAction%', format: Utils.formatPct, sortType: 'numeric', desc: 'PAs ending in 3 or fewer pitches / total PAs', group: 'stats' },
+    { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+: per-pitch location quality scored against an xRV-weighted (zone × count × pitch-type × handedness) table. Captures command independent of stuff or contact luck. Z-score normalized: 100 = league avg, +10 = 1 SD better.', group: 'stats', rocHide: true },
   ],
   hitterStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
