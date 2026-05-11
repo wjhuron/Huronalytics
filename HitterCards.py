@@ -194,8 +194,11 @@ HITTER_STAT_LINE_COLOR = {
     'Hitter+': ('hitterPlus', 'raw', True,  10),
 }
 
-# Headline stat order
-HEADLINE_STATS = ['PA', 'AVG', 'OBP', 'SLG', 'BB%', 'K%', 'SD+', 'CT+', 'BB+', 'Hitter+']
+# Headline stat order — MLB default. ROC overrides this since the + family
+# and bat-tracking metrics aren't computed for AAA.
+HEADLINE_STATS_MLB = ['PA', 'AVG', 'OBP', 'SLG', 'BB%', 'K%', 'SD+', 'CT+', 'BB+', 'Hitter+']
+HEADLINE_STATS_ROC = ['PA', 'AVG', 'OBP', 'SLG', 'BB%', 'K%', 'wRC+']
+HEADLINE_STATS = HEADLINE_STATS_MLB  # default; render switches based on team
 
 # ─────────────────────────────────────────────────────────────────────
 # Theme variables — warm-paper defaults. Theme wrappers (e.g.
@@ -382,6 +385,27 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
     n_hh = sum(1 for v, _ in evs_valid if v >= 95.0)
     n_brl = sum(1 for v, p in evs_valid if is_barrel(v, sf(p.get('LaunchAngle'))))
 
+    # Avg EV / Max EV — population-wide mean / max ExitVelo for the group.
+    # Used directly for ROC (where xwOBAcon is null) and as cross-check
+    # context for MLB.
+    avg_ev = sum(v for v, _p in evs_valid) / n_ev if n_ev else None
+    max_ev = max((v for v, _p in evs_valid), default=None)
+
+    # Air Pull% — fraction of BIPs that are in-the-air (LA >= 25°) AND
+    # pulled (pull or pull_side spray direction).
+    n_airpull = 0
+    n_bip_with_ang = 0
+    for p in bip:
+        la = sf(p.get('LaunchAngle'))
+        ang = spray_angle(sf(p.get('HC_X')), sf(p.get('HC_Y')))
+        sd = spray_direction(ang, bats)
+        if la is None or sd is None:
+            continue
+        n_bip_with_ang += 1
+        if la >= 25 and sd in ('pull', 'pull_side'):
+            n_airpull += 1
+    air_pull_pct = (n_airpull / n_bip_with_ang) if n_bip_with_ang else None
+
     # xwOBAcon: average xwOBA on BIP with non-null xwOBA
     bip_xw = [sf(p.get('xwOBA')) for p in bip]
     bip_xw = [v for v in bip_xw if v is not None]
@@ -420,6 +444,9 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
         'xwOBAsp':  xwobasp,
         'rv100':    rv100,
         'xRv100':   xRv100,
+        'avgEV':       avg_ev,
+        'maxEV':       max_ev,
+        'airPullPct':  air_pull_pct,
         # Carry forward for downstream charts
         '_bip':     bip,
         '_swings':  swings,
@@ -459,8 +486,8 @@ def render_rate_kde_to_axes(ax, num_points, num_weights,
                              den_points, den_weights,
                              x_min, x_max, z_min, z_max,
                              sz_top, sz_bot, label, sample_label,
-                             scale_max=1.0, mask_threshold=0.05,
-                             min_n=5):
+                             scale_max=1.0, scale_min=0.0,
+                             mask_threshold=0.05, min_n=5):
     """Render a SMOOTHED RATE field via two KDEs.
     rate(x, z) = K_num(x, z) / K_den(x, z)
 
@@ -494,7 +521,11 @@ def render_rate_kde_to_axes(ax, num_points, num_weights,
         # Use HEAT_CMAP (navy → light blue → white → red) — matches the
         # website's swing-heat-map color scheme. With absolute scaling, weak
         # hitters' bins stay in the cool blue range (no white/red).
-        normalized_rate = np.clip(rate / scale_max, 0.0, 1.0)
+        # Normalize: (rate - scale_min) / (scale_max - scale_min). For most
+        # metrics scale_min=0; for ROC's Avg-EV damage panel, scale_min=50
+        # so the cmap input maps EV ∈ [50, 110] → [0, 1].
+        scale_range = max(scale_max - scale_min, 1e-9)
+        normalized_rate = np.clip((rate - scale_min) / scale_range, 0.0, 1.0)
         rgba = HEAT_CMAP(normalized_rate)
         # Alpha mask — fade regions where denominator is below threshold (low data)
         den_peak = den_grid.max() if den_grid.max() > 0 else 1.0
@@ -707,8 +738,11 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                   va='top', fontweight='600')
 
     # ─── Headline stats strip ────────────────────────────────────────
+    # ROC players have a reduced stat set (no + family, no bat-tracking)
+    is_roc = (h_row.get('team') == 'ROC')
+    headline_stats = HEADLINE_STATS_ROC if is_roc else HEADLINE_STATS_MLB
     stat_values = []
-    for k in HEADLINE_STATS:
+    for k in headline_stats:
         if k == 'PA':
             stat_values.append(str(h_row.get('pa', '—')))
         elif k == 'AVG':  stat_values.append(fmt_3dec(h_row.get('avg')))
@@ -728,7 +762,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     HL_PAD_CHARS = 4
     HL_MIN_CHARS = 5
     hl_char_widths = []
-    for i, k in enumerate(HEADLINE_STATS):
+    for i, k in enumerate(headline_stats):
         widest = max(len(k), len(stat_values[i]))
         hl_char_widths.append(max(HL_MIN_CHARS, widest + HL_PAD_CHARS))
     hl_total_chars = sum(hl_char_widths)
@@ -742,7 +776,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     stat_y_value = stat_y_header - cell_h
     hitter_la = metadata.get('hitterLeagueAverages', {})
     cur_x = photo_left
-    for i, k in enumerate(HEADLINE_STATS):
+    for i, k in enumerate(headline_stats):
         cw = hl_widths[i]
         val_str = stat_values[i]
         # Header cell
@@ -778,9 +812,11 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # Subtle group dividers — thin vertical hairlines between stat groups
     # so the headline strip reads as PA | slash-line | rate-stats | +stats
     # without changing cell sizes. Anchors the eye without re-sizing.
-    GROUP_BOUNDARIES = {'AVG', 'BB%', 'SD+'}  # divider drawn BEFORE these keys
+    # For MLB: divide PA | slash | rate | + family. For ROC: just PA | slash | rate | wRC+.
+    GROUP_BOUNDARIES = ({'AVG', 'BB%', 'wRC+'} if is_roc
+                        else {'AVG', 'BB%', 'SD+'})
     div_x = photo_left
-    for i, k in enumerate(HEADLINE_STATS):
+    for i, k in enumerate(headline_stats):
         if i > 0 and k in GROUP_BOUNDARIES:
             ax_main.plot([div_x, div_x],
                           [stat_y_value, stat_y_header + cell_h],
@@ -1161,7 +1197,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         swing_pts = []          # all swing locations (denominator for WHIFFS)
         whiff_pts = []          # swinging-strike locations (numerator for WHIFFS)
         bip_pts_loc = []        # BIP locations (denominator for DAMAGE)
-        bip_xw_weights = []     # BIP xwOBA values (numerator weights for DAMAGE)
+        bip_xw_weights = []     # BIP xwOBA values (MLB DAMAGE weights)
+        bip_ev_weights = []     # BIP ExitVelo values (ROC DAMAGE weights)
         for p in hitter_pitches:
             if p.get('Throws') != hand: continue
             px = sf(p.get('PlateX')); pz = sf(p.get('PlateZ'))
@@ -1172,16 +1209,24 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                 if desc == 'Swinging Strike':
                     whiff_pts.append((px, pz))
             if desc == 'In Play':
-                xw = sf(p.get('xwOBA'))
-                if xw is not None:
-                    bip_pts_loc.append((px, pz))
-                    bip_xw_weights.append(xw)
+                if is_roc:
+                    # ROC: weight by ExitVelo (xwOBA isn't tagged for AAA)
+                    ev = sf(p.get('ExitVelo'))
+                    if ev is not None:
+                        bip_pts_loc.append((px, pz))
+                        bip_ev_weights.append(ev)
+                else:
+                    xw = sf(p.get('xwOBA'))
+                    if xw is not None:
+                        bip_pts_loc.append((px, pz))
+                        bip_xw_weights.append(xw)
 
         # Aggregate metrics for the panel subtitle
         n_swings_hand = len(swing_pts)
         n_whiffs_hand = len(whiff_pts)
         whiff_pct_hand = (n_whiffs_hand / n_swings_hand) if n_swings_hand else None
         xwobacon_hand = (sum(bip_xw_weights) / len(bip_xw_weights)) if bip_xw_weights else None
+        avg_ev_hand = (sum(bip_ev_weights) / len(bip_ev_weights)) if bip_ev_weights else None
 
         for ci, mode in enumerate(['whiffs', 'damage']):  # col index
             ax = fig.add_axes([zhm_x_left + ci * (panel_w + 0.01),
@@ -1205,22 +1250,40 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                     sz_top, sz_bot, label, sample,
                     scale_max=0.6, mask_threshold=0.02, min_n=5)
             else:
-                # DAMAGE rate KDE — numerator = xwOBA-weighted BIPs, denom = BIPs.
-                # Color anchored on absolute xwOBA scale [0, 1] via WOBA_CMAP
-                # (same as LA × Spray zones — weak hitters render cool, no red).
-                if xwobacon_hand is not None:
-                    label = (f"DAMAGE vs {hand_label} · "
-                             f"xwOBAcon {fmt_3dec(xwobacon_hand)}")
-                    sample = f"{len(bip_pts_loc)} BIP"
+                # DAMAGE rate KDE — for MLB: xwOBA-weighted BIPs gives mean
+                # xwOBAcon per location. For ROC: ExitVelo-weighted gives mean
+                # Avg EV per location (xwOBA isn't tagged for AAA).
+                if is_roc:
+                    if avg_ev_hand is not None:
+                        label = (f"DAMAGE vs {hand_label} · "
+                                 f"Avg EV {avg_ev_hand:.1f} mph")
+                        sample = f"{len(bip_pts_loc)} BIP"
+                    else:
+                        label = f"DAMAGE vs {hand_label}"
+                        sample = f"n = {len(bip_pts_loc)}"
+                    # ExitVelo: clamp range [50, 110] mph. MLB avg EV ~88 mph
+                    # falls at (88-50)/60 = 0.63 along the cmap → warm.
+                    render_rate_kde_to_axes(ax,
+                        bip_pts_loc, bip_ev_weights,
+                        bip_pts_loc, None,
+                        ZONE_X_MIN, ZONE_X_MAX, ZONE_Z_MIN, ZONE_Z_MAX,
+                        sz_top, sz_bot, label, sample,
+                        scale_max=110.0, scale_min=50.0,
+                        mask_threshold=0.05, min_n=5)
                 else:
-                    label = f"DAMAGE vs {hand_label}"
-                    sample = f"n = {len(bip_pts_loc)}"
-                render_rate_kde_to_axes(ax,
-                    bip_pts_loc, bip_xw_weights,   # num: BIPs weighted by xwOBA
-                    bip_pts_loc, None,             # den: BIPs (uniform weight)
-                    ZONE_X_MIN, ZONE_X_MAX, ZONE_Z_MIN, ZONE_Z_MAX,
-                    sz_top, sz_bot, label, sample,
-                    scale_max=1.0, mask_threshold=0.05, min_n=5)
+                    if xwobacon_hand is not None:
+                        label = (f"DAMAGE vs {hand_label} · "
+                                 f"xwOBAcon {fmt_3dec(xwobacon_hand)}")
+                        sample = f"{len(bip_pts_loc)} BIP"
+                    else:
+                        label = f"DAMAGE vs {hand_label}"
+                        sample = f"n = {len(bip_pts_loc)}"
+                    render_rate_kde_to_axes(ax,
+                        bip_pts_loc, bip_xw_weights,
+                        bip_pts_loc, None,
+                        ZONE_X_MIN, ZONE_X_MAX, ZONE_Z_MIN, ZONE_Z_MAX,
+                        sz_top, sz_bot, label, sample,
+                        scale_max=1.0, mask_threshold=0.05, min_n=5)
 
     # ─── Heat-map color-scale legend ──────────────────────────────
     # Compact side-by-side scales sharing HEAT_CMAP but different scale_max:
@@ -1285,107 +1348,109 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     legend_y = 0.215
     _hm_legend_row(zhm_x_left + 0.005, hm_mid - 0.008, legend_y,
                     'WHIFF RATE', '0%', '60%+', mlb_pos=0.420)
-    _hm_legend_row(hm_mid + 0.008, zhm_x_right - 0.005, legend_y,
-                    'xwOBAcon', '.000', '1.000+', mlb_pos=0.370)
+    # ROC: DAMAGE legend shows EV (50-110 mph) with MLB tick at 88 mph
+    # → (88-50)/60 = 0.633 along the bar. MLB: xwOBAcon (.000-1.000+) with
+    # MLB tick at .370 → 0.370.
+    if is_roc:
+        _hm_legend_row(hm_mid + 0.008, zhm_x_right - 0.005, legend_y,
+                        'Avg EV', '50', '110+ mph', mlb_pos=0.633)
+    else:
+        _hm_legend_row(hm_mid + 0.008, zhm_x_right - 0.005, legend_y,
+                        'xwOBAcon', '.000', '1.000+', mlb_pos=0.370)
 
     # ─── Contact Profile strip (7 cells, proportional widths) ──────
-    cp_y_top = 0.155
-    cp_y_bot = 0.120
-    cp_x_left = 0.01
-    cp_x_right = 0.99
-    cp_height = cp_y_top - cp_y_bot
-    cp_cells = [
-        ('Bat Speed',        h_row.get('batSpeed'),      'mph', None),
-        ('Avg EV',           h_row.get('avgEVAll'),      'mph', None),
-        ('Max EV',           h_row.get('maxEV'),         'mph', None),
-        ('Squared-Up%',      h_row.get('squaredUpPct'),  'pct', None),
-        ('Blast%',           h_row.get('blastPct'),      'pct', None),
-        ('IdealAtkAngle%',   h_row.get('idealAAPct'),    'pct', None),
-        ('Air Pull%',        h_row.get('airPullPct'),    'pct', None),
-    ]
-    # Format value strings up front so we can size cells against actual widths
-    def _format_cp_val(val, kind):
-        if val is None: return '—'
-        if kind == 'pct': return f'{val * 100:.1f}%'
-        return f'{val:.1f} {kind}' if kind else f'{val:.1f}'
-    cp_val_strs = [_format_cp_val(v, kd) for (_l, v, kd, _) in cp_cells]
-    # Smart padding — each cell sized to fit its widest line (label or value).
-    CP_PAD_CHARS = 4
-    CP_MIN_CHARS = 9
-    cp_char_widths = []
-    for i, (lbl, _v, _kd, _) in enumerate(cp_cells):
-        widest = max(len(lbl), len(cp_val_strs[i]))
-        cp_char_widths.append(max(CP_MIN_CHARS, widest + CP_PAD_CHARS))
-    cp_total = sum(cp_char_widths)
-    cp_widths_frac = [(cp_x_right - cp_x_left) * c / cp_total
-                      for c in cp_char_widths]
-    cp_x_offsets = []
-    _cx = cp_x_left
-    for w in cp_widths_frac:
-        cp_x_offsets.append(_cx)
-        _cx += w
+    # Skipped entirely for ROC — bat-tracking metrics aren't recorded for
+    # AAA, and the three available (Avg EV / Max EV / Air Pull%) move into
+    # the Pitch Group table instead.
+    if not is_roc:
+        cp_y_top = 0.155
+        cp_y_bot = 0.120
+        cp_x_left = 0.01
+        cp_x_right = 0.99
+        cp_height = cp_y_top - cp_y_bot
+        cp_cells = [
+            ('Bat Speed',        h_row.get('batSpeed'),      'mph', None),
+            ('Avg EV',           h_row.get('avgEVAll'),      'mph', None),
+            ('Max EV',           h_row.get('maxEV'),         'mph', None),
+            ('Squared-Up%',      h_row.get('squaredUpPct'),  'pct', None),
+            ('Blast%',           h_row.get('blastPct'),      'pct', None),
+            ('IdealAtkAngle%',   h_row.get('idealAAPct'),    'pct', None),
+            ('Air Pull%',        h_row.get('airPullPct'),    'pct', None),
+        ]
+        def _format_cp_val(val, kind):
+            if val is None: return '—'
+            if kind == 'pct': return f'{val * 100:.1f}%'
+            return f'{val:.1f} {kind}' if kind else f'{val:.1f}'
+        cp_val_strs = [_format_cp_val(v, kd) for (_l, v, kd, _) in cp_cells]
+        CP_PAD_CHARS = 4
+        CP_MIN_CHARS = 9
+        cp_char_widths = []
+        for i, (lbl, _v, _kd, _) in enumerate(cp_cells):
+            widest = max(len(lbl), len(cp_val_strs[i]))
+            cp_char_widths.append(max(CP_MIN_CHARS, widest + CP_PAD_CHARS))
+        cp_total = sum(cp_char_widths)
+        cp_widths_frac = [(cp_x_right - cp_x_left) * c / cp_total
+                          for c in cp_char_widths]
+        cp_x_offsets = []
+        _cx = cp_x_left
+        for w in cp_widths_frac:
+            cp_x_offsets.append(_cx)
+            _cx += w
 
-    for i, (lbl, val, kind, _) in enumerate(cp_cells):
-        cx = cp_x_offsets[i]
-        cw = cp_widths_frac[i]
-        val_str = cp_val_strs[i]
-        # Header (label)
-        ax_main.add_patch(Rectangle((cx * FIG_W, (cp_y_bot + cp_height / 2) * FIG_H),
-                                      cw * FIG_W, cp_height / 2 * FIG_H,
-                                      facecolor=DARKER, edgecolor=SUBTLE_BORDER,
-                                      linewidth=0.6))
-        ax_main.text((cx + cw / 2) * FIG_W,
-                       (cp_y_bot + cp_height * 0.75) * FIG_H, lbl,
-                       fontsize=11, ha='center', va='center', color=ACCENT,
-                       fontweight='bold', fontfamily='Avenir Next')
-        # Cell background using percentile color from h_row[key + '_pctl']
-        pctl_key_map = {
-            'Bat Speed': 'batSpeed_pctl', 'Avg EV': 'avgEVAll_pctl',
-            'Max EV': 'maxEV_pctl', 'Squared-Up%': 'squaredUpPct_pctl',
-            'Blast%': 'blastPct_pctl', 'IdealAtkAngle%': 'idealAAPct_pctl',
-            'Air Pull%': 'airPullPct_pctl',
-        }
-        pctl = h_row.get(pctl_key_map.get(lbl, ''))
-        cell_bg = DARK_CELL
-        if pctl is not None:
-            # Saturated target color (blue→gray→red, higher=better)
-            if pctl <= 50:
-                t = pctl / 50.0
-                r_t = int(0 + t * 140); g_t = int(100 + t * 40); b_t = int(255 - t * 115)
-            else:
-                t = (pctl - 50) / 50.0
-                r_t = int(140 + t * 115); g_t = int(140 - t * 120); b_t = int(140 - t * 120)
-            # Dampening — blend the saturated target with DARK_CELL bg by
-            # `cp_alpha` so the Contact Profile reads as supporting context
-            # rather than an alarm system across 7 cells.
-            cp_alpha = 0.55      # was implicitly 1.0 (full saturation)
-            rb = int(DARK_CELL[1:3], 16)
-            rg = int(DARK_CELL[3:5], 16)
-            rbb = int(DARK_CELL[5:7], 16)
-            r = int(rb * (1 - cp_alpha) + r_t * cp_alpha)
-            g = int(rg * (1 - cp_alpha) + g_t * cp_alpha)
-            b = int(rbb * (1 - cp_alpha) + b_t * cp_alpha)
-            cell_bg = f'#{r:02x}{g:02x}{b:02x}'
-        ax_main.add_patch(Rectangle((cx * FIG_W, cp_y_bot * FIG_H),
-                                      cw * FIG_W, cp_height / 2 * FIG_H,
-                                      facecolor=cell_bg, edgecolor=SUBTLE_BORDER,
-                                      linewidth=0.6))
-        ax_main.text((cx + cw / 2) * FIG_W,
-                       (cp_y_bot + cp_height * 0.25) * FIG_H, val_str,
-                       fontsize=14, ha='center', va='center', color=TEXT_PRIMARY,
-                       fontweight='bold', fontfamily='Avenir Next')
-    # Section title
-    # Section title — same letterspaced editorial style as LA × Spray title
-    fig.text(0.5, cp_y_top + 0.008, 'C O N T A C T   P R O F I L E',
-              fontsize=12, ha='center', va='bottom', color=TEXT_SECONDARY,
-              fontweight='700', fontfamily='Avenir Next')
-    rule_w_cp = 0.13
-    ax_rule_cp = fig.add_axes([0.5 - rule_w_cp / 2, cp_y_top + 0.005,
-                                rule_w_cp, 0.0008])
-    ax_rule_cp.axis('off')
-    ax_rule_cp.add_patch(Rectangle((0, 0), 1, 1, facecolor=TEXT_SECONDARY,
-                                     edgecolor='none', alpha=0.30,
-                                     transform=ax_rule_cp.transAxes))
+        for i, (lbl, val, kind, _) in enumerate(cp_cells):
+            cx = cp_x_offsets[i]
+            cw = cp_widths_frac[i]
+            val_str = cp_val_strs[i]
+            ax_main.add_patch(Rectangle((cx * FIG_W, (cp_y_bot + cp_height / 2) * FIG_H),
+                                          cw * FIG_W, cp_height / 2 * FIG_H,
+                                          facecolor=DARKER, edgecolor=SUBTLE_BORDER,
+                                          linewidth=0.6))
+            ax_main.text((cx + cw / 2) * FIG_W,
+                           (cp_y_bot + cp_height * 0.75) * FIG_H, lbl,
+                           fontsize=11, ha='center', va='center', color=ACCENT,
+                           fontweight='bold', fontfamily='Avenir Next')
+            pctl_key_map = {
+                'Bat Speed': 'batSpeed_pctl', 'Avg EV': 'avgEVAll_pctl',
+                'Max EV': 'maxEV_pctl', 'Squared-Up%': 'squaredUpPct_pctl',
+                'Blast%': 'blastPct_pctl', 'IdealAtkAngle%': 'idealAAPct_pctl',
+                'Air Pull%': 'airPullPct_pctl',
+            }
+            pctl = h_row.get(pctl_key_map.get(lbl, ''))
+            cell_bg = DARK_CELL
+            if pctl is not None:
+                if pctl <= 50:
+                    t = pctl / 50.0
+                    r_t = int(0 + t * 140); g_t = int(100 + t * 40); b_t = int(255 - t * 115)
+                else:
+                    t = (pctl - 50) / 50.0
+                    r_t = int(140 + t * 115); g_t = int(140 - t * 120); b_t = int(140 - t * 120)
+                cp_alpha = 0.55
+                rb = int(DARK_CELL[1:3], 16)
+                rg = int(DARK_CELL[3:5], 16)
+                rbb = int(DARK_CELL[5:7], 16)
+                r = int(rb * (1 - cp_alpha) + r_t * cp_alpha)
+                g = int(rg * (1 - cp_alpha) + g_t * cp_alpha)
+                b = int(rbb * (1 - cp_alpha) + b_t * cp_alpha)
+                cell_bg = f'#{r:02x}{g:02x}{b:02x}'
+            ax_main.add_patch(Rectangle((cx * FIG_W, cp_y_bot * FIG_H),
+                                          cw * FIG_W, cp_height / 2 * FIG_H,
+                                          facecolor=cell_bg, edgecolor=SUBTLE_BORDER,
+                                          linewidth=0.6))
+            ax_main.text((cx + cw / 2) * FIG_W,
+                           (cp_y_bot + cp_height * 0.25) * FIG_H, val_str,
+                           fontsize=14, ha='center', va='center', color=TEXT_PRIMARY,
+                           fontweight='bold', fontfamily='Avenir Next')
+        # Section title — same letterspaced editorial style as LA × Spray title
+        fig.text(0.5, cp_y_top + 0.008, 'C O N T A C T   P R O F I L E',
+                  fontsize=12, ha='center', va='bottom', color=TEXT_SECONDARY,
+                  fontweight='700', fontfamily='Avenir Next')
+        rule_w_cp = 0.13
+        ax_rule_cp = fig.add_axes([0.5 - rule_w_cp / 2, cp_y_top + 0.005,
+                                    rule_w_cp, 0.0008])
+        ax_rule_cp.axis('off')
+        ax_rule_cp.add_patch(Rectangle((0, 0), 1, 1, facecolor=TEXT_SECONDARY,
+                                         edgecolor='none', alpha=0.30,
+                                         transform=ax_rule_cp.transAxes))
 
     # ─── Bottom table: per-pitch-group performance ──────────────────
     # Compute per-group stats
@@ -1403,26 +1468,52 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     total_stats['group'] = 'Total'
     total_stats['usagePct'] = 1.0
 
-    # Build table data
-    BOTTOM_HEADERS = ['Pitch Group', 'Count', 'Usage', 'Swing%', 'Chase%', 'Whiff%',
-                      'Hard-Hit%', 'Barrel%', 'xwOBAcon', 'xwOBAsp',
-                      'RV/100', 'xRV/100']
-    rows = []
-    for r in group_rows + [total_stats]:
-        rows.append([
-            r['group'],
-            str(r.get('count', 0)),
-            fmt_pct(r.get('usagePct')),
-            fmt_pct(r.get('swingPct')),
-            fmt_pct(r.get('chasePct')),
-            fmt_pct(r.get('whiffPct')),
-            fmt_pct(r.get('hardHitPct')),
-            fmt_pct(r.get('barrelPct')),
-            fmt_3dec(r.get('xwOBAcon')),
-            fmt_3dec(r.get('xwOBAsp')),
-            fmt_signed_decimal(r.get('rv100')),
-            fmt_signed_decimal(r.get('xRv100')),
-        ])
+    # Build table data — different columns for ROC (no xwOBA-based metrics
+    # but adds Avg EV / Max EV / Air Pull% in their place since the Contact
+    # Profile strip is dropped for ROC).
+    def _fmt_ev(v):
+        return f'{v:.1f}' if v is not None else '—'
+
+    if is_roc:
+        BOTTOM_HEADERS = ['Pitch Group', 'Count', 'Usage', 'Swing%', 'Chase%',
+                          'Whiff%', 'Hard-Hit%', 'Barrel%', 'xwOBAsp',
+                          'Avg EV', 'Max EV', 'Air Pull%']
+        rows = []
+        for r in group_rows + [total_stats]:
+            rows.append([
+                r['group'],
+                str(r.get('count', 0)),
+                fmt_pct(r.get('usagePct')),
+                fmt_pct(r.get('swingPct')),
+                fmt_pct(r.get('chasePct')),
+                fmt_pct(r.get('whiffPct')),
+                fmt_pct(r.get('hardHitPct')),
+                fmt_pct(r.get('barrelPct')),
+                fmt_3dec(r.get('xwOBAsp')),
+                _fmt_ev(r.get('avgEV')),
+                _fmt_ev(r.get('maxEV')),
+                fmt_pct(r.get('airPullPct')),
+            ])
+    else:
+        BOTTOM_HEADERS = ['Pitch Group', 'Count', 'Usage', 'Swing%', 'Chase%',
+                          'Whiff%', 'Hard-Hit%', 'Barrel%', 'xwOBAcon',
+                          'xwOBAsp', 'RV/100', 'xRV/100']
+        rows = []
+        for r in group_rows + [total_stats]:
+            rows.append([
+                r['group'],
+                str(r.get('count', 0)),
+                fmt_pct(r.get('usagePct')),
+                fmt_pct(r.get('swingPct')),
+                fmt_pct(r.get('chasePct')),
+                fmt_pct(r.get('whiffPct')),
+                fmt_pct(r.get('hardHitPct')),
+                fmt_pct(r.get('barrelPct')),
+                fmt_3dec(r.get('xwOBAcon')),
+                fmt_3dec(r.get('xwOBAsp')),
+                fmt_signed_decimal(r.get('rv100')),
+                fmt_signed_decimal(r.get('xRv100')),
+            ])
 
     # PITCH GROUP BREAKDOWN section title removed — the table's own header
     # row already labels the section (Pitch Group | Count | Usage | ...).
@@ -1538,6 +1629,31 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             tinted = raw_cell_color(val_str, 0.0, 2.0, True, row_bg, max_alpha=0.40)
             if tinted: table.get_celld()[(rr, ci)].set_facecolor(tinted)
 
+    # ROC-only columns: Avg EV / Max EV (mph, MLB avg ~88/110, higher=better)
+    # and Air Pull% (pct, MLB avg ~13%, higher=better).
+    if is_roc:
+        for hdr, (k, scale) in [('Avg EV', ('avgEVAll', 4.0)),
+                                  ('Max EV', ('maxEV', 4.0))]:
+            ci = col_idx(hdr)
+            if ci is None: continue
+            la = hl_a.get(k)
+            if la is None: continue
+            for rr in range(1, len(rows) + 1):
+                val_str = rows[rr - 1][ci]
+                row_bg = DARKER if rr == len(rows) else (DARK_CELL if rr % 2 == 1 else ALT_ROW_BG)
+                tinted = raw_cell_color(val_str, la, scale, True, row_bg, max_alpha=0.40)
+                if tinted: table.get_celld()[(rr, ci)].set_facecolor(tinted)
+        # Air Pull% (percentage column, higher=better)
+        ci = col_idx('Air Pull%')
+        if ci is not None:
+            la = hl_a.get('airPullPct')
+            if la is not None:
+                for rr in range(1, len(rows) + 1):
+                    val_str = rows[rr - 1][ci]
+                    row_bg = DARKER if rr == len(rows) else (DARK_CELL if rr % 2 == 1 else ALT_ROW_BG)
+                    tinted = pct_cell_color(val_str, la, row_bg, True, max_alpha=0.40)
+                    if tinted: table.get_celld()[(rr, ci)].set_facecolor(tinted)
+
     # ─── Watermark ─────────────────────────────────────────────────
     # Watermark — top-right corner. Sits in the empty space above the
     # right edge of the LA × Spray chart, well clear of any table cells.
@@ -1560,7 +1676,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 # ─────────────────────────────────────────────────────────────────────
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team           = "ROC"                   # Team filter (e.g., "NYY"), or None for all teams
+    team           = None                    # Team filter (e.g., "NYY"), or None for all teams
     filter_hitters = ""       # Semicolon-separated "Last, First" names, or "" for all
     year_label     = "2026 Season"        # Display label on the card
     output_dir     = OUTPUT_DIR
