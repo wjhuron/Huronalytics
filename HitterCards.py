@@ -371,6 +371,12 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
         return None
     swings = [p for p in group_pitches if p.get('Description') in SWING_DESC]
     whiffs = [p for p in group_pitches if p.get('Description') == 'Swinging Strike']
+    # Bunt-excluded swing count — matches the canonical leaderboard whiffPct
+    # denominator (pipeline_compute.py L400-402, L566). Bunt-attempt whiffs
+    # themselves are indistinguishable from regular whiffs (no BBType on any
+    # swinging strike), so they stay in the numerator — negligible.
+    swings_non_bunt = [p for p in swings
+                       if not str(p.get('BBType', '')).startswith('bunt')]
     iz = [p for p in group_pitches if compute_iz(p) is True]
     ooz_swings = [p for p in swings if compute_iz(p) is False]
     ooz_total = sum(1 for p in group_pitches if compute_iz(p) is False)
@@ -383,7 +389,14 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
     evs_valid = [(v, p) for v, p in evs if v is not None]
     n_ev = len(evs_valid)
     n_hh = sum(1 for v, _ in evs_valid if v >= 95.0)
-    n_brl = sum(1 for v, p in evs_valid if is_barrel(v, sf(p.get('LaunchAngle'))))
+    # Barrels — prefer Statcast `Barrel` column code '6' (matches the canonical
+    # leaderboard); fall back to is_barrel(ev, la) heuristic only when the
+    # column is empty for the whole group. See pipeline_compute.py ~L329-338.
+    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
+    if has_barrel_col:
+        n_brl = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
+    else:
+        n_brl = sum(1 for v, p in evs_valid if is_barrel(v, sf(p.get('LaunchAngle'))))
 
     # Avg EV / Max EV — population-wide mean / max ExitVelo for the group.
     # Used directly for ROC (where xwOBAcon is null) and as cross-check
@@ -391,20 +404,20 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
     avg_ev = sum(v for v, _p in evs_valid) / n_ev if n_ev else None
     max_ev = max((v for v, _p in evs_valid), default=None)
 
-    # Air Pull% — fraction of BIPs that are in-the-air (LA >= 25°) AND
-    # pulled (pull or pull_side spray direction).
+    # Air Pull% — pulled line drives + fly balls / total BIPs.
+    # Matches pipeline_compute.py exactly (canonical leaderboard formula):
+    #   air_pull = (pull|pull_side spray) AND (line_drive|fly_ball BBType)
+    #   airPullPct = air_pull / n_bip
     n_airpull = 0
-    n_bip_with_ang = 0
     for p in bip:
-        la = sf(p.get('LaunchAngle'))
+        bb_type = p.get('BBType')
         ang = spray_angle(sf(p.get('HC_X')), sf(p.get('HC_Y')))
         sd = spray_direction(ang, bats)
-        if la is None or sd is None:
+        if sd is None:
             continue
-        n_bip_with_ang += 1
-        if la >= 25 and sd in ('pull', 'pull_side'):
+        if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball'):
             n_airpull += 1
-    air_pull_pct = (n_airpull / n_bip_with_ang) if n_bip_with_ang else None
+    air_pull_pct = (n_airpull / len(bip)) if bip else None
 
     # xwOBAcon: average xwOBA on BIP with non-null xwOBA
     bip_xw = [sf(p.get('xwOBA')) for p in bip]
@@ -437,7 +450,7 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
         'count': n,
         'swingPct': len(swings) / n if n else None,
         'chasePct': len(ooz_swings) / ooz_total if ooz_total else None,
-        'whiffPct': len(whiffs) / len(swings) if swings else None,
+        'whiffPct': len(whiffs) / len(swings_non_bunt) if swings_non_bunt else None,
         'hardHitPct': n_hh / n_ev if n_ev else None,
         'barrelPct': n_brl / n_ev if n_ev else None,
         'xwOBAcon': xwobacon,
