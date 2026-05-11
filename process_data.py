@@ -1947,12 +1947,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Loc+ — pitcher location-quality index. xRV-weighted (zone × count ×
     # pitch_type × batter_hand × pitcher_hand) cell table, Bayesian-regressed
     # per pitcher, z-score normalized to 100 ± 10. See pipeline_locplus.py.
+    # Also computes per-pitch-type Loc+ for the Arsenal tab (each row in
+    # pitch_leaderboard gets a Loc+ standardized within its pitch-type group).
     from pipeline_locplus import compute_loc_plus
-    loc_results, loc_weights = compute_loc_plus(
-        all_pitches, pitcher_groups,
+    loc_results, pitch_loc_results, loc_weights = compute_loc_plus(
+        all_pitches, pitcher_groups, pitch_groups,
         lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
         woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
     )
+    for row in pitch_leaderboard:
+        key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
+        r = pitch_loc_results.get(key)
+        if r is not None:
+            row['locPlus'] = r['locPlus']
+            row['locPlusRaw'] = round(r['raw_loc_adj'], 5)
+            row['locPlusN'] = r['n_pitches']
+        else:
+            row['locPlus'] = None
+            row['locPlusRaw'] = None
+            row['locPlusN'] = 0
+    print(f"  Loc+ per-pitch-type computed for {len(pitch_loc_results)} rows.")
+
     for row in pitcher_leaderboard:
         key = (row['pitcher'], row['team'], row.get('throws'))
         r = loc_results.get(key)

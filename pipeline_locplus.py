@@ -74,7 +74,9 @@ def pitch_type_group(p):
 CELL_SHRINK_K   = 50       # cell → marginal-prior shrinkage pseudo-obs
 PITCHER_PRIOR_N = 400      # pitcher → league regression pseudo-obs
 LOC_SCALE_K     = 10       # locPlus = 100 + LOC_SCALE_K × z
-MIN_PITCHER_PITCHES = 100  # floor for computing locPlus at all
+MIN_PITCHER_PITCHES = 100  # floor for computing overall locPlus
+MIN_PITCH_TYPE_PITCHES = 25  # floor for per-pitch-type locPlus
+PITCH_TYPE_PRIOR_N = 150   # per-pitch-type Bayesian shrinkage pseudo-obs
 
 HANDS = ('L', 'R')
 
@@ -298,18 +300,81 @@ def serialize_weight_table(smoothed):
     return out
 
 
-def compute_loc_plus(all_pitches, pitches_by_pitcher, lg_woba, woba_scale):
+def regress_and_normalize_by_pt(pitch_raw,
+                                pt_group_fn,
+                                pool_filter_fn,
+                                n_prior=PITCH_TYPE_PRIOR_N,
+                                min_n=MIN_PITCH_TYPE_PITCHES,
+                                scale_k=LOC_SCALE_K):
+    """Per-pitch-type-GROUP Bayesian regression + z-score normalization.
+
+    Each row in `pitch_raw` is keyed by some tuple that includes a raw
+    pitch type (e.g., 'FF', 'ST'). `pt_group_fn(key)` returns the family
+    name ('FF', 'SI', 'FC', 'SL', 'CB', 'CH', 'OTHER') used for the
+    standardization bucket. Raw sweepers (ST) and traditional sliders (SL)
+    therefore standardize against the same SL-group pool even though they
+    appear as separate leaderboard rows.
+
+    `pool_filter_fn(key)` keeps a key in the (mu, sigma) pool — used to
+    exclude ROC rows from the baseline distribution while still scoring
+    them. Multi-team aggregates (2TM/3TM) stay in the pool, matching the
+    overall-Loc+ convention.
+    """
+    eligible = {k: v for k, v in pitch_raw.items() if v['n_pitches'] >= min_n}
+    if not eligible:
+        return {}
+
+    # Bucket by pitch-type group
+    by_group = defaultdict(dict)
+    for k, v in eligible.items():
+        by_group[pt_group_fn(k)][k] = v
+
+    for group, rows in by_group.items():
+        pool = {k: v for k, v in rows.items() if pool_filter_fn(k)}
+        if not pool:
+            for k in rows:
+                rows[k]['locPlus'] = 100.0
+            continue
+        lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
+        for v in rows.values():
+            n = v['n_pitches']
+            v['raw_loc_adj'] = (n * v['raw_loc'] + n_prior * lg_raw) / (n + n_prior)
+        pool_adj = [rows[k]['raw_loc_adj'] for k in pool]
+        mu = sum(pool_adj) / len(pool_adj)
+        sigma = math.sqrt(sum((v - mu) ** 2 for v in pool_adj) / len(pool_adj))
+        for v in rows.values():
+            if sigma > 1e-9:
+                z = (v['raw_loc_adj'] - mu) / sigma
+                v['locPlus'] = round(100.0 - scale_k * z, 1)
+            else:
+                v['locPlus'] = 100.0
+
+    # Flatten back into one dict
+    out = {}
+    for rows in by_group.values():
+        out.update(rows)
+    return out
+
+
+def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
+                    lg_woba, woba_scale):
     """Main entry point.
 
     Args:
         all_pitches: flat list of pitch dicts (MLB + AAA). MLB-only is
             filtered inside via is_eligible_baseline.
         pitches_by_pitcher: dict[(pitcher, team, throws)] -> list of pitch dicts
+        pitches_by_pitch_type: dict[(pitcher, team, pitch_type, throws)] ->
+            list of pitch dicts (matches pitch_groups key order in
+            process_data.py)
         lg_woba, woba_scale: FanGraphs Guts constants for xRV
 
     Returns:
-        normalized: dict[(pitcher, team, throws)] -> {locPlus, raw_loc,
-            raw_loc_adj, n_pitches, zone_loc}
+        pitcher_results: dict[(pitcher, team, throws)] -> {locPlus, ...}
+            (one row per pitcher, all pitch types combined)
+        pitch_results: dict[(pitcher, team, pitch_type, throws)] -> {locPlus, ...}
+            (one row per pitcher × pitch type, standardized within pitch-type
+            GROUP — so sweepers and traditional sliders share a baseline)
         weight_table_json: dict for metadata output
     """
     rv_fn = make_rv_xrv(lg_woba, woba_scale)
@@ -320,6 +385,13 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, lg_woba, woba_scale):
     smoothed = shrink_table(raw_table, marginals)
 
     pitcher_raw = compute_pitcher_raw(pitches_by_pitcher, smoothed)
-    normalized = regress_and_normalize(pitcher_raw)
+    pitcher_results = regress_and_normalize(pitcher_raw)
 
-    return normalized, serialize_weight_table(smoothed)
+    pitch_raw = compute_pitcher_raw(pitches_by_pitch_type, smoothed)
+    pitch_results = regress_and_normalize_by_pt(
+        pitch_raw,
+        pt_group_fn=lambda k: PITCH_TYPE_GROUPS.get(k[2], 'OTHER'),
+        pool_filter_fn=lambda k: k[1] not in AAA_TEAMS,
+    )
+
+    return pitcher_results, pitch_results, serialize_weight_table(smoothed)

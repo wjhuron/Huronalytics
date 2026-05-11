@@ -1050,6 +1050,9 @@ const Aggregator = {
         // Stuff+ (pre-computed, always merge from JSON — not recomputable in browser)
         if (ppre.stuffScore !== undefined) rows[pmi].stuffScore = ppre.stuffScore;
         if (ppre.stuffScore_pctl !== undefined) rows[pmi].stuffScore_pctl = ppre.stuffScore_pctl;
+        // Loc+ (pre-computed; needs the league weight table unavailable client-side)
+        if (ppre.locPlus !== undefined) rows[pmi].locPlus = ppre.locPlus;
+        if (ppre.locPlus_pctl !== undefined) rows[pmi].locPlus_pctl = ppre.locPlus_pctl;
       }
     }
 
