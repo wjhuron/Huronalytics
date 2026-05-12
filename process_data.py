@@ -2947,6 +2947,33 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
+    # ROC wRC+ override: FanGraphs publishes AAA-baseline wRC+ using AAA
+    # wOBA weights and IL/PCL park factors. Our pipeline computes wRC+ with
+    # MLB constants, which inflates ROC wRC+ by ~13-19 points for qualified
+    # hitters. Replace ROC rows with FG's value (keyed by MLBAM id) where
+    # available. Falls back to the pipeline value if FG doesn't have the
+    # player or the scraper failed — never blocks the pipeline.
+    try:
+        from fg_aaa_wrcplus import refresh_if_stale as _fg_refresh_aaa_wrc
+        _fg_cache_aaa = _fg_refresh_aaa_wrc(max_age_hours=24, verbose=True)
+        _fg_players = _fg_cache_aaa.get('players', {})
+        _n_replaced = 0
+        _n_roc = 0
+        for row in hitter_leaderboard:
+            if not row.get('_isROC'):
+                continue
+            _n_roc += 1
+            mid = row.get('mlbId')
+            if mid is None:
+                continue
+            fg_player = _fg_players.get(str(int(mid)))
+            if fg_player and fg_player.get('wRCplus') is not None:
+                row['wRCplus'] = fg_player['wRCplus']
+                _n_replaced += 1
+        print(f"  ROC wRC+ override: replaced {_n_replaced}/{_n_roc} ROC hitters with FanGraphs AAA value")
+    except Exception as _e:
+        print(f"  WARNING: FG AAA wRC+ override failed ({type(_e).__name__}: {_e})")
+
     # Pass 2: refresh hitter league averages for stats populated by the boxscore
     # merge + wRC+ (kPct, bbPct, avg, obp, slg, ops, iso, wRCplus, xWRCplus). The
     # first pass above runs before the boxscore merge, so these are None on every
