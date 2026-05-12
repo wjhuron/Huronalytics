@@ -121,6 +121,29 @@ def _paste_number_formats_from_row(ws, src_row_1idx, dest_start_1idx, dest_end_1
     ws.spreadsheet.batch_update({'requests': [request]})
 
 
+# Columns whose string values would otherwise be misparsed by USER_ENTERED.
+# Baseball counts like "1-0" get parsed as the date "January 0" and stored
+# as date serials (46022, 46023, …) — the cell then displays as "46023"
+# instead of "1-0". Prefixing each value with a leading apostrophe forces
+# Sheets to store the cell as text; the apostrophe is hidden in the rendered
+# display and downstream readers still see "1-0".
+TEXT_FORCE_COLUMNS = {'Count'}
+
+
+def _force_text_for_columns(df, cols):
+    """Prefix non-empty string values in `cols` with `'` so Sheets'
+    USER_ENTERED parser treats them as text and skips number/date coercion.
+    Returns a copy of `df`; never mutates the caller's dataframe.
+    """
+    cols_present = [c for c in cols if c in df.columns]
+    if not cols_present:
+        return df
+    df = df.copy()
+    for c in cols_present:
+        df[c] = df[c].apply(lambda v: f"'{v}" if isinstance(v, str) and v else v)
+    return df
+
+
 def _df_to_rows(df):
     """Convert a dataframe to a list-of-lists suitable for gspread. NaN /
     NaT / pd.NA become empty strings (Sheets shows blank rather than '#N/A').
@@ -167,6 +190,10 @@ def push_team_data(df, team, gc=None, verbose=True):
         if verbose:
             print(f"  [sheets] tab {team!r} not found in workbook ({e}); skipping")
         return None
+
+    # Force text storage for columns whose values would be misparsed by
+    # USER_ENTERED (e.g. Count "1-0" → date serial 46023).
+    df = _force_text_for_columns(df, TEXT_FORCE_COLUMNS)
 
     rows = _df_to_rows(df)
     if not rows:
