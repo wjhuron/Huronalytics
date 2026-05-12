@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-05-11 18:46",
+  "generatedAt": "2026-05-12 00:58",
   "totalPitches": 179520,
   "totalPitchers": 587,
   "totalHitters": 493,
@@ -452,12 +452,12 @@
     "avg": 0.2407,
     "obp": 0.3199,
     "slg": 0.3896,
-    "ops": 0.7095,
+    "ops": 0.7094,
     "iso": 0.1489,
     "kPct": 0.2215,
     "bbPct": 0.0917,
     "bbToK": 0.4618,
-    "wRCplus": 99.6721,
+    "wRCplus": 99.6591,
     "xWRCplus": 102.4051
   },
   "vaaRegressions": {
