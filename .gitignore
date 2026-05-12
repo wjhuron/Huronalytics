@@ -7,6 +7,7 @@ service_account.json
 mlb_id_cache.json
 outlier_results.json
 name_duplicates_report.txt
+data/fg_aaa_wrcplus.json
 
 # Python
 .venv/
