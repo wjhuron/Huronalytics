@@ -84,6 +84,43 @@ def _col_letter(n):
     return s
 
 
+def _paste_number_formats_from_row(ws, src_row_1idx, dest_start_1idx, dest_end_1idx, n_cols):
+    """Paste the cell formatting (incl. number format) from a single existing
+    row onto a destination range. Used right after appending new data so the
+    new rows inherit the column-specific number formats already set up on the
+    sheet — e.g. Velocity (`0.0`), Extension (`0.00`), PlateX (`0.000`),
+    RTilt/OTilt (`h:mm`). Without this, appended cells default to "Automatic"
+    and round values like 82.0 render as 82.
+
+    Safe to call only when there's at least one existing data row to copy from
+    (i.e. dest_start_1idx > src_row_1idx). The destination range can be any
+    number of rows — the Sheets API repeats the source format to fill it.
+    """
+    # 0-indexed conversion. endRowIndex is exclusive.
+    src_row_0 = src_row_1idx - 1
+    request = {
+        'copyPaste': {
+            'source': {
+                'sheetId': ws.id,
+                'startRowIndex': src_row_0,
+                'endRowIndex': src_row_0 + 1,
+                'startColumnIndex': 0,
+                'endColumnIndex': n_cols,
+            },
+            'destination': {
+                'sheetId': ws.id,
+                'startRowIndex': dest_start_1idx - 1,
+                'endRowIndex': dest_end_1idx,
+                'startColumnIndex': 0,
+                'endColumnIndex': n_cols,
+            },
+            'pasteType': 'PASTE_FORMAT',
+            'pasteOrientation': 'NORMAL',
+        }
+    }
+    ws.spreadsheet.batch_update({'requests': [request]})
+
+
 def _df_to_rows(df):
     """Convert a dataframe to a list-of-lists suitable for gspread. NaN /
     NaT / pd.NA become empty strings (Sheets shows blank rather than '#N/A').
@@ -148,6 +185,24 @@ def push_team_data(df, team, gc=None, verbose=True):
     range_name = f"A{next_row}:{end_col}{end_row}"
 
     ws.update(range_name, rows, value_input_option='USER_ENTERED')
+
+    # Inherit per-column number formats from an existing data row so values
+    # like Velocity 82.0 don't display as "82" (Automatic format strips
+    # trailing zeros). Row 2 is the canonical source — it's the first data
+    # row Wally set up with per-column formats. Only safe when there's at
+    # least one existing data row above the new block.
+    if next_row > 2:
+        try:
+            _paste_number_formats_from_row(
+                ws, src_row_1idx=2,
+                dest_start_1idx=next_row, dest_end_1idx=end_row,
+                n_cols=len(df.columns),
+            )
+        except Exception as e:
+            if verbose:
+                print(f"  [sheets] number-format paste failed "
+                      f"({type(e).__name__}: {e}); continuing")
+
     # Match the existing data rows in the sheet:
     #   font Helvetica Neue 8, center horiz, top vert, SOLID 1px borders all sides.
     #   Column A (Game Date) is additionally bold.
