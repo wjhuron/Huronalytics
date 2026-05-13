@@ -130,6 +130,19 @@ def _paste_number_formats_from_row(ws, src_row_1idx, dest_start_1idx, dest_end_1
 TEXT_FORCE_COLUMNS = {'Count'}
 
 
+# Columns where we explicitly enforce a number format on every appended block,
+# independent of what row 2 happens to look like. The format-paste-from-row-2
+# step inherits most column formats correctly, but some tabs have row 2 cells
+# with the format missing or wrong — e.g. AAA's row 2 RTilt was empty, which
+# caused the whole RTilt column to render as raw decimals (0.0986) instead of
+# clock times (2:22). Enforcing these by name makes the push robust to any
+# tab's row 2 state.
+EXPLICIT_NUMBER_FORMATS = {
+    'RTilt': {'type': 'TIME',   'pattern': 'h:mm'},
+    'OTilt': {'type': 'TIME',   'pattern': 'h:mm'},
+}
+
+
 def _force_text_for_columns(df, cols):
     """Prefix non-empty string values in `cols` with `'` so Sheets'
     USER_ENTERED parser treats them as text and skips number/date coercion.
@@ -253,6 +266,24 @@ def push_team_data(df, team, gc=None, verbose=True):
         **base_fmt,
         'textFormat': {**base_fmt['textFormat'], 'bold': True},
     })
+
+    # Explicitly enforce number formats on columns we don't want to rely on
+    # row 2 having set up correctly. Currently: RTilt + OTilt (TIME h:mm) —
+    # AAA's row 2 had RTilt empty, which made the whole RTilt column render
+    # as raw decimals after a push. This pass guarantees the right format
+    # regardless of row 2's state on any tab.
+    for col_name, fmt_spec in EXPLICIT_NUMBER_FORMATS.items():
+        if col_name not in df.columns:
+            continue
+        col_idx_1 = df.columns.get_loc(col_name) + 1
+        col_a1 = _col_letter(col_idx_1)
+        rng = f'{col_a1}{next_row}:{col_a1}{end_row}'
+        try:
+            ws.format(rng, {'numberFormat': fmt_spec})
+        except Exception as e:
+            if verbose:
+                print(f"  [sheets] failed to apply {fmt_spec} to {col_name} "
+                      f"({type(e).__name__}: {e}); continuing")
 
     if verbose:
         wb_label = 'NL 2026' if wb_id == SHEETS_NL else 'AL 2026'
