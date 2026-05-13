@@ -45,10 +45,10 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-05-13 15:49",
-  "totalPitches": 185770,
+  "generatedAt": "2026-05-13 20:28",
+  "totalPitches": 186351,
   "totalPitchers": 590,
-  "totalHitters": 495,
+  "totalHitters": 496,
   "rocTeams": [
     "ROC"
   ],
@@ -56,272 +56,272 @@
     "FF": {
       "velocity": 94.58,
       "effectiveVelo": 94.73,
-      "spinRate": 2314.59,
+      "spinRate": 2314.46,
       "indVertBrk": 16.13,
-      "horzBrk": 3.43,
+      "horzBrk": 3.4,
       "relPosZ": 5.66,
-      "relPosX": -0.71,
+      "relPosX": -0.7,
       "extension": 6.5,
-      "armAngle": 39.47,
+      "armAngle": 39.49,
       "vaa": -4.66,
-      "haa": 0.51,
-      "strikePct": 0.6584,
-      "izPct": 0.5266,
-      "swStrRate": 0.1051,
-      "swStrPct": 0.2149,
-      "cswPct": 0.2792,
-      "izWhiffPct": 0.1708,
-      "twoStrikeWhiffPct": 0.208,
+      "haa": 0.5,
+      "strikePct": 0.6583,
+      "izPct": 0.5265,
+      "swStrRate": 0.1052,
+      "swStrPct": 0.215,
+      "cswPct": 0.2791,
+      "izWhiffPct": 0.1707,
+      "twoStrikeWhiffPct": 0.2082,
       "chasePct": 0.279,
-      "gbPct": 0.314,
-      "fpsPct": 0.6164,
+      "gbPct": 0.3144,
+      "fpsPct": 0.6162,
       "breakTiltMinutes": 25,
       "breakTilt": "12:25",
-      "xBA": 0.2474,
-      "xSLG": 0.442,
-      "xwOBA": 0.3493,
-      "xwOBAcon": 0.3943,
+      "xBA": 0.2468,
+      "xSLG": 0.4409,
+      "xwOBA": 0.3492,
+      "xwOBAcon": 0.3941,
       "count": 563
     },
     "SI": {
       "velocity": 93.94,
-      "effectiveVelo": 93.93,
-      "spinRate": 2184.37,
-      "indVertBrk": 7.52,
-      "horzBrk": 6.07,
+      "effectiveVelo": 93.94,
+      "spinRate": 2184.21,
+      "indVertBrk": 7.53,
+      "horzBrk": 6.06,
       "relPosZ": 5.52,
       "relPosX": -0.6,
       "extension": 6.41,
-      "armAngle": 32.72,
+      "armAngle": 32.75,
       "vaa": -5.81,
       "haa": 0.06,
-      "strikePct": 0.6722,
-      "izPct": 0.5629,
-      "swStrRate": 0.0621,
-      "swStrPct": 0.1375,
-      "cswPct": 0.2827,
-      "izWhiffPct": 0.1019,
-      "twoStrikeWhiffPct": 0.1311,
-      "chasePct": 0.2541,
-      "gbPct": 0.5467,
-      "fpsPct": 0.6316,
+      "strikePct": 0.6719,
+      "izPct": 0.5627,
+      "swStrRate": 0.062,
+      "swStrPct": 0.1373,
+      "cswPct": 0.2824,
+      "izWhiffPct": 0.1017,
+      "twoStrikeWhiffPct": 0.1303,
+      "chasePct": 0.2535,
+      "gbPct": 0.5472,
+      "fpsPct": 0.631,
       "breakTiltMinutes": 71,
       "breakTilt": "1:11",
-      "xBA": 0.2884,
-      "xSLG": 0.4393,
+      "xBA": 0.2876,
+      "xSLG": 0.4381,
       "xwOBA": 0.3659,
-      "xwOBAcon": 0.3644,
+      "xwOBAcon": 0.3643,
       "count": 445
     },
     "CH": {
-      "velocity": 86.07,
+      "velocity": 86.06,
       "effectiveVelo": 86.1,
-      "spinRate": 1758.18,
+      "spinRate": 1758.41,
       "indVertBrk": 4.18,
-      "horzBrk": 4.6,
+      "horzBrk": 4.54,
       "relPosZ": 5.62,
-      "relPosX": -0.46,
+      "relPosX": -0.45,
       "extension": 6.42,
-      "armAngle": 36.26,
-      "vaa": -7.47,
+      "armAngle": 36.27,
+      "vaa": -7.48,
       "haa": 0.03,
-      "strikePct": 0.5805,
-      "izPct": 0.3838,
-      "swStrRate": 0.1593,
-      "swStrPct": 0.3224,
+      "strikePct": 0.5804,
+      "izPct": 0.3836,
+      "swStrRate": 0.1594,
+      "swStrPct": 0.3226,
       "cswPct": 0.2481,
       "izWhiffPct": 0.2224,
-      "twoStrikeWhiffPct": 0.2722,
-      "chasePct": 0.3272,
-      "gbPct": 0.506,
-      "fpsPct": 0.5438,
+      "twoStrikeWhiffPct": 0.2728,
+      "chasePct": 0.3271,
+      "gbPct": 0.5065,
+      "fpsPct": 0.544,
       "breakTiltMinutes": 104,
       "breakTilt": "1:44",
-      "xBA": 0.2312,
-      "xSLG": 0.3431,
-      "xwOBA": 0.2767,
-      "xwOBAcon": 0.3344,
-      "count": 364
+      "xBA": 0.2304,
+      "xSLG": 0.3419,
+      "xwOBA": 0.2764,
+      "xwOBAcon": 0.3343,
+      "count": 361
     },
     "SL": {
       "velocity": 86.22,
       "effectiveVelo": 86.41,
-      "spinRate": 2432.82,
+      "spinRate": 2433.04,
       "indVertBrk": 1.03,
-      "horzBrk": -1.45,
+      "horzBrk": -1.44,
       "relPosZ": 5.8,
-      "relPosX": -0.61,
+      "relPosX": -0.6,
       "extension": 6.36,
       "armAngle": 41.16,
       "vaa": -7.8,
       "haa": 1.02,
-      "strikePct": 0.6246,
-      "izPct": 0.4499,
+      "strikePct": 0.6247,
+      "izPct": 0.45,
       "swStrRate": 0.1606,
-      "swStrPct": 0.3368,
+      "swStrPct": 0.3366,
       "cswPct": 0.3088,
-      "izWhiffPct": 0.1919,
-      "twoStrikeWhiffPct": 0.2946,
-      "chasePct": 0.3191,
-      "gbPct": 0.4162,
-      "fpsPct": 0.6089,
+      "izWhiffPct": 0.1916,
+      "twoStrikeWhiffPct": 0.2943,
+      "chasePct": 0.3193,
+      "gbPct": 0.4163,
+      "fpsPct": 0.6092,
       "breakTiltMinutes": 620,
       "breakTilt": "10:20",
-      "xBA": 0.233,
-      "xSLG": 0.39,
-      "xwOBA": 0.3019,
-      "xwOBAcon": 0.3805,
+      "xBA": 0.2325,
+      "xSLG": 0.3892,
+      "xwOBA": 0.3017,
+      "xwOBAcon": 0.3804,
       "count": 374
     },
     "ST": {
       "velocity": 82.46,
       "effectiveVelo": 82.3,
-      "spinRate": 2575.59,
-      "indVertBrk": 1.12,
-      "horzBrk": -5.27,
+      "spinRate": 2576.24,
+      "indVertBrk": 1.13,
+      "horzBrk": -5.28,
       "relPosZ": 5.43,
       "relPosX": -0.61,
       "extension": 6.35,
-      "armAngle": 29.61,
+      "armAngle": 29.6,
       "vaa": -7.62,
       "haa": 1.42,
-      "strikePct": 0.6043,
-      "izPct": 0.4393,
-      "swStrRate": 0.1358,
-      "swStrPct": 0.3111,
-      "cswPct": 0.3019,
-      "izWhiffPct": 0.1746,
-      "twoStrikeWhiffPct": 0.2874,
-      "chasePct": 0.296,
-      "gbPct": 0.3487,
-      "fpsPct": 0.5749,
+      "strikePct": 0.6044,
+      "izPct": 0.4394,
+      "swStrRate": 0.1357,
+      "swStrPct": 0.3107,
+      "cswPct": 0.3018,
+      "izWhiffPct": 0.1744,
+      "twoStrikeWhiffPct": 0.2869,
+      "chasePct": 0.2959,
+      "gbPct": 0.3492,
+      "fpsPct": 0.5757,
       "breakTiltMinutes": 566,
       "breakTilt": "9:26",
-      "xBA": 0.1957,
-      "xSLG": 0.3138,
-      "xwOBA": 0.2582,
+      "xBA": 0.1955,
+      "xSLG": 0.3135,
+      "xwOBA": 0.2584,
       "xwOBAcon": 0.3282,
-      "count": 290
+      "count": 289
     },
     "FS": {
-      "velocity": 86.46,
-      "effectiveVelo": 86.85,
-      "spinRate": 1380.88,
+      "velocity": 86.45,
+      "effectiveVelo": 86.84,
+      "spinRate": 1380.77,
       "indVertBrk": 2.88,
       "horzBrk": 7.07,
       "relPosZ": 5.71,
       "relPosX": -1.03,
       "extension": 6.58,
-      "armAngle": 39.88,
-      "vaa": -7.73,
+      "armAngle": 39.87,
+      "vaa": -7.72,
       "haa": 0.41,
-      "strikePct": 0.5872,
-      "izPct": 0.3722,
+      "strikePct": 0.5871,
+      "izPct": 0.3716,
       "swStrRate": 0.1772,
-      "swStrPct": 0.3519,
+      "swStrPct": 0.3522,
       "cswPct": 0.2561,
-      "izWhiffPct": 0.2246,
-      "twoStrikeWhiffPct": 0.3087,
-      "chasePct": 0.3505,
-      "gbPct": 0.5311,
-      "fpsPct": 0.549,
-      "breakTiltMinutes": 128,
-      "breakTilt": "2:08",
+      "izWhiffPct": 0.2247,
+      "twoStrikeWhiffPct": 0.3068,
+      "chasePct": 0.3509,
+      "gbPct": 0.5303,
+      "fpsPct": 0.5459,
+      "breakTiltMinutes": 127,
+      "breakTilt": "2:07",
       "xBA": 0.2138,
       "xSLG": 0.3177,
-      "xwOBA": 0.2552,
-      "xwOBAcon": 0.3368,
-      "count": 129
+      "xwOBA": 0.2556,
+      "xwOBAcon": 0.3371,
+      "count": 130
     },
     "CU": {
-      "velocity": 80.37,
+      "velocity": 80.38,
       "effectiveVelo": 80.21,
-      "spinRate": 2561.23,
-      "indVertBrk": -11.71,
-      "horzBrk": -4.33,
+      "spinRate": 2561.93,
+      "indVertBrk": -11.72,
+      "horzBrk": -4.32,
       "relPosZ": 5.95,
       "relPosX": -0.75,
       "extension": 6.37,
-      "armAngle": 44.14,
+      "armAngle": 44.18,
       "vaa": -9.82,
       "haa": 1.34,
-      "strikePct": 0.5798,
-      "izPct": 0.4127,
-      "swStrRate": 0.1262,
-      "swStrPct": 0.3106,
-      "cswPct": 0.3002,
-      "izWhiffPct": 0.1576,
-      "twoStrikeWhiffPct": 0.2801,
-      "chasePct": 0.2829,
-      "gbPct": 0.4857,
-      "fpsPct": 0.5483,
+      "strikePct": 0.5797,
+      "izPct": 0.4129,
+      "swStrRate": 0.1264,
+      "swStrPct": 0.311,
+      "cswPct": 0.3003,
+      "izWhiffPct": 0.1579,
+      "twoStrikeWhiffPct": 0.281,
+      "chasePct": 0.2826,
+      "gbPct": 0.4856,
+      "fpsPct": 0.5487,
       "breakTiltMinutes": 392,
       "breakTilt": "6:32",
-      "xBA": 0.2207,
-      "xSLG": 0.3649,
-      "xwOBA": 0.2865,
-      "xwOBAcon": 0.3792,
+      "xBA": 0.2199,
+      "xSLG": 0.3637,
+      "xwOBA": 0.2862,
+      "xwOBAcon": 0.3789,
       "count": 245
     },
     "FC": {
       "velocity": 89.68,
       "effectiveVelo": 90.02,
-      "spinRate": 2374.91,
+      "spinRate": 2374.24,
       "indVertBrk": 8.52,
-      "horzBrk": -1.19,
-      "relPosZ": 5.66,
-      "relPosX": -0.83,
+      "horzBrk": -1.18,
+      "relPosZ": 5.65,
+      "relPosX": -0.82,
       "extension": 6.41,
-      "armAngle": 37.42,
+      "armAngle": 37.39,
       "vaa": -6.02,
-      "haa": 1.26,
-      "strikePct": 0.6499,
-      "izPct": 0.5212,
+      "haa": 1.24,
+      "strikePct": 0.65,
+      "izPct": 0.5211,
       "swStrRate": 0.1081,
       "swStrPct": 0.2249,
-      "cswPct": 0.2752,
+      "cswPct": 0.2751,
       "izWhiffPct": 0.1556,
-      "twoStrikeWhiffPct": 0.2221,
+      "twoStrikeWhiffPct": 0.2243,
       "chasePct": 0.2672,
-      "gbPct": 0.3799,
-      "fpsPct": 0.6052,
+      "gbPct": 0.3802,
+      "fpsPct": 0.6049,
       "breakTiltMinutes": 702,
       "breakTilt": "11:42",
-      "xBA": 0.2679,
-      "xSLG": 0.4511,
-      "xwOBA": 0.353,
-      "xwOBAcon": 0.3691,
+      "xBA": 0.2666,
+      "xSLG": 0.449,
+      "xwOBA": 0.3529,
+      "xwOBAcon": 0.369,
       "count": 253
     },
     "SV": {
-      "velocity": 81.28,
-      "effectiveVelo": 81.22,
-      "spinRate": 2622.31,
-      "indVertBrk": -6.33,
-      "horzBrk": -10.61,
-      "relPosZ": 5.68,
-      "relPosX": -1.51,
-      "extension": 6.43,
-      "armAngle": 35.32,
+      "velocity": 81.25,
+      "effectiveVelo": 81.2,
+      "spinRate": 2615.72,
+      "indVertBrk": -6.31,
+      "horzBrk": -10.3,
+      "relPosZ": 5.69,
+      "relPosX": -1.46,
+      "extension": 6.42,
+      "armAngle": 35.52,
       "vaa": -8.91,
-      "haa": 2.95,
-      "strikePct": 0.6061,
-      "izPct": 0.4272,
-      "swStrRate": 0.148,
-      "swStrPct": 0.3383,
-      "cswPct": 0.3164,
-      "izWhiffPct": 0.1743,
-      "twoStrikeWhiffPct": 0.2935,
-      "chasePct": 0.3226,
-      "gbPct": 0.4449,
-      "fpsPct": 0.5797,
-      "breakTiltMinutes": 467,
-      "breakTilt": "7:47",
-      "xBA": 0.2162,
-      "xSLG": 0.3264,
-      "xwOBA": 0.2699,
-      "xwOBAcon": 0.3619,
-      "count": 39
+      "haa": 2.86,
+      "strikePct": 0.6032,
+      "izPct": 0.4259,
+      "swStrRate": 0.1469,
+      "swStrPct": 0.3367,
+      "cswPct": 0.3149,
+      "izWhiffPct": 0.1738,
+      "twoStrikeWhiffPct": 0.2918,
+      "chasePct": 0.3203,
+      "gbPct": 0.4398,
+      "fpsPct": 0.5746,
+      "breakTiltMinutes": 463,
+      "breakTilt": "7:43",
+      "xBA": 0.2143,
+      "xSLG": 0.3235,
+      "xwOBA": 0.2679,
+      "xwOBAcon": 0.36,
+      "count": 40
     },
     "KN": {
       "velocity": 80.6,
@@ -355,41 +355,41 @@
     }
   },
   "pitcherLeagueAverages": {
-    "strikePct": 0.6335,
+    "strikePct": 0.6334,
     "izPct": 0.484,
     "swStrRate": 0.1188,
     "swStrPct": 0.2537,
-    "cswPct": 0.2833,
-    "izWhiffPct": 0.1669,
-    "chasePct": 0.2929,
-    "gbPct": 0.4245,
-    "kPct": 0.2228,
+    "cswPct": 0.2832,
+    "izWhiffPct": 0.1668,
+    "chasePct": 0.2927,
+    "gbPct": 0.4248,
+    "kPct": 0.2229,
     "bbPct": 0.0918,
-    "kbbPct": 0.131,
-    "babip": 0.2887,
-    "fpsPct": 0.6014,
+    "kbbPct": 0.1311,
+    "babip": 0.2886,
+    "fpsPct": 0.6012,
     "twoStrikeWhiffPct": 0.2461,
-    "oneOneWinPct": 0.6455,
-    "earlyActionPct": 0.4321,
-    "relPosZ": 5.6491,
-    "relPosX": -0.6798,
-    "extension": 6.4341,
-    "armAngle": 37.4201,
-    "vaa": -6.4661,
-    "haa": 0.6777,
-    "avgEVAgainst": 89.0342,
-    "maxEVAgainst": 110.9755,
-    "hardHitPct": 0.4036,
-    "barrelPctAgainst": 0.0842,
-    "ldPct": 0.2354,
-    "fbPct": 0.2643,
-    "puPct": 0.0748,
+    "oneOneWinPct": 0.6452,
+    "earlyActionPct": 0.4317,
+    "relPosZ": 5.6493,
+    "relPosX": -0.6758,
+    "extension": 6.434,
+    "armAngle": 37.435,
+    "vaa": -6.4662,
+    "haa": 0.6749,
+    "avgEVAgainst": 89.0291,
+    "maxEVAgainst": 110.9734,
+    "hardHitPct": 0.4034,
+    "barrelPctAgainst": 0.0841,
+    "ldPct": 0.2353,
+    "fbPct": 0.2641,
+    "puPct": 0.0747,
     "hrFbPct": 0.1231,
-    "wOBA": 0.3169,
-    "xBA": 0.2431,
-    "xSLG": 0.3989,
-    "xwOBA": 0.3211,
-    "xwOBAcon": 0.3681,
+    "wOBA": 0.3167,
+    "xBA": 0.2425,
+    "xSLG": 0.3978,
+    "xwOBA": 0.321,
+    "xwOBAcon": 0.368,
     "count": 590,
     "locPlus": 100.0,
     "era": 4.13,
@@ -399,77 +399,77 @@
     "siera": 4.13
   },
   "hitterLeagueAverages": {
-    "babip": 0.2887,
-    "wOBA": 0.3172,
-    "xBA": 0.2434,
-    "xSLG": 0.3999,
+    "babip": 0.2886,
+    "wOBA": 0.3171,
+    "xBA": 0.2427,
+    "xSLG": 0.3988,
     "xwOBA": 0.3213,
     "xwOBAcon": 0.3688,
-    "xwOBAsp": 0.3698,
-    "avgEVAll": 89.0383,
-    "ev50": 99.8957,
-    "maxEV": 109.5188,
-    "hardHitPct": 0.4037,
-    "barrelPct": 0.0843,
-    "gbPct": 0.4252,
-    "ldPct": 0.2356,
-    "fbPct": 0.2644,
-    "puPct": 0.0748,
+    "xwOBAsp": 0.3697,
+    "avgEVAll": 89.0336,
+    "ev50": 99.8909,
+    "maxEV": 109.5223,
+    "hardHitPct": 0.4035,
+    "barrelPct": 0.0842,
+    "gbPct": 0.4255,
+    "ldPct": 0.2355,
+    "fbPct": 0.2642,
+    "puPct": 0.0747,
     "hrFbPct": 0.1234,
-    "pullPct": 0.4505,
+    "pullPct": 0.4507,
     "middlePct": 0.2859,
-    "oppoPct": 0.2635,
-    "airPullPct": 0.1738,
+    "oppoPct": 0.2634,
+    "airPullPct": 0.1736,
     "swingPct": 0.4691,
-    "izSwingPct": 0.6542,
-    "chasePct": 0.295,
-    "izSwChase": 0.3592,
-    "contactPct": 0.7476,
-    "izContactPct": 0.8344,
-    "whiffPct": 0.2524,
-    "batSpeed": 71.1609,
-    "swingLength": 7.328,
-    "attackAngle": 9.7162,
-    "attackDirection": -1.442,
-    "swingPathTilt": 32.1906,
-    "blastPct": 0.1942,
-    "squaredUpPct": 0.7052,
-    "idealAAPct": 0.4973,
+    "izSwingPct": 0.6543,
+    "chasePct": 0.2949,
+    "izSwChase": 0.3594,
+    "contactPct": 0.7477,
+    "izContactPct": 0.8345,
+    "whiffPct": 0.2523,
+    "batSpeed": 71.1615,
+    "swingLength": 7.3287,
+    "attackAngle": 9.7197,
+    "attackDirection": -1.4484,
+    "swingPathTilt": 32.1933,
+    "blastPct": 0.1941,
+    "squaredUpPct": 0.7051,
+    "idealAAPct": 0.4959,
     "twoStrikeWhiffPct": 0.2469,
     "firstPitchSwingPct": 0.3075,
-    "avgFbDist": 312.747,
-    "avgHrDist": 392.446,
+    "avgFbDist": 312.7145,
+    "avgHrDist": 392.4132,
     "sprintSpeed": 27.1298,
-    "runValue": 0.6182,
-    "xRunValue": 0.4099,
-    "rv100": -0.179,
-    "xRv100": -0.3255,
-    "count": 495,
+    "runValue": 0.6226,
+    "xRunValue": 0.4137,
+    "rv100": -0.1785,
+    "xRv100": -0.3246,
+    "count": 496,
     "bbPlus": 100.0,
     "sdPlus": 100.0,
     "ctPlus": 100.0,
     "hitterPlus": 100.0,
-    "avg": 0.2405,
-    "obp": 0.3194,
-    "slg": 0.3891,
-    "ops": 0.7085,
-    "iso": 0.1487,
-    "kPct": 0.2217,
+    "avg": 0.2403,
+    "obp": 0.3193,
+    "slg": 0.3888,
+    "ops": 0.7081,
+    "iso": 0.1485,
+    "kPct": 0.2219,
     "bbPct": 0.0915,
-    "bbToK": 0.4585,
-    "wRCplus": 99.8013,
-    "xWRCplus": 102.703
+    "bbToK": 0.4583,
+    "wRCplus": 99.6922,
+    "xWRCplus": 102.7182
   },
   "vaaRegressions": {
     "CH": {
-      "slope": 1.071492,
-      "intercept": -9.398542,
-      "leagueAvgPlateZ": 1.800413
+      "slope": 1.071804,
+      "intercept": -9.399998,
+      "leagueAvgPlateZ": 1.798896
     },
     "CU": {
-      "slope": 0.972141,
-      "intercept": -11.564297,
-      "leagueAvgPlateZ": 1.798519
+      "slope": 0.971986,
+      "intercept": -11.565999,
+      "leagueAvgPlateZ": 1.798136
     },
     "EP": {
       "slope": 0.493588,
@@ -477,19 +477,19 @@
       "leagueAvgPlateZ": 2.711961
     },
     "FC": {
-      "slope": 1.127442,
-      "intercept": -8.826362,
-      "leagueAvgPlateZ": 2.492344
+      "slope": 1.128404,
+      "intercept": -8.827738,
+      "leagueAvgPlateZ": 2.494316
     },
     "FF": {
-      "slope": 1.059158,
-      "intercept": -7.655037,
-      "leagueAvgPlateZ": 2.831019
+      "slope": 1.05896,
+      "intercept": -7.654968,
+      "leagueAvgPlateZ": 2.831506
     },
     "FS": {
-      "slope": 1.055036,
-      "intercept": -9.556965,
-      "leagueAvgPlateZ": 1.737459
+      "slope": 1.05564,
+      "intercept": -9.556385,
+      "leagueAvgPlateZ": 1.73998
     },
     "KN": {
       "slope": 1.074595,
@@ -497,36 +497,36 @@
       "leagueAvgPlateZ": 2.233143
     },
     "SI": {
-      "slope": 1.087319,
-      "intercept": -8.425614,
-      "leagueAvgPlateZ": 2.40295
+      "slope": 1.086866,
+      "intercept": -8.424387,
+      "leagueAvgPlateZ": 2.403263
     },
     "SL": {
-      "slope": 1.085117,
-      "intercept": -9.854717,
-      "leagueAvgPlateZ": 1.893036
+      "slope": 1.085088,
+      "intercept": -9.855059,
+      "leagueAvgPlateZ": 1.89294
     },
     "ST": {
-      "slope": 1.123621,
-      "intercept": -9.874166,
-      "leagueAvgPlateZ": 2.00381
+      "slope": 1.12241,
+      "intercept": -9.8705,
+      "leagueAvgPlateZ": 2.004667
     },
     "SV": {
-      "slope": 1.092356,
-      "intercept": -10.907132,
-      "leagueAvgPlateZ": 1.829872
+      "slope": 1.09327,
+      "intercept": -10.911031,
+      "leagueAvgPlateZ": 1.833261
     }
   },
   "haaRegressions": {
     "CH": {
-      "slope": 0.73179,
-      "intercept": 0.077613,
-      "leagueAvgPlateX": -0.07469
+      "slope": 0.732864,
+      "intercept": 0.076599,
+      "leagueAvgPlateX": -0.071844
     },
     "CU": {
-      "slope": 1.239717,
-      "intercept": 1.2741,
-      "leagueAvgPlateX": 0.051718
+      "slope": 1.238234,
+      "intercept": 1.272237,
+      "leagueAvgPlateX": 0.051269
     },
     "EP": {
       "slope": 1.196532,
@@ -534,19 +534,19 @@
       "leagueAvgPlateX": -0.065714
     },
     "FC": {
-      "slope": 1.786399,
-      "intercept": 0.987558,
-      "leagueAvgPlateX": 0.144383
+      "slope": 1.78836,
+      "intercept": 0.976262,
+      "leagueAvgPlateX": 0.143234
     },
     "FF": {
-      "slope": 1.08526,
-      "intercept": 0.513619,
-      "leagueAvgPlateX": -0.007399
+      "slope": 1.08514,
+      "intercept": 0.511598,
+      "leagueAvgPlateX": -0.007268
     },
     "FS": {
-      "slope": 0.821778,
-      "intercept": 0.50526,
-      "leagueAvgPlateX": -0.120424
+      "slope": 0.819936,
+      "intercept": 0.507001,
+      "leagueAvgPlateX": -0.121347
     },
     "KN": {
       "slope": 1.29156,
@@ -554,24 +554,24 @@
       "leagueAvgPlateX": 0.11981
     },
     "SI": {
-      "slope": 0.840988,
-      "intercept": 0.122579,
-      "leagueAvgPlateX": -0.075734
+      "slope": 0.841064,
+      "intercept": 0.123211,
+      "leagueAvgPlateX": -0.075491
     },
     "SL": {
-      "slope": 1.923125,
-      "intercept": 0.737411,
-      "leagueAvgPlateX": 0.150648
+      "slope": 1.926747,
+      "intercept": 0.732867,
+      "leagueAvgPlateX": 0.149593
     },
     "ST": {
-      "slope": 2.308911,
-      "intercept": 0.997102,
-      "leagueAvgPlateX": 0.184361
+      "slope": 2.301082,
+      "intercept": 0.997974,
+      "leagueAvgPlateX": 0.186309
     },
     "SV": {
-      "slope": 1.519938,
-      "intercept": 2.667196,
-      "leagueAvgPlateX": 0.184055
+      "slope": 1.566542,
+      "intercept": 2.583331,
+      "leagueAvgPlateX": 0.175063
     }
   },
   "sacqZones": [
@@ -609,7 +609,7 @@
       "woba": 0.319,
       "xwobacon": 0.504,
       "quality": false,
-      "count": 124
+      "count": 125
     },
     {
       "spray": "center_oppo",
@@ -621,7 +621,7 @@
       "woba": 0.617,
       "xwobacon": 0.723,
       "quality": true,
-      "count": 165
+      "count": 166
     },
     {
       "spray": "center_oppo",
@@ -633,7 +633,7 @@
       "woba": 0.465,
       "xwobacon": 0.647,
       "quality": false,
-      "count": 185
+      "count": 187
     },
     {
       "spray": "center_oppo",
@@ -645,7 +645,7 @@
       "woba": 0.315,
       "xwobacon": 0.667,
       "quality": false,
-      "count": 180
+      "count": 181
     },
     {
       "spray": "center_oppo",
@@ -657,7 +657,7 @@
       "woba": 0.344,
       "xwobacon": 0.727,
       "quality": false,
-      "count": 162
+      "count": 164
     },
     {
       "spray": "center_oppo",
@@ -681,7 +681,7 @@
       "woba": 0.052,
       "xwobacon": 0.292,
       "quality": false,
-      "count": 143
+      "count": 144
     },
     {
       "spray": "center_oppo",
@@ -705,7 +705,7 @@
       "woba": 0.015,
       "xwobacon": 0.021,
       "quality": false,
-      "count": 165
+      "count": 166
     },
     {
       "spray": "center_pull",
@@ -729,7 +729,7 @@
       "woba": 0.613,
       "xwobacon": 0.385,
       "quality": true,
-      "count": 163
+      "count": 164
     },
     {
       "spray": "center_pull",
@@ -825,7 +825,7 @@
       "woba": 0.052,
       "xwobacon": 0.094,
       "quality": false,
-      "count": 163
+      "count": 164
     },
     {
       "spray": "center_pull",
@@ -945,7 +945,7 @@
       "woba": 0.246,
       "xwobacon": 0.131,
       "quality": false,
-      "count": 104
+      "count": 105
     },
     {
       "spray": "oppo",
@@ -957,7 +957,7 @@
       "woba": 0.09,
       "xwobacon": 0.055,
       "quality": false,
-      "count": 240
+      "count": 241
     },
     {
       "spray": "oppo",
@@ -981,7 +981,7 @@
       "woba": 0.284,
       "xwobacon": 0.157,
       "quality": false,
-      "count": 293
+      "count": 295
     },
     {
       "spray": "oppo_side",
@@ -1017,7 +1017,7 @@
       "woba": 0.785,
       "xwobacon": 0.694,
       "quality": true,
-      "count": 139
+      "count": 140
     },
     {
       "spray": "oppo_side",
@@ -1053,7 +1053,7 @@
       "woba": 0.501,
       "xwobacon": 0.598,
       "quality": true,
-      "count": 166
+      "count": 167
     },
     {
       "spray": "oppo_side",
@@ -1113,7 +1113,7 @@
       "woba": 0.129,
       "xwobacon": 0.149,
       "quality": false,
-      "count": 1942
+      "count": 1949
     },
     {
       "spray": "pull",
@@ -1125,7 +1125,7 @@
       "woba": 0.347,
       "xwobacon": 0.362,
       "quality": false,
-      "count": 364
+      "count": 366
     },
     {
       "spray": "pull",
@@ -1149,7 +1149,7 @@
       "woba": 0.868,
       "xwobacon": 0.748,
       "quality": true,
-      "count": 339
+      "count": 340
     },
     {
       "spray": "pull",
@@ -1245,7 +1245,7 @@
       "woba": 0.104,
       "xwobacon": 0.164,
       "quality": false,
-      "count": 1030
+      "count": 1036
     },
     {
       "spray": "pull_side",
@@ -1341,7 +1341,7 @@
       "woba": 0.47,
       "xwobacon": 0.446,
       "quality": false,
-      "count": 92
+      "count": 93
     },
     {
       "spray": "pull_side",
@@ -1377,7 +1377,7 @@
       "woba": 0.14,
       "xwobacon": 0.176,
       "quality": false,
-      "count": 464
+      "count": 465
     },
     {
       "spray": "center_oppo",
@@ -1425,7 +1425,7 @@
       "woba": 0.429,
       "xwobacon": 0.666,
       "quality": false,
-      "count": 206
+      "count": 207
     },
     {
       "spray": "center_oppo",
@@ -1437,7 +1437,7 @@
       "woba": 0.322,
       "xwobacon": 0.65,
       "quality": false,
-      "count": 204
+      "count": 205
     },
     {
       "spray": "center_oppo",
@@ -1497,7 +1497,7 @@
       "woba": 0.018,
       "xwobacon": 0.02,
       "quality": false,
-      "count": 204
+      "count": 205
     },
     {
       "spray": "center_pull",
@@ -1509,7 +1509,7 @@
       "woba": 0.252,
       "xwobacon": 0.175,
       "quality": false,
-      "count": 739
+      "count": 744
     },
     {
       "spray": "center_pull",
@@ -1545,7 +1545,7 @@
       "woba": 0.826,
       "xwobacon": 0.757,
       "quality": true,
-      "count": 186
+      "count": 187
     },
     {
       "spray": "center_pull",
@@ -1557,7 +1557,7 @@
       "woba": 0.662,
       "xwobacon": 0.665,
       "quality": true,
-      "count": 227
+      "count": 228
     },
     {
       "spray": "center_pull",
@@ -1641,7 +1641,7 @@
       "woba": 0.213,
       "xwobacon": 0.175,
       "quality": false,
-      "count": 333
+      "count": 335
     },
     {
       "spray": "oppo",
@@ -1665,7 +1665,7 @@
       "woba": 0.672,
       "xwobacon": 0.469,
       "quality": true,
-      "count": 101
+      "count": 102
     },
     {
       "spray": "oppo",
@@ -1713,7 +1713,7 @@
       "woba": 0.576,
       "xwobacon": 0.472,
       "quality": true,
-      "count": 159
+      "count": 160
     },
     {
       "spray": "oppo",
@@ -1749,7 +1749,7 @@
       "woba": 0.093,
       "xwobacon": 0.049,
       "quality": false,
-      "count": 256
+      "count": 257
     },
     {
       "spray": "oppo",
@@ -1761,7 +1761,7 @@
       "woba": 0.031,
       "xwobacon": 0.016,
       "quality": false,
-      "count": 729
+      "count": 730
     },
     {
       "spray": "oppo_side",
@@ -1797,7 +1797,7 @@
       "woba": 0.534,
       "xwobacon": 0.485,
       "quality": true,
-      "count": 166
+      "count": 167
     },
     {
       "spray": "oppo_side",
@@ -1881,7 +1881,7 @@
       "woba": 0.005,
       "xwobacon": 0.073,
       "quality": false,
-      "count": 183
+      "count": 185
     },
     {
       "spray": "oppo_side",
@@ -1893,7 +1893,7 @@
       "woba": 0.003,
       "xwobacon": 0.022,
       "quality": false,
-      "count": 262
+      "count": 263
     },
     {
       "spray": "pull",
@@ -1905,7 +1905,7 @@
       "woba": 0.221,
       "xwobacon": 0.154,
       "quality": false,
-      "count": 1462
+      "count": 1465
     },
     {
       "spray": "pull",
@@ -1917,7 +1917,7 @@
       "woba": 0.427,
       "xwobacon": 0.383,
       "quality": false,
-      "count": 286
+      "count": 288
     },
     {
       "spray": "pull",
@@ -1977,7 +1977,7 @@
       "woba": 1.189,
       "xwobacon": 0.897,
       "quality": true,
-      "count": 189
+      "count": 190
     },
     {
       "spray": "pull",
@@ -2001,7 +2001,7 @@
       "woba": 0.948,
       "xwobacon": 0.462,
       "quality": true,
-      "count": 84
+      "count": 85
     },
     {
       "spray": "pull",
@@ -2025,7 +2025,7 @@
       "woba": 0.026,
       "xwobacon": 0.017,
       "quality": false,
-      "count": 190
+      "count": 191
     },
     {
       "spray": "pull_side",
@@ -2037,7 +2037,7 @@
       "woba": 0.149,
       "xwobacon": 0.165,
       "quality": false,
-      "count": 1506
+      "count": 1513
     },
     {
       "spray": "pull_side",
@@ -2061,7 +2061,7 @@
       "woba": 0.381,
       "xwobacon": 0.502,
       "quality": false,
-      "count": 294
+      "count": 297
     },
     {
       "spray": "pull_side",
@@ -2073,7 +2073,7 @@
       "woba": 0.666,
       "xwobacon": 0.756,
       "quality": true,
-      "count": 223
+      "count": 226
     },
     {
       "spray": "pull_side",
@@ -2109,7 +2109,7 @@
       "woba": 0.962,
       "xwobacon": 0.884,
       "quality": true,
-      "count": 172
+      "count": 173
     },
     {
       "spray": "pull_side",
@@ -2133,7 +2133,7 @@
       "woba": 0.294,
       "xwobacon": 0.376,
       "quality": false,
-      "count": 129
+      "count": 130
     },
     {
       "spray": "pull_side",
@@ -2157,7 +2157,7 @@
       "woba": 0.019,
       "xwobacon": 0.016,
       "quality": false,
-      "count": 163
+      "count": 164
     },
     {
       "spray": "center_oppo",
@@ -2169,7 +2169,7 @@
       "woba": 0.126,
       "xwobacon": 0.177,
       "quality": false,
-      "count": 880
+      "count": 881
     },
     {
       "spray": "center_oppo",
@@ -2193,7 +2193,7 @@
       "woba": 0.331,
       "xwobacon": 0.5,
       "quality": false,
-      "count": 254
+      "count": 255
     },
     {
       "spray": "center_oppo",
@@ -2205,7 +2205,7 @@
       "woba": 0.582,
       "xwobacon": 0.714,
       "quality": true,
-      "count": 328
+      "count": 329
     },
     {
       "spray": "center_oppo",
@@ -2217,7 +2217,7 @@
       "woba": 0.446,
       "xwobacon": 0.657,
       "quality": false,
-      "count": 391
+      "count": 394
     },
     {
       "spray": "center_oppo",
@@ -2229,7 +2229,7 @@
       "woba": 0.318,
       "xwobacon": 0.658,
       "quality": false,
-      "count": 384
+      "count": 386
     },
     {
       "spray": "center_oppo",
@@ -2241,7 +2241,7 @@
       "woba": 0.35,
       "xwobacon": 0.725,
       "quality": false,
-      "count": 369
+      "count": 371
     },
     {
       "spray": "center_oppo",
@@ -2265,7 +2265,7 @@
       "woba": 0.065,
       "xwobacon": 0.282,
       "quality": false,
-      "count": 290
+      "count": 291
     },
     {
       "spray": "center_oppo",
@@ -2289,7 +2289,7 @@
       "woba": 0.017,
       "xwobacon": 0.021,
       "quality": false,
-      "count": 369
+      "count": 371
     },
     {
       "spray": "center_pull",
@@ -2301,7 +2301,7 @@
       "woba": 0.27,
       "xwobacon": 0.179,
       "quality": false,
-      "count": 1187
+      "count": 1192
     },
     {
       "spray": "center_pull",
@@ -2313,7 +2313,7 @@
       "woba": 0.542,
       "xwobacon": 0.389,
       "quality": true,
-      "count": 351
+      "count": 352
     },
     {
       "spray": "center_pull",
@@ -2337,7 +2337,7 @@
       "woba": 0.831,
       "xwobacon": 0.75,
       "quality": true,
-      "count": 372
+      "count": 373
     },
     {
       "spray": "center_pull",
@@ -2349,7 +2349,7 @@
       "woba": 0.691,
       "xwobacon": 0.674,
       "quality": true,
-      "count": 440
+      "count": 441
     },
     {
       "spray": "center_pull",
@@ -2409,7 +2409,7 @@
       "woba": 0.052,
       "xwobacon": 0.096,
       "quality": false,
-      "count": 334
+      "count": 335
     },
     {
       "spray": "center_pull",
@@ -2433,7 +2433,7 @@
       "woba": 0.309,
       "xwobacon": 0.174,
       "quality": false,
-      "count": 544
+      "count": 546
     },
     {
       "spray": "oppo",
@@ -2457,7 +2457,7 @@
       "woba": 0.694,
       "xwobacon": 0.454,
       "quality": true,
-      "count": 151
+      "count": 152
     },
     {
       "spray": "oppo",
@@ -2505,7 +2505,7 @@
       "woba": 0.555,
       "xwobacon": 0.435,
       "quality": true,
-      "count": 292
+      "count": 293
     },
     {
       "spray": "oppo",
@@ -2529,7 +2529,7 @@
       "woba": 0.23,
       "xwobacon": 0.137,
       "quality": false,
-      "count": 233
+      "count": 234
     },
     {
       "spray": "oppo",
@@ -2541,7 +2541,7 @@
       "woba": 0.091,
       "xwobacon": 0.052,
       "quality": false,
-      "count": 496
+      "count": 498
     },
     {
       "spray": "oppo",
@@ -2553,7 +2553,7 @@
       "woba": 0.033,
       "xwobacon": 0.016,
       "quality": false,
-      "count": 1294
+      "count": 1295
     },
     {
       "spray": "oppo_side",
@@ -2565,7 +2565,7 @@
       "woba": 0.224,
       "xwobacon": 0.175,
       "quality": false,
-      "count": 779
+      "count": 781
     },
     {
       "spray": "oppo_side",
@@ -2589,7 +2589,7 @@
       "woba": 0.564,
       "xwobacon": 0.487,
       "quality": true,
-      "count": 295
+      "count": 296
     },
     {
       "spray": "oppo_side",
@@ -2601,7 +2601,7 @@
       "woba": 0.798,
       "xwobacon": 0.703,
       "quality": true,
-      "count": 299
+      "count": 300
     },
     {
       "spray": "oppo_side",
@@ -2637,7 +2637,7 @@
       "woba": 0.462,
       "xwobacon": 0.609,
       "quality": false,
-      "count": 331
+      "count": 332
     },
     {
       "spray": "oppo_side",
@@ -2673,7 +2673,7 @@
       "woba": 0.016,
       "xwobacon": 0.074,
       "quality": false,
-      "count": 369
+      "count": 371
     },
     {
       "spray": "oppo_side",
@@ -2685,7 +2685,7 @@
       "woba": 0.009,
       "xwobacon": 0.02,
       "quality": false,
-      "count": 515
+      "count": 516
     },
     {
       "spray": "pull",
@@ -2697,7 +2697,7 @@
       "woba": 0.168,
       "xwobacon": 0.151,
       "quality": false,
-      "count": 3404
+      "count": 3414
     },
     {
       "spray": "pull",
@@ -2709,7 +2709,7 @@
       "woba": 0.382,
       "xwobacon": 0.371,
       "quality": false,
-      "count": 650
+      "count": 654
     },
     {
       "spray": "pull",
@@ -2733,7 +2733,7 @@
       "woba": 0.849,
       "xwobacon": 0.746,
       "quality": true,
-      "count": 671
+      "count": 672
     },
     {
       "spray": "pull",
@@ -2769,7 +2769,7 @@
       "woba": 1.226,
       "xwobacon": 0.897,
       "quality": true,
-      "count": 371
+      "count": 372
     },
     {
       "spray": "pull",
@@ -2793,7 +2793,7 @@
       "woba": 0.961,
       "xwobacon": 0.494,
       "quality": true,
-      "count": 200
+      "count": 201
     },
     {
       "spray": "pull",
@@ -2817,7 +2817,7 @@
       "woba": 0.016,
       "xwobacon": 0.016,
       "quality": false,
-      "count": 360
+      "count": 361
     },
     {
       "spray": "pull_side",
@@ -2829,7 +2829,7 @@
       "woba": 0.131,
       "xwobacon": 0.164,
       "quality": false,
-      "count": 2536
+      "count": 2549
     },
     {
       "spray": "pull_side",
@@ -2853,7 +2853,7 @@
       "woba": 0.346,
       "xwobacon": 0.5,
       "quality": false,
-      "count": 528
+      "count": 531
     },
     {
       "spray": "pull_side",
@@ -2865,7 +2865,7 @@
       "woba": 0.647,
       "xwobacon": 0.764,
       "quality": true,
-      "count": 459
+      "count": 462
     },
     {
       "spray": "pull_side",
@@ -2901,7 +2901,7 @@
       "woba": 1.035,
       "xwobacon": 0.949,
       "quality": true,
-      "count": 348
+      "count": 349
     },
     {
       "spray": "pull_side",
@@ -2925,7 +2925,7 @@
       "woba": 0.367,
       "xwobacon": 0.405,
       "quality": false,
-      "count": 221
+      "count": 223
     },
     {
       "spray": "pull_side",
@@ -2949,228 +2949,228 @@
       "woba": 0.011,
       "xwobacon": 0.018,
       "quality": false,
-      "count": 287
+      "count": 288
     }
   ],
   "mvnModels": {
     "CH_L": {
       "mlb": {
         "mu": [
-          4.505421,
-          -14.295354,
-          37.173875,
-          6.38476,
-          84.506414
+          4.503655,
+          -14.297266,
+          37.165161,
+          6.384677,
+          84.504474
         ],
         "cov": [
           [
-            28.039957,
-            1.649135,
-            33.629656,
-            0.216101,
-            -2.096567
+            28.043101,
+            1.640935,
+            33.619351,
+            0.216002,
+            -2.105709
           ],
           [
-            1.649135,
-            10.379654,
-            7.42287,
-            0.117226,
-            -1.958419
+            1.640935,
+            10.377011,
+            7.396997,
+            0.117098,
+            -1.966602
           ],
           [
-            33.629656,
-            7.42287,
-            108.790427,
-            0.087984,
-            -0.058476
+            33.619351,
+            7.396997,
+            108.722276,
+            0.086797,
+            -0.088496
           ],
           [
-            0.216101,
-            0.117226,
-            0.087984,
-            0.201349,
-            -0.203552
+            0.216002,
+            0.117098,
+            0.086797,
+            0.201449,
+            -0.203967
           ],
           [
-            -2.096567,
-            -1.958419,
-            -0.058476,
-            -0.203552,
-            10.406756
+            -2.105709,
+            -1.966602,
+            -0.088496,
+            -0.203967,
+            10.405712
           ]
         ],
-        "n": 6844
+        "n": 6840
       },
       "roc": {
         "mu": [
-          4.504161,
-          -14.296296,
-          5.66105,
-          1.817144,
-          6.379492,
-          84.452726
+          4.488605,
+          -14.307134,
+          5.658632,
+          1.814628,
+          6.37888,
+          84.445553
         ],
         "cov": [
           [
-            27.886634,
-            1.454062,
-            0.841854,
-            -1.182067,
-            0.198095,
-            -1.964659
+            27.776127,
+            1.490565,
+            0.843691,
+            -1.170637,
+            0.197641,
+            -1.916091
           ],
           [
-            1.454062,
-            10.325745,
-            0.121873,
-            0.089442,
-            0.125397,
-            -1.764893
+            1.490565,
+            10.271936,
+            0.124453,
+            0.087303,
+            0.124311,
+            -1.728064
           ],
           [
-            0.841854,
-            0.121873,
-            0.147881,
-            -0.122545,
-            -0.002587,
-            0.073362
+            0.843691,
+            0.124453,
+            0.147719,
+            -0.120701,
+            -0.002417,
+            0.073811
           ],
           [
-            -1.182067,
-            0.089442,
-            -0.122545,
-            0.589724,
-            0.056865,
-            -0.426679
+            -1.170637,
+            0.087303,
+            -0.120701,
+            0.588203,
+            0.056641,
+            -0.435541
           ],
           [
-            0.198095,
-            0.125397,
-            -0.002587,
-            0.056865,
-            0.198925,
-            -0.165277
+            0.197641,
+            0.124311,
+            -0.002417,
+            0.056641,
+            0.197288,
+            -0.16372
           ],
           [
-            -1.964659,
-            -1.764893,
-            0.073362,
-            -0.426679,
-            -0.165277,
-            10.494091
+            -1.916091,
+            -1.728064,
+            0.073811,
+            -0.435541,
+            -0.16372,
+            10.479228
           ]
         ],
-        "n": 7209
+        "n": 7275
       }
     },
     "CH_R": {
       "mlb": {
         "mu": [
-          4.020793,
-          15.004566,
-          35.79925,
-          6.451339,
-          86.91908
+          4.019817,
+          14.997163,
+          35.807883,
+          6.450816,
+          86.92554
         ],
         "cov": [
           [
-            21.455102,
-            0.992578,
-            23.279336,
-            0.111525,
-            -2.317505
+            21.459562,
+            0.992975,
+            23.270982,
+            0.110945,
+            -2.316881
           ],
           [
-            0.992578,
-            12.344538,
-            -10.250196,
-            -0.002319,
-            0.25068
+            0.992975,
+            12.376059,
+            -10.266809,
+            -0.00205,
+            0.232207
           ],
           [
-            23.279336,
-            -10.250196,
-            129.50218,
-            -0.097744,
-            -4.671771
+            23.270982,
+            -10.266809,
+            129.487847,
+            -0.095599,
+            -4.652444
           ],
           [
-            0.111525,
-            -0.002319,
-            -0.097744,
-            0.151523,
-            -0.122216
+            0.110945,
+            -0.00205,
+            -0.095599,
+            0.151331,
+            -0.121744
           ],
           [
-            -2.317505,
-            0.25068,
-            -4.671771,
-            -0.122216,
-            11.273797
+            -2.316881,
+            0.232207,
+            -4.652444,
+            -0.121744,
+            11.283169
           ]
         ],
-        "n": 12264
+        "n": 12267
       },
       "roc": {
         "mu": [
-          4.096184,
-          14.97045,
-          5.599818,
-          -1.690447,
-          6.445585,
-          86.876197
+          4.093565,
+          14.962554,
+          5.600914,
+          -1.688658,
+          6.445082,
+          86.884145
         ],
         "cov": [
           [
-            21.623509,
-            0.788398,
-            0.774228,
-            0.436775,
-            0.095005,
-            -2.365241
+            21.633397,
+            0.79346,
+            0.774409,
+            0.436287,
+            0.094683,
+            -2.371547
           ],
           [
-            0.788398,
-            12.522199,
-            -0.271755,
-            -0.170182,
-            0.020242,
-            0.42461
+            0.79346,
+            12.548141,
+            -0.275261,
+            -0.174274,
+            0.020455,
+            0.402887
           ],
           [
-            0.774228,
-            -0.271755,
-            0.174117,
-            0.095324,
-            -0.01858,
-            -0.157809
+            0.774409,
+            -0.275261,
+            0.174632,
+            0.09592,
+            -0.018414,
+            -0.154581
           ],
           [
-            0.436775,
-            -0.170182,
-            0.095324,
-            0.426949,
-            -0.015983,
-            0.11497
+            0.436287,
+            -0.174274,
+            0.09592,
+            0.427222,
+            -0.015709,
+            0.118319
           ],
           [
-            0.095005,
-            0.020242,
-            -0.01858,
-            -0.015983,
-            0.151399,
-            -0.118638
+            0.094683,
+            0.020455,
+            -0.018414,
+            -0.015709,
+            0.151151,
+            -0.118214
           ],
           [
-            -2.365241,
-            0.42461,
-            -0.157809,
-            0.11497,
-            -0.118638,
-            11.334675
+            -2.371547,
+            0.402887,
+            -0.154581,
+            0.118319,
+            -0.118214,
+            11.347083
           ]
         ],
-        "n": 13154
+        "n": 13163
       }
     },
     "CU_L": {
@@ -3223,64 +3223,64 @@
       },
       "roc": {
         "mu": [
-          -11.423591,
-          7.849209,
-          6.04214,
-          1.56156,
-          6.26529,
-          79.503553
+          -11.435075,
+          7.856247,
+          6.042761,
+          1.560398,
+          6.265638,
+          79.484964
         ],
         "cov": [
           [
-            19.115806,
-            -5.875668,
-            -0.477697,
-            1.447196,
-            0.316098,
-            5.071056
+            19.08888,
+            -5.884872,
+            -0.477995,
+            1.443292,
+            0.31491,
+            5.121231
           ],
           [
-            -5.875668,
-            18.00853,
-            0.294077,
-            -0.276468,
-            -0.340414,
-            -5.998437
+            -5.884872,
+            17.972769,
+            0.295095,
+            -0.274509,
+            -0.340771,
+            -6.04337
           ],
           [
-            -0.477697,
-            0.294077,
-            0.103639,
-            -0.079488,
-            -0.033418,
-            -0.281208
+            -0.477995,
+            0.295095,
+            0.103436,
+            -0.079151,
+            -0.033364,
+            -0.285286
           ],
           [
-            1.447196,
-            -0.276468,
-            -0.079488,
-            0.423214,
-            0.040904,
-            -0.009365
+            1.443292,
+            -0.274509,
+            -0.079151,
+            0.422217,
+            0.040323,
+            -0.008991
           ],
           [
-            0.316098,
-            -0.340414,
-            -0.033418,
-            0.040904,
-            0.198091,
-            0.210556
+            0.31491,
+            -0.340771,
+            -0.033364,
+            0.040323,
+            0.197558,
+            0.211982
           ],
           [
-            5.071056,
-            -5.998437,
-            -0.281208,
-            -0.009365,
-            0.210556,
-            13.371126
+            5.121231,
+            -6.04337,
+            -0.285286,
+            -0.008991,
+            0.211982,
+            13.465303
           ]
         ],
-        "n": 3603
+        "n": 3618
       }
     },
     "CU_R": {
@@ -3333,64 +3333,64 @@
       },
       "roc": {
         "mu": [
-          -11.867381,
-          -8.85315,
-          5.919579,
-          -1.608162,
-          6.395056,
-          80.649707
+          -11.873175,
+          -8.849803,
+          5.920931,
+          -1.607013,
+          6.394732,
+          80.662711
         ],
         "cov": [
           [
-            12.873413,
-            1.316398,
-            -0.365794,
-            -0.348548,
-            0.039015,
-            3.067142
+            12.85276,
+            1.306096,
+            -0.366927,
+            -0.349048,
+            0.039589,
+            3.036457
           ],
           [
-            1.316398,
-            20.594601,
-            0.541998,
-            0.690496,
-            0.034046,
-            7.380451
+            1.306096,
+            20.536963,
+            0.541626,
+            0.689421,
+            0.033611,
+            7.368167
           ],
           [
-            -0.365794,
-            0.541998,
-            0.158242,
-            0.089516,
-            -0.045642,
-            -0.139346
+            -0.366927,
+            0.541626,
+            0.158273,
+            0.089672,
+            -0.045633,
+            -0.13389
           ],
           [
-            -0.348548,
-            0.690496,
-            0.089516,
-            0.447225,
-            -0.04073,
-            0.089774
+            -0.349048,
+            0.689421,
+            0.089672,
+            0.446202,
+            -0.040679,
+            0.094334
           ],
           [
-            0.039015,
-            0.034046,
-            -0.045642,
-            -0.04073,
-            0.156418,
-            0.083575
+            0.039589,
+            0.033611,
+            -0.045633,
+            -0.040679,
+            0.155944,
+            0.082313
           ],
           [
-            3.067142,
-            7.380451,
-            -0.139346,
-            0.089774,
-            0.083575,
-            14.822475
+            3.036457,
+            7.368167,
+            -0.13389,
+            0.094334,
+            0.082313,
+            14.827009
           ]
         ],
-        "n": 9381
+        "n": 9413
       }
     },
     "FC_L": {
@@ -3443,64 +3443,64 @@
       },
       "roc": {
         "mu": [
-          8.353112,
-          1.823307,
-          5.722657,
-          1.88875,
-          6.371206,
-          88.506663
+          8.356899,
+          1.804221,
+          5.716775,
+          1.893101,
+          6.370444,
+          88.493561
         ],
         "cov": [
           [
-            8.366062,
-            -2.338912,
-            -0.066319,
-            -0.064205,
-            -0.004986,
-            1.000392
+            8.297874,
+            -2.32047,
+            -0.068951,
+            -0.062939,
+            -0.004853,
+            0.972237
           ],
           [
-            -2.338912,
-            8.025584,
-            0.232006,
-            0.070684,
-            0.011849,
-            -0.60374
+            -2.32047,
+            8.03844,
+            0.243169,
+            0.046348,
+            0.012875,
+            -0.527805
           ],
           [
-            -0.066319,
-            0.232006,
-            0.13122,
-            -0.114783,
-            -0.019797,
-            0.302134
+            -0.068951,
+            0.243169,
+            0.133489,
+            -0.118426,
+            -0.019212,
+            0.317326
           ],
           [
-            -0.064205,
-            0.070684,
-            -0.114783,
-            0.625742,
-            0.097975,
-            -0.441362
+            -0.062939,
+            0.046348,
+            -0.118426,
+            0.630208,
+            0.095921,
+            -0.480808
           ],
           [
-            -0.004986,
-            0.011849,
-            -0.019797,
-            0.097975,
-            0.155768,
-            0.192833
+            -0.004853,
+            0.012875,
+            -0.019212,
+            0.095921,
+            0.153943,
+            0.192499
           ],
           [
-            1.000392,
-            -0.60374,
-            0.302134,
-            -0.441362,
-            0.192833,
-            6.557441
+            0.972237,
+            -0.527805,
+            0.317326,
+            -0.480808,
+            0.192499,
+            6.655314
           ]
         ],
-        "n": 3647
+        "n": 3696
       }
     },
     "FC_R": {
@@ -3553,64 +3553,64 @@
       },
       "roc": {
         "mu": [
-          8.596541,
-          -2.155981,
-          5.623756,
-          -1.704157,
-          6.395906,
-          89.912853
+          8.596391,
+          -2.156633,
+          5.623938,
+          -1.704329,
+          6.395785,
+          89.914199
         ],
         "cov": [
           [
-            11.089339,
-            1.856722,
-            0.166621,
-            0.394354,
-            -0.018812,
-            2.7716
+            11.082524,
+            1.855238,
+            0.166466,
+            0.394067,
+            -0.018772,
+            2.76914
           ],
           [
-            1.856722,
-            9.036031,
-            -0.310546,
-            -0.147528,
-            -0.138872,
-            2.041751
+            1.855238,
+            9.031757,
+            -0.310454,
+            -0.147264,
+            -0.138668,
+            2.039256
           ],
           [
-            0.166621,
-            -0.310546,
-            0.155985,
-            0.092906,
-            -0.035035,
-            0.049446
+            0.166466,
+            -0.310454,
+            0.155913,
+            0.092792,
+            -0.035038,
+            0.049726
           ],
           [
-            0.394354,
-            -0.147528,
-            0.092906,
-            0.423935,
-            -0.047036,
-            0.204816
+            0.394067,
+            -0.147264,
+            0.092792,
+            0.423656,
+            -0.046973,
+            0.204356
           ],
           [
-            -0.018812,
-            -0.138872,
-            -0.035035,
-            -0.047036,
-            0.196287,
-            0.100204
+            -0.018772,
+            -0.138668,
+            -0.035038,
+            -0.046973,
+            0.196159,
+            0.099917
           ],
           [
-            2.7716,
-            2.041751,
-            0.049446,
-            0.204816,
-            0.100204,
-            8.227937
+            2.76914,
+            2.039256,
+            0.049726,
+            0.204356,
+            0.099917,
+            8.224197
           ]
         ],
-        "n": 11795
+        "n": 11804
       }
     },
     "FF_L": {
@@ -3663,64 +3663,64 @@
       },
       "roc": {
         "mu": [
-          16.107452,
-          -7.900889,
-          5.709836,
-          1.726417,
-          6.449918,
-          93.309817
+          16.113716,
+          -7.903412,
+          5.710251,
+          1.723595,
+          6.449354,
+          93.31225
         ],
         "cov": [
           [
-            7.780311,
-            2.913737,
-            0.47111,
-            -0.88375,
-            -0.061118,
-            0.639921
+            7.750343,
+            2.898001,
+            0.468107,
+            -0.880961,
+            -0.061269,
+            0.641646
           ],
           [
-            2.913737,
-            15.805321,
-            0.60617,
-            -0.838293,
-            0.176816,
-            -0.600105
+            2.898001,
+            15.740359,
+            0.601058,
+            -0.834922,
+            0.177216,
+            -0.588861
           ],
           [
-            0.47111,
-            0.60617,
-            0.149951,
-            -0.14739,
-            -0.022948,
-            0.066256
+            0.468107,
+            0.601058,
+            0.149499,
+            -0.146096,
+            -0.022981,
+            0.065504
           ],
           [
-            -0.88375,
-            -0.838293,
-            -0.14739,
-            0.541032,
-            0.041818,
-            -0.259567
+            -0.880961,
+            -0.834922,
+            -0.146096,
+            0.539121,
+            0.041416,
+            -0.260234
           ],
           [
-            -0.061118,
-            0.176816,
-            -0.022948,
-            0.041818,
-            0.202566,
-            -0.064528
+            -0.061269,
+            0.177216,
+            -0.022981,
+            0.041416,
+            0.201586,
+            -0.063979
           ],
           [
-            0.639921,
-            -0.600105,
-            0.066256,
-            -0.259567,
-            -0.064528,
-            5.534908
+            0.641646,
+            -0.588861,
+            0.065504,
+            -0.260234,
+            -0.063979,
+            5.508528
           ]
         ],
-        "n": 16318
+        "n": 16441
       }
     },
     "FF_R": {
@@ -3773,284 +3773,284 @@
       },
       "roc": {
         "mu": [
-          16.177175,
-          7.813867,
-          5.662786,
-          -1.628205,
-          6.508258,
-          95.009121
+          16.175813,
+          7.807229,
+          5.663084,
+          -1.628092,
+          6.508248,
+          95.008866
         ],
         "cov": [
           [
-            7.15805,
-            -2.629386,
-            0.458805,
-            0.577181,
-            0.120889,
-            0.223087
+            7.159882,
+            -2.614912,
+            0.457742,
+            0.576056,
+            0.121419,
+            0.225155
           ],
           [
-            -2.629386,
-            15.22318,
-            -0.678267,
-            -0.765862,
-            -0.12848,
-            0.197889
+            -2.614912,
+            15.268449,
+            -0.680477,
+            -0.7671,
+            -0.127548,
+            0.201788
           ],
           [
-            0.458805,
-            -0.678267,
-            0.181578,
-            0.126436,
-            -0.025769,
-            0.101154
+            0.457742,
+            -0.680477,
+            0.181632,
+            0.126488,
+            -0.025829,
+            0.100803
           ],
           [
-            0.577181,
-            -0.765862,
-            0.126436,
-            0.449899,
-            -0.016129,
-            0.162041
+            0.576056,
+            -0.7671,
+            0.126488,
+            0.449653,
+            -0.016229,
+            0.161615
           ],
           [
-            0.120889,
-            -0.12848,
-            -0.025769,
-            -0.016129,
-            0.172357,
-            0.059126
+            0.121419,
+            -0.127548,
+            -0.025829,
+            -0.016229,
+            0.172406,
+            0.059426
           ],
           [
-            0.223087,
-            0.197889,
-            0.101154,
-            0.162041,
-            0.059126,
-            5.769231
+            0.225155,
+            0.201788,
+            0.100803,
+            0.161615,
+            0.059426,
+            5.767314
           ]
         ],
-        "n": 43383
+        "n": 43425
       }
     },
     "FS_L": {
       "mlb": {
         "mu": [
-          3.719756,
-          -11.806636,
-          38.303432,
-          6.41376,
-          85.040503
+          3.731331,
+          -11.804259,
+          38.345323,
+          6.414106,
+          85.048973
         ],
         "cov": [
           [
-            21.855373,
-            1.796124,
-            20.558085,
-            0.613533,
-            -2.053244
+            21.87401,
+            1.817302,
+            20.673503,
+            0.612838,
+            -2.004161
           ],
           [
-            1.796124,
-            21.201628,
-            16.515435,
-            0.265346,
-            -4.808647
+            1.817302,
+            21.151717,
+            16.506654,
+            0.264409,
+            -4.783832
           ],
           [
-            20.558085,
-            16.515435,
-            90.493339,
-            1.103415,
-            -2.476857
+            20.673503,
+            16.506654,
+            90.802998,
+            1.104774,
+            -2.347495
           ],
           [
-            0.613533,
-            0.265346,
-            1.103415,
-            0.246367,
-            -0.021402
+            0.612838,
+            0.264409,
+            1.104774,
+            0.245687,
+            -0.020278
           ],
           [
-            -2.053244,
-            -4.808647,
-            -2.476857,
-            -0.021402,
-            8.470442
+            -2.004161,
+            -4.783832,
+            -2.347495,
+            -0.020278,
+            8.471755
           ]
         ],
-        "n": 1311
+        "n": 1315
       },
       "roc": {
         "mu": [
-          3.778107,
-          -11.855791,
-          5.692076,
-          1.706186,
-          6.424972,
-          84.973658
+          3.788662,
+          -11.853451,
+          5.693627,
+          1.70588,
+          6.425261,
+          84.98169
         ],
         "cov": [
           [
-            21.845867,
-            2.316163,
-            0.276139,
-            -0.398766,
-            0.583918,
-            -2.377383
+            21.861922,
+            2.3347,
+            0.28063,
+            -0.399943,
+            0.583221,
+            -2.330764
           ],
           [
-            2.316163,
-            21.002977,
-            0.110319,
-            0.607969,
-            0.19361,
-            -4.998347
+            2.3347,
+            20.957543,
+            0.111058,
+            0.605448,
+            0.192935,
+            -4.974292
           ],
           [
-            0.276139,
-            0.110319,
-            0.107877,
-            -0.108805,
-            0.040429,
-            -0.097116
+            0.28063,
+            0.111058,
+            0.10845,
+            -0.108624,
+            0.040464,
+            -0.09267
           ],
           [
-            -0.398766,
-            0.607969,
-            -0.108805,
-            0.43254,
-            -0.093397,
-            -0.64379
+            -0.399943,
+            0.605448,
+            -0.108624,
+            0.431427,
+            -0.093173,
+            -0.643279
           ],
           [
-            0.583918,
-            0.19361,
-            0.040429,
-            -0.093397,
-            0.241438,
-            0.021138
+            0.583221,
+            0.192935,
+            0.040464,
+            -0.093173,
+            0.240815,
+            0.021991
           ],
           [
-            -2.377383,
-            -4.998347,
-            -0.097116,
-            -0.64379,
-            0.021138,
-            9.073249
+            -2.330764,
+            -4.974292,
+            -0.09267,
+            -0.643279,
+            0.021991,
+            9.073829
           ]
         ],
-        "n": 1416
+        "n": 1420
       }
     },
     "FS_R": {
       "mlb": {
         "mu": [
-          2.715103,
-          11.348625,
-          40.268861,
-          6.619087,
-          86.740373
+          2.716444,
+          11.361941,
+          40.253436,
+          6.62024,
+          86.727068
         ],
         "cov": [
           [
-            22.849879,
-            2.300373,
-            23.780835,
-            -0.315163,
-            -0.303294
+            22.845805,
+            2.324868,
+            23.769155,
+            -0.313021,
+            -0.320552
           ],
           [
-            2.300373,
-            18.798951,
-            -12.970481,
-            -0.209965,
-            4.701991
+            2.324868,
+            18.84147,
+            -13.061629,
+            -0.208966,
+            4.696346
           ],
           [
-            23.780835,
-            -12.970481,
-            108.496606,
-            -0.071867,
-            -9.128534
+            23.769155,
+            -13.061629,
+            108.662946,
+            -0.078409,
+            -9.114304
           ],
           [
-            -0.315163,
-            -0.209965,
-            -0.071867,
-            0.132688,
-            -0.088016
+            -0.313021,
+            -0.208966,
+            -0.078409,
+            0.132695,
+            -0.08652
           ],
           [
-            -0.303294,
-            4.701991,
-            -9.128534,
-            -0.088016,
-            11.684362
+            -0.320552,
+            4.696346,
+            -9.114304,
+            -0.08652,
+            11.66039
           ]
         ],
-        "n": 5999
+        "n": 5996
       },
       "roc": {
         "mu": [
-          2.809401,
-          11.251726,
-          5.746262,
-          -1.622231,
-          6.589975,
-          86.665491
+          2.810339,
+          11.264829,
+          5.74407,
+          -1.626027,
+          6.590674,
+          86.652981
         ],
         "cov": [
           [
-            22.37724,
-            1.850364,
-            0.594884,
-            0.479912,
-            -0.321614,
-            -0.450046
+            22.417239,
+            1.884116,
+            0.593876,
+            0.475581,
+            -0.319805,
+            -0.4764
           ],
           [
-            1.850364,
-            19.093158,
-            -0.409467,
-            -0.477233,
-            -0.195141,
-            4.645159
+            1.884116,
+            19.131178,
+            -0.411494,
+            -0.483166,
+            -0.195272,
+            4.637252
           ],
           [
-            0.594884,
-            -0.409467,
-            0.174379,
-            0.100593,
-            -0.040735,
-            -0.2801
+            0.593876,
+            -0.411494,
+            0.173959,
+            0.099894,
+            -0.040832,
+            -0.286107
           ],
           [
-            0.479912,
-            -0.477233,
-            0.100593,
-            0.334049,
-            -0.03326,
-            -0.402817
+            0.475581,
+            -0.483166,
+            0.099894,
+            0.333399,
+            -0.033219,
+            -0.409722
           ],
           [
-            -0.321614,
-            -0.195141,
-            -0.040735,
-            -0.03326,
-            0.139632,
-            -0.052049
+            -0.319805,
+            -0.195272,
+            -0.040832,
+            -0.033219,
+            0.140067,
+            -0.052293
           ],
           [
-            -0.450046,
-            4.645159,
-            -0.2801,
-            -0.402817,
-            -0.052049,
-            11.384323
+            -0.4764,
+            4.637252,
+            -0.286107,
+            -0.409722,
+            -0.052293,
+            11.352895
           ]
         ],
-        "n": 6691
+        "n": 6693
       }
     },
     "KN_R": {
@@ -4213,64 +4213,64 @@
       },
       "roc": {
         "mu": [
-          7.194278,
-          -15.862295,
-          5.575096,
-          1.905833,
-          6.373112,
-          93.015477
+          7.196288,
+          -15.84965,
+          5.574482,
+          1.902843,
+          6.373287,
+          93.013322
         ],
         "cov": [
           [
-            21.471633,
-            3.260077,
-            1.408164,
-            -1.454159,
-            0.420345,
-            3.680307
+            21.422223,
+            3.248052,
+            1.399819,
+            -1.451651,
+            0.4191,
+            3.656941
           ],
           [
-            3.260077,
-            7.527631,
-            0.350295,
-            -0.52487,
-            0.086525,
-            -0.471864
+            3.248052,
+            7.54792,
+            0.347901,
+            -0.531691,
+            0.086631,
+            -0.471204
           ],
           [
-            1.408164,
-            0.350295,
-            0.287647,
-            -0.253169,
-            -0.008516,
-            0.691308
+            1.399819,
+            0.347901,
+            0.286838,
+            -0.251529,
+            -0.008543,
+            0.689521
           ],
           [
-            -1.454159,
-            -0.52487,
-            -0.253169,
-            0.68291,
-            0.114849,
-            -0.939615
+            -1.451651,
+            -0.531691,
+            -0.251529,
+            0.682756,
+            0.114218,
+            -0.934819
           ],
           [
-            0.420345,
-            0.086525,
-            -0.008516,
-            0.114849,
-            0.308143,
-            -0.175418
+            0.4191,
+            0.086631,
+            -0.008543,
+            0.114218,
+            0.30694,
+            -0.174772
           ],
           [
-            3.680307,
-            -0.471864,
-            0.691308,
-            -0.939615,
-            -0.175418,
-            8.072105
+            3.656941,
+            -0.471204,
+            0.689521,
+            -0.934819,
+            -0.174772,
+            8.051613
           ]
         ],
-        "n": 9524
+        "n": 9563
       }
     },
     "SI_R": {
@@ -4323,64 +4323,64 @@
       },
       "roc": {
         "mu": [
-          7.634864,
-          15.605057,
-          5.498017,
-          -1.697632,
-          6.421507,
-          94.29222
+          7.643056,
+          15.596298,
+          5.498921,
+          -1.697058,
+          6.420985,
+          94.294958
         ],
         "cov": [
           [
-            24.000246,
-            -0.696101,
-            1.791576,
-            1.18332,
-            0.268277,
-            3.130411
+            24.021108,
+            -0.737941,
+            1.792121,
+            1.184667,
+            0.268461,
+            3.122662
           ],
           [
-            -0.696101,
-            9.004682,
-            0.122441,
-            -0.09111,
-            -0.128961,
-            1.939634
+            -0.737941,
+            9.023799,
+            0.117595,
+            -0.093673,
+            -0.127426,
+            1.931447
           ],
           [
-            1.791576,
-            0.122441,
-            0.342075,
-            0.172506,
-            -0.018929,
-            0.627491
+            1.792121,
+            0.117595,
+            0.341688,
+            0.172359,
+            -0.018973,
+            0.625248
           ],
           [
-            1.18332,
-            -0.09111,
-            0.172506,
-            0.429491,
-            0.003293,
-            0.244775
+            1.184667,
+            -0.093673,
+            0.172359,
+            0.428708,
+            0.003279,
+            0.244774
           ],
           [
-            0.268277,
-            -0.128961,
-            -0.018929,
-            0.003293,
-            0.164339,
-            0.017126
+            0.268461,
+            -0.127426,
+            -0.018973,
+            0.003279,
+            0.164123,
+            0.016627
           ],
           [
-            3.130411,
-            1.939634,
-            0.627491,
-            0.244775,
-            0.017126,
-            6.511568
+            3.122662,
+            1.931447,
+            0.625248,
+            0.244774,
+            0.016627,
+            6.504872
           ]
         ],
-        "n": 22622
+        "n": 22689
       }
     },
     "SL_L": {
@@ -4433,64 +4433,64 @@
       },
       "roc": {
         "mu": [
-          1.243555,
-          3.922177,
-          5.851564,
-          1.807771,
-          6.347737,
-          84.913065
+          1.227944,
+          3.921298,
+          5.851744,
+          1.806678,
+          6.347028,
+          84.918971
         ],
         "cov": [
           [
-            15.608212,
-            -1.157979,
-            0.012528,
-            0.345742,
-            0.058887,
-            2.07822
+            15.684106,
+            -1.194438,
+            0.009779,
+            0.345633,
+            0.057631,
+            2.077442
           ],
           [
-            -1.157979,
-            8.060508,
-            -0.140501,
-            0.236068,
-            -0.019925,
-            -2.047168
+            -1.194438,
+            8.05074,
+            -0.139181,
+            0.234665,
+            -0.018639,
+            -2.0497
           ],
           [
-            0.012528,
-            -0.140501,
-            0.12445,
-            -0.087752,
-            0.017261,
-            -0.0707
+            0.009779,
+            -0.139181,
+            0.124012,
+            -0.087188,
+            0.01718,
+            -0.071154
           ],
           [
-            0.345742,
-            0.236068,
-            -0.087752,
-            0.469675,
-            -0.036017,
-            -0.288804
+            0.345633,
+            0.234665,
+            -0.087188,
+            0.467591,
+            -0.035873,
+            -0.287943
           ],
           [
-            0.058887,
-            -0.019925,
-            0.017261,
-            -0.036017,
-            0.172846,
-            -0.00443
+            0.057631,
+            -0.018639,
+            0.01718,
+            -0.035873,
+            0.172416,
+            -0.006131
           ],
           [
-            2.07822,
-            -2.047168,
-            -0.0707,
-            -0.288804,
-            -0.00443,
-            7.85611
+            2.077442,
+            -2.0497,
+            -0.071154,
+            -0.287943,
+            -0.006131,
+            7.830595
           ]
         ],
-        "n": 6881
+        "n": 6921
       }
     },
     "SL_R": {
@@ -4543,171 +4543,171 @@
       },
       "roc": {
         "mu": [
-          1.110319,
-          -3.517389,
-          5.799897,
-          -1.571281,
-          6.348696,
-          86.621571
+          1.109208,
+          -3.517074,
+          5.799695,
+          -1.571287,
+          6.348536,
+          86.623168
         ],
         "cov": [
           [
-            14.314114,
-            0.660523,
-            -0.041868,
+            14.310991,
+            0.659799,
+            -0.04147,
             -0.017397,
-            0.069189,
-            2.714008
+            0.069402,
+            2.709844
           ],
           [
-            0.660523,
-            9.110995,
-            -0.02296,
-            0.063387,
-            -0.16246,
-            0.936323
+            0.659799,
+            9.109323,
+            -0.023252,
+            0.063635,
+            -0.162691,
+            0.93656
           ],
           [
-            -0.041868,
-            -0.02296,
-            0.154131,
-            0.093736,
-            -0.030775,
-            -0.022131
+            -0.04147,
+            -0.023252,
+            0.154133,
+            0.093669,
+            -0.030689,
+            -0.022704
           ],
           [
             -0.017397,
-            0.063387,
-            0.093736,
-            0.456333,
-            -0.033109,
-            0.310938
+            0.063635,
+            0.093669,
+            0.456125,
+            -0.033112,
+            0.310775
           ],
           [
-            0.069189,
-            -0.16246,
-            -0.030775,
-            -0.033109,
-            0.196465,
-            0.053622
+            0.069402,
+            -0.162691,
+            -0.030689,
+            -0.033112,
+            0.196425,
+            0.053131
           ],
           [
-            2.714008,
-            0.936323,
-            -0.022131,
-            0.310938,
-            0.053622,
-            6.573582
+            2.709844,
+            0.93656,
+            -0.022704,
+            0.310775,
+            0.053131,
+            6.575302
           ]
         ],
-        "n": 18006
+        "n": 18016
       }
     },
     "ST_L": {
       "mlb": {
         "mu": [
-          0.030291,
-          13.411739,
-          28.72444,
-          6.277012,
-          80.809832
+          0.050828,
+          13.432527,
+          28.625721,
+          6.277056,
+          80.811047
         ],
         "cov": [
           [
-            16.557153,
-            -3.065752,
-            1.0697,
-            0.135452,
-            -0.970609
+            16.497518,
+            -3.175885,
+            1.538878,
+            0.136608,
+            -0.977446
           ],
           [
-            -3.065752,
-            17.614133,
-            2.058539,
-            -0.230818,
-            -1.560017
+            -3.175885,
+            17.542273,
+            2.537314,
+            -0.231978,
+            -1.571271
           ],
           [
-            1.0697,
-            2.058539,
-            158.676636,
-            0.303987,
-            12.863899
+            1.538878,
+            2.537314,
+            157.166814,
+            0.305812,
+            12.947841
           ],
           [
-            0.135452,
-            -0.230818,
-            0.303987,
-            0.317414,
-            -0.309241
+            0.136608,
+            -0.231978,
+            0.305812,
+            0.318732,
+            -0.310798
           ],
           [
-            -0.970609,
-            -1.560017,
-            12.863899,
-            -0.309241,
-            8.587187
+            -0.977446,
+            -1.571271,
+            12.947841,
+            -0.310798,
+            8.623081
           ]
         ],
-        "n": 5401
+        "n": 5377
       },
       "roc": {
         "mu": [
-          0.04743,
-          13.415582,
-          5.418505,
-          2.493282,
-          6.274315,
-          80.781632
+          0.081488,
+          13.452786,
+          5.415124,
+          2.497547,
+          6.273569,
+          80.757009
         ],
         "cov": [
           [
-            16.528739,
-            -3.08793,
-            -0.088781,
-            0.178813,
-            0.13629,
-            -0.991931
+            16.614437,
+            -3.188289,
+            -0.087157,
+            0.17934,
+            0.135234,
+            -1.163338
           ],
           [
-            -3.08793,
-            17.626712,
-            0.181236,
-            0.110801,
-            -0.242415,
-            -1.59989
+            -3.188289,
+            17.597528,
+            0.194788,
+            0.088245,
+            -0.245709,
+            -1.668424
           ],
           [
-            -0.088781,
-            0.181236,
-            0.221394,
-            -0.121895,
-            -0.022889,
-            0.382501
+            -0.087157,
+            0.194788,
+            0.220394,
+            -0.120735,
+            -0.02283,
+            0.392717
           ],
           [
-            0.178813,
-            0.110801,
-            -0.121895,
-            0.461283,
-            0.092644,
-            -0.767053
+            0.17934,
+            0.088245,
+            -0.120735,
+            0.460179,
+            0.092628,
+            -0.782391
           ],
           [
-            0.13629,
-            -0.242415,
-            -0.022889,
-            0.092644,
-            0.318471,
-            -0.29678
+            0.135234,
+            -0.245709,
+            -0.02283,
+            0.092628,
+            0.318585,
+            -0.292484
           ],
           [
-            -0.991931,
-            -1.59989,
-            0.382501,
-            -0.767053,
-            -0.29678,
-            8.569876
+            -1.163338,
+            -1.668424,
+            0.392717,
+            -0.782391,
+            -0.292484,
+            8.784928
           ]
         ],
         "n": 5564
@@ -4763,174 +4763,174 @@
       },
       "roc": {
         "mu": [
-          1.611134,
-          -14.14295,
-          5.432187,
-          -2.074141,
-          6.368103,
-          83.157541
+          1.611379,
+          -14.143716,
+          5.433022,
+          -2.073696,
+          6.368427,
+          83.165076
         ],
         "cov": [
           [
-            18.964514,
-            2.814275,
-            -0.831307,
-            -0.457463,
-            0.213705,
-            -1.43169
+            18.9509,
+            2.817762,
+            -0.830665,
+            -0.458074,
+            0.214623,
+            -1.426941
           ],
           [
-            2.814275,
-            16.751299,
-            0.250716,
-            0.549251,
-            0.115785,
-            3.465441
+            2.817762,
+            16.727561,
+            0.249491,
+            0.547177,
+            0.116622,
+            3.456935
           ],
           [
-            -0.831307,
-            0.250716,
-            0.297362,
-            0.159079,
-            -0.017867,
-            0.50514
+            -0.830665,
+            0.249491,
+            0.29713,
+            0.159092,
+            -0.017815,
+            0.507063
           ],
           [
-            -0.457463,
-            0.549251,
-            0.159079,
-            0.470198,
-            0.013935,
-            0.333816
+            -0.458074,
+            0.547177,
+            0.159092,
+            0.469494,
+            0.013782,
+            0.335615
           ],
           [
-            0.213705,
-            0.115785,
-            -0.017867,
-            0.013935,
-            0.161901,
-            0.064791
+            0.214623,
+            0.116622,
+            -0.017815,
+            0.013782,
+            0.161858,
+            0.065455
           ],
           [
-            -1.43169,
-            3.465441,
-            0.50514,
-            0.333816,
-            0.064791,
-            9.285615
+            -1.426941,
+            3.456935,
+            0.507063,
+            0.335615,
+            0.065455,
+            9.293285
           ]
         ],
-        "n": 12412
+        "n": 12444
       }
     },
     "SV_L": {
       "mlb": {
         "mu": [
-          -6.059942,
-          12.105476,
-          37.042651,
-          6.411931,
-          80.899424
+          -5.963612,
+          11.888679,
+          37.93531,
+          6.402561,
+          80.876011
         ],
         "cov": [
           [
-            6.098766,
-            -0.509815,
-            -2.127378,
-            0.124576,
-            -0.255439
+            6.398807,
+            -0.774425,
+            -0.860018,
+            0.092428,
+            -0.316827
           ],
           [
-            -0.509815,
-            8.021849,
-            0.707396,
-            0.377923,
-            -3.23043
+            -0.774425,
+            8.956142,
+            -2.255329,
+            0.381718,
+            -2.967624
           ],
           [
-            -2.127378,
-            0.707396,
-            101.935979,
-            -4.203481,
-            12.331296
+            -0.860018,
+            -2.255329,
+            107.234182,
+            -4.04458,
+            11.235633
           ],
           [
-            0.124576,
-            0.377923,
-            -4.203481,
-            0.303569,
-            -1.307542
+            0.092428,
+            0.381718,
+            -4.04458,
+            0.286592,
+            -1.21716
           ],
           [
-            -0.255439,
-            -3.23043,
-            12.331296,
-            -1.307542,
-            11.24763
+            -0.316827,
+            -2.967624,
+            11.235633,
+            -1.21716,
+            10.556639
           ]
         ],
-        "n": 347
+        "n": 371
       },
       "roc": {
         "mu": [
-          -6.133967,
-          11.994293,
-          5.671793,
-          2.051332,
-          6.390217,
-          80.851359
+          -6.026829,
+          11.886829,
+          5.690537,
+          1.989098,
+          6.380341,
+          80.740976
         ],
         "cov": [
           [
-            6.162195,
-            -0.36123,
-            -0.013282,
-            0.030588,
-            0.132228,
-            -0.391221
+            6.442115,
+            -0.541259,
+            -0.000587,
+            -0.022469,
+            0.096031,
+            -0.481001
           ],
           [
-            -0.36123,
-            8.039886,
-            -0.174374,
-            -0.041486,
-            0.40417,
-            -2.842976
+            -0.541259,
+            9.103005,
+            -0.241954,
+            -0.039269,
+            0.379364,
+            -2.703126
           ],
           [
-            -0.013282,
-            -0.174374,
-            0.140591,
-            -0.29067,
-            -0.165773,
-            0.832594
+            -0.000587,
+            -0.241954,
+            0.137229,
+            -0.264109,
+            -0.150792,
+            0.749645
           ],
           [
-            0.030588,
-            -0.041486,
-            -0.29067,
-            1.305616,
-            0.459315,
-            -1.508319
+            -0.022469,
+            -0.039269,
+            -0.264109,
+            1.21386,
+            0.416637,
+            -1.273396
           ],
           [
-            0.132228,
-            0.40417,
-            -0.165773,
-            0.459315,
-            0.296031,
-            -1.178003
+            0.096031,
+            0.379364,
+            -0.150792,
+            0.416637,
+            0.268334,
+            -1.047175
           ],
           [
-            -0.391221,
-            -2.842976,
-            0.832594,
-            -1.508319,
-            -1.178003,
-            11.426102
+            -0.481001,
+            -2.703126,
+            0.749645,
+            -1.273396,
+            -1.047175,
+            10.51597
           ]
         ],
-        "n": 368
+        "n": 410
       }
     },
     "SV_R": {
@@ -5048,17 +5048,17 @@
     "ATH": 41,
     "TOR": 42,
     "HOU": 42,
-    "NYY": 43,
+    "NYY": 44,
     "CWS": 41,
     "NYM": 40,
     "ATL": 42,
     "TEX": 42,
-    "BAL": 42,
+    "BAL": 43,
     "STL": 41,
     "SEA": 43,
     "KCR": 41,
     "PHI": 41,
-    "CLE": 43,
+    "CLE": 44,
     "MIA": 42,
     "BOS": 41,
     "SFG": 41,
@@ -5070,7 +5070,7 @@
     "TBR": 41,
     "CIN": 42,
     "SDP": 41,
-    "LAA": 43,
+    "LAA": 44,
     "LAD": 42,
     "CHC": 41,
     "WSH": 42,
@@ -12644,15 +12644,15 @@
   },
   "hitterPlusStandardization": {
     "bbPlus": {
-      "mean": 103.331,
-      "sd": 12.973
+      "mean": 103.332,
+      "sd": 12.94
     },
     "sdPlus": {
       "mean": 101.649,
       "sd": 13.348
     },
     "ctPlus": {
-      "mean": 100.315,
+      "mean": 100.316,
       "sd": 3.486
     },
     "weights": {
@@ -12663,7 +12663,7 @@
     "scale": 40,
     "nQualified": 176
   },
-  "sieraConstant": 6.0028,
+  "sieraConstant": 6.0015,
   "gutsConstants": {
     "lgWOBA": 0.3173,
     "wOBAScale": 1.266,
