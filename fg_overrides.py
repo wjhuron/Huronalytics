@@ -67,13 +67,25 @@ def _http_get_json(url, timeout=30):
 
 
 def fetch_mlb_hitters(year=2026):
-    """Returns dict keyed by xMLBAMID with wRC+, xwOBA, PA, name.
+    """Returns dict keyed by xMLBAMID with wRC+, xwOBA, xBA, xSLG, PA, name.
 
-    Why not also wOBA? Pipeline wOBA matches FG wOBA to within ±0.0005
-    (rounding noise — both use FG's published linear weights), so the
-    override would be cosmetically identical. xwOBA differs by ~0.001
-    which can flip the displayed third decimal (e.g. .484 vs .485), so
-    that one's worth overriding."""
+    Override scope:
+    - wRC+, xwOBA, xBA, xSLG — pulled because the pipeline's rounded
+      values flip the displayed third decimal (or whole number for wRC+)
+      vs FG for a substantial fraction of hitters.
+    - wOBA / AVG / OBP / SLG / BABIP / OPS / ISO — NOT pulled. Pipeline
+      matches FG to within ±0.0005 (rounding noise) since we already use
+      FG's published wOBA linear weights from the Guts page. Override
+      would be cosmetically identical.
+    - HardHit%, Barrel% — not pulled yet. The deltas (~0.003) hint at
+      methodology differences (EV cutoffs / denominators), so an
+      override would paper over an underlying mismatch rather than fix
+      it. Worth auditing the pipeline definitions before deciding.
+
+    FG field naming quirks:
+    - "xAVG" on the API → exposed as `xBA` here to match pipeline naming.
+    - `xSLG` and `xwOBA` use FG's names directly (same as pipeline).
+    """
     params = (
         f'pos=all&stats=bat&lg=all&qual=0&type=1'
         f'&season={year}&seasonEnd={year}'
@@ -88,9 +100,13 @@ def fetch_mlb_hitters(year=2026):
         if mid is None or wrc is None:
             continue
         xwoba = r.get('xwOBA')
+        xba = r.get('xAVG')
+        xslg = r.get('xSLG')
         out[str(int(mid))] = {
             'wRCplus': round(float(wrc)),
             'xwOBA':   round(float(xwoba), 3) if xwoba is not None else None,
+            'xBA':     round(float(xba),   3) if xba   is not None else None,
+            'xSLG':    round(float(xslg),  3) if xslg  is not None else None,
             'pa':      int(r.get('PA') or 0),
             'name':    r.get('PlayerName') or r.get('Name'),
         }

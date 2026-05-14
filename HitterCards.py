@@ -1173,13 +1173,13 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     is_roc = (h_row.get('team') == 'ROC')
     headline_stats = HEADLINE_STATS_ROC if is_roc else HEADLINE_STATS_MLB
 
-    # FG override: pull canonical wRC+ (and xwOBA for MLB) so the card
-    # matches what readers see on fangraphs.com. The pipeline writes
-    # these values directly into the JSON, so this fallback only matters
-    # when the card is rendered against an older leaderboard snapshot
-    # (pre-FG-override pipeline run). MLB hitters use mlbHitters
-    # (wRC+ + xwOBA); AAA hitters use aaaHitters (wRC+ only — FG doesn't
-    # publish xwOBA for AAA).
+    # FG override: pull canonical wRC+ (and xwOBA/xBA/xSLG for MLB) so
+    # the card matches fangraphs.com. The pipeline writes these values
+    # directly into the JSON, so this fallback only matters when the
+    # card is rendered against an older leaderboard snapshot (pre-FG-
+    # override pipeline run). MLB hitters get wRC+ + xwOBA + xBA + xSLG;
+    # AAA hitters get wRC+ only (FG doesn't publish the Statcast
+    # expected stats for AAA).
     try:
         from fg_overrides import refresh_if_stale as _fg_refresh
         _fg_cache = _fg_refresh(max_age_hours=24, verbose=True)
@@ -1189,14 +1189,20 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             _fg_player = _fg_cache.get(_group_key, {}).get(str(int(_mid)))
             if _fg_player:
                 _h_row_modified = False
-                if _fg_player.get('wRCplus') is not None:
-                    if not _h_row_modified:
-                        h_row = dict(h_row); _h_row_modified = True
-                    h_row['wRCplus'] = _fg_player['wRCplus']
-                if _fg_player.get('xwOBA') is not None:
-                    if not _h_row_modified:
-                        h_row = dict(h_row); _h_row_modified = True
-                    h_row['xwOBA'] = _fg_player['xwOBA']
+                # Fields to copy from the FG cache to the in-memory row.
+                # Each entry is (cache_key, row_key); silently skip when
+                # the cache doesn't have a value for that key (AAA only
+                # has wRCplus, MLB has all four).
+                for cache_k, row_k in (
+                    ('wRCplus', 'wRCplus'),
+                    ('xwOBA',   'xwOBA'),
+                    ('xBA',     'xBA'),
+                    ('xSLG',    'xSLG'),
+                ):
+                    if _fg_player.get(cache_k) is not None:
+                        if not _h_row_modified:
+                            h_row = dict(h_row); _h_row_modified = True
+                        h_row[row_k] = _fg_player[cache_k]
     except Exception as _e:
         # Never block the card render on FG scraper failure.
         print(f'  WARNING: FG override unavailable ({type(_e).__name__}: {_e})')
