@@ -1209,7 +1209,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
 
-    # BIP scatter
+    # BIP scatter — capture Event so we can outline hits / extra-base hits
     bip_pts = []
     for p in hitter_pitches:
         if p.get('Description') != 'In Play': continue
@@ -1219,18 +1219,38 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ang = spray_angle(sf(p.get('HC_X')), sf(p.get('HC_Y')))
         ev = sf(p.get('ExitVelo'))
         if la is None or ang is None: continue
-        bip_pts.append((ang, max(-20, min(60, la)), ev, la))
+        event = p.get('Event', '') or ''
+        bip_pts.append((ang, max(-20, min(60, la)), ev, la, event))
 
-    def ev_color(ev):
-        # Alpha 0.95 (was 0.85) — dots fully opaque so they don't get
-        # washed by the saturated SACQ zone colors underneath.
-        if ev is None: return (0.6, 0.6, 0.6, 0.75)
-        t = max(0, min(1, (ev - 70) / 45))
-        if t < 0.5:
-            s = t / 0.5
-            return ((0 + s * 140) / 255, (100 + s * 40) / 255, (255 - s * 115) / 255, 0.95)
-        s = (t - 0.5) / 0.5
-        return ((140 + s * 115) / 255, (140 - s * 120) / 255, (140 - s * 120) / 255, 0.95)
+    # Outcome-based dot coloring (replaces the old EV gradient). Warm-paper
+    # palette: gray for non-hits, amber for singles, purple for doubles,
+    # teal for triples, crimson for home runs. Size still encodes EV so the
+    # chart shows BOTH outcome AND contact quality.
+    OUTCOME_COLORS = {
+        'Out': '#6e6557',      # muted warm gray (Out/E/FC)
+        '1B':  '#e0892b',      # rich amber
+        '2B':  '#9a4eaf',      # medium purple (distinct from #5d3b8e Avg Placement)
+        '3B':  '#188a8a',      # teal
+        'HR':  '#a8261e',      # deep crimson (matches the warm-theme accent family)
+    }
+    OUTCOME_ALPHA = {'Out': 0.62, '1B': 0.95, '2B': 0.95, '3B': 0.95, 'HR': 0.95}
+
+    def _outcome_category(event):
+        if event == 'Single':   return '1B'
+        if event == 'Double':   return '2B'
+        if event == 'Triple':   return '3B'
+        if event == 'Home Run': return 'HR'
+        # Everything else in-play: Out / Error / Fielders Choice / Sac
+        return 'Out'
+
+    def outcome_color(event):
+        cat = _outcome_category(event)
+        hex_c = OUTCOME_COLORS[cat]
+        a = OUTCOME_ALPHA[cat]
+        r = int(hex_c[1:3], 16) / 255
+        g = int(hex_c[3:5], 16) / 255
+        b = int(hex_c[5:7], 16) / 255
+        return (r, g, b, a)
 
     def ev_size(ev):
         # Match hitter page (js/player-page.js evRadius): 7-12 pixel radii.
@@ -1245,43 +1265,51 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         if ev < 105: return 200
         return 240               # r ~17 px equivalent
 
-    # Thin dark edge on every BIP dot for contrast against the saturated
-    # SACQ zone backgrounds — gray dots in particular were blending with
-    # the muted tan/teal zones without an edge.
-    for x, y, ev, _real in bip_pts:
-        ax_spray.scatter([x], [y], s=ev_size(ev), c=[ev_color(ev)],
-                          edgecolors='#1a1612', linewidths=0.7, zorder=3)
+    # Render order: outs first (back), then hits in increasing weight order
+    # (1B → 2B → 3B → HR) so the most distinctive markers sit on top and
+    # never get obscured by neighboring out dots.
+    _OUTCOME_Z = {'Out': 0, '1B': 1, '2B': 2, '3B': 3, 'HR': 4}
+    for x, y, ev, _real, event in sorted(bip_pts,
+                                          key=lambda r: _OUTCOME_Z[_outcome_category(r[4])]):
+        cat = _outcome_category(event)
+        ax_spray.scatter([x], [y], s=ev_size(ev), c=[outcome_color(event)],
+                          edgecolors='#1a1612', linewidths=0.6,
+                          zorder=3 + _OUTCOME_Z[cat])
 
-    # Median placement (cyan marker) using REAL la (not clamped) — matches
-    # the hitter page (median, not mean, so single extreme BIPs don't pull
-    # the marker away from where the hitter typically places the ball)
-    if bip_pts:
+    # Median placement marker — prefer the values stored on the leaderboard
+    # row (h_row['medLA'] and h_row['medSpray']). Those are computed by the
+    # pipeline from the source-of-truth sheet data and stay in sync with the
+    # website's "Avg Placement" annotation. Falls back to recomputing from
+    # the local pickle ONLY for whichever value is missing (older pipeline
+    # output) — never overwrite a value that already came from the JSON.
+    med_spray = sf(h_row.get('medSpray'))
+    med_la_real = sf(h_row.get('medLA'))
+    if (med_spray is None or med_la_real is None) and bip_pts:
         sorted_sprays = sorted(p[0] for p in bip_pts)
         sorted_las = sorted(p[3] for p in bip_pts)
         n_pts = len(bip_pts)
         mid = n_pts // 2
         if n_pts % 2 == 0:
-            med_spray = (sorted_sprays[mid - 1] + sorted_sprays[mid]) / 2
-            med_la_real = (sorted_las[mid - 1] + sorted_las[mid]) / 2
+            pickle_spray = (sorted_sprays[mid - 1] + sorted_sprays[mid]) / 2
+            pickle_la = (sorted_las[mid - 1] + sorted_las[mid]) / 2
         else:
-            med_spray = sorted_sprays[mid]
-            med_la_real = sorted_las[mid]
+            pickle_spray = sorted_sprays[mid]
+            pickle_la = sorted_las[mid]
+        if med_spray is None:    med_spray = pickle_spray
+        if med_la_real is None:  med_la_real = pickle_la
+    if med_spray is not None and med_la_real is not None:
         med_la_plot = max(-20, min(60, med_la_real))
-        # Always cyan, regardless of theme — this is a system annotation.
-        # Outer white halo + cyan inner dot, black edge for contrast on
-        # any background (cream paper or dark navy alike).
+        # Outer white halo + purple inner dot — matches the legend swatch.
         ax_spray.scatter([med_spray], [med_la_plot], s=420,
                           c='white', zorder=10, alpha=0.95,
                           edgecolors='black', linewidths=0.5)
         ax_spray.scatter([med_spray], [med_la_plot], s=240,
                           c=MARKER_ACCENT, edgecolors='black',
                           linewidths=2, zorder=11)
-    else:
-        med_spray = med_la_real = None
 
     # xwOBAsp (hitter overall, hand-specific zones with pooled fallback)
     xwobasp_sum = 0; xwobasp_n = 0; total_bip = 0
-    for ang, _yc, _ev, la_r in bip_pts:
+    for ang, _yc, _ev, la_r, _event in bip_pts:
         total_bip += 1
         sd = spray_direction(ang, bats)
         lb = la_bin_idx(la_r) if la_r is not None else None
@@ -1435,10 +1463,14 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     legend_y_dots = spray_axes_bottom - 0.045    # clear of xlabel
     legend_y_grad = spray_axes_bottom - 0.090    # generous gap from dots
 
-    EV_LEGEND = [
-        ('70 mph',  '#0064ff'),
-        ('95 mph',  '#8c8c8c'),
-        ('115 mph', '#ff1414'),
+    # Dot colors now encode outcome (not EV). Legend uses the same warm-paper
+    # palette as the BIP scatter above.
+    OUTCOME_LEGEND = [
+        ('Out / E / FC', OUTCOME_COLORS['Out']),
+        ('1B',          OUTCOME_COLORS['1B']),
+        ('2B',          OUTCOME_COLORS['2B']),
+        ('3B',          OUTCOME_COLORS['3B']),
+        ('HR',          OUTCOME_COLORS['HR']),
     ]
     LEGEND_FONTSIZE = 13
     DOT_RADIUS = 0.0065
@@ -1467,14 +1499,25 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                     transform=fig.transFigure, figure=fig)
         fig.add_artist(c)
 
-    # Row 1 — pre-measure entire row to center it
+    def _draw_outlined_dot(x, y, edge_color, edge_width, radius=DOT_RADIUS):
+        # Neutral gray fill so the outline reads clearly; matches the visual
+        # treatment of a typical mid-EV BIP dot.
+        c = Circle((x, y), radius,
+                    facecolor=PERCENTILE_NEUTRAL,
+                    edgecolor=edge_color, linewidth=edge_width,
+                    transform=fig.transFigure, figure=fig)
+        fig.add_artist(c)
+
+    # Row 1 — pre-measure entire row to center it. Includes:
+    #   5 outcome color dots + Size = EV + Avg Placement
     row1_w = 0.0
-    for label, _ in EV_LEGEND:
+    for label, _ in OUTCOME_LEGEND:
         row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text(label, LEGEND_FONTSIZE) + ITEM_GAP
-    row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Size = EV', LEGEND_FONTSIZE)
+    row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Size = EV', LEGEND_FONTSIZE) + ITEM_GAP
+    row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Avg Placement', LEGEND_FONTSIZE)
     cur_x = legend_center_x - row1_w / 2
 
-    for label, hexcolor in EV_LEGEND:
+    for label, hexcolor in OUTCOME_LEGEND:
         _draw_dot(cur_x + DOT_RADIUS, legend_y_dots, hexcolor)
         cur_x += 2 * DOT_RADIUS + 0.006
         cur_x = _draw_text(cur_x, legend_y_dots, label, LEGEND_FONTSIZE, PERCENTILE_NEUTRAL)
@@ -1482,7 +1525,16 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     _draw_dot(cur_x + DOT_RADIUS * 0.85, legend_y_dots, TEXT_DIMMED,
               radius=DOT_RADIUS * 0.85)
     cur_x += 2 * DOT_RADIUS + 0.006
-    _draw_text(cur_x, legend_y_dots, 'Size = EV', LEGEND_FONTSIZE, TEXT_DIMMED)
+    cur_x = _draw_text(cur_x, legend_y_dots, 'Size = EV', LEGEND_FONTSIZE, TEXT_DIMMED)
+    cur_x += ITEM_GAP
+    # Avg Placement marker — purple fill with black edge, matches the inner
+    # layer of the median marker drawn on the scatter (s=240 dot at MARKER_ACCENT).
+    c_avg = Circle((cur_x + DOT_RADIUS, legend_y_dots), DOT_RADIUS,
+                    facecolor=MARKER_ACCENT, edgecolor='black', linewidth=1.2,
+                    transform=fig.transFigure, figure=fig)
+    fig.add_artist(c_avg)
+    cur_x += 2 * DOT_RADIUS + 0.006
+    _draw_text(cur_x, legend_y_dots, 'Avg Placement', LEGEND_FONTSIZE, TEXT_DIMMED)
 
     # Row 2 — MLB wOBAcon gradient (label + .000 + bar + 1.000+)
     grad_label = 'MLB wOBAcon: '
