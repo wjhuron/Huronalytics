@@ -787,7 +787,7 @@ def _format_bubble_value(v, spec):
         # Per memory: never prefix positives with '+'. Negatives still get '-'.
         return f'{v:.1f}'
     if spec == 'mph':
-        return f'{v:.1f}'
+        return f'{v:.1f} mph'
     return str(v)
 
 
@@ -1583,14 +1583,19 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     legend_y_grad = spray_axes_bottom - 0.090    # generous gap from dots
 
     # Dot colors now encode outcome (not EV). Legend uses the same warm-paper
-    # palette as the BIP scatter above.
-    OUTCOME_LEGEND = [
-        ('Out / E / FC', OUTCOME_COLORS['Out']),
-        ('1B',          OUTCOME_COLORS['1B']),
-        ('2B',          OUTCOME_COLORS['2B']),
-        ('3B',          OUTCOME_COLORS['3B']),
-        ('HR',          OUTCOME_COLORS['HR']),
+    # palette as the BIP scatter above. Each tuple is (label, color, cat-key)
+    # so we can filter out categories the hitter has zero of (e.g. no 3B for
+    # a player with no triples) — no point listing what isn't on the chart.
+    OUTCOME_LEGEND_ALL = [
+        ('Out / E / FC', OUTCOME_COLORS['Out'], 'Out'),
+        ('1B',           OUTCOME_COLORS['1B'],  '1B'),
+        ('2B',           OUTCOME_COLORS['2B'],  '2B'),
+        ('3B',           OUTCOME_COLORS['3B'],  '3B'),
+        ('HR',           OUTCOME_COLORS['HR'],  'HR'),
     ]
+    _present_cats = {_outcome_category(p[4]) for p in bip_pts}
+    OUTCOME_LEGEND = [item for item in OUTCOME_LEGEND_ALL
+                       if item[2] in _present_cats]
     LEGEND_FONTSIZE = 13
     DOT_RADIUS = 0.0065
     ITEM_GAP = 0.026
@@ -1628,15 +1633,20 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         fig.add_artist(c)
 
     # Row 1 — pre-measure entire row to center it. Includes:
-    #   5 outcome color dots + Size = EV + Avg Placement
+    #   N outcome color dots + Size = EV + Avg Placement
+    # The Avg Placement swatch is a halo-style two-circle marker (white
+    # outer + purple inner) so we use a larger effective radius for its
+    # slot in the layout. Matches the chart's median marker.
+    AVG_HALO_RADIUS = DOT_RADIUS * 1.35
+
     row1_w = 0.0
-    for label, _ in OUTCOME_LEGEND:
+    for label, _, _cat in OUTCOME_LEGEND:
         row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text(label, LEGEND_FONTSIZE) + ITEM_GAP
     row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Size = EV', LEGEND_FONTSIZE) + ITEM_GAP
-    row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Avg Placement', LEGEND_FONTSIZE)
+    row1_w += 2 * AVG_HALO_RADIUS + 0.006 + _measure_text('Avg Placement', LEGEND_FONTSIZE)
     cur_x = legend_center_x - row1_w / 2
 
-    for label, hexcolor in OUTCOME_LEGEND:
+    for label, hexcolor, _cat in OUTCOME_LEGEND:
         _draw_dot(cur_x + DOT_RADIUS, legend_y_dots, hexcolor)
         cur_x += 2 * DOT_RADIUS + 0.006
         cur_x = _draw_text(cur_x, legend_y_dots, label, LEGEND_FONTSIZE, PERCENTILE_NEUTRAL)
@@ -1646,13 +1656,21 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     cur_x += 2 * DOT_RADIUS + 0.006
     cur_x = _draw_text(cur_x, legend_y_dots, 'Size = EV', LEGEND_FONTSIZE, TEXT_DIMMED)
     cur_x += ITEM_GAP
-    # Avg Placement marker — purple fill with black edge, matches the inner
-    # layer of the median marker drawn on the scatter (s=240 dot at MARKER_ACCENT).
-    c_avg = Circle((cur_x + DOT_RADIUS, legend_y_dots), DOT_RADIUS,
-                    facecolor=MARKER_ACCENT, edgecolor='black', linewidth=1.2,
-                    transform=fig.transFigure, figure=fig)
-    fig.add_artist(c_avg)
-    cur_x += 2 * DOT_RADIUS + 0.006
+
+    # Avg Placement marker — two concentric circles matching the chart's
+    # median marker: outer white halo with thin black edge, inner purple
+    # core with heavier black edge. Center positioned so the OUTER circle
+    # occupies the same slot width as a regular dot would at AVG_HALO_RADIUS.
+    avg_cx = cur_x + AVG_HALO_RADIUS
+    halo = Circle((avg_cx, legend_y_dots), AVG_HALO_RADIUS,
+                   facecolor='white', edgecolor='black', linewidth=0.6,
+                   transform=fig.transFigure, figure=fig, zorder=10)
+    fig.add_artist(halo)
+    core = Circle((avg_cx, legend_y_dots), DOT_RADIUS,
+                   facecolor=MARKER_ACCENT, edgecolor='black', linewidth=1.4,
+                   transform=fig.transFigure, figure=fig, zorder=11)
+    fig.add_artist(core)
+    cur_x += 2 * AVG_HALO_RADIUS + 0.006
     _draw_text(cur_x, legend_y_dots, 'Avg Placement', LEGEND_FONTSIZE, TEXT_DIMMED)
 
     # Row 2 — MLB wOBAcon gradient (label + .000 + bar + 1.000+)
