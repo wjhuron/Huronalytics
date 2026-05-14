@@ -2955,21 +2955,28 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
-    # FanGraphs override: replace our pipeline-computed wRC+ with the
-    # canonical FG value for every hitter (MLB and AAA). FG has slightly
+    # FanGraphs override: replace our pipeline-computed wRC+ and xwOBA
+    # with canonical FG values for every hitter. FG has slightly
     # different park-factor / wOBA-weight tuning that produces small but
-    # visible deltas (e.g. Wood reads 151 here, 152 on FG). Pulling FG's
-    # number keeps the card numerically aligned with what readers see on
-    # fangraphs.com. AAA hitters specifically used to be ~13-19 points
-    # off because our pipeline applied MLB constants to AAA data; FG uses
-    # AAA-baseline weights + IL/PCL park factors.
+    # visible deltas (e.g. Wood reads wRC+ 151 here, 152 on FG; xwOBA
+    # rounds to .425 here, .426 on FG). Pulling FG's numbers keeps the
+    # card numerically aligned with fangraphs.com.
+    #
+    # - wRC+: overridden for both MLB and AAA hitters. AAA gap is large
+    #   (~13-19 pts) because our pipeline applies MLB constants to AAA
+    #   data; FG uses AAA-baseline weights + IL/PCL park factors.
+    # - xwOBA: overridden for MLB hitters only. FG doesn't publish xwOBA
+    #   for AAA (it requires Statcast EV/LA data, MLB-only).
+    # - wOBA: NOT overridden — pipeline matches FG to within ±0.0005
+    #   (we already use FG's published linear weights), so the override
+    #   would be cosmetically identical to the pipeline value.
     try:
         from fg_overrides import refresh_if_stale as _fg_refresh
         _fg = _fg_refresh(max_age_hours=24, verbose=True)
         _fg_mlb_h = _fg.get('mlbHitters', {})
         _fg_aaa_h = _fg.get('aaaHitters', {})
-        n_mlb_replaced = n_mlb = 0
-        n_aaa_replaced = n_aaa = 0
+        n_mlb_wrc = n_mlb_xwoba = n_mlb = 0
+        n_aaa_wrc = n_aaa = 0
         for row in hitter_leaderboard:
             mid = row.get('mlbId')
             if mid is None:
@@ -2980,17 +2987,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 fg_player = _fg_aaa_h.get(mid_str)
                 if fg_player and fg_player.get('wRCplus') is not None:
                     row['wRCplus'] = fg_player['wRCplus']
-                    n_aaa_replaced += 1
+                    n_aaa_wrc += 1
             else:
                 n_mlb += 1
                 fg_player = _fg_mlb_h.get(mid_str)
-                if fg_player and fg_player.get('wRCplus') is not None:
-                    row['wRCplus'] = fg_player['wRCplus']
-                    n_mlb_replaced += 1
-        print(f"  FG wRC+ override: replaced {n_mlb_replaced}/{n_mlb} MLB + "
-              f"{n_aaa_replaced}/{n_aaa} AAA hitters with FanGraphs value")
+                if fg_player:
+                    if fg_player.get('wRCplus') is not None:
+                        row['wRCplus'] = fg_player['wRCplus']
+                        n_mlb_wrc += 1
+                    if fg_player.get('xwOBA') is not None:
+                        row['xwOBA'] = fg_player['xwOBA']
+                        n_mlb_xwoba += 1
+        print(f"  FG hitter override: wRC+ replaced for {n_mlb_wrc}/{n_mlb} MLB + "
+              f"{n_aaa_wrc}/{n_aaa} AAA; xwOBA replaced for {n_mlb_xwoba}/{n_mlb} MLB")
     except Exception as _e:
-        print(f"  WARNING: FG wRC+ override failed ({type(_e).__name__}: {_e})")
+        print(f"  WARNING: FG hitter override failed ({type(_e).__name__}: {_e})")
 
     # Pass 2: refresh hitter league averages for stats populated by the boxscore
     # merge + wRC+ (kPct, bbPct, avg, obp, slg, ops, iso, wRCplus, xWRCplus). The

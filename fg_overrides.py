@@ -67,7 +67,13 @@ def _http_get_json(url, timeout=30):
 
 
 def fetch_mlb_hitters(year=2026):
-    """Returns dict keyed by xMLBAMID with wRC+, PA, name."""
+    """Returns dict keyed by xMLBAMID with wRC+, xwOBA, PA, name.
+
+    Why not also wOBA? Pipeline wOBA matches FG wOBA to within ±0.0005
+    (rounding noise — both use FG's published linear weights), so the
+    override would be cosmetically identical. xwOBA differs by ~0.001
+    which can flip the displayed third decimal (e.g. .484 vs .485), so
+    that one's worth overriding."""
     params = (
         f'pos=all&stats=bat&lg=all&qual=0&type=1'
         f'&season={year}&seasonEnd={year}'
@@ -81,10 +87,12 @@ def fetch_mlb_hitters(year=2026):
         wrc = r.get('wRC+')
         if mid is None or wrc is None:
             continue
+        xwoba = r.get('xwOBA')
         out[str(int(mid))] = {
             'wRCplus': round(float(wrc)),
-            'pa': int(r.get('PA') or 0),
-            'name': r.get('PlayerName') or r.get('Name'),
+            'xwOBA':   round(float(xwoba), 3) if xwoba is not None else None,
+            'pa':      int(r.get('PA') or 0),
+            'name':    r.get('PlayerName') or r.get('Name'),
         }
     return out
 
