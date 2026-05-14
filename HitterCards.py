@@ -185,9 +185,13 @@ HITTER_STAT_LINE_COLOR = {
     'AVG':     ('avg',        'raw', True,  0.05),
     'OBP':     ('obp',        'raw', True,  0.05),
     'SLG':     ('slg',        'raw', True,  0.10),
+    'OPS':     ('ops',        'raw', True,  0.15),   # OBP+SLG combined range
+    'wOBA':    ('wOBA',       'raw', True,  0.05),
+    'wRC+':    ('wRCplus',    'raw', True,  20),
+    # Legacy entries — no longer in the canonical headline strip but kept
+    # in case a theme wrapper or alternative layout references them.
     'BB%':     ('bbPct',      'pct', True),
     'K%':      ('kPct',       'pct', False),
-    'wRC+':    ('wRCplus',    'raw', True,  20),
     'SD+':     ('sdPlus',     'raw', True,  10),
     'CT+':     ('ctPlus',     'raw', True,  10),
     'BB+':     ('bbPlus',     'raw', True,  10),
@@ -196,8 +200,12 @@ HITTER_STAT_LINE_COLOR = {
 
 # Headline stat order — MLB default. ROC overrides this since the + family
 # and bat-tracking metrics aren't computed for AAA.
-HEADLINE_STATS_MLB = ['PA', 'AVG', 'OBP', 'SLG', 'BB%', 'K%', 'SD+', 'CT+', 'BB+', 'Hitter+']
-HEADLINE_STATS_ROC = ['PA', 'AVG', 'OBP', 'SLG', 'BB%', 'K%', 'wRC+']
+# Headline strip — non-redundant with the percentile bubble panel below.
+# Bubbles already carry BB%, K%, SD+, CT+, BB+, Hitter+ and the QoC family,
+# so the strip focuses on the slash line and the bottom-line production
+# stats (wOBA = true linear-weighted runs, wRC+ = park/league-adjusted).
+HEADLINE_STATS_MLB = ['PA', 'AVG', 'OBP', 'SLG', 'OPS', 'wOBA', 'wRC+']
+HEADLINE_STATS_ROC = ['PA', 'AVG', 'OBP', 'SLG', 'OPS', 'wOBA', 'wRC+']
 HEADLINE_STATS = HEADLINE_STATS_MLB  # default; render switches based on team
 
 # ─────────────────────────────────────────────────────────────────────
@@ -1189,9 +1197,14 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         elif k == 'AVG':  stat_values.append(fmt_3dec(h_row.get('avg')))
         elif k == 'OBP':  stat_values.append(fmt_3dec(h_row.get('obp')))
         elif k == 'SLG':  stat_values.append(fmt_3dec(h_row.get('slg')))
+        elif k == 'OPS':  stat_values.append(fmt_3dec(h_row.get('ops')))
+        elif k == 'wOBA': stat_values.append(fmt_3dec(h_row.get('wOBA')))
+        elif k == 'wRC+': stat_values.append(fmt_int(h_row.get('wRCplus')))
+        # Legacy stats kept as fallbacks in case a theme wrapper or older
+        # caller still references them — the canonical strip doesn't show
+        # any of these anymore (they're all in the percentile bubbles).
         elif k == 'BB%':  stat_values.append(fmt_pct(h_row.get('bbPct')))
         elif k == 'K%':   stat_values.append(fmt_pct(h_row.get('kPct')))
-        elif k == 'wRC+': stat_values.append(fmt_int(h_row.get('wRCplus')))
         elif k == 'SD+':  stat_values.append(fmt_int(h_row.get('sdPlus')))
         elif k == 'CT+':  stat_values.append(fmt_int(h_row.get('ctPlus')))
         elif k == 'BB+':  stat_values.append(fmt_int(h_row.get('bbPlus')))
@@ -1251,11 +1264,11 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         cur_x += cw
 
     # Subtle group dividers — thin vertical hairlines between stat groups
-    # so the headline strip reads as PA | slash-line | rate-stats | +stats
-    # without changing cell sizes. Anchors the eye without re-sizing.
-    # For MLB: divide PA | slash | rate | + family. For ROC: just PA | slash | rate | wRC+.
-    GROUP_BOUNDARIES = ({'AVG', 'BB%', 'wRC+'} if is_roc
-                        else {'AVG', 'BB%', 'SD+'})
+    # so the headline strip reads as three semantic groups without changing
+    # cell sizes:
+    #   PA  |  AVG OBP SLG OPS  |  wOBA wRC+
+    #   (sample size)   (traditional production)   (modern summary)
+    GROUP_BOUNDARIES = {'AVG', 'wOBA'}
     div_x = photo_left
     for i, k in enumerate(headline_stats):
         if i > 0 and k in GROUP_BOUNDARIES:
