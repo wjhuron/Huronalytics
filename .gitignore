@@ -8,6 +8,7 @@ mlb_id_cache.json
 outlier_results.json
 name_duplicates_report.txt
 data/fg_aaa_wrcplus.json
+data/fg_overrides.json
 
 # Python
 .venv/

@@ -2955,32 +2955,42 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
-    # ROC wRC+ override: FanGraphs publishes AAA-baseline wRC+ using AAA
-    # wOBA weights and IL/PCL park factors. Our pipeline computes wRC+ with
-    # MLB constants, which inflates ROC wRC+ by ~13-19 points for qualified
-    # hitters. Replace ROC rows with FG's value (keyed by MLBAM id) where
-    # available. Falls back to the pipeline value if FG doesn't have the
-    # player or the scraper failed — never blocks the pipeline.
+    # FanGraphs override: replace our pipeline-computed wRC+ with the
+    # canonical FG value for every hitter (MLB and AAA). FG has slightly
+    # different park-factor / wOBA-weight tuning that produces small but
+    # visible deltas (e.g. Wood reads 151 here, 152 on FG). Pulling FG's
+    # number keeps the card numerically aligned with what readers see on
+    # fangraphs.com. AAA hitters specifically used to be ~13-19 points
+    # off because our pipeline applied MLB constants to AAA data; FG uses
+    # AAA-baseline weights + IL/PCL park factors.
     try:
-        from fg_aaa_wrcplus import refresh_if_stale as _fg_refresh_aaa_wrc
-        _fg_cache_aaa = _fg_refresh_aaa_wrc(max_age_hours=24, verbose=True)
-        _fg_players = _fg_cache_aaa.get('players', {})
-        _n_replaced = 0
-        _n_roc = 0
+        from fg_overrides import refresh_if_stale as _fg_refresh
+        _fg = _fg_refresh(max_age_hours=24, verbose=True)
+        _fg_mlb_h = _fg.get('mlbHitters', {})
+        _fg_aaa_h = _fg.get('aaaHitters', {})
+        n_mlb_replaced = n_mlb = 0
+        n_aaa_replaced = n_aaa = 0
         for row in hitter_leaderboard:
-            if not row.get('_isROC'):
-                continue
-            _n_roc += 1
             mid = row.get('mlbId')
             if mid is None:
                 continue
-            fg_player = _fg_players.get(str(int(mid)))
-            if fg_player and fg_player.get('wRCplus') is not None:
-                row['wRCplus'] = fg_player['wRCplus']
-                _n_replaced += 1
-        print(f"  ROC wRC+ override: replaced {_n_replaced}/{_n_roc} ROC hitters with FanGraphs AAA value")
+            mid_str = str(int(mid))
+            if row.get('_isROC'):
+                n_aaa += 1
+                fg_player = _fg_aaa_h.get(mid_str)
+                if fg_player and fg_player.get('wRCplus') is not None:
+                    row['wRCplus'] = fg_player['wRCplus']
+                    n_aaa_replaced += 1
+            else:
+                n_mlb += 1
+                fg_player = _fg_mlb_h.get(mid_str)
+                if fg_player and fg_player.get('wRCplus') is not None:
+                    row['wRCplus'] = fg_player['wRCplus']
+                    n_mlb_replaced += 1
+        print(f"  FG wRC+ override: replaced {n_mlb_replaced}/{n_mlb} MLB + "
+              f"{n_aaa_replaced}/{n_aaa} AAA hitters with FanGraphs value")
     except Exception as _e:
-        print(f"  WARNING: FG AAA wRC+ override failed ({type(_e).__name__}: {_e})")
+        print(f"  WARNING: FG wRC+ override failed ({type(_e).__name__}: {_e})")
 
     # Pass 2: refresh hitter league averages for stats populated by the boxscore
     # merge + wRC+ (kPct, bbPct, avg, obp, slg, ops, iso, wRCplus, xWRCplus). The
@@ -3136,7 +3146,47 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         total_w = sum(w for _, w in hr9_pairs)
         metadata['pitcherLeagueAverages']['hr9'] = round(sum(v * w for v, w in hr9_pairs) / total_w, 2) if total_w > 0 else None
 
+    # FanGraphs override: replace pipeline-computed FIP / xFIP / SIERA with
+    # the canonical FG values for MLB pitchers. Same motivation as the
+    # hitter wRC+ override above — pipeline values match FG approximately
+    # but small precision/rounding deltas read as bugs when readers
+    # cross-reference. AAA pitchers (_isROC) keep the pipeline values
+    # since FG doesn't publish AAA-baseline FIP/xFIP/SIERA cleanly.
+    try:
+        from fg_overrides import refresh_if_stale as _fg_refresh_pit
+        _fg_pit_cache = _fg_refresh_pit(max_age_hours=24, verbose=False)
+        _fg_pit = _fg_pit_cache.get('mlbPitchers', {})
+        n_pit_replaced = n_pit = 0
+        for row in pitcher_leaderboard:
+            if row.get('_isROC') or row.get('_isCombined'):
+                continue
+            mid = row.get('mlbId')
+            if mid is None:
+                continue
+            fg_p = _fg_pit.get(str(int(mid)))
+            if not fg_p:
+                continue
+            n_pit += 1
+            changed = False
+            if fg_p.get('fip') is not None:
+                row['fip'] = fg_p['fip']
+                changed = True
+            if fg_p.get('xfip') is not None:
+                row['xFIP'] = fg_p['xfip']
+                changed = True
+            if fg_p.get('siera') is not None:
+                row['siera'] = fg_p['siera']
+                changed = True
+            if changed:
+                n_pit_replaced += 1
+        print(f"  FG FIP/xFIP/SIERA override: replaced "
+              f"{n_pit_replaced}/{n_pit} MLB pitchers with FanGraphs values")
+    except Exception as _e:
+        print(f"  WARNING: FG pitcher override failed ({type(_e).__name__}: {_e})")
+
     # FIP, xFIP, SIERA league averages — weighted by IP (MLB only, exclude combined rows)
+    # Computed AFTER the FG override so the league average reflects the
+    # canonical values that ship in the JSON.
     for stat in ['fip', 'xFIP', 'siera']:
         pairs = [(r[stat], ip_str_to_float(r.get('ip'))) for r in pitcher_leaderboard
                  if r.get(stat) is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0

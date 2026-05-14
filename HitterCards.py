@@ -1173,23 +1173,25 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     is_roc = (h_row.get('team') == 'ROC')
     headline_stats = HEADLINE_STATS_ROC if is_roc else HEADLINE_STATS_MLB
 
-    # ROC wRC+ override: pull FanGraphs's AAA-baseline wRC+ (uses AAA wOBA
-    # weights + IL/PCL park factors). Our own pipeline applies MLB constants
-    # to AAA data which inflates by ~10-20 points. Falls back to the pipeline
-    # value if FG doesn't have the player or the scraper failed.
-    if is_roc:
-        try:
-            from fg_aaa_wrcplus import refresh_if_stale as _fg_refresh
-            _fg_cache = _fg_refresh(max_age_hours=24, verbose=True)
-            _mid = h_row.get('mlbId')
-            if _mid is not None:
-                _fg_player = _fg_cache.get('players', {}).get(str(int(_mid)))
-                if _fg_player and _fg_player.get('wRCplus') is not None:
-                    h_row = dict(h_row)  # shallow copy — don't mutate caller's dict
-                    h_row['wRCplus'] = _fg_player['wRCplus']
-        except Exception as _e:
-            # Never block the card render on FG scraper failure.
-            print(f'  WARNING: FG AAA wRC+ override unavailable ({type(_e).__name__}: {_e})')
+    # wRC+ override: pull the canonical value from FanGraphs for both MLB
+    # and AAA hitters so the card matches what readers see on fangraphs.com.
+    # The pipeline writes FG values directly into the JSON, so this fallback
+    # only matters when the card is rendered against an older leaderboard
+    # snapshot (pre-FG-override pipeline run). MLB hitters use mlbHitters;
+    # AAA hitters use aaaHitters (FG's AAA-baseline value).
+    try:
+        from fg_overrides import refresh_if_stale as _fg_refresh
+        _fg_cache = _fg_refresh(max_age_hours=24, verbose=True)
+        _group_key = 'aaaHitters' if is_roc else 'mlbHitters'
+        _mid = h_row.get('mlbId')
+        if _mid is not None:
+            _fg_player = _fg_cache.get(_group_key, {}).get(str(int(_mid)))
+            if _fg_player and _fg_player.get('wRCplus') is not None:
+                h_row = dict(h_row)  # shallow copy — don't mutate caller's dict
+                h_row['wRCplus'] = _fg_player['wRCplus']
+    except Exception as _e:
+        # Never block the card render on FG scraper failure.
+        print(f'  WARNING: FG wRC+ override unavailable ({type(_e).__name__}: {_e})')
     stat_values = []
     for k in headline_stats:
         if k == 'PA':
