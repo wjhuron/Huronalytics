@@ -1688,18 +1688,48 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # slot in the layout. Matches the chart's median marker.
     AVG_HALO_RADIUS = DOT_RADIUS * 1.35
 
+    # Vertical separator between the outcome swatches (Out/1B/2B/3B/HR —
+    # what the dot's color means) and the visual-encoding swatches
+    # (Size = EV, Avg Placement — what the dot's size/shape means). The
+    # gap on each side of the divider is half the regular ITEM_GAP to
+    # signal "section break" rather than "another item in the list".
+    DIV_HALF_GAP = ITEM_GAP * 0.55
+    DIV_W = 0.0012   # axis-x width of the divider (thin)
+    DIV_HEIGHT = 0.018   # axis-y; matches roughly 1.5x the dot diameter
+
     row1_w = 0.0
     for label, _, _cat in OUTCOME_LEGEND:
         row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text(label, LEGEND_FONTSIZE) + ITEM_GAP
+    # Replace the trailing ITEM_GAP after the last outcome with the
+    # half-gap + divider + half-gap pattern.
+    row1_w -= ITEM_GAP
+    row1_w += DIV_HALF_GAP + DIV_W + DIV_HALF_GAP
     row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Size = EV', LEGEND_FONTSIZE) + ITEM_GAP
     row1_w += 2 * AVG_HALO_RADIUS + 0.006 + _measure_text('Avg Placement', LEGEND_FONTSIZE)
     cur_x = legend_center_x - row1_w / 2
 
-    for label, hexcolor, _cat in OUTCOME_LEGEND:
+    for i, (label, hexcolor, _cat) in enumerate(OUTCOME_LEGEND):
         _draw_dot(cur_x + DOT_RADIUS, legend_y_dots, hexcolor)
         cur_x += 2 * DOT_RADIUS + 0.006
         cur_x = _draw_text(cur_x, legend_y_dots, label, LEGEND_FONTSIZE, PERCENTILE_NEUTRAL)
-        cur_x += ITEM_GAP
+        # Trailing gap after each outcome — but the LAST outcome uses the
+        # half-gap pattern around the divider instead.
+        if i < len(OUTCOME_LEGEND) - 1:
+            cur_x += ITEM_GAP
+
+    # Divider: thin vertical rule centered on the legend row.
+    # Added to fig (not an axes) so the figure-relative transform is
+    # consistent with the dots and text in this row.
+    cur_x += DIV_HALF_GAP
+    divider = Rectangle(
+        (cur_x, legend_y_dots - DIV_HEIGHT / 2),
+        DIV_W, DIV_HEIGHT,
+        facecolor=TEXT_FAINT, edgecolor='none', alpha=0.6,
+        transform=fig.transFigure, figure=fig, zorder=10,
+    )
+    fig.add_artist(divider)
+    cur_x += DIV_W + DIV_HALF_GAP
+
     _draw_dot(cur_x + DOT_RADIUS * 0.85, legend_y_dots, TEXT_DIMMED,
               radius=DOT_RADIUS * 0.85)
     cur_x += 2 * DOT_RADIUS + 0.006
