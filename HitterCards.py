@@ -268,7 +268,83 @@ WOBA_CMAP = LinearSegmentedColormap.from_list(
 # ─────────────────────────────────────────────────────────────────────
 # Data loading
 # ─────────────────────────────────────────────────────────────────────
-def load_pitch_data(path='/Users/wallyhuron/Huronalytics/data/all_pitches_rs_cache.pkl'):
+RELEASE_PICKLE_URL = (
+    'https://github.com/wjhuron/Huronalytics/releases/download/'
+    'latest-data/all_pitches_rs_cache.pkl'
+)
+
+
+def fetch_pickle_from_release(out_path, verbose=True):
+    """Download the latest pickle from the GitHub Release that the CI
+    pipeline pushes to on every successful run. Streams in 4MB chunks so
+    we don't blow memory on a ~100MB download. Returns True on success."""
+    import urllib.request
+    if verbose:
+        print(f"  Fetching latest pickle from GitHub Release…")
+    req = urllib.request.Request(
+        RELEASE_PICKLE_URL,
+        headers={'User-Agent': 'HitterCards/auto-refresh'},
+    )
+    tmp_path = out_path + '.tmp'
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            total = int(resp.headers.get('Content-Length') or 0)
+            written = 0
+            with open(tmp_path, 'wb') as f:
+                while True:
+                    chunk = resp.read(4 * 1024 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    written += len(chunk)
+                    if verbose and total:
+                        pct = 100.0 * written / total
+                        print(f"\r    downloaded {written // (1024 * 1024)} / "
+                              f"{total // (1024 * 1024)} MB  ({pct:.0f}%)", end='')
+            if verbose and total:
+                print()
+        os.replace(tmp_path, out_path)
+        return True
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except OSError: pass
+        if verbose:
+            print(f"  Auto-refresh failed: {type(e).__name__}: {e}")
+        return False
+
+
+def load_pitch_data(path='/Users/wallyhuron/Huronalytics/data/all_pitches_rs_cache.pkl',
+                     auto_refresh=True):
+    """Load the pitch-level pickle. When auto_refresh is True (default),
+    the pickle is automatically refreshed from the latest GitHub Release
+    if it's stale or missing. This makes the local pickle effectively
+    "never stuck" — the CI run uploads a fresh pickle every day, and this
+    function pulls it as needed."""
+    needs_refresh = False
+    refresh_reason = None
+    if not os.path.exists(path):
+        needs_refresh = True
+        refresh_reason = 'missing'
+    else:
+        try:
+            is_stale, pickle_dt, json_dt = check_pickle_freshness(path)
+            if is_stale:
+                needs_refresh = True
+                refresh_reason = f'stale ({pickle_dt} → {json_dt})'
+        except Exception:
+            pass  # If check fails, just load whatever we have
+
+    if needs_refresh and auto_refresh:
+        print(f"  Pickle {refresh_reason}; downloading latest from release…")
+        ok = fetch_pickle_from_release(path)
+        if ok:
+            print(f"  ✓ Pickle refreshed.")
+        else:
+            print(f"  ✗ Auto-refresh failed; using whatever's on disk.")
+            print(f"     Manual fix: python3 refresh_pickle.py (Sheets→pickle)")
+            print(f"                  python3 process_data.py    (full pipeline)")
+
     with open(path, 'rb') as f:
         return pickle.load(f)
 
@@ -276,6 +352,40 @@ def load_pitch_data(path='/Users/wallyhuron/Huronalytics/data/all_pitches_rs_cac
 def load_hitter_leaderboard(path='/Users/wallyhuron/Huronalytics/data/hitter_leaderboard_rs.json'):
     with open(path) as f:
         return json.load(f)
+
+
+def check_pickle_freshness(pickle_path='/Users/wallyhuron/Huronalytics/data/all_pitches_rs_cache.pkl',
+                            leaderboard_path='/Users/wallyhuron/Huronalytics/data/hitter_leaderboard_rs.json'):
+    """Compare pickle mtime against the leaderboard JSON's most-recent
+    lastGameDate. Returns (is_stale, pickle_latest_date_str, json_latest_date_str).
+
+    The pickle holds pitch-level data (gitignored, doesn't propagate from
+    CI); the JSON holds aggregated stats (git-tracked, always fresh). When
+    the JSON's most recent game date is newer than the latest date present
+    in the pickle, the card will plot a stale snapshot. This function
+    surfaces that drift.
+    """
+    import datetime
+    # Get the most recent Game Date present in the pickle
+    try:
+        with open(pickle_path, 'rb') as f:
+            pitches = pickle.load(f)
+    except Exception:
+        return True, None, None
+    dates = [p.get('Game Date') for p in pitches if p.get('Game Date')]
+    pickle_latest = max(dates) if dates else None
+
+    # Get the most recent lastGameDate in the JSON across all hitters
+    try:
+        with open(leaderboard_path) as f:
+            lb = json.load(f)
+    except Exception:
+        return False, pickle_latest, None
+    json_dates = [r.get('lastGameDate') for r in lb if r.get('lastGameDate')]
+    json_latest = max(json_dates) if json_dates else None
+
+    is_stale = bool(json_latest and pickle_latest and json_latest > pickle_latest)
+    return is_stale, pickle_latest, json_latest
 
 
 def load_metadata(path=METADATA_PATH):
@@ -877,7 +987,9 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     """
     print(f"Generating hitter card: {hitter_name} ({team_abbrev or 'auto'}) — {year_label} [layout={layout}]")
 
-    # Load data
+    # Load data — load_pitch_data auto-refreshes from the CI Release if the
+    # local pickle is stale or missing (the pipeline uploads it on every run,
+    # so this keeps the card aligned with whatever date is in the JSON).
     print("  Loading pitch cache + leaderboard + metadata...")
     all_pitches = load_pitch_data()
     hitter_lb = load_hitter_leaderboard()
@@ -1149,11 +1261,14 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     sacq_lookup, hand_zones, pool_zones = build_sacq_lookup(metadata, bats)
     # Shift the entire LA × Spray block so the title's TOP edge (not its
     # center) sits at the top of the headline stats strip cells. The title
-    # text is drawn with va='center' so the center sits ~0.0037 figrel
-    # below the top edge (half of the title's ~0.0074 figrel text height
-    # at fontsize=12). The shift accounts for that half-height offset.
+    # text is drawn with va='center' so the center sits ~0.0070 figrel
+    # below the top edge (half of the title's ~0.0140 figrel text height
+    # at the bumped fontsize). The shift accounts for that half-height
+    # offset. Bumped from 12pt to 18pt — title was reading too small at
+    # the card's actual print/share size.
+    _LA_TITLE_FONTSIZE = 18
     _headline_top_y_figrel = (stat_y_header + cell_h) / FIG_H
-    _TITLE_HALF_HEIGHT_FIGREL = 12 * 1.2 / 72 / FIG_H / 2  # ~0.0056 for 12pt on 18in
+    _TITLE_HALF_HEIGHT_FIGREL = _LA_TITLE_FONTSIZE * 1.2 / 72 / FIG_H / 2
     _LA_SHIFT = 0.985 - (_headline_top_y_figrel - _TITLE_HALF_HEIGHT_FIGREL)
 
     spray_axes_left = 9.5 / FIG_W      # left edge (clear of headline stats)
@@ -1188,8 +1303,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ly = LA_RANGES[lb]
         lo = max(-20, ly[0]); hi = min(60, ly[1])
         col = WOBA_CMAP(min(1.0, v / 1.0))
-        # Bumped from 0.25 → 0.45 so SACQ zones pop instead of washing out.
-        alpha = 0.15 if z.get('count', 0) < 20 else 0.45
+        # Bumped to 0.70 so SACQ zones pop boldly off the cream paper
+        # instead of feeling washed out — high-wOBA red zones now read as
+        # genuinely red, low-wOBA blue zones as genuinely blue.
+        alpha = 0.22 if z.get('count', 0) < 20 else 0.70
         ax_spray.add_patch(Rectangle((min(bx), lo), abs(bx[1] - bx[0]), hi - lo,
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
@@ -1203,8 +1320,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ly = LA_RANGES[lb]
         lo = max(-20, ly[0]); hi = min(60, ly[1])
         col = WOBA_CMAP(min(1.0, v / 1.0))
-        # Bumped from 0.25 → 0.45 so SACQ zones pop instead of washing out.
-        alpha = 0.15 if z.get('count', 0) < 20 else 0.45
+        # Bumped to 0.70 so SACQ zones pop boldly off the cream paper
+        # instead of feeling washed out — high-wOBA red zones now read as
+        # genuinely red, low-wOBA blue zones as genuinely blue.
+        alpha = 0.22 if z.get('count', 0) < 20 else 0.70
         ax_spray.add_patch(Rectangle((min(bx), lo), abs(bx[1] - bx[0]), hi - lo,
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
@@ -1253,17 +1372,17 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         return (r, g, b, a)
 
     def ev_size(ev):
-        # Match hitter page (js/player-page.js evRadius): 7-12 pixel radii.
-        # Convert to matplotlib `s` (area in points²) at SAVE_DPI=150:
-        #   s = π × (r_px × 72/150)² = π × r² × 0.2304
-        # Slightly scaled up so dots read at our wider chart proportions.
-        if ev is None: return 80
-        if ev < 80:  return 80   # r ~10 px equivalent
-        if ev < 90:  return 105
-        if ev < 95:  return 135
-        if ev < 100: return 165
-        if ev < 105: return 200
-        return 240               # r ~17 px equivalent
+        # Bumped up across the board so high-EV dots really pop. The ratio
+        # between min (slow grounder) and max (115+ rocket) is wider too,
+        # so the eye reads contact quality without needing to check colors.
+        # Each tier is roughly 1.7× the previous (was 1.3×).
+        if ev is None: return 110
+        if ev < 80:  return 110
+        if ev < 90:  return 175
+        if ev < 95:  return 250
+        if ev < 100: return 340
+        if ev < 105: return 430
+        return 540
 
     # Render order: outs first (back), then hits in increasing weight order
     # (1B → 2B → 3B → HR) so the most distinctive markers sit on top and
@@ -1427,10 +1546,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # underline rule. Same treatment used for all section titles below.
     title_x = (spray_axes_left + spray_axes_right) / 2
     fig.text(title_x, 0.985 - _LA_SHIFT, 'L A U N C H   A N G L E   ×   S P R A Y   A N G L E',
-              color=TEXT_SECONDARY, fontsize=12, fontweight='700',
+              color=TEXT_SECONDARY, fontsize=_LA_TITLE_FONTSIZE, fontweight='700',
               fontfamily='Avenir Next', va='center', ha='center')
-    # Thin underline rule
-    rule_w = 0.18
+    # Thin underline rule — slightly wider with the bigger title
+    rule_w = 0.27
     ax_rule = fig.add_axes([title_x - rule_w / 2, 0.978 - _LA_SHIFT, rule_w, 0.0008])
     ax_rule.axis('off')
     ax_rule.add_patch(Rectangle((0, 0), 1, 1, facecolor=TEXT_SECONDARY,
