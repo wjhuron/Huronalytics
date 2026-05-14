@@ -862,9 +862,14 @@ def _render_percentile_bubbles(fig, h_row):
     LABEL_BAR_GAP = 0.008
     BAR_VALUE_GAP = 0.010
 
-    BAR_HEIGHT_IN  = 0.26
+    # Bar height is now ~85% of the circle diameter so the bar fully enters
+    # the circle at the meeting point — no empty curve above/below the
+    # tangent. Combined with the fill-extends-into-circle trick below, the
+    # bar and circle read as one connected glyph instead of "bar, gap,
+    # bubble, gap, value".
+    BAR_HEIGHT_IN  = 0.34
     bar_h_axis     = BAR_HEIGHT_IN / fig.get_size_inches()[1]
-    CIRCLE_DIAM_IN = 0.38
+    CIRCLE_DIAM_IN = 0.40
     ellipse_w = CIRCLE_DIAM_IN / fig.get_size_inches()[0]
     ellipse_h = CIRCLE_DIAM_IN / fig.get_size_inches()[1]
     CIRCLE_CLEARANCE_AXIS_X = (CIRCLE_DIAM_IN / fig.get_size_inches()[0]) * 0.55
@@ -925,21 +930,26 @@ def _render_percentile_bubbles(fig, h_row):
 
             # Pill fill — a plain rectangle of exact percentile width,
             # CLIPPED to the track's rounded pill shape. The fill spans from
-            # x_bar_left to the LEFT edge of the percentile circle, so the
-            # full fill is visible regardless of how small the percentile is
-            # (the circle sits AFTER the fill, not on top of it). This makes
-            # low-pctl bars look symmetric to high-pctl bars — a visible
-            # proportional stub before the circle.
+            # x_bar_left to the LEFT edge of the percentile circle, plus an
+            # OVERLAP into the circle so the bar visually merges with the
+            # bubble (otherwise the curved circle-edge above/below the thin
+            # bar reads as a gap). The circle is drawn on top at higher
+            # zorder, so the overlap is hidden but the seam disappears.
             radius_x = ellipse_w / 2
             # Effective movement range for the circle's left edge — reserve a
             # circle's diameter at the right end so the circle never overshoots.
             effective_bar_w = bar_total_w - 2 * radius_x
             p = max(0, min(100, pctl)) / 100.0 if pctl is not None else 0
             fill_w = effective_bar_w * p
-            if fill_w > 0:
+            # Render width = true percentile width + a chunk into the circle
+            # so the bar and circle look continuous. radius_x * 0.85 puts
+            # the rendered right edge about halfway through the circle.
+            FILL_INTO_CIRCLE = radius_x * 0.85
+            fill_render_w = fill_w + FILL_INTO_CIRCLE if fill_w > 0 else 0
+            if fill_render_w > 0:
                 fill = Rectangle(
                     (x_bar_left, track_y),
-                    fill_w, bar_h_axis,
+                    fill_render_w, bar_h_axis,
                     facecolor=fill_color, edgecolor='none', alpha=0.95,
                     zorder=9,
                 )
