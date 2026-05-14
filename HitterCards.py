@@ -936,25 +936,32 @@ def _render_percentile_bubbles(fig, h_row):
             )
             ax.add_patch(track)
 
-            # Pill fill — a plain rectangle of exact percentile width,
-            # CLIPPED to the track's rounded pill shape. The fill spans from
-            # x_bar_left to the LEFT edge of the percentile circle, plus an
-            # OVERLAP into the circle so the bar visually merges with the
-            # bubble (otherwise the curved circle-edge above/below the thin
-            # bar reads as a gap). The circle is drawn on top at higher
-            # zorder, so the overlap is hidden but the seam disappears.
+            # Pill fill — a plain rectangle CLIPPED to the track's rounded
+            # pill shape. The visible-fill width controls where the circle
+            # sits; the rendered fill overlaps INTO the circle so the bar
+            # and bubble read as one continuous glyph (the circle is drawn
+            # at higher zorder, so the overlap is hidden but the seam
+            # disappears).
+            #
+            # Why visible_fill_w isn't just `effective_bar_w * p`:
+            # A pure-linear mapping puts a 6th-percentile circle at ~6% of
+            # the bar width, which is so close to x_bar_left that the
+            # bubble visually collapses to "at zero". We add a baseline
+            # MIN_VISIBLE so low percentiles get a clear non-zero offset.
+            # The numeric percentile inside the circle stays the source of
+            # truth; this just gives the eye a fairer visual cue. The
+            # cost is a small compression of the linear range — 99th
+            # percentile sits a hair shorter than it would otherwise.
             radius_x = ellipse_w / 2
-            # Effective movement range for the circle's left edge — reserve a
-            # circle's diameter at the right end so the circle never overshoots.
+            # Reserve a circle's diameter at the right end so the circle
+            # never overshoots the bar.
             effective_bar_w = bar_total_w - 2 * radius_x
             p = max(0, min(100, pctl)) / 100.0 if pctl is not None else 0
-            fill_w = effective_bar_w * p
-            # Render width = true percentile width + a chunk into the circle
-            # so the bar and circle look continuous. radius_x * 0.85 puts
-            # the rendered right edge about halfway through the circle.
+            MIN_VISIBLE = radius_x * 1.5   # ~0.6 in baseline at pctl=0
+            visible_fill_w = MIN_VISIBLE + p * (effective_bar_w - MIN_VISIBLE)
             FILL_INTO_CIRCLE = radius_x * 0.85
-            fill_render_w = fill_w + FILL_INTO_CIRCLE if fill_w > 0 else 0
-            if fill_render_w > 0:
+            fill_render_w = visible_fill_w + FILL_INTO_CIRCLE
+            if pctl is not None and fill_render_w > 0:
                 fill = Rectangle(
                     (x_bar_left, track_y),
                     fill_render_w, bar_h_axis,
@@ -964,11 +971,14 @@ def _render_percentile_bubbles(fig, h_row):
                 ax.add_patch(fill)
                 fill.set_clip_path(track)
 
-            # Circle sits right after the fill — its LEFT edge at fill end,
-            # so the full fill is always visible (no part covered by the
-            # circle). For pctl=0 the circle sits at the very left of the
-            # bar; for pctl=100 its right edge aligns with the bar's right.
-            circle_x = x_bar_left + fill_w + radius_x
+            # Circle's LEFT edge sits at x_bar_left + visible_fill_w, so the
+            # full visible fill is always to the left of the circle. With
+            # the MIN_VISIBLE baseline, low-percentile bubbles sit a clear
+            # circle-width to the right of x_bar_left, never collapsing
+            # to "at zero". For pctl=100 the circle's right edge aligns
+            # with the bar's right (because visible_fill_w = effective_bar_w
+            # at p=1, and circle_x + radius_x = x_bar_left + bar_total_w).
+            circle_x = x_bar_left + visible_fill_w + radius_x
             ell = Ellipse((circle_x, row_mid),
                            ellipse_w, ellipse_h,
                            facecolor=ring_color, edgecolor='none',
