@@ -2218,6 +2218,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             stands = None
 
+        # Latest game date present in this hitter's pitch data. Used by
+        # downstream consumers (e.g. card generator's "Through {date}" stamp)
+        # so they can show a freshness stamp without needing the pitch-level
+        # pickle, which is gitignored and won't propagate from CI.
+        _hitter_dates = [p.get('Game Date') for p in pitches if p.get('Game Date')]
+        last_game_date = max(_hitter_dates) if _hitter_dates else None
+
         row = {
             'hitter': hitter,
             'team': team,
@@ -2225,6 +2232,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'count': len(pitches),
             'mlbId': get_mlb_id(hitter, team),
             '_isROC': team in AAA_TEAMS,
+            'lastGameDate': last_game_date,
         }
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))

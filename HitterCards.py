@@ -608,11 +608,274 @@ def fmt_signed_decimal(v, decimals=1):
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Percentile bubble grid (layout='bubbles' variant)
+# ─────────────────────────────────────────────────────────────────────
+#
+# Replaces heat maps + contact profile + pitch group table with a 4-column
+# percentile grid. Each cell shows:
+#     [label]                                          [value]
+#     [██████████████████████████████████]  [○ pctl]
+# colored on a blue→red gradient matching the player page (low = blue/bad,
+# high = red/good — the percentile rank is already directionally normalized
+# for inverted stats like K%, Whiff%, Chase%).
+#
+# Column spec format: (display_label, value_key, pctl_key, format_spec)
+# format_spec: one of '3dec' (.425), 'pct1' (62.0%), 'int' (160),
+#              'dec1' (96.3), 'dec1+' (signed, e.g. +8.7), 'mph' (96.3 mph)
+
+BUBBLE_COLUMNS = [
+    ('RESULT', [
+        ('Run Value (All Pitches)', 'xRv100',     'xRv100_pctl',       'dec1+'),
+        ('xwOBA',             'xwOBA',            'xwOBA_pctl',        '3dec'),
+        ('Hitter+',           'hitterPlus',       'hitterPlus_pctl',   'int'),
+        ('Swing Decisions+',  'sdPlus',           'sdPlus_pctl',       'int'),
+        ('Contact+',          'ctPlus',           'ctPlus_pctl',       'int'),
+        ('Batted Ball+',      'bbPlus',           'bbPlus_pctl',       'int'),
+    ]),
+    ('QUALITY OF CONTACT', [
+        ('xwOBAcon',    'xwOBAcon',     'xwOBAcon_pctl',     '3dec'),
+        ('Avg EV',      'avgEVAll',     'avgEVAll_pctl',     'mph'),
+        ('Max EV',      'maxEV',        'maxEV_pctl',        'mph'),
+        ('Hard-Hit%',   'hardHitPct',   'hardHitPct_pctl',   'pct1'),
+        ('Barrel%',     'barrelPct',    'barrelPct_pctl',    'pct1'),
+        ('xwOBAsp',     'xwOBAsp',      'xwOBAsp_pctl',      '3dec'),
+        ('Air Pull%',   'airPullPct',   'airPullPct_pctl',   'pct1'),
+    ]),
+    ('PLATE DISCIPLINE', [
+        ('BB%',         'bbPct',        'bbPct_pctl',        'pct1'),
+        ('K%',          'kPct',         'kPct_pctl',         'pct1'),
+        ('Chase%',      'chasePct',     'chasePct_pctl',     'pct1'),
+        ('Whiff%',      'whiffPct',     'whiffPct_pctl',     'pct1'),
+        ('IZ Contact%', 'izContactPct', 'izContactPct_pctl', 'pct1'),
+    ]),
+    ('BAT TRACKING', [
+        ('Bat Speed',   'batSpeed',     'batSpeed_pctl',     'mph'),
+        ('Squared-Up%', 'squaredUpPct', 'squaredUpPct_pctl', 'pct1'),
+        ('Blast%',      'blastPct',     'blastPct_pctl',     'pct1'),
+    ]),
+]
+
+
+def _format_bubble_value(v, spec):
+    if v is None:
+        return '—'
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return '—'
+    if spec == '3dec':
+        s = f'{v:.3f}'
+        # Match site convention: no leading 0 on rate stats like .425
+        return s[1:] if s.startswith('0.') else (f'-{s[2:]}' if s.startswith('-0.') else s)
+    if spec == 'pct1':
+        return f'{v * 100:.1f}%' if abs(v) <= 1 else f'{v:.1f}%'
+    if spec == 'int':
+        return f'{int(round(v))}'
+    if spec == 'dec1':
+        return f'{v:.1f}'
+    if spec == 'dec1+':
+        # Per memory: never prefix positives with '+'. Negatives still get '-'.
+        return f'{v:.1f}'
+    if spec == 'mph':
+        return f'{v:.1f}'
+    return str(v)
+
+
+def _percentile_color(pctl):
+    """Blue → light gray → red gradient matching the website player page.
+    pctl is 0-100; the rank is already directionally normalized (high = good)."""
+    if pctl is None:
+        return (0.55, 0.55, 0.55), (0.40, 0.40, 0.40)  # bar fill, ring/circle
+    p = max(0, min(100, pctl)) / 100.0
+    # Anchor colors (extreme-blue at 0, neutral at 0.5, extreme-red at 1)
+    blue_dark  = (0.18, 0.30, 0.78)
+    blue_mid   = (0.45, 0.55, 0.82)
+    neutral    = (0.55, 0.55, 0.55)
+    red_mid    = (0.85, 0.45, 0.45)
+    red_dark   = (0.83, 0.15, 0.15)
+    def lerp(a, b, t):
+        return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
+    if p < 0.25:
+        c = lerp(blue_dark, blue_mid, p / 0.25)
+    elif p < 0.50:
+        c = lerp(blue_mid, neutral, (p - 0.25) / 0.25)
+    elif p < 0.75:
+        c = lerp(neutral, red_mid, (p - 0.50) / 0.25)
+    else:
+        c = lerp(red_mid, red_dark, (p - 0.75) / 0.25)
+    # Bar fill: same hue. Ring: slightly darker version of c.
+    ring = tuple(max(0, ch * 0.78) for ch in c)
+    return c, ring
+
+
+def _render_percentile_bubbles(fig, h_row):
+    """Single-column percentile panel matching the website's PERCENTILE
+    RANKINGS sidebar. Vertical stack of section sub-headers + pill-bar rows:
+
+        RESULT  ──────────────────────────────────
+          Run Value      [──────fill──────(○)]   8.7
+          xwOBA          [──────fill──────(○)]   .425
+          ...
+        QUALITY OF CONTACT  ──────────────────────
+          xwOBAcon       [──────fill──────(○)]   .603
+          ...
+
+    Anchored to the left side of the card (clear of LA × Spray at x ≥ 0.43).
+    """
+    from matplotlib.patches import Rectangle, Ellipse, FancyBboxPatch
+
+    GRID_LEFT, GRID_RIGHT = 0.020, 0.385
+    GRID_TOP, GRID_BOT = 0.715, 0.030
+    col_w = GRID_RIGHT - GRID_LEFT
+
+    total_rows = sum(len(metrics) for _h, metrics in BUBBLE_COLUMNS)
+    n_sections = len(BUBBLE_COLUMNS)
+
+    grid_h = GRID_TOP - GRID_BOT
+    SECTION_HEADER_H = 0.024
+    SECTION_TOP_GAP  = 0.008
+    SECTION_GAP      = 0.022
+    fixed_overhead = (n_sections * (SECTION_HEADER_H + SECTION_TOP_GAP)
+                       + (n_sections - 1) * SECTION_GAP)
+    row_h = (grid_h - fixed_overhead) / total_rows
+
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    ax.axis('off')
+    ax.set_zorder(5)
+
+    # Row layout: [label][gap][pill bar with circle on right end][gap][value]
+    # LABEL_W must accommodate the longest label — currently
+    # "Run Value (All Pitches)" at the chosen font size.
+    LABEL_W = col_w * 0.38
+    VALUE_W = col_w * 0.13
+    LABEL_BAR_GAP = 0.008
+    BAR_VALUE_GAP = 0.010
+
+    BAR_HEIGHT_IN  = 0.26
+    bar_h_axis     = BAR_HEIGHT_IN / fig.get_size_inches()[1]
+    CIRCLE_DIAM_IN = 0.38
+    ellipse_w = CIRCLE_DIAM_IN / fig.get_size_inches()[0]
+    ellipse_h = CIRCLE_DIAM_IN / fig.get_size_inches()[1]
+    CIRCLE_CLEARANCE_AXIS_X = (CIRCLE_DIAM_IN / fig.get_size_inches()[0]) * 0.55
+
+    x_label_left  = GRID_LEFT
+    x_label_right = GRID_LEFT + LABEL_W
+    x_bar_left    = x_label_right + LABEL_BAR_GAP
+    x_bar_zone_right = GRID_RIGHT - VALUE_W - BAR_VALUE_GAP
+    x_bar_right   = x_bar_zone_right - CIRCLE_CLEARANCE_AXIS_X
+    x_value_right = GRID_RIGHT
+    bar_total_w   = x_bar_right - x_bar_left
+
+    rounding = bar_h_axis / 2  # fully rounded pill ends
+
+    y_cursor = GRID_TOP
+    for sec_idx, (section, metrics) in enumerate(BUBBLE_COLUMNS):
+        if sec_idx > 0:
+            y_cursor -= SECTION_GAP
+
+        header_y = y_cursor
+        ax.text(GRID_LEFT, header_y, section,
+                ha='left', va='top',
+                fontsize=13, fontfamily='Avenir Next', fontweight='700',
+                color=TEXT_SECONDARY)
+        rule_y = header_y - SECTION_HEADER_H + 0.002
+        ax.add_patch(Rectangle((GRID_LEFT, rule_y),
+                                col_w, 0.0010,
+                                facecolor=TEXT_FAINT, edgecolor='none', alpha=0.5))
+        y_cursor = header_y - SECTION_HEADER_H - SECTION_TOP_GAP
+
+        for label, val_key, pctl_key, fmt_spec in metrics:
+            row_top = y_cursor
+            row_bot = y_cursor - row_h
+            row_mid = (row_top + row_bot) / 2
+            y_cursor = row_bot
+
+            val = h_row.get(val_key)
+            pctl = h_row.get(pctl_key)
+            val_str = _format_bubble_value(val, fmt_spec)
+            fill_color, ring_color = _percentile_color(pctl)
+
+            # Label
+            ax.text(x_label_left, row_mid, label,
+                    ha='left', va='center',
+                    fontsize=13, fontfamily='Avenir Next', fontweight='500',
+                    color=TEXT_PRIMARY)
+
+            # Pill track — full rounded pill in gray
+            track_y = row_mid - bar_h_axis / 2
+            track = FancyBboxPatch(
+                (x_bar_left + rounding, track_y),
+                bar_total_w - 2 * rounding, bar_h_axis,
+                boxstyle=f'round,pad=0,rounding_size={rounding}',
+                facecolor=TEXT_FAINT, edgecolor='none', alpha=0.20,
+                linewidth=0, zorder=8,
+            )
+            ax.add_patch(track)
+
+            # Pill fill — a plain rectangle of exact percentile width,
+            # CLIPPED to the track's rounded pill shape. The fill spans from
+            # x_bar_left to the LEFT edge of the percentile circle, so the
+            # full fill is visible regardless of how small the percentile is
+            # (the circle sits AFTER the fill, not on top of it). This makes
+            # low-pctl bars look symmetric to high-pctl bars — a visible
+            # proportional stub before the circle.
+            radius_x = ellipse_w / 2
+            # Effective movement range for the circle's left edge — reserve a
+            # circle's diameter at the right end so the circle never overshoots.
+            effective_bar_w = bar_total_w - 2 * radius_x
+            p = max(0, min(100, pctl)) / 100.0 if pctl is not None else 0
+            fill_w = effective_bar_w * p
+            if fill_w > 0:
+                fill = Rectangle(
+                    (x_bar_left, track_y),
+                    fill_w, bar_h_axis,
+                    facecolor=fill_color, edgecolor='none', alpha=0.95,
+                    zorder=9,
+                )
+                ax.add_patch(fill)
+                fill.set_clip_path(track)
+
+            # Circle sits right after the fill — its LEFT edge at fill end,
+            # so the full fill is always visible (no part covered by the
+            # circle). For pctl=0 the circle sits at the very left of the
+            # bar; for pctl=100 its right edge aligns with the bar's right.
+            circle_x = x_bar_left + fill_w + radius_x
+            ell = Ellipse((circle_x, row_mid),
+                           ellipse_w, ellipse_h,
+                           facecolor=ring_color, edgecolor='none',
+                           linewidth=0, zorder=12)
+            ax.add_patch(ell)
+            label_pctl = f'{int(round(pctl))}' if pctl is not None else '—'
+            ax.text(circle_x, row_mid, label_pctl,
+                    ha='center', va='center',
+                    fontsize=11, fontfamily='Avenir Next', fontweight='700',
+                    color='#ffffff', zorder=13)
+
+            # Value
+            ax.text(x_value_right, row_mid, val_str,
+                    ha='right', va='center',
+                    fontsize=13, fontfamily='Avenir Next', fontweight='600',
+                    color=TEXT_PRIMARY)
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Card render
 # ─────────────────────────────────────────────────────────────────────
 def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
-                       output_dir=OUTPUT_DIR):
-    print(f"Generating hitter card: {hitter_name} ({team_abbrev or 'auto'}) — {year_label}")
+                       output_dir=OUTPUT_DIR, layout='classic'):
+    """Render a seasonal hitter card.
+
+    layout:
+        'classic' — default. Heat maps (Whiff/Damage × RHP/LHP) on the left,
+            LA × Spray on the right, Contact Profile + Pitch Group table at
+            the bottom.
+        'bubbles' — mockup variant. Drops the heat maps, Contact Profile,
+            and Pitch Group table; replaces them with a 4-column percentile
+            bubble grid (Result / QoC / Plate Discipline / Bat Tracking).
+            Keeps the headline strip and LA × Spray chart unchanged.
+    """
+    print(f"Generating hitter card: {hitter_name} ({team_abbrev or 'auto'}) — {year_label} [layout={layout}]")
 
     # Load data
     print("  Loading pitch cache + leaderboard + metadata...")
@@ -661,17 +924,28 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     parts = hitter_name.split(', ')
     display_name = (parts[1] + ' ' + parts[0]).upper() if len(parts) == 2 else hitter_name.upper()
 
-    # Age — fetch from MLB API
+    # Age + throws — fetch from MLB API. fetch_player_metadata returns
+    # 'hand' = pitchHand.code (the player's throwing hand). For a hitter
+    # this is what they throw with — i.e. the "throws" side. The function
+    # also returns 'age'. Both are used in the identity line below.
     age = h_row.get('age')
-    if not age and mlb_id:
+    throws = h_row.get('throws')
+    if (not age or not throws) and mlb_id:
         try:
             from Cards import fetch_player_metadata
             meta = fetch_player_metadata(mlb_id)
-            age = meta.get('age', '—')
+            if not age:
+                age = meta.get('age', '—')
+            if not throws:
+                throws = meta.get('hand', 'R')
         except Exception:
-            age = '—'
-    if not age:
-        age = '—'
+            pass
+    if not age:    age = '—'
+    if not throws: throws = 'R'
+
+    # Position from h_row (resolved daily into hitter_position_cache.json
+    # at pipeline time). Fallback to '—' if missing.
+    position = h_row.get('position') or '—'
 
     # ─── Set up the figure ─────────────────────────────────────────
     fig = plt.figure(figsize=(FIG_W, FIG_H), dpi=DPI)
@@ -729,23 +1003,37 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     ax_main.text(text_x, photo_top - 0.15, display_name,
                   fontsize=36, fontfamily='DIN Condensed', color=TEXT_PRIMARY,
                   va='top', fontweight='bold')
-    hand_code = 'LHH' if bats == 'L' else ('SHH' if bats == 'S' else 'RHH')
+    # Identity line: "POS | B/T | TEAM | Age: N"
+    # Bats/throws are shown as "L/R" (single-letter codes joined by slash)
+    # so the line stays compact. Switch hitters show "S/<throws>".
     ax_main.text(text_x, photo_top - 1.05,
-                  f"{hand_code}  |  {team}  |  Age: {age}",
+                  f"{position}  |  {bats}/{throws}  |  {team}  |  Age: {age}",
                   fontsize=16, fontfamily='Avenir Next', color=TEXT_PRIMARY, va='top',
                   fontweight='600')
     # Year label + "Through {date}" inline data freshness stamp.
-    # Pulled from metadata.generatedAt — shareable cards need the date so
-    # readers know which snapshot of the season they're looking at.
-    _gen_at = metadata.get('generatedAt', '')
+    # Resolution order:
+    #   1. h_row['lastGameDate'] — written by process_data.py from the JSON
+    #      leaderboard, always fresh (the JSON is git-tracked, the pickle
+    #      is not, so this is the most reliable source).
+    #   2. max Game Date in hitter_pitches — fallback when the leaderboard
+    #      row doesn't yet have lastGameDate (older pipeline run).
+    #   3. metadata.generatedAt — last-resort fallback.
     _date_suffix = ''
-    if _gen_at:
-        try:
-            from datetime import datetime
-            _dt = datetime.strptime(_gen_at[:10], '%Y-%m-%d')
+    try:
+        from datetime import datetime
+        _latest = h_row.get('lastGameDate')
+        if not _latest:
+            _hitter_dates = [p.get('Game Date') for p in hitter_pitches
+                              if p.get('Game Date')]
+            _latest = max(_hitter_dates) if _hitter_dates else None
+        if not _latest:
+            _gen_at = metadata.get('generatedAt', '')
+            _latest = _gen_at[:10] if _gen_at else None
+        if _latest:
+            _dt = datetime.strptime(_latest[:10], '%Y-%m-%d')
             _date_suffix = f"  ·  Through {_dt.strftime('%B %-d').lstrip('0')}"
-        except Exception:
-            _date_suffix = ''
+    except Exception:
+        _date_suffix = ''
     ax_main.text(text_x, photo_top - 1.80, year_label + _date_suffix,
                   fontsize=17, fontfamily='Avenir Next', color=TEXT_SECONDARY,
                   va='top', fontweight='600')
@@ -859,11 +1147,20 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # Mirrors the hitter page panel: title centered above, annotations in
     # top-left, big tall chart, legend below.
     sacq_lookup, hand_zones, pool_zones = build_sacq_lookup(metadata, bats)
+    # Shift the entire LA × Spray block so the title's TOP edge (not its
+    # center) sits at the top of the headline stats strip cells. The title
+    # text is drawn with va='center' so the center sits ~0.0037 figrel
+    # below the top edge (half of the title's ~0.0074 figrel text height
+    # at fontsize=12). The shift accounts for that half-height offset.
+    _headline_top_y_figrel = (stat_y_header + cell_h) / FIG_H
+    _TITLE_HALF_HEIGHT_FIGREL = 12 * 1.2 / 72 / FIG_H / 2  # ~0.0056 for 12pt on 18in
+    _LA_SHIFT = 0.985 - (_headline_top_y_figrel - _TITLE_HALF_HEIGHT_FIGREL)
+
     spray_axes_left = 9.5 / FIG_W      # left edge (clear of headline stats)
     spray_axes_right = 0.985
-    spray_axes_bottom = 0.295          # more vertical room below chart so
+    spray_axes_bottom = 0.295 - _LA_SHIFT
                                         # the legend block can breathe
-    spray_axes_top = 0.910             # leave room for title + 2 annotations
+    spray_axes_top = 0.910 - _LA_SHIFT
     ax_spray = fig.add_axes([spray_axes_left, spray_axes_bottom,
                               spray_axes_right - spray_axes_left,
                               spray_axes_top - spray_axes_bottom])
@@ -1037,7 +1334,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             bipnote = f"({pctl_int}{suffix} percentile, {bip_str})"
         else:
             bipnote = f"({bip_str})"
-        l1_y = 0.955
+        l1_y = 0.955 - _LA_SHIFT
         # Approach: render label first (gray), measure its width via the
         # renderer, place value right after, measure that, place bipnote.
         renderer = fig.canvas.get_renderer()
@@ -1060,7 +1357,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     if med_spray is not None and med_la_real is not None:
         sd = ('Pull' if med_spray > 0 else 'Oppo') if bats == 'L' else \
              ('Pull' if med_spray < 0 else 'Oppo')
-        l2_y = 0.930
+        l2_y = 0.930 - _LA_SHIFT
         renderer = fig.canvas.get_renderer()
         inv = fig.transFigure.inverted()
 
@@ -1101,12 +1398,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # Editorial-style title: letterspaced uppercase, off-white, with thin
     # underline rule. Same treatment used for all section titles below.
     title_x = (spray_axes_left + spray_axes_right) / 2
-    fig.text(title_x, 0.985, 'L A U N C H   A N G L E   ×   S P R A Y',
+    fig.text(title_x, 0.985 - _LA_SHIFT, 'L A U N C H   A N G L E   ×   S P R A Y   A N G L E',
               color=TEXT_SECONDARY, fontsize=12, fontweight='700',
               fontfamily='Avenir Next', va='center', ha='center')
     # Thin underline rule
     rule_w = 0.18
-    ax_rule = fig.add_axes([title_x - rule_w / 2, 0.978, rule_w, 0.0008])
+    ax_rule = fig.add_axes([title_x - rule_w / 2, 0.978 - _LA_SHIFT, rule_w, 0.0008])
     ax_rule.axis('off')
     ax_rule.add_patch(Rectangle((0, 0), 1, 1, facecolor=TEXT_SECONDARY,
                                   edgecolor='none', alpha=0.30,
@@ -1213,6 +1510,30 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     for s in ax_grad.spines.values(): s.set_visible(False)
     cur = bar_left_x + grad_bar_w + 0.006
     _draw_text(cur, legend_y_grad, grad_high, LEGEND_FONTSIZE, TEXT_DIMMED)
+
+    # ═════════════════════════════════════════════════════════════════
+    # LAYOUT BRANCH: 'bubbles' variant
+    # Drops heat maps, contact profile, and pitch group table; renders a
+    # 4-column percentile bubble grid in the left half. Keeps headline +
+    # LA × Spray exactly as the classic layout. Early-returns after save
+    # so the classic-layout code below is untouched.
+    # ═════════════════════════════════════════════════════════════════
+    if layout == 'bubbles':
+        _render_percentile_bubbles(fig, h_row)
+
+        # Watermark — bottom-right corner.
+        fig.text(0.99, 0.012, 'Huronalytics', color=TEXT_DIMMED, fontsize=10,
+                  fontfamily='Avenir Next', ha='right', va='bottom',
+                  fontweight='600')
+
+        # Save with _bubbles suffix so the two layouts can coexist.
+        safe_name = display_name.replace(' ', '_').replace('.', '').replace(',', '')
+        out_path = os.path.join(output_dir,
+                                  f'HitterCard_{safe_name}_{year_label.replace(" ", "_")}_bubbles.png')
+        plt.savefig(out_path, dpi=SAVE_DPI, facecolor=BG, bbox_inches='tight')
+        plt.close(fig)
+        print(f"  Saved: {out_path}")
+        return True
 
     # No section title for heat maps — the four panel titles
     # ("WHIFFS vs RHP — 33.9%", etc.) already label the section.
@@ -1686,10 +2007,9 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                     if tinted: table.get_celld()[(rr, ci)].set_facecolor(tinted)
 
     # ─── Watermark ─────────────────────────────────────────────────
-    # Watermark — top-right corner. Sits in the empty space above the
-    # right edge of the LA × Spray chart, well clear of any table cells.
-    fig.text(0.99, 0.992, 'Huronalytics', color=TEXT_DIMMED, fontsize=10,
-              fontfamily='Avenir Next', ha='right', va='top',
+    # Watermark — bottom-right corner.
+    fig.text(0.99, 0.012, 'Huronalytics', color=TEXT_DIMMED, fontsize=10,
+              fontfamily='Avenir Next', ha='right', va='bottom',
               fontweight='600')
 
     # Save
@@ -1707,8 +2027,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 # ─────────────────────────────────────────────────────────────────────
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team           = None                    # Team filter (e.g., "NYY"), or None for all teams
-    filter_hitters = ""       # Semicolon-separated "Last, First" names, or "" for all
+    team           = "WSH"                   # Team filter (e.g., "NYY"), or None for all teams
+    filter_hitters = "Wood, James"       # Semicolon-separated "Last, First" names, or "" for all
     year_label     = "2026 Season"        # Display label on the card
     output_dir     = OUTPUT_DIR
 
@@ -1722,12 +2042,17 @@ def main():
                          help=f'Display label on the card (default: "{year_label}")')
     parser.add_argument('--output-dir', default=None,
                          help=f'Output directory (default: {OUTPUT_DIR})')
+    parser.add_argument('--layout', default='classic',
+                         choices=['classic', 'bubbles'],
+                         help="'classic' = heat maps + contact profile + pitch group table. "
+                              "'bubbles' = 4-column percentile grid in place of those three sections.")
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
     if args.hitters is not None: filter_hitters = args.hitters
     if args.year_label is not None: year_label = args.year_label
     if args.output_dir is not None: output_dir = args.output_dir
+    layout = args.layout
 
     # Parse filter_hitters string into a list (empty string → render all)
     if filter_hitters:
@@ -1742,7 +2067,8 @@ def main():
               f"({team_label}) — {year_label} ═══\n")
         for name in hitter_names:
             render_hitter_card(name, team_abbrev=team,
-                                year_label=year_label, output_dir=output_dir)
+                                year_label=year_label, output_dir=output_dir,
+                                layout=layout)
     else:
         # No specific names: render every (qualified) hitter, optionally filtered by team
         leaderboard = load_hitter_leaderboard()
@@ -1754,7 +2080,8 @@ def main():
               f"({team_label}) — {year_label} ═══\n")
         for r in targets:
             render_hitter_card(r.get('hitter'), team_abbrev=r.get('team'),
-                                year_label=year_label, output_dir=output_dir)
+                                year_label=year_label, output_dir=output_dir,
+                                layout=layout)
 
 
 if __name__ == '__main__':
