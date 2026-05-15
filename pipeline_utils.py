@@ -53,9 +53,19 @@ ALL_TEAMS = MLB_TEAMS | AAA_TEAMS
 #   MLB hitter:        3.1 PA × TG
 #   MiLB/ROC hitter:   2.7 PA × TG
 #   MLB starter:       1.0 IP × TG    (GS/G > SP_GS_RATIO)
-#   MLB reliever:      0.5 IP × TG    (official "relief-pitcher specific" #)
+#   MLB reliever:      0.30 IP × TG   (see note below)
 #   MiLB/ROC starter:  0.8 IP × TG
-#   MiLB/ROC reliever: 0.4 IP × TG
+#   MiLB/ROC reliever: 0.24 IP × TG
+#
+# Reliever coefficient (0.30): MLB has no official reliever qualifier,
+# so we match FanGraphs' relief-pitching leaderboard, which is the de
+# facto public standard. Empirically derived: across all 30 teams,
+# IP >= 0.30 × team_games reproduces FanGraphs' qualified-reliever set
+# with ZERO mismatches (every qualified reliever sits at >= 0.302 IP/TG,
+# every non-qualified at <= 0.296 IP/TG, so 0.30 is the exact dividing
+# line). The old 0.5 value was far too strict (it qualified only ~1
+# reliever per team vs FanGraphs' ~6). ROC reliever (0.24) keeps the
+# same 0.80 ROC-to-MLB scaling used for starters (0.8/1.0) and hitters.
 #
 # These must stay in sync with the JS mirror in js/aggregator.js (QUAL)
 # and the Utils.hitterPaPerGame / Utils.pitcherIpPerGame helpers.
@@ -64,9 +74,9 @@ SP_GS_RATIO = 0.5
 QUAL_PA_PER_GAME_MLB     = 3.1
 QUAL_PA_PER_GAME_MILB    = 2.7
 QUAL_SP_IP_PER_GAME_MLB  = 1.0
-QUAL_RP_IP_PER_GAME_MLB  = 0.5
+QUAL_RP_IP_PER_GAME_MLB  = 0.30
 QUAL_SP_IP_PER_GAME_MILB = 0.8
-QUAL_RP_IP_PER_GAME_MILB = 0.4
+QUAL_RP_IP_PER_GAME_MILB = 0.24
 
 
 def hitter_pa_per_game(is_roc):

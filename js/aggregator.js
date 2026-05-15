@@ -12,12 +12,15 @@ var QUAL = {
   PA_PER_GAME:       3.1,   // MLB hitter
   PA_PER_GAME_MILB:  2.7,   // ROC / MiLB hitter
   // Pitcher qualification: IP >= teamGames × per-game multiplier.
-  // Reliever multipliers match the official "relief-pitcher specific"
-  // standards (0.5 MLB / 0.4 MiLB); starters use the general standards.
-  SP_IP_PER_GAME:      1.0, // MLB starter
-  RP_IP_PER_GAME:      0.5, // MLB reliever (was an inline tg/3 ≈ 0.333)
-  SP_IP_PER_GAME_MILB: 0.8, // ROC / MiLB starter
-  RP_IP_PER_GAME_MILB: 0.4, // ROC / MiLB reliever
+  // Reliever multiplier (0.30) matches FanGraphs' relief-pitching
+  // leaderboard exactly: empirically, IP >= 0.30 × teamGames reproduces
+  // FG's qualified-reliever set with zero mismatches across all 30 teams.
+  // ROC reliever (0.24) keeps the same 0.80 ROC-to-MLB scaling as
+  // starters. Keep in sync with pipeline_utils.py QUAL_* constants.
+  SP_IP_PER_GAME:      1.0,  // MLB starter
+  RP_IP_PER_GAME:      0.30, // MLB reliever (FanGraphs-matched)
+  SP_IP_PER_GAME_MILB: 0.8,  // ROC / MiLB starter
+  RP_IP_PER_GAME_MILB: 0.24, // ROC / MiLB reliever
   SP_GS_RATIO:       0.5,   // Starter if GS/G > 0.5
   HARD_HIT_MPH:      95,    // Exit velo >= 95 mph = hard hit
   MIN_BIP_PCTL:      25,    // Minimum BIP for batted-ball percentile coloring
