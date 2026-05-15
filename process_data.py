@@ -2643,13 +2643,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PLUS_W_CT = 0.28
     HITTER_PLUS_SCALE = 40  # multiplier on composite z-score
 
-    # Standardization uses 3.1 × TGP qualified hitters (the leaderboard gate).
+    # Standardization uses the leaderboard-qualified hitter pool (ROC-aware:
+    # 3.1 PA×TG for MLB, 2.7 for ROC). In practice ROC hitters have None
+    # bbPlus/sdPlus/ctPlus so they're excluded anyway, but the threshold is
+    # ROC-aware for consistency with the rest of the qualification logic.
+    from pipeline_utils import hitter_pa_per_game as _hitter_pa_per_game
     _hplus_qual = []
     for _row in hitter_leaderboard:
         _team_g = team_games_played.get(_row.get('team'))
         if _team_g is None and team_games_played:
             _team_g = max(team_games_played.values())
-        if _team_g and _row.get('pa', 0) >= 3.1 * _team_g and \
+        _pa_thresh = _hitter_pa_per_game(bool(_row.get('_isROC'))) * (_team_g or 0)
+        if _team_g and _row.get('pa', 0) >= _pa_thresh and \
            _row.get('bbPlus') is not None and _row.get('sdPlus') is not None and _row.get('ctPlus') is not None:
             _hplus_qual.append(_row)
     if len(_hplus_qual) >= 10:
@@ -3226,14 +3231,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # pitchers). All rows still get a percentile rank stored — non-qualified
     # rows have ranks for tooltip display but are not colored at render time.
     # Counting stats (hr, sb) keep the unfiltered pool.
+    # Canonical qualification — ROC-aware via the shared pipeline_utils
+    # helpers (MLB hitter 3.1 PA×TG, ROC 2.7; MLB SP 1.0 IP×TG / RP 0.5,
+    # ROC SP 0.8 / RP 0.4). NOTE: compute_percentile_ranks_with_aaa routes
+    # ROC rows to interpolation BEFORE qualifier_fn is ever called, so the
+    # MLB pool is unaffected by the ROC branch here — the ROC-aware code
+    # is kept for correctness/consistency with the frontend.
+    from pipeline_utils import (
+        hitter_pa_per_game, pitcher_ip_per_game, SP_GS_RATIO,
+    )
+
     def _hitter_qualified_for_pctl(row):
         pa = row.get('pa', 0) or 0
         tg = team_games_played.get(row.get('team'))
         if tg is None and team_games_played:
             tg = max(team_games_played.values())
-        return bool(tg) and pa >= 3.1 * tg
+        if not tg:
+            return False
+        return pa >= hitter_pa_per_game(bool(row.get('_isROC'))) * tg
 
-    SP_GS_RATIO = 0.5  # mirrors aggregator.js QUAL.SP_GS_RATIO
     def _pitcher_qualified_for_pctl(row):
         ip_str = row.get('ip')
         ip_f = ip_str_to_float(ip_str) if ip_str is not None else 0
@@ -3245,8 +3261,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         g = row.get('g') or 0
         gs = row.get('gs') or 0
         is_starter = g > 0 and (gs / g) > SP_GS_RATIO
-        threshold = tg * 1.0 if is_starter else tg / 3.0
-        return ip_f >= threshold
+        per_game = pitcher_ip_per_game(is_starter, bool(row.get('_isROC')))
+        return ip_f >= tg * per_game
 
     # Hitter counting stats — keep unfiltered pool, do not apply qualifier_fn.
     HITTER_COUNTING_PCTL = {'hr', 'sb'}

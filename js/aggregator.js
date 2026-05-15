@@ -8,7 +8,16 @@
 // These thresholds appear across aggregator, data, and leaderboard modules.
 // Centralizing them here prevents silent drift when one file is updated but not another.
 var QUAL = {
-  PA_PER_GAME:       3.1,   // Hitter qualified: PA >= teamGames * 3.1
+  // Hitter qualification: PA >= teamGames × per-game multiplier.
+  PA_PER_GAME:       3.1,   // MLB hitter
+  PA_PER_GAME_MILB:  2.7,   // ROC / MiLB hitter
+  // Pitcher qualification: IP >= teamGames × per-game multiplier.
+  // Reliever multipliers match the official "relief-pitcher specific"
+  // standards (0.5 MLB / 0.4 MiLB); starters use the general standards.
+  SP_IP_PER_GAME:      1.0, // MLB starter
+  RP_IP_PER_GAME:      0.5, // MLB reliever (was an inline tg/3 ≈ 0.333)
+  SP_IP_PER_GAME_MILB: 0.8, // ROC / MiLB starter
+  RP_IP_PER_GAME_MILB: 0.4, // ROC / MiLB reliever
   SP_GS_RATIO:       0.5,   // Starter if GS/G > 0.5
   HARD_HIT_MPH:      95,    // Exit velo >= 95 mph = hard hit
   MIN_BIP_PCTL:      25,    // Minimum BIP for batted-ball percentile coloring
@@ -691,7 +700,8 @@ const Aggregator = {
       const tg = mtRow ? (cumTeamGames[r.pitcher] || 0) : (teamGames[r.team] || 0);
       const ipFloat = Utils.parseIP(mtRow ? mtRow.ip : r.ip);
       const isStarter = Utils.isStarter(mtRow ? mtRow.g : r.g, mtRow ? mtRow.gs : r.gs);
-      r._qualified = ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
+      const _isROC = Aggregator._isROCTeam(r.team);
+      r._qualified = ipFloat >= tg * Utils.pitcherIpPerGame(isStarter, _isROC);
       // Per-team row of a multi-team player: interpolate against the combined-row pool
       r._inPool = mtRow && r !== mtRow ? false : true;
     }
@@ -1207,14 +1217,16 @@ const Aggregator = {
           const tg = cumTeamGamesPitch[r.pitcher] || 0;
           const ipFloat = Utils.parseIP(cp.ip);
           const isStarter = Utils.isStarter(cp.g, cp.gs);
-          return ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
+          const isROC = Aggregator._isROCTeam(r.team);
+          return ipFloat >= tg * Utils.pitcherIpPerGame(isStarter, isROC);
         }
         var p = ipLookup[r.pitcher + '|' + r.team];
         if (!p) return false;
         var tg = teamGames[r.team] || 0;
         var ipFloat = Utils.parseIP(p.ip);
         var isStarter = Utils.isStarter(p.g, p.gs);
-        return ipFloat >= (isStarter ? tg * 1.0 : tg / 3);
+        var isROC = Aggregator._isROCTeam(r.team);
+        return ipFloat >= tg * Utils.pitcherIpPerGame(isStarter, isROC);
       });
     }
 
@@ -1599,7 +1611,7 @@ const Aggregator = {
         _tg = hitterTg[r.team] || 0;
         _pa = (r.paAll != null ? r.paAll : r.pa) || 0;
       }
-      r._qualified = _tg > 0 && _pa >= _tg * QUAL.PA_PER_GAME;
+      r._qualified = _tg > 0 && _pa >= _tg * Utils.hitterPaPerGame(Aggregator._isROCTeam(r.team));
     }
 
     // Compute percentiles. Rate stats use the qualified pool only — short-
@@ -1648,14 +1660,15 @@ const Aggregator = {
       }
       rows = rows.filter(function (r) {
         const mt = combinedByHitter[r.hitter];
+        const isROC = Aggregator._isROCTeam(r.team);
         if (mt) {
           const tg = cumTgH[r.hitter] || 0;
           const pa = (mt.paAll != null ? mt.paAll : mt.pa) || 0;
-          return pa >= tg * QUAL.PA_PER_GAME;
+          return pa >= tg * Utils.hitterPaPerGame(isROC);
         }
         var tg = tgHitter[r.team] || 0;
         var pa = (r.paAll != null ? r.paAll : r.pa) || 0;
-        return pa >= tg * QUAL.PA_PER_GAME;
+        return pa >= tg * Utils.hitterPaPerGame(isROC);
       });
     }
 

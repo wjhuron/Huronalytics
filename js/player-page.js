@@ -799,13 +799,14 @@ var PlayerPage = {
     var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
     var tg = teamGames[data.team] || 0;
     var isQualified;
+    var _isROC = Aggregator.loaded && Aggregator._isROCTeam(data.team);
     if (isPitcher) {
       var ipFloat = Utils.parseIP(data.ip);
       var isStarter = Utils.isStarter(data.g, data.gs);
-      var ipThreshold = isStarter ? tg * 1.0 : tg / 3;
+      var ipThreshold = tg * Utils.pitcherIpPerGame(isStarter, _isROC);
       isQualified = ipFloat >= ipThreshold;
     } else {
-      isQualified = (data.pa || 0) >= tg * QUAL.PA_PER_GAME;
+      isQualified = (data.pa || 0) >= tg * Utils.hitterPaPerGame(_isROC);
     }
     var alwaysColorKeys = isPitcher ? { ffVelo: true, siVelo: true } : { maxEV: true };
 
@@ -1071,12 +1072,13 @@ var PlayerPage = {
     sectionLabel.textContent = 'xRun Value / 100 PA';
     container.appendChild(sectionLabel);
 
-    // Qualification (PA × team games × QUAL.PA_PER_GAME) — same gate the
-    // generic _renderPercentiles uses for hitter rate stats.
+    // Qualification (PA × team games, ROC-aware: 3.1 MLB / 2.7 ROC) —
+    // same gate the generic _renderPercentiles uses for hitter rate stats.
     var teamGames = Aggregator.loaded ? Aggregator.getTeamGamesPlayed() : {};
     var tg = teamGames[data.team] || 0;
     var pa = data.pa || 0;
-    var isQualified = tg > 0 && pa >= tg * QUAL.PA_PER_GAME;
+    var _isROC = Aggregator.loaded && Aggregator._isROCTeam(data.team);
+    var isQualified = tg > 0 && pa >= tg * Utils.hitterPaPerGame(_isROC);
 
     var xRv100 = data.xRv100;
     var pctl = data.xRv100_pctl;
