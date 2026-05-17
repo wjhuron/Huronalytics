@@ -17,13 +17,25 @@ Behavior:
 - Each appended block is formatted Helvetica Neue, size 8, centered, to match
   the existing data in the sheet.
 
-One-time auth setup:
-    1. In Google Cloud Console, create (or pick) a project.
+One-time auth setup (service account — preferred, headless, never expires):
+    1. Google Cloud Console → pick/create a project.
     2. Enable the Google Sheets API for that project.
-    3. Create OAuth 2.0 Client ID credentials of type "Desktop app".
-    4. Download the JSON, save it to ~/.config/gspread/credentials.json.
-    5. First run will open a browser for consent. The token is cached at
-       ~/.config/gspread/authorized_user.json — subsequent runs are silent.
+    3. IAM & Admin → Service Accounts → Create service account.
+    4. On the new account: Keys → Add key → JSON → download.
+    5. Save the JSON to ~/.config/gspread/service_account.json.
+    6. Open the downloaded JSON, copy the "client_email" value, and share
+       BOTH the "AL 2026" and "NL 2026" workbooks with that email as
+       Editor (the same way you'd share with a person).
+
+    The service account has no token expiry and needs no browser, so the
+    pipeline runs unattended forever.
+
+Legacy fallback (interactive OAuth — used only if no service_account.json):
+    Desktop OAuth client at ~/.config/gspread/credentials.json, browser
+    consent cached at ~/.config/gspread/authorized_user.json. NOTE: if the
+    OAuth consent screen is in "Testing" status, Google revokes the refresh
+    token after 7 days ("invalid_grant: Token has been expired or revoked"),
+    which is exactly why the service-account path above is preferred.
 """
 
 import os
@@ -54,8 +66,13 @@ def _workbook_id_for_team(team):
 
 
 def _get_client():
-    """Return an authorized gspread client. First call will open a browser
-    if no cached token exists."""
+    """Return an authorized gspread client.
+
+    Prefers a service account (headless, no token expiry) at gspread's
+    conventional path ~/.config/gspread/service_account.json. Falls back to
+    interactive OAuth only if no service-account key is present, so an
+    in-progress migration never hard-breaks the pipeline.
+    """
     try:
         import gspread
     except ImportError:
@@ -63,14 +80,27 @@ def _get_client():
             "gspread is required for sheets push. Install with: pip install gspread"
         )
 
+    sa_path = os.path.expanduser('~/.config/gspread/service_account.json')
+    if os.path.exists(sa_path):
+        # Service account: no browser, no 7-day refresh-token expiry. The
+        # AL 2026 / NL 2026 workbooks must each be shared (Editor) with the
+        # account's client_email or gspread raises APIError 403 / 404.
+        return gspread.service_account(filename=sa_path)
+
+    # Fallback: interactive OAuth (Desktop client). Breaks every 7 days if
+    # the OAuth consent screen is in "Testing" status — see module docstring.
     cred_path = os.path.expanduser('~/.config/gspread/credentials.json')
     if not os.path.exists(cred_path):
         raise RuntimeError(
-            f"OAuth client config not found at {cred_path}.\n"
-            "One-time setup:\n"
-            "  1. Google Cloud Console → enable Google Sheets API for any project.\n"
-            "  2. Create OAuth 2.0 Client ID, type 'Desktop app'.\n"
-            "  3. Download JSON, save as ~/.config/gspread/credentials.json"
+            "No Google Sheets credentials found.\n"
+            "Preferred (headless, never expires) — save a service-account "
+            f"key to {sa_path}:\n"
+            "  1. Google Cloud Console → enable the Google Sheets API.\n"
+            "  2. IAM & Admin → Service Accounts → Create; add a JSON key.\n"
+            "  3. Save the JSON to the path above.\n"
+            "  4. Share the AL 2026 and NL 2026 Sheets (Editor) with the\n"
+            "     service account's client_email.\n"
+            f"Or legacy OAuth — save a Desktop OAuth client to {cred_path}."
         )
     return gspread.oauth()  # uses ~/.config/gspread/{credentials,authorized_user}.json
 
@@ -82,6 +112,79 @@ def _col_letter(n):
         n, r = divmod(n - 1, 26)
         s = chr(65 + r) + s
     return s
+
+
+def _paste_number_formats_from_row(ws, src_row_1idx, dest_start_1idx, dest_end_1idx, n_cols):
+    """Paste the cell formatting (incl. number format) from a single existing
+    row onto a destination range. Used right after appending new data so the
+    new rows inherit the column-specific number formats already set up on the
+    sheet — e.g. Velocity (`0.0`), Extension (`0.00`), PlateX (`0.000`),
+    RTilt/OTilt (`h:mm`). Without this, appended cells default to "Automatic"
+    and round values like 82.0 render as 82.
+
+    Safe to call only when there's at least one existing data row to copy from
+    (i.e. dest_start_1idx > src_row_1idx). The destination range can be any
+    number of rows — the Sheets API repeats the source format to fill it.
+    """
+    # 0-indexed conversion. endRowIndex is exclusive.
+    src_row_0 = src_row_1idx - 1
+    request = {
+        'copyPaste': {
+            'source': {
+                'sheetId': ws.id,
+                'startRowIndex': src_row_0,
+                'endRowIndex': src_row_0 + 1,
+                'startColumnIndex': 0,
+                'endColumnIndex': n_cols,
+            },
+            'destination': {
+                'sheetId': ws.id,
+                'startRowIndex': dest_start_1idx - 1,
+                'endRowIndex': dest_end_1idx,
+                'startColumnIndex': 0,
+                'endColumnIndex': n_cols,
+            },
+            'pasteType': 'PASTE_FORMAT',
+            'pasteOrientation': 'NORMAL',
+        }
+    }
+    ws.spreadsheet.batch_update({'requests': [request]})
+
+
+# Columns whose string values would otherwise be misparsed by USER_ENTERED.
+# Baseball counts like "1-0" get parsed as the date "January 0" and stored
+# as date serials (46022, 46023, …) — the cell then displays as "46023"
+# instead of "1-0". Prefixing each value with a leading apostrophe forces
+# Sheets to store the cell as text; the apostrophe is hidden in the rendered
+# display and downstream readers still see "1-0".
+TEXT_FORCE_COLUMNS = {'Count'}
+
+
+# Columns where we explicitly enforce a number format on every appended block,
+# independent of what row 2 happens to look like. The format-paste-from-row-2
+# step inherits most column formats correctly, but some tabs have row 2 cells
+# with the format missing or wrong — e.g. AAA's row 2 RTilt was empty, which
+# caused the whole RTilt column to render as raw decimals (0.0986) instead of
+# clock times (2:22). Enforcing these by name makes the push robust to any
+# tab's row 2 state.
+EXPLICIT_NUMBER_FORMATS = {
+    'RTilt': {'type': 'TIME',   'pattern': 'h:mm'},
+    'OTilt': {'type': 'TIME',   'pattern': 'h:mm'},
+}
+
+
+def _force_text_for_columns(df, cols):
+    """Prefix non-empty string values in `cols` with `'` so Sheets'
+    USER_ENTERED parser treats them as text and skips number/date coercion.
+    Returns a copy of `df`; never mutates the caller's dataframe.
+    """
+    cols_present = [c for c in cols if c in df.columns]
+    if not cols_present:
+        return df
+    df = df.copy()
+    for c in cols_present:
+        df[c] = df[c].apply(lambda v: f"'{v}" if isinstance(v, str) and v else v)
+    return df
 
 
 def _df_to_rows(df):
@@ -131,6 +234,10 @@ def push_team_data(df, team, gc=None, verbose=True):
             print(f"  [sheets] tab {team!r} not found in workbook ({e}); skipping")
         return None
 
+    # Force text storage for columns whose values would be misparsed by
+    # USER_ENTERED (e.g. Count "1-0" → date serial 46023).
+    df = _force_text_for_columns(df, TEXT_FORCE_COLUMNS)
+
     rows = _df_to_rows(df)
     if not rows:
         return None
@@ -148,6 +255,24 @@ def push_team_data(df, team, gc=None, verbose=True):
     range_name = f"A{next_row}:{end_col}{end_row}"
 
     ws.update(range_name, rows, value_input_option='USER_ENTERED')
+
+    # Inherit per-column number formats from an existing data row so values
+    # like Velocity 82.0 don't display as "82" (Automatic format strips
+    # trailing zeros). Row 2 is the canonical source — it's the first data
+    # row Wally set up with per-column formats. Only safe when there's at
+    # least one existing data row above the new block.
+    if next_row > 2:
+        try:
+            _paste_number_formats_from_row(
+                ws, src_row_1idx=2,
+                dest_start_1idx=next_row, dest_end_1idx=end_row,
+                n_cols=len(df.columns),
+            )
+        except Exception as e:
+            if verbose:
+                print(f"  [sheets] number-format paste failed "
+                      f"({type(e).__name__}: {e}); continuing")
+
     # Match the existing data rows in the sheet:
     #   font Helvetica Neue 8, center horiz, top vert, SOLID 1px borders all sides.
     #   Column A (Game Date) is additionally bold.
@@ -171,6 +296,24 @@ def push_team_data(df, team, gc=None, verbose=True):
         **base_fmt,
         'textFormat': {**base_fmt['textFormat'], 'bold': True},
     })
+
+    # Explicitly enforce number formats on columns we don't want to rely on
+    # row 2 having set up correctly. Currently: RTilt + OTilt (TIME h:mm) —
+    # AAA's row 2 had RTilt empty, which made the whole RTilt column render
+    # as raw decimals after a push. This pass guarantees the right format
+    # regardless of row 2's state on any tab.
+    for col_name, fmt_spec in EXPLICIT_NUMBER_FORMATS.items():
+        if col_name not in df.columns:
+            continue
+        col_idx_1 = df.columns.get_loc(col_name) + 1
+        col_a1 = _col_letter(col_idx_1)
+        rng = f'{col_a1}{next_row}:{col_a1}{end_row}'
+        try:
+            ws.format(rng, {'numberFormat': fmt_spec})
+        except Exception as e:
+            if verbose:
+                print(f"  [sheets] failed to apply {fmt_spec} to {col_name} "
+                      f"({type(e).__name__}: {e}); continuing")
 
     if verbose:
         wb_label = 'NL 2026' if wb_id == SHEETS_NL else 'AL 2026'

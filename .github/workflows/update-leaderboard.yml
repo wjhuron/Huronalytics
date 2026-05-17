@@ -82,20 +82,45 @@ jobs:
           git add data/ index.html css/ js/
           if git diff --cached --quiet; then
             echo "No changes to deploy."
-            exit 0
-          fi
-          git commit -m "Update leaderboard $(date '+%Y-%m-%d %H:%M')"
+          else
+            git commit -m "Update leaderboard $(date '+%Y-%m-%d %H:%M')"
 
-          # Retry on non-fast-forward: if a concurrent push landed on main
-          # while we were running, rebase the leaderboard commit on top and
-          # try again. Five attempts is enough headroom for any realistic
-          # race; if we still can't push after that, surface the error.
-          for attempt in 1 2 3 4 5; do
-            if git push origin main; then
-              exit 0
-            fi
-            echo "Push attempt $attempt rejected, rebasing on origin/main and retrying..."
-            git pull --rebase origin main
-          done
-          echo "Push still failing after 5 attempts."
-          exit 1
+            # Retry on non-fast-forward: if a concurrent push landed on main
+            # while we were running, rebase the leaderboard commit on top and
+            # try again. Five attempts is enough headroom for any realistic
+            # race; if we still can't push after that, surface the error.
+            for attempt in 1 2 3 4 5; do
+              if git push origin main; then
+                break
+              fi
+              echo "Push attempt $attempt rejected, rebasing on origin/main and retrying..."
+              git pull --rebase origin main
+              if [ $attempt -eq 5 ]; then
+                echo "Push still failing after 5 attempts."
+                exit 1
+              fi
+            done
+          fi
+
+      # Publish the pickle cache as a GitHub Release asset. The pickle is
+      # gitignored (it's ~100 MB, too big for git) but downstream tools like
+      # HitterCards.py depend on it for per-pitch data. Without this step,
+      # local clones can never get a fresh pickle from CI — they'd have to
+      # run process_data.py locally, which means re-fetching everything
+      # from Google Sheets. Attaching to a fixed-tag release lets the
+      # card auto-download the latest pickle in seconds.
+      - name: Publish pickle to "latest-data" release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-data
+          name: Latest pipeline pickle
+          body: |
+            Automated upload of the pitch-level cache from the most
+            recent pipeline run. HitterCards.py downloads this file
+            automatically when it detects a stale local pickle.
+
+            Updated: ${{ github.event.repository.updated_at }}
+          files: data/all_pitches_rs_cache.pkl
+          fail_on_unmatched_files: true
+          make_latest: false

@@ -1195,10 +1195,14 @@ class BaseballSavantFocusedDownloader:
             print(f"  Merged bat speed for {filled} pitches")
         return df
 
-    def download_team_games(self, team_abbrev, start_date, end_date, pitchers_only=False):
+    def download_team_games(self, team_abbrev, start_date, end_date, pitchers_only=False, save_csv=True):
         """
         Download all games for a specific team within a date range and save as a single CSV.
         Combines live feed data with Statcast Search supplement.
+
+        If save_csv=False, the dataframe is built and stashed in
+        ``self._last_combined_df`` for a downstream sheets push, but no local
+        CSV is written.
         """
         # Get all games for the team within the date range
         game_pks = self.get_team_games(team_abbrev, start_date, end_date)
@@ -1268,19 +1272,22 @@ class BaseballSavantFocusedDownloader:
         # ROC/AAA normalization (no-op for MLB downloads)
         combined_df = self.normalize_aaa_labels(combined_df)
 
-        # Save the combined data directly to the team file
+        # Save the combined data directly to the team file (skip local CSV
+        # write when caller is only doing a Sheets push).
         output_filename = os.path.join(self.download_dir, f"{team_abbrev}.csv")
-        combined_df.to_csv(output_filename, index=False)
+        if save_csv:
+            combined_df.to_csv(output_filename, index=False)
 
         print(f"\nCombined {len(all_dfs)} games with {len(combined_df)} total pitches")
-        print(f"Combined data saved to: {output_filename}")
+        if save_csv:
+            print(f"Combined data saved to: {output_filename}")
 
         # Stash for downstream Sheets push (caller passes flag to main)
         self._last_combined_df = combined_df
 
         return output_filename
 
-    def download_games_by_id(self, game_pks, filter_team=None, output_name=None):
+    def download_games_by_id(self, game_pks, filter_team=None, output_name=None, save_csv=True):
         """
         Download one or more games by their game PK IDs and save as a single CSV.
 
@@ -1364,10 +1371,12 @@ class BaseballSavantFocusedDownloader:
             stem = "custom"
 
         output_filename = os.path.join(self.download_dir, f"{stem}.csv")
-        combined_df.to_csv(output_filename, index=False)
+        if save_csv:
+            combined_df.to_csv(output_filename, index=False)
 
         print(f"\nCombined {len(all_dfs)} games with {len(combined_df)} total pitches")
-        print(f"Data saved to: {output_filename}")
+        if save_csv:
+            print(f"Data saved to: {output_filename}")
 
         # Stash for downstream Sheets push (caller passes flag to main)
         self._last_combined_df = combined_df
@@ -1418,25 +1427,36 @@ def main():
 
     downloader = BaseballSavantFocusedDownloader()
 
+    # When pushing to Sheets, the local CSV is redundant — skip writing it.
+    save_csv = not push_to_sheets
+
     # ── Logic: game_id takes priority, otherwise fall back to team/date lookup ──
     if game_id:
         result = downloader.download_games_by_id(
             game_pks=game_id,
             filter_team=filter_team,
             output_name=output_name if output_name else None,
+            save_csv=save_csv,
         )
 
         if result:
-            print(f"\nData saved to: {result}")
+            if save_csv:
+                print(f"\nData saved to: {result}")
+            else:
+                print(f"\nDownloaded successfully (CSV skipped — pushing to Sheets)")
         else:
             print("\nFailed to download game data")
 
     elif team_abbrev:
-        result = downloader.download_team_games(team_abbrev, start_date, end_date, pitchers_only)
+        result = downloader.download_team_games(team_abbrev, start_date, end_date, pitchers_only,
+                                                save_csv=save_csv)
 
         if result:
             print(f"\nSuccessfully downloaded and combined games for {team_abbrev}")
-            print(f"Data saved to: {result}")
+            if save_csv:
+                print(f"Data saved to: {result}")
+            else:
+                print(f"CSV skipped — pushing to Sheets")
         else:
             print(f"\nFailed to download any games for {team_abbrev}")
 
@@ -1454,6 +1474,15 @@ def main():
             push_csv_to_sheets(downloader._last_combined_df)
         except Exception as e:
             print(f"\nSheets push failed: {e}")
+            # Fallback: write the CSV locally so the data isn't lost.
+            # We skipped the local write above because push_to_sheets was True,
+            # so this is the only on-disk copy if Sheets is down.
+            if not save_csv and result:
+                try:
+                    downloader._last_combined_df.to_csv(result, index=False)
+                    print(f"Wrote fallback CSV to: {result}")
+                except Exception as e2:
+                    print(f"Could not write fallback CSV either: {e2}")
 
 
 if __name__ == "__main__":

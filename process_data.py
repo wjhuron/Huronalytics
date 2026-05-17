@@ -2218,6 +2218,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         else:
             stands = None
 
+        # Latest game date present in this hitter's pitch data. Used by
+        # downstream consumers (e.g. card generator's "Through {date}" stamp)
+        # so they can show a freshness stamp without needing the pitch-level
+        # pickle, which is gitignored and won't propagate from CI.
+        _hitter_dates = [p.get('Game Date') for p in pitches if p.get('Game Date')]
+        last_game_date = max(_hitter_dates) if _hitter_dates else None
+
         row = {
             'hitter': hitter,
             'team': team,
@@ -2225,6 +2232,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'count': len(pitches),
             'mlbId': get_mlb_id(hitter, team),
             '_isROC': team in AAA_TEAMS,
+            'lastGameDate': last_game_date,
         }
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
@@ -2635,13 +2643,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PLUS_W_CT = 0.28
     HITTER_PLUS_SCALE = 40  # multiplier on composite z-score
 
-    # Standardization uses 3.1 × TGP qualified hitters (the leaderboard gate).
+    # Standardization uses the leaderboard-qualified hitter pool (ROC-aware:
+    # 3.1 PA×TG for MLB, 2.7 for ROC). In practice ROC hitters have None
+    # bbPlus/sdPlus/ctPlus so they're excluded anyway, but the threshold is
+    # ROC-aware for consistency with the rest of the qualification logic.
+    from pipeline_utils import hitter_pa_per_game as _hitter_pa_per_game
     _hplus_qual = []
     for _row in hitter_leaderboard:
         _team_g = team_games_played.get(_row.get('team'))
         if _team_g is None and team_games_played:
             _team_g = max(team_games_played.values())
-        if _team_g and _row.get('pa', 0) >= 3.1 * _team_g and \
+        _pa_thresh = _hitter_pa_per_game(bool(_row.get('_isROC'))) * (_team_g or 0)
+        if _team_g and _row.get('pa', 0) >= _pa_thresh and \
            _row.get('bbPlus') is not None and _row.get('sdPlus') is not None and _row.get('ctPlus') is not None:
             _hplus_qual.append(_row)
     if len(_hplus_qual) >= 10:
@@ -2947,6 +2960,61 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
+    # FanGraphs override: replace our pipeline-computed wRC+, xwOBA, xBA,
+    # and xSLG with canonical FG values for every hitter. FG has slightly
+    # different park-factor / wOBA-weight tuning and intermediate
+    # precision that produces small but visible deltas (e.g. Wood reads
+    # wRC+ 151 here vs 152 on FG; xwOBA .425 vs .426). Pulling FG's
+    # numbers keeps the card aligned with fangraphs.com.
+    #
+    # - wRC+: overridden for both MLB and AAA hitters. AAA gap is large
+    #   (~13-19 pts) because our pipeline applies MLB constants to AAA
+    #   data; FG uses AAA-baseline weights + IL/PCL park factors.
+    # - xwOBA / xBA / xSLG: overridden for MLB hitters only. FG doesn't
+    #   publish these for AAA (they require Statcast EV/LA data which is
+    #   MLB-only).
+    # - wOBA / AVG / OBP / SLG / BABIP / OPS / ISO: NOT overridden —
+    #   pipeline matches FG to within ±0.0005 (rounding noise), so the
+    #   override would be cosmetically identical to the pipeline value.
+    try:
+        from fg_overrides import refresh_if_stale as _fg_refresh
+        _fg = _fg_refresh(max_age_hours=24, verbose=True)
+        _fg_mlb_h = _fg.get('mlbHitters', {})
+        _fg_aaa_h = _fg.get('aaaHitters', {})
+        n_mlb_wrc = n_mlb_xwoba = n_mlb_xba = n_mlb_xslg = n_mlb = 0
+        n_aaa_wrc = n_aaa = 0
+        for row in hitter_leaderboard:
+            mid = row.get('mlbId')
+            if mid is None:
+                continue
+            mid_str = str(int(mid))
+            if row.get('_isROC'):
+                n_aaa += 1
+                fg_player = _fg_aaa_h.get(mid_str)
+                if fg_player and fg_player.get('wRCplus') is not None:
+                    row['wRCplus'] = fg_player['wRCplus']
+                    n_aaa_wrc += 1
+            else:
+                n_mlb += 1
+                fg_player = _fg_mlb_h.get(mid_str)
+                if fg_player:
+                    if fg_player.get('wRCplus') is not None:
+                        row['wRCplus'] = fg_player['wRCplus']
+                        n_mlb_wrc += 1
+                    if fg_player.get('xwOBA') is not None:
+                        row['xwOBA'] = fg_player['xwOBA']
+                        n_mlb_xwoba += 1
+                    if fg_player.get('xBA') is not None:
+                        row['xBA'] = fg_player['xBA']
+                        n_mlb_xba += 1
+                    if fg_player.get('xSLG') is not None:
+                        row['xSLG'] = fg_player['xSLG']
+                        n_mlb_xslg += 1
+        print(f"  FG hitter override: wRC+ {n_mlb_wrc}/{n_mlb} MLB + {n_aaa_wrc}/{n_aaa} AAA; "
+              f"xwOBA {n_mlb_xwoba} | xBA {n_mlb_xba} | xSLG {n_mlb_xslg} (MLB)")
+    except Exception as _e:
+        print(f"  WARNING: FG hitter override failed ({type(_e).__name__}: {_e})")
+
     # Pass 2: refresh hitter league averages for stats populated by the boxscore
     # merge + wRC+ (kPct, bbPct, avg, obp, slg, ops, iso, wRCplus, xWRCplus). The
     # first pass above runs before the boxscore merge, so these are None on every
@@ -3101,7 +3169,47 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         total_w = sum(w for _, w in hr9_pairs)
         metadata['pitcherLeagueAverages']['hr9'] = round(sum(v * w for v, w in hr9_pairs) / total_w, 2) if total_w > 0 else None
 
+    # FanGraphs override: replace pipeline-computed FIP / xFIP / SIERA with
+    # the canonical FG values for MLB pitchers. Same motivation as the
+    # hitter wRC+ override above — pipeline values match FG approximately
+    # but small precision/rounding deltas read as bugs when readers
+    # cross-reference. AAA pitchers (_isROC) keep the pipeline values
+    # since FG doesn't publish AAA-baseline FIP/xFIP/SIERA cleanly.
+    try:
+        from fg_overrides import refresh_if_stale as _fg_refresh_pit
+        _fg_pit_cache = _fg_refresh_pit(max_age_hours=24, verbose=False)
+        _fg_pit = _fg_pit_cache.get('mlbPitchers', {})
+        n_pit_replaced = n_pit = 0
+        for row in pitcher_leaderboard:
+            if row.get('_isROC') or row.get('_isCombined'):
+                continue
+            mid = row.get('mlbId')
+            if mid is None:
+                continue
+            fg_p = _fg_pit.get(str(int(mid)))
+            if not fg_p:
+                continue
+            n_pit += 1
+            changed = False
+            if fg_p.get('fip') is not None:
+                row['fip'] = fg_p['fip']
+                changed = True
+            if fg_p.get('xfip') is not None:
+                row['xFIP'] = fg_p['xfip']
+                changed = True
+            if fg_p.get('siera') is not None:
+                row['siera'] = fg_p['siera']
+                changed = True
+            if changed:
+                n_pit_replaced += 1
+        print(f"  FG FIP/xFIP/SIERA override: replaced "
+              f"{n_pit_replaced}/{n_pit} MLB pitchers with FanGraphs values")
+    except Exception as _e:
+        print(f"  WARNING: FG pitcher override failed ({type(_e).__name__}: {_e})")
+
     # FIP, xFIP, SIERA league averages — weighted by IP (MLB only, exclude combined rows)
+    # Computed AFTER the FG override so the league average reflects the
+    # canonical values that ship in the JSON.
     for stat in ['fip', 'xFIP', 'siera']:
         pairs = [(r[stat], ip_str_to_float(r.get('ip'))) for r in pitcher_leaderboard
                  if r.get(stat) is not None and r.get('ip') is not None and ip_str_to_float(r['ip']) > 0
@@ -3123,14 +3231,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # pitchers). All rows still get a percentile rank stored — non-qualified
     # rows have ranks for tooltip display but are not colored at render time.
     # Counting stats (hr, sb) keep the unfiltered pool.
+    # Canonical qualification — ROC-aware via the shared pipeline_utils
+    # helpers (MLB hitter 3.1 PA×TG, ROC 2.7; MLB SP 1.0 IP×TG / RP 0.5,
+    # ROC SP 0.8 / RP 0.4). NOTE: compute_percentile_ranks_with_aaa routes
+    # ROC rows to interpolation BEFORE qualifier_fn is ever called, so the
+    # MLB pool is unaffected by the ROC branch here — the ROC-aware code
+    # is kept for correctness/consistency with the frontend.
+    from pipeline_utils import (
+        hitter_pa_per_game, pitcher_ip_per_game, SP_GS_RATIO,
+    )
+
     def _hitter_qualified_for_pctl(row):
         pa = row.get('pa', 0) or 0
         tg = team_games_played.get(row.get('team'))
         if tg is None and team_games_played:
             tg = max(team_games_played.values())
-        return bool(tg) and pa >= 3.1 * tg
+        if not tg:
+            return False
+        return pa >= hitter_pa_per_game(bool(row.get('_isROC'))) * tg
 
-    SP_GS_RATIO = 0.5  # mirrors aggregator.js QUAL.SP_GS_RATIO
     def _pitcher_qualified_for_pctl(row):
         ip_str = row.get('ip')
         ip_f = ip_str_to_float(ip_str) if ip_str is not None else 0
@@ -3142,8 +3261,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         g = row.get('g') or 0
         gs = row.get('gs') or 0
         is_starter = g > 0 and (gs / g) > SP_GS_RATIO
-        threshold = tg * 1.0 if is_starter else tg / 3.0
-        return ip_f >= threshold
+        per_game = pitcher_ip_per_game(is_starter, bool(row.get('_isROC')))
+        return ip_f >= tg * per_game
 
     # Hitter counting stats — keep unfiltered pool, do not apply qualifier_fn.
     HITTER_COUNTING_PCTL = {'hr', 'sb'}

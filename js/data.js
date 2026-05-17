@@ -173,10 +173,14 @@ const DataStore = {
       var _qIp = (mtRow && !isCombinedRow) ? mtRow.ip : row.ip;
       var _qG = (mtRow && !isCombinedRow) ? mtRow.g : row.g;
       var _qGs = (mtRow && !isCombinedRow) ? mtRow.gs : row.gs;
+      // ROC-aware qualification (3.1 PA×TG MLB / 2.7 ROC for hitters;
+      // 1.0/0.5 MLB & 0.8/0.4 ROC IP×TG for pitchers).
+      var _isROC = (typeof Aggregator !== 'undefined') &&
+                   Aggregator._isROCTeam && Aggregator._isROCTeam(row.team);
       // Min count: use PA for hitters, pitch count for pitchers and hitterPitch
       if (tab === 'hitter') {
         if (filters.minCount === 'Q') {
-          if (_qPa < _tg * QUAL.PA_PER_GAME) return false;
+          if (_qPa < _tg * Utils.hitterPaPerGame(_isROC)) return false;
         } else if ((row.pa || 0) < filters.minCount) return false;
       } else {
         if (row.count < filters.minCount) return false;
@@ -187,7 +191,7 @@ const DataStore = {
         if (filters.minIp === 'Q') {
           var ipFloat = Utils.parseIP(_qIp);
           var isStarter = Utils.isStarter(_qG, _qGs);
-          var ipThresh = isStarter ? _tg * 1.0 : _tg / 3;
+          var ipThresh = _tg * Utils.pitcherIpPerGame(isStarter, _isROC);
           if (ipFloat < ipThresh) return false;
         } else if ((row.ip || 0) < filters.minIp) return false;
       }

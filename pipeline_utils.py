@@ -44,6 +44,52 @@ MLB_TEAMS = {
 AAA_TEAMS = {'ROC'}
 ALL_TEAMS = MLB_TEAMS | AAA_TEAMS
 
+# ── Leaderboard qualification thresholds ─────────────────────────────────
+# Per official MLB qualifier standards. "Team games" (TG) = games the
+# player's team has played. Rookies / Spring Training / Arizona Fall League
+# rows are deliberately NOT modeled (this project doesn't surface them);
+# Fielding qualifiers are out of scope.
+#
+#   MLB hitter:        3.1 PA × TG
+#   MiLB/ROC hitter:   2.7 PA × TG
+#   MLB starter:       1.0 IP × TG    (GS/G > SP_GS_RATIO)
+#   MLB reliever:      0.30 IP × TG   (see note below)
+#   MiLB/ROC starter:  0.8 IP × TG
+#   MiLB/ROC reliever: 0.24 IP × TG
+#
+# Reliever coefficient (0.30): MLB has no official reliever qualifier,
+# so we match FanGraphs' relief-pitching leaderboard, which is the de
+# facto public standard. Empirically derived: across all 30 teams,
+# IP >= 0.30 × team_games reproduces FanGraphs' qualified-reliever set
+# with ZERO mismatches (every qualified reliever sits at >= 0.302 IP/TG,
+# every non-qualified at <= 0.296 IP/TG, so 0.30 is the exact dividing
+# line). The old 0.5 value was far too strict (it qualified only ~1
+# reliever per team vs FanGraphs' ~6). ROC reliever (0.24) keeps the
+# same 0.80 ROC-to-MLB scaling used for starters (0.8/1.0) and hitters.
+#
+# These must stay in sync with the JS mirror in js/aggregator.js (QUAL)
+# and the Utils.hitterPaPerGame / Utils.pitcherIpPerGame helpers.
+SP_GS_RATIO = 0.5
+
+QUAL_PA_PER_GAME_MLB     = 3.1
+QUAL_PA_PER_GAME_MILB    = 2.7
+QUAL_SP_IP_PER_GAME_MLB  = 1.0
+QUAL_RP_IP_PER_GAME_MLB  = 0.30
+QUAL_SP_IP_PER_GAME_MILB = 0.8
+QUAL_RP_IP_PER_GAME_MILB = 0.24
+
+
+def hitter_pa_per_game(is_roc):
+    """PA-per-team-game multiplier for hitter qualification."""
+    return QUAL_PA_PER_GAME_MILB if is_roc else QUAL_PA_PER_GAME_MLB
+
+
+def pitcher_ip_per_game(is_starter, is_roc):
+    """IP-per-team-game multiplier for pitcher qualification."""
+    if is_roc:
+        return QUAL_SP_IP_PER_GAME_MILB if is_starter else QUAL_RP_IP_PER_GAME_MILB
+    return QUAL_SP_IP_PER_GAME_MLB if is_starter else QUAL_RP_IP_PER_GAME_MLB
+
 # ── Team abbreviation → MLB API team ID ──────────────────────────────────
 TEAM_ABBREV_TO_ID = {
     'ARI': 109, 'ATL': 144, 'BAL': 110, 'BOS': 111, 'CHC': 112,

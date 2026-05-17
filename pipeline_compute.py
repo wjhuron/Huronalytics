@@ -442,10 +442,13 @@ def compute_hitter_stats(pitches):
               if safe_float(p.get('LaunchAngle')) is not None]
 
     spray_data = []
+    all_spray = []   # raw spray angles for median computation
     for p in bip:
         hc_x = safe_float(p.get('HC_X'))
         hc_y = safe_float(p.get('HC_Y'))
         angle = spray_angle(hc_x, hc_y)
+        if angle is not None:
+            all_spray.append(angle)
         direction = spray_direction(angle, p.get('Bats'))
         if direction:
             spray_data.append((direction, p.get('BBType')))
@@ -540,6 +543,7 @@ def compute_hitter_stats(pitches):
         'ev50': ev50,
         'maxEV': round(max(ev_valid), 1) if ev_valid else None,
         'medLA': round(median(all_la), 1) if all_la else None,
+        'medSpray': round(median(all_spray), 1) if all_spray else None,
         'hardHitPct': round(hard_hit_pct, 4) if hard_hit_pct is not None else None,
         'babip': babip,
         'barrelPct': barrels / len(ev_valid) if ev_valid else None,

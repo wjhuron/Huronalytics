@@ -833,10 +833,12 @@ const Leaderboard = {
             // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
             showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
           } else if (isPitcherRow) {
-            // Pitcher overall: IP-based qualification
+            // Pitcher overall: IP-based qualification (ROC-aware:
+            // MLB SP 1.0 / RP 0.5, ROC SP 0.8 / RP 0.4 × team games).
             const ipFloat = Utils.parseIP(row.ip);
             const isStarter = Utils.isStarter(row.g, row.gs);
-            const ipThresh = isStarter ? tg * 1.0 : tg / 3;
+            const isROC = Aggregator.loaded && Aggregator._isROCTeam(row.team);
+            const ipThresh = tg * Utils.pitcherIpPerGame(isStarter, isROC);
             showColor = ipFloat >= ipThresh;
             // Pitcher always-color: extension
             if (!showColor) showColor = col.key === 'extension';
@@ -847,8 +849,10 @@ const Leaderboard = {
             // Hitter overall: per-stat qualification gates.
             // Always use overall-season PA (paAll) so platoon/date splits honour
             // overall qualification rather than requiring a split-specific minimum.
+            // ROC-aware: MLB 3.1 PA×TG, ROC 2.7.
             const overallPa = (row.paAll != null ? row.paAll : row.pa) || 0;
-            const paQual = overallPa >= tg * QUAL.PA_PER_GAME;
+            const isROC = Aggregator.loaded && Aggregator._isROCTeam(row.team);
+            const paQual = overallPa >= tg * Utils.hitterPaPerGame(isROC);
             if (HITTER_ALWAYS_COLOR[col.key]) {
               showColor = true;
             } else if (HITTER_BIP_STATS[col.key]) {

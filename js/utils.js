@@ -222,6 +222,20 @@ const Utils = {
     return g > 0 && (gs / g) > QUAL.SP_GS_RATIO;
   },
 
+  // ── Canonical qualification multipliers ──────────────────────────────
+  // Mirror of pipeline_utils.hitter_pa_per_game / pitcher_ip_per_game.
+  // Callers resolve `isROC` themselves (Aggregator._isROCTeam(row.team))
+  // and pass it in, so these helpers stay dependency-free.
+  //   MLB hitter 3.1 PA×TG / ROC 2.7
+  //   MLB SP 1.0 IP×TG, RP 0.5 / ROC SP 0.8, RP 0.4
+  hitterPaPerGame: function (isROC) {
+    return isROC ? QUAL.PA_PER_GAME_MILB : QUAL.PA_PER_GAME;
+  },
+  pitcherIpPerGame: function (isStarter, isROC) {
+    if (isROC) return isStarter ? QUAL.SP_IP_PER_GAME_MILB : QUAL.RP_IP_PER_GAME_MILB;
+    return isStarter ? QUAL.SP_IP_PER_GAME : QUAL.RP_IP_PER_GAME;
+  },
+
   // Create a pitch badge <span> element (small or regular size)
   createPitchBadge: function (pitchType, small) {
     var badge = document.createElement('span');
