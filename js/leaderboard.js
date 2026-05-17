@@ -30,7 +30,7 @@ const COLUMNS = {
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
     { key: 'xRunValue',   label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'outcomes' },
     { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
-    { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+ for this pitch type — xRV-weighted location quality standardized within the pitch-type group (FF, SI, FC, SL, CB, CH). 100 = group avg, +10 = 1 SD better.', group: 'outcomes', rocHide: true },
+    { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+ for this pitch type — xRV-weighted location quality standardized within the pitch-type group (FF, SI, FC, SL, CB, CH). 100 = group avg, +10 = 1 SD better. ROC pitchers scored against the MLB baseline.', group: 'outcomes' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on swings (whiffs / swings) for this pitch type', group: 'outcomes' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate for this pitch type', group: 'outcomes' },
     { key: 'cswPct',      label: 'CSW%',     format: Utils.formatPct, sortType: 'numeric', desc: 'Called strikes + whiffs / total pitches for this pitch type', group: 'outcomes' },
@@ -107,7 +107,7 @@ const COLUMNS = {
     { key: 'fpsPct',      label: 'FPS%',     format: Utils.formatPct, sortType: 'numeric', desc: 'First-pitch strike rate', group: 'stats' },
     { key: 'oneOneWinPct', label: '1-1 Win%', format: Utils.formatPct, sortType: 'numeric', desc: 'Strike rate on 1-1 counts (strikes + BIP / total 1-1 pitches)', group: 'stats' },
     { key: 'earlyActionPct', label: 'EarlyAction%', format: Utils.formatPct, sortType: 'numeric', desc: 'PAs ending in 3 or fewer pitches / total PAs', group: 'stats' },
-    { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+: per-pitch location quality scored against an xRV-weighted (zone × count × pitch-type × handedness) table. Captures command independent of stuff or contact luck. Z-score normalized: 100 = league avg, +10 = 1 SD better.', group: 'stats', rocHide: true },
+    { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+: per-pitch location quality scored against an xRV-weighted (zone × count × pitch-type × handedness) table. Captures command independent of stuff or contact luck. Z-score normalized: 100 = league avg, +10 = 1 SD better. ROC pitchers scored against the MLB baseline.', group: 'stats' },
   ],
   hitterStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },

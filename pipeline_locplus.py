@@ -88,22 +88,33 @@ HANDS = ('L', 'R')
 def is_eligible_baseline(p):
     """Pitches that count toward the MLB lookup table.
 
-    Excludes: non-MLB sources, intent walks, HBP, pitchouts, bunt-attempt
-    pitches, and any pitch missing zone/count/pitch-type/handedness/RunExp.
+    Requires RunExp because the cell weights are means of rv_fn(p), which
+    is xwOBA/RunExp-derived. Excludes non-MLB sources, intent walks, HBP,
+    pitchouts, bunt-attempt pitches, and any pitch missing the lookup key.
     """
     if p.get('_source') != 'MLB':
+        return False
+    if safe_float(p.get('RunExp')) is None:
         return False
     return _is_scorable(p)
 
 
 def is_eligible_score(p):
-    """Pitches that get a Loc+ contribution (used for any pitcher,
-    including ROC). Same physical/data-quality requirements as the
-    baseline filter, just without the MLB-only restriction."""
+    """Pitches that get a Loc+ contribution (used for ANY pitcher,
+    including ROC).
+
+    Scoring is a pure lookup: a pitch's Loc+ contribution is the league
+    cell value for its (zone × count × pitch_type × bhand × phand) bucket.
+    The pitch's OWN RunExp/xwOBA is never used to score it, so RunExp is
+    NOT required here. This is what lets ROC pitchers be scored — the ROC
+    sheet has location/count/pitch-type/handedness but no RunExp column.
+    """
     return _is_scorable(p)
 
 
 def _is_scorable(p):
+    """Lookup-key validity + event exclusions. No RunExp requirement —
+    that lives in is_eligible_baseline only."""
     if p.get('Event') == 'Intent Walk':
         return False
     desc = p.get('Description') or ''
@@ -112,8 +123,6 @@ def _is_scorable(p):
     if desc == 'Hit By Pitch':
         return False
     if p.get('BBType') in ('bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'):
-        return False
-    if safe_float(p.get('RunExp')) is None:
         return False
     if classify_zone(p) is None:
         return False
@@ -244,45 +253,52 @@ def compute_pitcher_raw(pitches_by_pitcher, table):
 
 def regress_and_normalize(pitcher_raw,
                           n_prior=PITCHER_PRIOR_N,
-                          min_n=MIN_PITCHER_PITCHES,
+                          min_n_score=1,
+                          min_n_pool=MIN_PITCHER_PITCHES,
                           scale_k=LOC_SCALE_K):
     """Bayesian regression + z-score normalization.
 
-    Standardization pool: qualified MLB pitchers (no ROC, no multi-team
-    aggregates). Multi-team aggregates and ROC pitchers are scored against
-    that standardization but excluded from (mu, sigma).
+    Two separate thresholds:
+    - min_n_score: minimum scorable pitches to GET a Loc+ value. Set to 1
+      so every pitcher with any usable location data is scored. Tiny
+      samples are pulled hard toward 100 by the n_prior shrinkage, which
+      is the statistically correct "we don't know yet" behavior.
+    - min_n_pool: minimum to be IN the (mu, sigma) standardization pool.
+      Kept high so noisy small-sample pitchers don't distort the league
+      distribution everyone is graded against.
+
+    Standardization pool also excludes ROC (Wally's rule: ROC scored
+    against the MLB baseline but not part of it). Multi-team aggregates
+    (2TM/3TM) stay in the pool, matching SD+/CT+ convention.
 
     Loc+ = 100 + scale_k × (mu - raw_adj) / sigma   (sign-flipped so higher = better)
     """
-    eligible = {k: v for k, v in pitcher_raw.items() if v['n_pitches'] >= min_n}
-    if not eligible:
+    scored = {k: v for k, v in pitcher_raw.items() if v['n_pitches'] >= min_n_score}
+    if not scored:
         return {}
 
-    # Standardization pool: exclude ROC only. Multi-team aggregates (2TM/3TM)
-    # are kept in the pool to match SD+/CT+ convention — Wally explicitly
-    # wants ROC excluded from the baseline, but multi-team players still
-    # contribute to the league distribution they're being graded against.
-    pool = {k: v for k, v in eligible.items() if k[1] not in AAA_TEAMS}
+    pool = {k: v for k, v in scored.items()
+            if k[1] not in AAA_TEAMS and v['n_pitches'] >= min_n_pool}
     if not pool:
         return {}
 
     lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
-    for v in eligible.values():
+    for v in scored.values():
         n = v['n_pitches']
         v['raw_loc_adj'] = (n * v['raw_loc'] + n_prior * lg_raw) / (n + n_prior)
 
-    pool_adj = [v['raw_loc_adj'] for k, v in eligible.items() if k in pool]
+    pool_adj = [scored[k]['raw_loc_adj'] for k in pool]
     mu = sum(pool_adj) / len(pool_adj)
     sigma = math.sqrt(sum((v - mu) ** 2 for v in pool_adj) / len(pool_adj))
 
-    for v in eligible.values():
+    for v in scored.values():
         if sigma > 1e-9:
             z = (v['raw_loc_adj'] - mu) / sigma
             # Sign flip: lower raw (better location) → higher locPlus
             v['locPlus'] = round(100.0 - scale_k * z, 1)
         else:
             v['locPlus'] = 100.0
-    return eligible
+    return scored
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -304,7 +320,8 @@ def regress_and_normalize_by_pt(pitch_raw,
                                 pt_group_fn,
                                 pool_filter_fn,
                                 n_prior=PITCH_TYPE_PRIOR_N,
-                                min_n=MIN_PITCH_TYPE_PITCHES,
+                                min_n_score=1,
+                                min_n_pool=MIN_PITCH_TYPE_PITCHES,
                                 scale_k=LOC_SCALE_K):
     """Per-pitch-type-GROUP Bayesian regression + z-score normalization.
 
@@ -315,24 +332,34 @@ def regress_and_normalize_by_pt(pitch_raw,
     therefore standardize against the same SL-group pool even though they
     appear as separate leaderboard rows.
 
-    `pool_filter_fn(key)` keeps a key in the (mu, sigma) pool — used to
-    exclude ROC rows from the baseline distribution while still scoring
-    them. Multi-team aggregates (2TM/3TM) stay in the pool, matching the
-    overall-Loc+ convention.
+    Two thresholds (same philosophy as the overall metric):
+    - min_n_score: minimum scorable pitches of that type to GET a value.
+      Set to 1 so EVERY pitch type a pitcher throws gets a Loc+. A pitcher
+      who threw 4 curveballs gets a curveball Loc+ ≈ 100 (n_prior pulls it
+      to the group mean) rather than a blank cell.
+    - min_n_pool: minimum to be IN the group's (mu, sigma) distribution.
+      Keeps the per-group baseline from being warped by 3-pitch samples.
+
+    `pool_filter_fn(key)` further restricts the pool (used to drop ROC
+    rows from the baseline while still scoring them). Multi-team
+    aggregates stay in the pool, matching the overall-Loc+ convention.
     """
-    eligible = {k: v for k, v in pitch_raw.items() if v['n_pitches'] >= min_n}
-    if not eligible:
+    scored = {k: v for k, v in pitch_raw.items() if v['n_pitches'] >= min_n_score}
+    if not scored:
         return {}
 
-    # Bucket by pitch-type group
+    # Bucket every scorable row by pitch-type group
     by_group = defaultdict(dict)
-    for k, v in eligible.items():
+    for k, v in scored.items():
         by_group[pt_group_fn(k)][k] = v
 
     for group, rows in by_group.items():
-        pool = {k: v for k, v in rows.items() if pool_filter_fn(k)}
+        pool = {k: v for k, v in rows.items()
+                if pool_filter_fn(k) and v['n_pitches'] >= min_n_pool}
         if not pool:
+            # No stable baseline for this group — everyone is league-average
             for k in rows:
+                rows[k]['raw_loc_adj'] = rows[k]['raw_loc']
                 rows[k]['locPlus'] = 100.0
             continue
         lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
