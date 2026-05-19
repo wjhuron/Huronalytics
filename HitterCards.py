@@ -895,7 +895,9 @@ def _render_percentile_bubbles(fig, h_row):
     # tracking (BatSpeed/SwingLength/AttackAngle/Squared-Up%/Blast%) is
     # MLB-only Statcast hardware — the data will never exist for AAA,
     # so showing the section as five "—" rows is just dead space.
-    _is_roc = bool(h_row.get('_isROC'))
+    # _isROC is pipeline-internal (stripped from JSON output), so detect
+    # ROC the same way the rest of the card does: by team string.
+    _is_roc = (h_row.get('team') == 'ROC')
     _columns = [(name, rows) for name, rows in BUBBLE_COLUMNS
                 if not (_is_roc and name == 'BAT TRACKING')]
     total_rows = sum(len(metrics) for _h, metrics in _columns)
