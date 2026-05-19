@@ -38,7 +38,19 @@ from pipeline_sdplus import (
 
 # ── Hyperparameters ─────────────────────────────────────────────────────
 CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-swings
-HITTER_PRIOR_N = 400      # hitter → league regression pseudo-swings
+HITTER_PRIOR_N = 85       # hitter → league regression pseudo-swings.
+                          #   Set to the metric's stabilization constant
+                          #   n0 (~84 swings, measured via the split-half
+                          #   reliability study). For a shrinkage estimator
+                          #   adj=(n·obs+K·lg)/(n+K), the MMSE-optimal
+                          #   pseudo-count is exactly K=n0. The old K=400
+                          #   over-shrank ~4.7×, compressing ~55% of the
+                          #   real between-hitter spread (SD 3.7 vs a true
+                          #   ~6.5). Coherent with MIN_HITTER_SWINGS=85:
+                          #   at the display floor the estimate is 50/50
+                          #   own-data/league. Rank-preserving (ρ≈.999 vs
+                          #   K=400); the qualified-pool re-anchor still
+                          #   re-centers the median to 100 downstream.
 CT_SCALE_K     = 30       # ctPlus = 100 + CT_SCALE_K × z
 MIN_HITTER_SWINGS = 85    # computation floor = split-half r=.50 point
                           #   (signal=noise). Measured directly via the
