@@ -1423,11 +1423,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
 
-    # ── PROTOTYPE (uncommitted): dedicated zone-boundary grid overlay ──
+    # ── Zone-boundary grid overlay ──
     # Uniform separators at the true spray/LA zone edges, drawn on top of
-    # the (unchanged) fills but below the BIP scatter, so the zone splits
-    # read clearly even between similarly-colored adjacent zones.
-    # Knobs to eyeball: _GRID_LW (line weight) and _GRID_ALPHA (opacity).
+    # the fills but below the BIP scatter, so the zone splits read clearly
+    # even between similarly-colored adjacent zones. Replaces the old
+    # tick-spaced ax.grid() (which drew lines that didn't match the zone
+    # edges). _GRID_LW = line width (pt), _GRID_ALPHA = opacity.
     _GRID_LW, _GRID_ALPHA = 1.0, 0.75
     _vx = sorted({e for b in bounds.values() for e in b})   # spray edges
     for _x in _vx:
