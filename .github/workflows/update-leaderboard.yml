@@ -81,13 +81,13 @@ jobs:
                       obj = json.loads(gzip.decompress(open(gz, 'rb').read()))
                       need = ['pitcherData', 'pitchData', 'hitterData', 'metadata', 'microData']
                       miss = [k for k in need if k not in obj]
+                      npitch = len(obj.get('pitcherData', []))
                       if miss:
                           errors.append(f'FAIL: {gz} inflated but missing keys: {miss}')
-                      elif len(obj.get('pitcherData', [])) < 50:
-                          errors.append(f'FAIL: {gz} pitcherData has only {len(obj.get("pitcherData", []))} rows')
+                      elif npitch < 50:
+                          errors.append(f'FAIL: {gz} pitcherData has only {npitch} rows')
                       else:
-                          print(f'OK: {gz} is {size:,} bytes, inflates to valid JSON '
-                                f'({len(obj["pitcherData"])} pitchers)')
+                          print(f'OK: {gz} is {size:,} bytes, inflates to JSON ({npitch} pitchers)')
                   except Exception as e:
                       errors.append(f'FAIL: {gz} did not decompress/parse: {e}')
 
