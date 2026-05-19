@@ -891,8 +891,15 @@ def _render_percentile_bubbles(fig, h_row):
     GRID_TOP, GRID_BOT = 0.715, 0.030
     col_w = GRID_RIGHT - GRID_LEFT
 
-    total_rows = sum(len(metrics) for _h, metrics in BUBBLE_COLUMNS)
-    n_sections = len(BUBBLE_COLUMNS)
+    # ROC (AAA) hitters: hide the BAT TRACKING section entirely. Bat
+    # tracking (BatSpeed/SwingLength/AttackAngle/Squared-Up%/Blast%) is
+    # MLB-only Statcast hardware — the data will never exist for AAA,
+    # so showing the section as five "—" rows is just dead space.
+    _is_roc = bool(h_row.get('_isROC'))
+    _columns = [(name, rows) for name, rows in BUBBLE_COLUMNS
+                if not (_is_roc and name == 'BAT TRACKING')]
+    total_rows = sum(len(metrics) for _h, metrics in _columns)
+    n_sections = len(_columns)
 
     grid_h = GRID_TOP - GRID_BOT
     SECTION_HEADER_H = 0.024
@@ -938,7 +945,7 @@ def _render_percentile_bubbles(fig, h_row):
     rounding = bar_h_axis / 2  # fully rounded pill ends
 
     y_cursor = GRID_TOP
-    for sec_idx, (section, metrics) in enumerate(BUBBLE_COLUMNS):
+    for sec_idx, (section, metrics) in enumerate(_columns):
         if sec_idx > 0:
             y_cursor -= SECTION_GAP
 
@@ -2359,8 +2366,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 # ─────────────────────────────────────────────────────────────────────
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team           = "WSH"                   # Team filter (e.g., "NYY"), or None for all teams
-    filter_hitters = ""       # Semicolon-separated "Last, First" names, or "" for all
+    team           = "ROC"                   # Team filter (e.g., "NYY"), or None for all teams
+    filter_hitters = "Crews, Dylan"       # Semicolon-separated "Last, First" names, or "" for all
     year_label     = "2026 Season"        # Display label on the card
     output_dir     = OUTPUT_DIR
 

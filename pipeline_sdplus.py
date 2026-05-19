@@ -128,9 +128,15 @@ def get_count(p):
 
 
 def is_eligible(p):
-    """Filter to pitches where a genuine swing/take decision occurred."""
-    if p.get('_source') != 'MLB':
-        return False
+    """Filter to pitches where a genuine swing/take decision occurred.
+
+    Note: _source is intentionally NOT filtered here. The cell weight
+    tables get an explicit MLB-only filter at the table-build step in
+    compute_sd_plus / compute_ct_plus (keeping the baseline MLB-only),
+    while per-hitter aggregation uses this class-based filter so ROC
+    hitters can be measured against the MLB tables (translation
+    framing — same convention as xwOBAsp / percentile pool / wRC+).
+    """
     if p.get('Event') == 'Intent Walk':
         return False
     desc = p.get('Description') or ''
@@ -142,8 +148,12 @@ def is_eligible(p):
         return False
     if p.get('BBType') in BUNT_BB_TYPES:
         return False
-    if p.get('RunExp') is None or safe_float(p.get('RunExp')) is None:
-        return False
+    # RunExp not required here: per-hitter aggregation doesn't use it (the
+    # cell table provides the RV via compute_dv / compute_ct_swing). The
+    # table-build step in compute_sd_plus / compute_ct_plus already self-
+    # filters pitches without RV via `if rv is None: continue`. Keeping
+    # this filter would re-block ROC (RunExp 0% populated for AAA, same as
+    # xwOBA/wOBAval — Savant model fields aren't published for AAA).
     if classify_decision(p) is None:
         return False
     if classify_zone(p) is None:
@@ -352,7 +362,9 @@ def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
         weight_table_json: dict for metadata output (audit/frontend)
     """
     rv_fn = make_rv_xrv(lg_woba, woba_scale)
-    eligible = [p for p in all_pitches if is_eligible(p)]
+    # Cell weight tables stay MLB-baselined (translation framing); ROC
+    # hitters are looked up against this MLB table by compute_hitter_sd.
+    eligible = [p for p in all_pitches if p.get('_source','MLB')=='MLB' and is_eligible(p)]
 
     raw_table = build_weight_table(eligible, rv_fn)
     zone_means = zone_level_means(eligible, rv_fn)

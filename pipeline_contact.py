@@ -293,7 +293,9 @@ def compute_ct_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
     process_data.py.
     """
     rv_fn = make_rv_xrv(lg_woba, woba_scale)
-    swings = [p for p in all_pitches if is_ct_eligible(p)]
+    # Cell weight tables stay MLB-baselined (translation framing); ROC
+    # hitters are looked up against this MLB table by compute_hitter_ct.
+    swings = [p for p in all_pitches if p.get('_source','MLB')=='MLB' and is_ct_eligible(p)]
     raw = build_contact_cell_weights(swings, rv_fn)
     zone_means = zone_level_contact_means(swings, rv_fn)
     smoothed = shrink_contact_cells(raw, zone_means)
