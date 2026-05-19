@@ -826,6 +826,48 @@ def _percentile_color(pctl):
     return c, ring
 
 
+def _hitter_stat_cell_color(value_str, league_avg, scale, higher_is_better,
+                            row_bg_hex, is_pct):
+    """Headline-strip cell tint, in the SAME hue family as the percentile
+    bubbles below it: red = above average (good), blue = below average (bad).
+
+    Deliberately NOT Cards.py's pct_cell_color/raw_cell_color, which tint
+    green/red — that palette is shared with the pitcher cards and must stay
+    put. The intensity math (deviation from league average, normalized and
+    clamped) is identical to Cards.py so only the hue changes; the extreme
+    anchors are pulled straight from _percentile_color so the strip can
+    never drift out of sync with the bubble gradient.
+    """
+    if league_avg is None or not value_str or value_str == '—':
+        return None
+    try:
+        if is_pct:
+            val = float(value_str.replace('%', ''))
+            diff = val - league_avg * 100
+            denom = 8.0                      # ±8 pp → full intensity (Cards.py)
+        else:
+            val = float(value_str)
+            diff = val - league_avg
+            denom = scale
+    except (ValueError, AttributeError):
+        return None
+    if not higher_is_better:
+        diff = -diff
+    intensity = max(-1.0, min(1.0, diff / denom))
+    # Extreme red (pctl 100 = good) / extreme blue (pctl 0 = bad) — exactly
+    # the bubble gradient endpoints.
+    anchor = _percentile_color(100 if intensity >= 0 else 0)[0]
+    target = tuple(int(round(ch * 255)) for ch in anchor)
+    alpha = abs(intensity) * 0.55           # match Cards.py saturation
+    rb = int(row_bg_hex[1:3], 16)
+    rg = int(row_bg_hex[3:5], 16)
+    rbb = int(row_bg_hex[5:7], 16)
+    r = int(rb * (1 - alpha) + target[0] * alpha)
+    g = int(rg * (1 - alpha) + target[1] * alpha)
+    b = int(rbb * (1 - alpha) + target[2] * alpha)
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
 def _render_percentile_bubbles(fig, h_row):
     """Single-column percentile panel matching the website's PERCENTILE
     RANKINGS sidebar. Vertical stack of section sub-headers + pill-bar rows:
@@ -1272,10 +1314,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             la_val = hitter_la.get(sl_cfg[0])
             if la_val is not None:
                 if sl_cfg[1] == 'pct':
-                    tinted = pct_cell_color(val_str, la_val, DARK_CELL, sl_cfg[2])
+                    tinted = _hitter_stat_cell_color(val_str, la_val, None,
+                                                     sl_cfg[2], DARK_CELL, is_pct=True)
                 else:
                     scale = sl_cfg[3] if len(sl_cfg) > 3 else 1.0
-                    tinted = raw_cell_color(val_str, la_val, scale, sl_cfg[2], DARK_CELL)
+                    tinted = _hitter_stat_cell_color(val_str, la_val, scale,
+                                                     sl_cfg[2], DARK_CELL, is_pct=False)
                 if tinted:
                     cell_bg = tinted
         ax_main.add_patch(Rectangle((cur_x, stat_y_value), cw, cell_h,
@@ -2295,7 +2339,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 def main():
     # ── Settings (edit these directly or override via command line) ──
     team           = "WSH"                   # Team filter (e.g., "NYY"), or None for all teams
-    filter_hitters = "Wood, James"       # Semicolon-separated "Last, First" names, or "" for all
+    filter_hitters = ""       # Semicolon-separated "Last, First" names, or "" for all
     year_label     = "2026 Season"        # Display label on the card
     output_dir     = OUTPUT_DIR
 
