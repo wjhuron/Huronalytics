@@ -2540,12 +2540,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # normalized coefficients come out at 58.5/41.5. Re-validate annually.
     BB_PLUS_W_CON = 0.585
     BB_PLUS_W_SP  = 0.415
+    # Reliability floor: BB+ is the slowest-stabilizing of the three
+    # component "+" stats. Split-half study put the r=.50 (signal=noise)
+    # point at ~80 batted balls (modelled; the same n/(n+n0) model
+    # predicted CT+'s crossing exactly, validating the extrapolation).
+    # Below this, BB+ (and therefore Hitter+, which is 65% BB+) is more
+    # noise than signal, so we don't compute it at all. Mirrored in
+    # js/aggregator.js (the only place BB+ is recomputed client-side).
+    BB_PLUS_MIN_BIP = 80
     lg_xwobacon_bb = hitter_league_avgs.get('xwOBAcon')
     lg_xwobasp_bb = hitter_league_avgs.get('xwOBAsp')
     for row in hitter_leaderboard:
         xc = row.get('xwOBAcon')
         xs = row.get('xwOBAsp')
-        if xc is not None and xs is not None and lg_xwobacon_bb and lg_xwobasp_bb:
+        if (xc is not None and xs is not None and lg_xwobacon_bb
+                and lg_xwobasp_bb and (row.get('nBip') or 0) >= BB_PLUS_MIN_BIP):
             con_plus = 100.0 * xc / lg_xwobacon_bb
             sp_plus = 100.0 * xs / lg_xwobasp_bb
             row['bbPlus'] = round(BB_PLUS_W_CON * con_plus + BB_PLUS_W_SP * sp_plus, 1)

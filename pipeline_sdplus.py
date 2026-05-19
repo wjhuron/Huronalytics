@@ -54,7 +54,12 @@ COUNTS = [(b, s) for b in range(4) for s in range(3)]
 CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-obs
 HITTER_PRIOR_N = 400      # hitter → league regression pseudo-obs
 SD_SCALE_K     = 30       # sdPlus = 100 + SD_SCALE_K × z
-MIN_HITTER_DECISIONS = 100  # floor for computing sdPlus at all
+MIN_HITTER_DECISIONS = 225  # floor = split-half r=.50 point (signal=
+                            # noise). Measured directly via the
+                            # reliability study (r=.50 crossing ~225-229
+                            # decisions). The old 100 was r~.34, i.e.
+                            # mostly noise. Leaderboard qualification
+                            # (3.1 × TGP) is a separate stricter gate.
 
 # MLB standard qualification: PA ≥ 3.1 × team games played.
 PA_PER_TEAM_GAME = 3.1

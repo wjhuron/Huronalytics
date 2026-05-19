@@ -40,8 +40,13 @@ from pipeline_sdplus import (
 CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-swings
 HITTER_PRIOR_N = 400      # hitter → league regression pseudo-swings
 CT_SCALE_K     = 30       # ctPlus = 100 + CT_SCALE_K × z
-MIN_HITTER_SWINGS = 50    # computation floor; qualification (3.1 × TGP)
-                          #   is applied separately on the leaderboard
+MIN_HITTER_SWINGS = 85    # computation floor = split-half r=.50 point
+                          #   (signal=noise). Measured directly via the
+                          #   reliability study (n0~84 swings; model
+                          #   prediction matched the measured crossing
+                          #   exactly). Below this CT+ is majority noise.
+                          #   Leaderboard qualification (3.1 × TGP) is a
+                          #   separate, stricter gate applied downstream.
 
 # ── Classification helpers ──────────────────────────────────────────────
 

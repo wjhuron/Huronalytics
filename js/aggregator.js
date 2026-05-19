@@ -1486,7 +1486,14 @@ const Aggregator = {
       const hLgAvgs = (DataStore && DataStore.metadata && DataStore.metadata.hitterLeagueAverages) || {};
       const lgXC = hLgAvgs.xwOBAcon;
       const lgXS = hLgAvgs.xwOBAsp;
-      if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS) {
+      // Reliability floor: BB+ is majority noise below ~80 batted balls
+      // (split-half r=.50 point). Keep in sync with BB_PLUS_MIN_BIP in
+      // process_data.py. Matters most here because date/hand filters
+      // shrink the sample. (Hitter+ is pass-through season value, not
+      // recomputed client-side, so it's gated server-side instead.)
+      var BB_PLUS_MIN_BIP = 80;
+      if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS &&
+          (obj.nBip || 0) >= BB_PLUS_MIN_BIP) {
         const conPlus = 100 * obj.xwOBAcon / lgXC;
         const spPlus = 100 * obj.xwOBAsp / lgXS;
         // Mirror the server's qualified-pool re-anchor (100 = qualified
