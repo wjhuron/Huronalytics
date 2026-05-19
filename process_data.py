@@ -2041,8 +2041,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             print(f"    {batter}: {ids}")
 
     # --- Compute SACQ zone table (league-wide LA × spray → wOBA) ---
-    LA_BINS = [(-999, 0), (0, 5), (5, 10), (10, 15), (15, 20), (20, 25),
-               (25, 30), (30, 35), (35, 40), (40, 50), (50, 999)]
+    # Negative-LA region split at -10: league wOBAcon for -10..0 (~.247,
+    # near-zero choppers/low liners that sneak through) is materially
+    # higher than everything below -10 (~.135, buried toppers), so the
+    # old single <0 bin masked real signal. -999 low sentinel kept so the
+    # serialization below (lo > -999) emits laMin=None for the catch-all.
+    LA_BINS = [(-999, -10), (-10, 0), (0, 5), (5, 10), (10, 15), (15, 20),
+               (20, 25), (25, 30), (30, 35), (35, 40), (40, 50), (50, 999)]
     SACQ_MIN_BIP = 20
     SACQ_QUALITY_THRESHOLD = 0.500
 

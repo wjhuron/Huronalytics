@@ -3480,7 +3480,7 @@ var PlayerPage = {
     var hoverMedLA = med_la;
     var hoverBats = bats;
     // LA bin label helper
-    var LA_BIN_LABELS = ['< 0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
+    var LA_BIN_LABELS = ['< -10°', '-10–0°', '0–5°', '5–10°', '10–15°', '15–20°', '20–25°',
                          '25–30°', '30–35°', '35–40°', '40–50°', '50°+'];
     var SPRAY_LABELS = { pull: 'Pull', pull_side: 'Pull-Side', center_pull: 'Center-Pull',
                          center_oppo: 'Center-Oppo', oppo_side: 'Oppo-Side', oppo: 'Oppo' };

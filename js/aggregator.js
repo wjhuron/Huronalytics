@@ -148,7 +148,10 @@ const Aggregator = {
 
   _HP_X: 125.42,
   _HP_Y: 198.27,
-  _LA_BINS: [[-999,0],[0,5],[5,10],[10,15],[15,20],[20,25],[25,30],[30,35],[35,40],[40,50],[50,999]],
+  // Negative-LA split at -10 — must match process_data.py / HitterCards.py
+  // LA_BINS exactly (same edges AND order) or client-recomputed xwOBAsp
+  // desyncs from the server sacqZones table.
+  _LA_BINS: [[-999,-10],[-10,0],[0,5],[5,10],[10,15],[15,20],[20,25],[25,30],[30,35],[35,40],[40,50],[50,999]],
 
   computeSprayAngle: function (hcX, hcY) {
     if (hcX == null || hcY == null) return null;

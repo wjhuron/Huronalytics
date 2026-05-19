@@ -436,7 +436,10 @@ def spray_direction(angle, bats):
         return 'oppo'
 
 
-LA_BINS = [(-9999, 0), (0, 5), (5, 10), (10, 15), (15, 20),
+# Negative-LA region split at -10 (mirrors process_data.py LA_BINS):
+# -10..0 (~.247 wOBAcon) is materially more productive than below -10
+# (~.135), so they get distinct SACQ zones.
+LA_BINS = [(-9999, -10), (-10, 0), (0, 5), (5, 10), (10, 15), (15, 20),
            (20, 25), (25, 30), (30, 35), (35, 40), (40, 50), (50, 9999)]
 
 
@@ -1420,6 +1423,23 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
 
+    # ── PROTOTYPE (uncommitted): dedicated zone-boundary grid overlay ──
+    # Uniform separators at the true spray/LA zone edges, drawn on top of
+    # the (unchanged) fills but below the BIP scatter, so the zone splits
+    # read clearly even between similarly-colored adjacent zones.
+    # Knobs to eyeball: _GRID_LW (line weight) and _GRID_ALPHA (opacity).
+    _GRID_LW, _GRID_ALPHA = 1.0, 0.75
+    _vx = sorted({e for b in bounds.values() for e in b})   # spray edges
+    for _x in _vx:
+        if -50 < _x < 50:
+            ax_spray.axvline(_x, color=GRID_COLOR, linewidth=_GRID_LW,
+                             alpha=_GRID_ALPHA, zorder=2)
+    _hy = sorted({e for rng in LA_BINS for e in rng})       # LA edges
+    for _y in _hy:
+        if -20 < _y < 60:
+            ax_spray.axhline(_y, color=GRID_COLOR, linewidth=_GRID_LW,
+                             alpha=_GRID_ALPHA, zorder=2)
+
     # BIP scatter — capture Event so we can outline hits / extra-base hits
     bip_pts = []
     for p in hitter_pitches:
@@ -1624,7 +1644,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     ax_spray.set_yticks(range(-20, 61, 10))
     ax_spray.tick_params(colors=TICK_COLOR, labelsize=8)
     for s in ax_spray.spines.values(): s.set_color(SPINE_COLOR)
-    ax_spray.grid(True, color=GRID_COLOR, alpha=0.10, linewidth=0.4)
+    ax_spray.grid(False)  # zone-edge overlay (above) is the only grid now
     leftL = ('Oppo' if bats == 'L' else 'Pull')
     rightL = ('Pull' if bats == 'L' else 'Oppo')
     # Title-case throughout — matches the card's typographic voice.
