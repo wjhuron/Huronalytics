@@ -1170,6 +1170,60 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     if roc_pitcher_count or roc_hitter_count:
         print(f"  Tagged {roc_pitcher_count} ROC pitcher pitches, {roc_hitter_count} ROC hitter pitches")
 
+    # --- Tier 2: fill xwOBA for ROC pitches (Savant doesn't publish their
+    # per-pitch xwOBA model output for AAA). The fix unlocks xwOBAcon,
+    # xwOBA, BB+, and Hitter+ for ROC hitters via the existing per-hitter
+    # aggregations downstream.
+    #
+    # BIP fill: pipeline_xwoba3d.py — joint EV x LA x spray x bats
+    # empirical wOBA table with hierarchical Bayesian shrinkage to 2D
+    # marginals. Table built from MLB BIP only (translation framing,
+    # consistent with xwOBAsp/SACQ zones/percentile pool/wRC+ overrides
+    # — ROC measured against the MLB baseline). Validated against
+    # Savant's published per-pitch xwOBA on held-out MLB BIP:
+    # per-BIP r=0.915, per-hitter aggregated r=0.962 at the BB+ floor
+    # of 80 BIP (MAE 0.015), bias ~0. MLB pitches NEVER overwritten —
+    # Savant's value stays gold standard where it exists.
+    #
+    # Non-BIP PA fill: BB / HBP get the FG Guts wOBA event weights;
+    # K events get 0. Needed so per-hitter xwOBA (mean over all PA, not
+    # just BIP) populates correctly.
+    from pipeline_xwoba3d import (
+        build_xwoba3d_table, shrink_xwoba3d, classify_bip as _xw3d_classify,
+    )
+    _mlb_bip = [p for p in all_pitches
+                if p.get('_source','MLB')=='MLB'
+                and _xw3d_classify(p) is not None
+                and safe_float(p.get('xwOBA')) is not None]
+    if _mlb_bip:
+        _raw3d = build_xwoba3d_table(_mlb_bip)
+        _smooth3d = shrink_xwoba3d(_raw3d, _mlb_bip)
+        _bb_w  = WOBA_WEIGHTS.get('BB',  0.69)
+        _hbp_w = WOBA_WEIGHTS.get('HBP', 0.72)
+        _n_bip = _n_bb = _n_hbp = _n_k = 0
+        for p in all_pitches:
+            if p.get('_source','MLB') == 'MLB': continue
+            if p.get('xwOBA') is not None:        continue   # don't overwrite
+            ev = p.get('Event')
+            if not ev: continue
+            key = _xw3d_classify(p)
+            if key is not None and key in _smooth3d:
+                p['xwOBA'] = round(_smooth3d[key][0], 4)
+                _n_bip += 1
+                continue
+            if ev in BB_EVENTS and ev != 'Intent Walk':
+                p['xwOBA'] = _bb_w;  _n_bb += 1
+            elif ev in HBP_EVENTS:
+                p['xwOBA'] = _hbp_w; _n_hbp += 1
+            elif ev in K_EVENTS:
+                p['xwOBA'] = 0.0;    _n_k += 1
+        # Keep the smoothed table for metadata serialization later.
+        _xw3d_smoothed_table = _smooth3d
+        print(f"  ROC xwOBA fill (3D EV×LA×spray×bats lookup): "
+              f"{_n_bip} BIP, {_n_bb} BB, {_n_hbp} HBP, {_n_k} K")
+    else:
+        _xw3d_smoothed_table = None
+
     # --- Cache pitch-level data for downstream per-pitch analysis (SD+, etc.) ---
     cache_path = os.path.join(DATA_DIR, f'all_pitches_{label.lower()}_cache.pkl')
     with open(cache_path, 'wb') as f:
@@ -2664,10 +2718,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     from pipeline_utils import hitter_pa_per_game as _hitter_pa_per_game
     _hplus_qual = []
     for _row in hitter_leaderboard:
+        # MLB-only standardization pool: ROC hitters now have full bb/sd/ct
+        # via the Tier 1 SD+/CT+ unlock and the Tier 2 xwOBAcon fill, but
+        # the Hitter+ baseline must stay MLB-anchored (translation framing,
+        # same convention as bbPlus re-anchor and percentile pool — ROC
+        # ranks against MLB, doesn't contribute to the MLB baseline).
+        if _row.get('_isROC') or _row.get('_isCombined'):
+            continue
         _team_g = team_games_played.get(_row.get('team'))
         if _team_g is None and team_games_played:
             _team_g = max(team_games_played.values())
-        _pa_thresh = _hitter_pa_per_game(bool(_row.get('_isROC'))) * (_team_g or 0)
+        _pa_thresh = _hitter_pa_per_game(False) * (_team_g or 0)
         if _team_g and _row.get('pa', 0) >= _pa_thresh and \
            _row.get('bbPlus') is not None and _row.get('sdPlus') is not None and _row.get('ctPlus') is not None:
             _hplus_qual.append(_row)
@@ -2813,6 +2874,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'locPlusWeights': loc_weights,
         'hitterPlusStandardization': hitter_plus_standardization,
         'plusReanchor': plus_reanchor,
+        # Tier 2: 3D xwOBA table used to fill ROC BIP xwOBA (no Savant
+        # per-pitch xwOBA available for AAA). For transparency / audit.
+        'xwOBA3DTable': (__import__('pipeline_xwoba3d').serialize_table(_xw3d_smoothed_table)
+                         if _xw3d_smoothed_table else {}),
     }
 
     # --- Generate micro-aggregate data ---

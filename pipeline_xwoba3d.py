@@ -28,7 +28,7 @@ from pipeline_utils import (
 # ~100 obs/cell on average across the ~288 cells.
 EV_BINS = [(0, 70), (70, 80), (80, 88), (88, 95), (95, 102), (102, 200)]
 LA_BINS = [(-90, -10), (-10, 0), (0, 10), (10, 20), (20, 30), (30, 40), (40, 90)]
-SPRAY_DIRS = ['pull', 'middle', 'opposite']
+SPRAY_DIRS = ['pull', 'pull_side', 'center_pull', 'center_oppo', 'oppo_side', 'oppo']
 HANDS = ['R', 'L', 'S']  # 'S' = switch hitter — rare per-pitch attribute
 
 # Hierarchical shrinkage pseudo-count toward 2D marginals.
