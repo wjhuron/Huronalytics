@@ -2696,6 +2696,73 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs['hitterPlus'] = 100.0
     print(f"  Hitter+ computed (BB+/SD+/CT+ composite, weights 65/7/28).")
 
+    # ── Qualified-pool re-anchor (all four "+" indices) ──────────────
+    # Before this pass, 100 was anchored to non-qualified means: bb/sd/ct
+    # to a broad all-MLB / eligibility-floor pool, hitterPlus to the
+    # qualified MEAN of a right-skewed composite. Net effect: a value of
+    # 100 landed at the ~41st–54th percentile of the qualified pool, not
+    # the 50th — so "100 = league average" actually read as below-typical
+    # for a regular (the Mead/Wood confusion). Re-anchor 100 to the
+    # qualified-pool MEDIAN of the SAME pool the leaderboard percentiles
+    # rank against (3.1 PA × team games, MLB), so 100 == exactly the 50th
+    # percentile. This is a pure monotone transform: ranks/percentiles are
+    # unchanged, only the displayed reference point moves. bb/sd/ct are
+    # ratio indices → rescale multiplicatively (×100/median). hitterPlus
+    # is an additive z-index (100 + 40·z) → recenter additively
+    # (+100−median) to preserve its SD≈40 spread. The bbPlus factor is
+    # published in metadata because the frontend recomputes bbPlus under
+    # filters and must mirror the same scale; sd/ct/hitterPlus are
+    # server-precomputed pass-through everywhere.
+    def _qual_median(_stat):
+        _vals = []
+        for _r in hitter_leaderboard:
+            if _r.get('_isROC') or _r.get('_isCombined'):
+                continue
+            _v = _r.get(_stat)
+            if _v is None:
+                continue
+            _tg = team_games_played.get(_r.get('team'))
+            if _tg is None and team_games_played:
+                _tg = max(team_games_played.values())
+            if not _tg:
+                continue
+            if _r.get('pa', 0) >= _hitter_pa_per_game(bool(_r.get('_isROC'))) * _tg:
+                _vals.append(_v)
+        if not _vals:
+            return None
+        _vals.sort()
+        _n = len(_vals)
+        return _vals[_n // 2] if _n % 2 else (_vals[_n // 2 - 1] + _vals[_n // 2]) / 2.0
+
+    plus_reanchor = {}
+    for _stat in ('bbPlus', 'sdPlus', 'ctPlus'):
+        _med = _qual_median(_stat)
+        if _med and abs(_med) > 1e-9:
+            _f = 100.0 / _med
+            plus_reanchor[_stat] = round(_f, 6)
+            for _r in hitter_leaderboard:
+                if _r.get(_stat) is not None:
+                    _r[_stat] = round(_r[_stat] * _f, 1)
+            # Keep the Hitter+ standardization metadata consistent with the
+            # re-anchored component scale (mean & sd scale by the factor).
+            _sd_meta = hitter_plus_standardization.get(_stat)
+            if _sd_meta:
+                _sd_meta['mean'] = round(_sd_meta['mean'] * _f, 3)
+                _sd_meta['sd'] = round(_sd_meta['sd'] * _f, 3)
+    _med_h = _qual_median('hitterPlus')
+    if _med_h is not None:
+        _shift = 100.0 - _med_h
+        plus_reanchor['hitterPlusShift'] = round(_shift, 4)
+        for _r in hitter_leaderboard:
+            if _r.get('hitterPlus') is not None:
+                _r['hitterPlus'] = round(_r['hitterPlus'] + _shift, 1)
+    # 100 is still the displayed reference (now = qualified median).
+    hitter_league_avgs['bbPlus'] = 100.0
+    hitter_league_avgs['sdPlus'] = 100.0
+    hitter_league_avgs['ctPlus'] = 100.0
+    hitter_league_avgs['hitterPlus'] = 100.0
+    print(f"  Plus re-anchor (qualified-pool median -> 100): {plus_reanchor}")
+
     # --- Metadata ---
     metadata = {
         'teams': all_teams,
@@ -2731,6 +2798,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'ctPlusWeights': ct_weights,
         'locPlusWeights': loc_weights,
         'hitterPlusStandardization': hitter_plus_standardization,
+        'plusReanchor': plus_reanchor,
     }
 
     # --- Generate micro-aggregate data ---

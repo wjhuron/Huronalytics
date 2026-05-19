@@ -1489,7 +1489,13 @@ const Aggregator = {
       if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS) {
         const conPlus = 100 * obj.xwOBAcon / lgXC;
         const spPlus = 100 * obj.xwOBAsp / lgXS;
-        obj.bbPlus = Math.round((0.6 * conPlus + 0.4 * spPlus) * 10) / 10;
+        // Mirror the server's qualified-pool re-anchor (100 = qualified
+        // median). sd/ct/hitterPlus are pass-through; bbPlus is the only
+        // "+" recomputed client-side, so it must apply the same factor.
+        const bbReAnchor = (DataStore && DataStore.metadata &&
+                            DataStore.metadata.plusReanchor &&
+                            DataStore.metadata.plusReanchor.bbPlus) || 1;
+        obj.bbPlus = Math.round((0.6 * conPlus + 0.4 * spPlus) * bbReAnchor * 10) / 10;
       } else {
         obj.bbPlus = null;
       }
