@@ -1,3 +1,17 @@
+// Cache-bust the data fetch with the same ?v= build tag the pipeline
+// stamps onto this script's own <script> tag in index.html (via
+// bump_asset_version). Captured at parse time — document.currentScript
+// is only valid while the script is executing synchronously.
+var DATA_VERSION = (function () {
+  try {
+    var src = (document.currentScript && document.currentScript.src) || '';
+    var m = src.match(/[?&]v=([\w-]+)/);
+    return m ? m[1] : '';
+  } catch (e) {
+    return '';
+  }
+})();
+
 const DataStore = {
   rs: {},
 
@@ -5,31 +19,61 @@ const DataStore = {
     return this.rs;
   },
 
+  /**
+   * Fetch the gzipped payload and inflate it in the browser.
+   *
+   * The data used to be a ~100 MB `window.RS_DATA = {...}` inline script
+   * (over GitHub's 100 MB file wall, slow to download). It now ships as
+   * data/data_embedded.json.gz (~13-16 MB) and is inflated here via the
+   * native DecompressionStream. Returns a Promise — app.js already
+   * chains .then()/.catch() on this, so the async path needs no caller
+   * changes; a fetch/inflate failure routes to app.js's existing
+   * "Error loading data. Please refresh." handler.
+   */
   load: function () {
-    if (window.RS_DATA) {
-      this.rs = {
-        pitcherData: window.RS_DATA.pitcherData || [],
-        pitchData: window.RS_DATA.pitchData || [],
-        hitterData: window.RS_DATA.hitterData || [],
-        hitterPitchData: window.RS_DATA.hitterPitchData || [],
-        metadata: window.RS_DATA.metadata || {},
-        microData: window.RS_DATA.microData || null,
-        pitchDetails: window.RS_DATA.pitchDetails || {},
-        hitterPitchDetails: window.RS_DATA.hitterPitchDetails || {},
-        hitterSwingLocations: window.RS_DATA.hitterSwingLocations || {},
-      };
+    var self = this;
+
+    if (typeof DecompressionStream === 'undefined') {
+      return Promise.reject(new Error(
+        'This browser does not support gzip DecompressionStream. ' +
+        'Please use a current version of Chrome, Firefox, Safari, or Edge.'));
     }
 
-    // Set flat globals so aggregator.js, player-page.js, scatter.js can access data
-    this.updateGlobals();
+    var url = 'data/data_embedded.json.gz' +
+              (DATA_VERSION ? ('?v=' + DATA_VERSION) : '');
 
-    this.metadata = this.rs.metadata;
-    this.pitcherData = this.rs.pitcherData;
-    this.pitchData = this.rs.pitchData;
-    this.hitterData = this.rs.hitterData;
-    this.hitterPitchData = this.rs.hitterPitchData;
+    return fetch(url).then(function (resp) {
+      if (!resp.ok) {
+        throw new Error('Data fetch failed: HTTP ' + resp.status);
+      }
+      if (!resp.body) {
+        throw new Error('Data fetch returned no body stream.');
+      }
+      var inflated = resp.body.pipeThrough(new DecompressionStream('gzip'));
+      return new Response(inflated).text();
+    }).then(function (text) {
+      var rd = JSON.parse(text);
+      self.rs = {
+        pitcherData: rd.pitcherData || [],
+        pitchData: rd.pitchData || [],
+        hitterData: rd.hitterData || [],
+        hitterPitchData: rd.hitterPitchData || [],
+        metadata: rd.metadata || {},
+        microData: rd.microData || null,
+        pitchDetails: rd.pitchDetails || {},
+        hitterPitchDetails: rd.hitterPitchDetails || {},
+        hitterSwingLocations: rd.hitterSwingLocations || {},
+      };
 
-    return Promise.resolve();
+      // Set flat globals so aggregator.js, player-page.js, scatter.js can access data
+      self.updateGlobals();
+
+      self.metadata = self.rs.metadata;
+      self.pitcherData = self.rs.pitcherData;
+      self.pitchData = self.rs.pitchData;
+      self.hitterData = self.rs.hitterData;
+      self.hitterPitchData = self.rs.hitterPitchData;
+    });
   },
 
   updateGlobals: function () {

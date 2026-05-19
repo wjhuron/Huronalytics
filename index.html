@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
 </head>
 <body>
-  <!-- Loading overlay shown while data_embedded.js loads -->
+  <!-- Loading overlay shown while the gzipped data payload loads -->
   <div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg,#1a1d23);color:var(--text,#e0e0e0);font-family:'Barlow',sans-serif;flex-direction:column;gap:12px;">
     <div style="font-size:1.4rem;font-weight:600;letter-spacing:1px;">HURONALYTICS</div>
     <div style="font-size:0.9rem;opacity:0.6;">Loading leaderboard data&hellip;</div>
@@ -505,7 +505,9 @@
     <p>Data: MLB 2026 | Generated <span id="generated-date"></span></p>
   </footer>
 
-  <script src="data/data_embedded.js?v=202605181633"></script>
+  <!-- Data is no longer a 100 MB inline script; js/data.js fetches the
+       gzipped payload (data/data_embedded.json.gz) and inflates it via
+       DecompressionStream. -->
   <script src="js/utils.js?v=202605181633"></script>
   <script src="js/aggregator.js?v=202605181633"></script>
   <script src="js/data.js?v=202605181633"></script>

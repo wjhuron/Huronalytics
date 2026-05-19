@@ -3504,30 +3504,45 @@ def write_embedded_js(rs_result):
             'hitterSwingLocations': result.get('hitter_swing_locations', {}),
         }
 
-    with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'w') as f:
-        f.write('// Auto-generated — do not edit\n')
-        f.write('window.RS_DATA = ')
-        data_obj = round_floats_inplace(build_data_obj(rs_result))
-        json.dump(data_obj, f, separators=(',', ':'))
-        f.write(';\n')
-    sz = os.path.getsize(os.path.join(DATA_DIR, 'data_embedded.js'))
-    print(f"  Wrote data_embedded.js ({sz / 1048576:.1f} MB)")
-    # Hard guard: GitHub rejects any file >100 MB with a pre-receive hook,
-    # and the workflow then burns ~90s on 5 doomed push+rebase retries
-    # before failing. Fail HERE instead, fast and with an actionable message.
-    # 99 MB threshold: 1 MB under GitHub's wall — enough to surface the
-    # problem before the commit without false-tripping on the normal
-    # post-rounding size (~97 MB). When this fires, the fix is structural,
-    # not another round of trimming: gzip the payload (≈6-8x smaller, also
-    # speeds page load) or move pitchDetails/microData out of git the way
-    # the pickle already ships as a Release asset.
-    if sz > 99 * 1048576:
+    import gzip
+
+    # Serialize the rounded payload, then gzip it. The browser fetches the
+    # .gz and inflates it with DecompressionStream (see js/data.js). JSON of
+    # this shape compresses ≈6-8x, so a ~97 MB payload lands at ~13-16 MB:
+    # well under GitHub's 100 MB file wall (months of season headroom), a
+    # far smaller git push every run, and a 6-8x smaller download for every
+    # visitor (the page-load speedup).
+    data_obj = round_floats_inplace(build_data_obj(rs_result))
+    payload = json.dumps(data_obj, separators=(',', ':')).encode('utf-8')
+    raw_mb = len(payload) / 1048576
+
+    gz_path = os.path.join(DATA_DIR, 'data_embedded.json.gz')
+    # mtime=0 → byte-identical output when the data is unchanged, so a
+    # same-day re-run with no new games produces no spurious commit.
+    with open(gz_path, 'wb') as f:
+        f.write(gzip.compress(payload, compresslevel=9, mtime=0))
+    gz_mb = os.path.getsize(gz_path) / 1048576
+
+    # Remove the legacy uncompressed file so the old 100 MB artifact stops
+    # being committed (the workflow's `git add data/` stages this deletion).
+    legacy_js = os.path.join(DATA_DIR, 'data_embedded.js')
+    if os.path.exists(legacy_js):
+        os.remove(legacy_js)
+
+    print(f"  Wrote data_embedded.json.gz "
+          f"({gz_mb:.1f} MB gz, {raw_mb:.1f} MB raw, "
+          f"{raw_mb / gz_mb:.1f}x ratio)")
+
+    # Guard on the COMPRESSED size (that's what git/GitHub sees). At ~15 MB
+    # this never fires in normal operation; tripping it means the payload
+    # grew ~3x unexpectedly and something is wrong. Fail fast with an
+    # actionable message rather than at the push step.
+    if os.path.getsize(gz_path) > 90 * 1048576:
         raise SystemExit(
-            f"FATAL: data_embedded.js is {sz / 1048576:.2f} MB — within 1 MB "
-            f"of GitHub's 100 MB hard file limit. Pushing will be rejected. "
-            f"This needs a structural fix (gzip transport or splitting "
-            f"micro-data/pitchDetails out of git), not more float trimming. "
-            f"See the round_floats_inplace docstring and write_embedded_js."
+            f"FATAL: data_embedded.json.gz is {gz_mb:.1f} MB. Even compressed "
+            f"it is near GitHub's 100 MB file wall — the payload needs to be "
+            f"split (move pitchDetails/microData to a Release asset like the "
+            f"pickle). See write_embedded_js."
         )
 
 
