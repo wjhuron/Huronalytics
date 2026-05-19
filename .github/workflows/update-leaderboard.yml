@@ -62,12 +62,34 @@ jobs:
                   if missing:
                       errors.append(f'FAIL: {f} missing fields: {missing}')
 
-          # Check data_embedded.js is non-trivial
-          size = os.path.getsize('data/data_embedded.js')
-          if size < 100000:
-              errors.append(f'FAIL: data_embedded.js is only {size} bytes (expected 100KB+)')
+          # Check the gzipped payload: non-trivial size AND actually
+          # inflates to JSON with the keys the frontend reads. A truncated
+          # or corrupt .gz would break the live site for every visitor, so
+          # validate it for real (cheap — ~1-2s for ~17 MB).
+          import gzip
+          gz = 'data/data_embedded.json.gz'
+          if os.path.exists('data/data_embedded.js'):
+              errors.append('FAIL: legacy data/data_embedded.js still present (should be replaced by the .gz)')
+          if not os.path.exists(gz):
+              errors.append(f'FAIL: {gz} is missing')
           else:
-              print(f'OK: data_embedded.js is {size:,} bytes')
+              size = os.path.getsize(gz)
+              if size < 1_000_000:
+                  errors.append(f'FAIL: {gz} is only {size} bytes (expected >1 MB)')
+              else:
+                  try:
+                      obj = json.loads(gzip.decompress(open(gz, 'rb').read()))
+                      need = ['pitcherData', 'pitchData', 'hitterData', 'metadata', 'microData']
+                      miss = [k for k in need if k not in obj]
+                      if miss:
+                          errors.append(f'FAIL: {gz} inflated but missing keys: {miss}')
+                      elif len(obj.get('pitcherData', [])) < 50:
+                          errors.append(f'FAIL: {gz} pitcherData has only {len(obj.get("pitcherData", []))} rows')
+                      else:
+                          print(f'OK: {gz} is {size:,} bytes, inflates to valid JSON '
+                                f'({len(obj["pitcherData"])} pitchers)')
+                  except Exception as e:
+                      errors.append(f'FAIL: {gz} did not decompress/parse: {e}')
 
           if errors:
               for e in errors:
