@@ -1001,17 +1001,16 @@ def _render_percentile_bubbles(fig, h_row):
 # Card render
 # ─────────────────────────────────────────────────────────────────────
 def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
-                       output_dir=OUTPUT_DIR, layout='classic'):
+                       output_dir=OUTPUT_DIR, layout='bubbles'):
     """Render a seasonal hitter card.
 
     layout:
-        'classic' — default. Heat maps (Whiff/Damage × RHP/LHP) on the left,
-            LA × Spray on the right, Contact Profile + Pitch Group table at
-            the bottom.
-        'bubbles' — mockup variant. Drops the heat maps, Contact Profile,
-            and Pitch Group table; replaces them with a 4-column percentile
-            bubble grid (Result / QoC / Plate Discipline / Bat Tracking).
-            Keeps the headline strip and LA × Spray chart unchanged.
+        'bubbles' — default. Single-column percentile bubble grid
+            (Result / Quality of Contact / Plate Discipline / Bat Tracking)
+            on the left, LA × Spray chart on the right, headline strip on top.
+        'classic' — legacy variant. Heat maps (Whiff/Damage × RHP/LHP) on the
+            left, LA × Spray on the right, Contact Profile + Pitch Group table
+            at the bottom. Still selectable via --layout classic.
     """
     print(f"Generating hitter card: {hitter_name} ({team_abbrev or 'auto'}) — {year_label} [layout={layout}]")
 
@@ -2310,10 +2309,11 @@ def main():
                          help=f'Display label on the card (default: "{year_label}")')
     parser.add_argument('--output-dir', default=None,
                          help=f'Output directory (default: {OUTPUT_DIR})')
-    parser.add_argument('--layout', default='classic',
+    parser.add_argument('--layout', default='bubbles',
                          choices=['classic', 'bubbles'],
-                         help="'classic' = heat maps + contact profile + pitch group table. "
-                              "'bubbles' = 4-column percentile grid in place of those three sections.")
+                         help="'bubbles' (default) = single-column percentile grid "
+                              "(Result / QoC / Plate Discipline / Bat Tracking). "
+                              "'classic' = legacy heat maps + contact profile + pitch group table.")
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
