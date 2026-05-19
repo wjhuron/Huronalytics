@@ -2627,12 +2627,14 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # SD+ — decision-only discipline index (xRV-weighted cells, dv_A formula,
     # Bayesian-regressed to league, ratio-to-league). See pipeline_sdplus.py.
     from pipeline_sdplus import compute_sd_plus, compute_team_games_played
-    # Include MLB teams AND multi-team aggregates (2TM/3TM/…); exclude AAA/ROC.
-    # Matches the pdPlus pattern — multi-team hitters get a combined SD+.
-    sd_pitches_by_hitter = {
-        key: pitches for key, pitches in hitter_groups.items()
-        if key[1] not in AAA_TEAMS
-    }
+    # Include MLB teams AND multi-team aggregates AND ROC. Cell weight
+    # tables stay MLB-baselined (filter applied inside compute_sd_plus /
+    # compute_ct_plus); per-hitter aggregation looks ROC swings up
+    # against the MLB table (translation framing, same as xwOBAsp /
+    # xwOBAcon). The qualified-pool re-anchor downstream is MLB-only,
+    # so any minor lg_raw shift from ROC entering regress_and_normalize
+    # is normalized out at the final sdPlus / ctPlus scale.
+    sd_pitches_by_hitter = dict(hitter_groups)
     sd_results, sd_weights = compute_sd_plus(
         all_pitches, sd_pitches_by_hitter,
         lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
