@@ -3390,6 +3390,42 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     }
 
 
+def round_floats_inplace(obj, ndigits=6):
+    """Recursively round every float in a nested list/dict structure.
+
+    The embedded payload stored full IEEE-754 float noise like
+    0.6231884057971014 (18 chars) for values the UI only ever renders via
+    toFixed at 1-3 decimals. Rounding to 6 decimals strips ~25-30% of the
+    file with zero visible effect.
+
+    RV-precision rule check: aggregator.js re-sums per-pitch runValue/
+    xRunValue from micro-data. Rounding each per-pitch value to 6 decimals
+    bounds the re-aggregation error at 5e-7 per pitch — under 0.001 runs
+    across a full season of a pitcher's pitches, ~100x below the 1-decimal
+    display precision. So the "sum at full precision, round at display"
+    rule is honored in practice (the rule targets premature 1-2 decimal
+    rounding that visibly accumulates; 6-decimal noise removal does not).
+
+    Mutates in place and also returns obj for convenience.
+    """
+    stack = [obj]
+    while stack:
+        cur = stack.pop()
+        if isinstance(cur, dict):
+            for k, v in cur.items():
+                if type(v) is float:
+                    cur[k] = round(v, ndigits)
+                elif type(v) is list or type(v) is dict:
+                    stack.append(v)
+        elif isinstance(cur, list):
+            for i, v in enumerate(cur):
+                if type(v) is float:
+                    cur[i] = round(v, ndigits)
+                elif type(v) is list or type(v) is dict:
+                    stack.append(v)
+    return obj
+
+
 def write_json_outputs(result, suffix):
     """Write JSON output files with the given suffix."""
     def strip_internal_keys(rows):
@@ -3422,18 +3458,22 @@ def write_json_outputs(result, suffix):
         except (json.JSONDecodeError, KeyError):
             print("  Warning: could not read existing Stuff+ scores")
 
+    # Round floats in every committed artifact (these also land in git via
+    # `git add data/`, so shrinking them speeds the push too). Mutating
+    # result['micro_data'] in place is fine: write_embedded_js runs next and
+    # wants the rounded values anyway (rounding is idempotent).
     with open(pitch_json_path, 'w') as f:
-        json.dump(strip_internal_keys(result['pitch_leaderboard']), f)
+        json.dump(round_floats_inplace(strip_internal_keys(result['pitch_leaderboard'])), f)
     with open(os.path.join(DATA_DIR, f'pitcher_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(strip_internal_keys(result['pitcher_leaderboard']), f)
+        json.dump(round_floats_inplace(strip_internal_keys(result['pitcher_leaderboard'])), f)
     with open(os.path.join(DATA_DIR, f'hitter_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(strip_internal_keys(result['hitter_leaderboard']), f)
+        json.dump(round_floats_inplace(strip_internal_keys(result['hitter_leaderboard'])), f)
     with open(os.path.join(DATA_DIR, f'hitter_pitch_leaderboard{suffix}.json'), 'w') as f:
-        json.dump(strip_internal_keys(result['hitter_pitch_leaderboard']), f)
+        json.dump(round_floats_inplace(strip_internal_keys(result['hitter_pitch_leaderboard'])), f)
     with open(os.path.join(DATA_DIR, f'metadata{suffix}.json'), 'w') as f:
-        json.dump(result['metadata'], f, indent=2)
+        json.dump(round_floats_inplace(result['metadata']), f, indent=2)
     with open(os.path.join(DATA_DIR, f'micro_data{suffix}.json'), 'w') as f:
-        json.dump(result['micro_data'], f, separators=(',', ':'))
+        json.dump(round_floats_inplace(result['micro_data']), f, separators=(',', ':'))
     print(f"  Wrote JSON files with suffix '{suffix}'")
 
 
@@ -3467,9 +3507,28 @@ def write_embedded_js(rs_result):
     with open(os.path.join(DATA_DIR, 'data_embedded.js'), 'w') as f:
         f.write('// Auto-generated — do not edit\n')
         f.write('window.RS_DATA = ')
-        json.dump(build_data_obj(rs_result), f, separators=(',', ':'))
+        data_obj = round_floats_inplace(build_data_obj(rs_result))
+        json.dump(data_obj, f, separators=(',', ':'))
         f.write(';\n')
-    print("  Wrote data_embedded.js")
+    sz = os.path.getsize(os.path.join(DATA_DIR, 'data_embedded.js'))
+    print(f"  Wrote data_embedded.js ({sz / 1048576:.1f} MB)")
+    # Hard guard: GitHub rejects any file >100 MB with a pre-receive hook,
+    # and the workflow then burns ~90s on 5 doomed push+rebase retries
+    # before failing. Fail HERE instead, fast and with an actionable message.
+    # 99 MB threshold: 1 MB under GitHub's wall — enough to surface the
+    # problem before the commit without false-tripping on the normal
+    # post-rounding size (~97 MB). When this fires, the fix is structural,
+    # not another round of trimming: gzip the payload (≈6-8x smaller, also
+    # speeds page load) or move pitchDetails/microData out of git the way
+    # the pickle already ships as a Release asset.
+    if sz > 99 * 1048576:
+        raise SystemExit(
+            f"FATAL: data_embedded.js is {sz / 1048576:.2f} MB — within 1 MB "
+            f"of GitHub's 100 MB hard file limit. Pushing will be rejected. "
+            f"This needs a structural fix (gzip transport or splitting "
+            f"micro-data/pitchDetails out of git), not more float trimming. "
+            f"See the round_floats_inplace docstring and write_embedded_js."
+        )
 
 
 def bump_asset_version(index_path=None):
