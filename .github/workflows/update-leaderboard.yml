@@ -1,12 +1,10 @@
 name: Update Leaderboard
 
 on:
-  # Manual trigger from GitHub Actions tab
+  # Manual trigger only — run from the GitHub Actions tab (or the gh
+  # CLI). Deliberately no schedule: Wally pushes this himself, so every
+  # run reflects an intentional update rather than a clock tick.
   workflow_dispatch:
-
-  # Auto-run daily at 8 AM ET (1 PM UTC)
-  schedule:
-    - cron: '0 13 * * *'
 
 permissions:
   contents: write

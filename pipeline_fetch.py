@@ -258,8 +258,14 @@ def load_mlb_id_cache(cache_path):
 
 
 def save_mlb_id_cache(cache, cache_path):
+    # Persist only successful lookups — an mlbId is stable, so caching it
+    # forever is correct. None entries (failed lookups, e.g. a callup MLB
+    # hadn't listed yet) are dropped on save so the next run re-attempts
+    # them instead of freezing the player ID-less permanently. None is
+    # still kept in-memory during a run for within-run dedup.
     with open(cache_path, 'w') as f:
-        json.dump(cache, f, indent=2)
+        json.dump({k: v for k, v in cache.items() if v is not None},
+                  f, indent=2)
 
 
 # ── Hitter primary position (max games per position, MLB only) ──────────
@@ -592,17 +598,11 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
     new_fetches = 0
     cache_key_prefix = team_abbrev + '|'
 
-    import datetime as _dt
-    _et = _today_et()
-    # Always re-fetch the last 10 days so retroactive scoring changes
-    # (hits ↔ errors, earned/unearned reclassifications) propagate.
-    recent_dates = {(_et - _dt.timedelta(days=i)).isoformat() for i in range(10)}
-
-    dates_to_fetch = []
-    for d in sorted(game_dates):
-        ck = cache_key_prefix + d
-        if ck not in cache or d in recent_dates:
-            dates_to_fetch.append(d)
+    # Re-fetch every game date every run so the MiLB boxscore data is
+    # never frozen — late scoring changes and any date that fetched
+    # wrong all get corrected. The cache is the in-run store only; it
+    # no longer gates what gets fetched.
+    dates_to_fetch = sorted(game_dates)
 
     if dates_to_fetch:
         print(f"  Fetching MiLB boxscores for {team_abbrev}: {len(dates_to_fetch)} date(s): {dates_to_fetch}")
@@ -686,16 +686,11 @@ def fetch_and_aggregate_boxscores(game_dates):
     cache = load_boxscore_cache()
     new_fetches = 0
 
-    import datetime as _dt
-    _et = _today_et()
-    # Always re-fetch the last 10 days so retroactive scoring changes
-    # (hits ↔ errors, earned/unearned reclassifications) propagate.
-    recent_dates = {(_et - _dt.timedelta(days=i)).isoformat() for i in range(10)}
-
-    dates_to_fetch = []
-    for d in sorted(game_dates):
-        if d not in cache or d in recent_dates:
-            dates_to_fetch.append(d)
+    # Re-fetch every game date every run so the boxscore data is never
+    # frozen: late scoring changes (hits ↔ errors, earned/unearned) and
+    # any date that fetched wrong all get corrected. The cache is the
+    # in-run store only; it no longer gates what gets fetched.
+    dates_to_fetch = sorted(game_dates)
 
     if dates_to_fetch:
         print(f"  Fetching boxscores for {len(dates_to_fetch)} new date(s): {dates_to_fetch}")
