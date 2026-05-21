@@ -11,7 +11,7 @@ import urllib.parse
 from guts import scrape_guts
 from pipeline_utils import (
     DATA_DIR, MLB_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
-    _today_et, _fullname_to_lastfirst,
+    _today_et, _fullname_to_lastfirst, box_key,
 )
 
 # ── Config ───────────────────────────────────────────────────────────────
@@ -642,7 +642,7 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
                 p_team = MILB_TEAM_NAME_TO_ABBREV.get(p['team'], p['team'])
                 if p_team != team_abbrev:
                     continue
-                key = p['name'] + '|' + team_abbrev
+                key = box_key(p['name'], team_abbrev, p.get('mlbId'))
                 if key not in pitcher_agg:
                     pitcher_agg[key] = {
                         'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0,
@@ -662,7 +662,7 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
                 h_team = MILB_TEAM_NAME_TO_ABBREV.get(h['team'], h['team'])
                 if h_team != team_abbrev:
                     continue
-                key = h['name'] + '|' + team_abbrev
+                key = box_key(h['name'], team_abbrev, h.get('mlbId'))
                 if key not in hitter_agg:
                     hitter_agg[key] = {
                         'g': 0, 'pa': 0, 'ab': 0, 'h': 0, 'r': 0,
@@ -730,7 +730,7 @@ def fetch_and_aggregate_boxscores(game_dates):
             if gpk:
                 seen_game_pks.add(gpk)
             for p in box.get('pitchers', []):
-                key = p['name'] + '|' + p['team']
+                key = box_key(p['name'], p['team'], p.get('mlbId'))
                 if key not in pitcher_agg:
                     pitcher_agg[key] = {
                         'g': 0, 'gs': 0, 'outs': 0, 'w': 0, 'l': 0, 'sv': 0, 'hld': 0,
@@ -747,7 +747,7 @@ def fetch_and_aggregate_boxscores(game_dates):
                     pitcher_id_map[p['mlbId']] = key
 
             for h in box.get('hitters', []):
-                key = h['name'] + '|' + h['team']
+                key = box_key(h['name'], h['team'], h.get('mlbId'))
                 if key not in hitter_agg:
                     hitter_agg[key] = {
                         'g': 0, 'pa': 0, 'ab': 0, 'h': 0, 'r': 0,

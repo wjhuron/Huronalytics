@@ -90,6 +90,19 @@ def pitcher_ip_per_game(is_starter, is_roc):
         return QUAL_SP_IP_PER_GAME_MILB if is_starter else QUAL_RP_IP_PER_GAME_MILB
     return QUAL_SP_IP_PER_GAME_MLB if is_starter else QUAL_RP_IP_PER_GAME_MLB
 
+
+def box_key(name, team, mlb_id):
+    """Aggregation / lookup key for boxscore stats.
+
+    Prefers `mlbId|team` — the MLB ID is immune to name-spelling variation
+    (accents, hyphens, periods, stray spaces), which otherwise splits one
+    player's boxscore across multiple buckets and leaves the leaderboard
+    row matching only a partial bucket. Falls back to `name|team` only
+    when no MLB ID is resolved. `|team` is retained so genuinely traded
+    players keep a correct per-team split. Used identically by the
+    aggregation (pipeline_fetch) and the merge (process_data)."""
+    return f"{mlb_id}|{team}" if mlb_id else f"{name}|{team}"
+
 # ── Team abbreviation → MLB API team ID ──────────────────────────────────
 TEAM_ABBREV_TO_ID = {
     'ARI': 109, 'ATL': 144, 'BAL': 110, 'BOS': 111, 'CHC': 112,

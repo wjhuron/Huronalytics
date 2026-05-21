@@ -23,7 +23,7 @@ from pipeline_utils import (
     SWING_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
     MLB_TEAMS, AAA_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
-    BALL_RADIUS_FT, ZONE_HALF_WIDTH,
+    BALL_RADIUS_FT, ZONE_HALF_WIDTH, box_key,
 )
 from pipeline_fetch import (
     fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
@@ -2916,7 +2916,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         # so the per-row merge below works uniformly. Boxscore dicts hold only summable
         # integers (g, gs, outs, er, hr, w, l, sv, hld, tbf, etc.).
         def _get_box(box_dict, id_map, name, team, mlb_id):
-            b = box_dict.get(f"{name}|{team}")
+            # mlbId|team primary (variation-proof); name|team is the
+            # fallback for boxscore records that resolved no MLB ID.
+            b = box_dict.get(box_key(name, team, mlb_id))
+            if not b:
+                b = box_dict.get(f"{name}|{team}")
             if not b and mlb_id:
                 alt = id_map.get(mlb_id)
                 if alt:
@@ -2941,7 +2945,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                         combined_box[k] = sum(vals)
                     else:
                         combined_box[k] = per_team_boxes[0].get(k)
-                pitcher_box[f"{pitcher}|{combined_team}"] = combined_box
+                pitcher_box[box_key(pitcher, combined_team, mlb_id)] = combined_box
 
         for batter, combined_team in combined_hitter_labels.items():
             mlb_id = mlb_id_cache.get(f"{batter}|{combined_team}")
@@ -2961,13 +2965,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                         combined_box[k] = sum(vals)
                     else:
                         combined_box[k] = per_team_boxes[0].get(k)
-                hitter_box[f"{batter}|{combined_team}"] = combined_box
+                hitter_box[box_key(batter, combined_team, mlb_id)] = combined_box
 
-        # Merge pitcher boxscore stats
+        # Merge pitcher boxscore stats. Primary key is mlbId|team (immune
+        # to name-spelling variation); name|team + the id_map are
+        # fallbacks for records with no resolved MLB ID.
         for row in pitcher_leaderboard:
-            key = row['pitcher'] + '|' + row['team']
-            box = pitcher_box.get(key)
-            # Fallback: match by MLB ID for compound last names (e.g. "Woods Richardson" vs "Richardson")
+            box = pitcher_box.get(box_key(row['pitcher'], row['team'], row.get('mlbId')))
+            if not box:
+                box = pitcher_box.get(row['pitcher'] + '|' + row['team'])
             if not box and row.get('mlbId'):
                 alt_key = pitcher_id_map.get(row['mlbId'])
                 if alt_key:
@@ -2998,11 +3004,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['era'] = None
                 row['hr9'] = None
 
-        # Merge hitter boxscore stats
+        # Merge hitter boxscore stats. Primary key is mlbId|team (immune
+        # to name-spelling variation); name|team + the id_map are
+        # fallbacks for records with no resolved MLB ID.
         for row in hitter_leaderboard:
-            key = row['hitter'] + '|' + row['team']
-            box = hitter_box.get(key)
-            # Fallback: match by MLB ID for compound last names
+            box = hitter_box.get(box_key(row['hitter'], row['team'], row.get('mlbId')))
+            if not box:
+                box = hitter_box.get(row['hitter'] + '|' + row['team'])
             if not box and row.get('mlbId'):
                 alt_key = hitter_id_map.get(row['mlbId'])
                 if alt_key:
@@ -3179,9 +3187,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Exclude MiLB teams from league-wide calculations
     total_outs = 0
     total_er = 0
-    for box_key, box in pitcher_box.items():
-        # box_key format: "Name|TEAM" — skip MiLB teams
-        box_team = box_key.split('|')[-1] if '|' in box_key else ''
+    for bkey, box in pitcher_box.items():
+        # bkey format: "<id-or-name>|TEAM" — team is the last segment.
+        box_team = bkey.split('|')[-1] if '|' in bkey else ''
         if box_team in AAA_TEAMS:
             continue
         total_outs += box.get('outs', 0)
