@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-05-21 12:31",
+  "generatedAt": "2026-05-21 16:23",
   "totalPitches": 219142,
   "totalPitchers": 613,
   "totalHitters": 515,
@@ -439,7 +439,7 @@
     "firstPitchSwingPct": 0.31,
     "avgFbDist": 312.6777,
     "avgHrDist": 392.0067,
-    "sprintSpeed": 27.1714,
+    "sprintSpeed": 27.1772,
     "runValue": 0.8405,
     "xRunValue": 0.5362,
     "rv100": -0.1495,
