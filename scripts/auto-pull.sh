@@ -11,10 +11,12 @@ cd "$REPO_DIR" || exit 1
 
 while true; do
   git fetch origin main --quiet 2>/dev/null
-  LOCAL=$(git rev-parse HEAD)
-  REMOTE=$(git rev-parse origin/main)
 
-  if [ "$LOCAL" != "$REMOTE" ]; then
+  # Only pull when origin/main has commits we don't have. Comparing hashes
+  # directly (the previous check) treats local-ahead and remote-ahead the
+  # same, so unpushed local commits made every cycle a no-op pull that still
+  # touched the working tree via --autostash.
+  if [ "$(git rev-list HEAD..origin/main --count)" -gt 0 ]; then
     echo "[$(date '+%H:%M:%S')] New commits detected, pulling..."
     if git pull --rebase --autostash origin main --quiet; then
       echo "[$(date '+%H:%M:%S')] Updated to $(git rev-parse --short HEAD)"
