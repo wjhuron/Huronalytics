@@ -59,6 +59,7 @@ CSW_DESC = {'Called Strike', 'Swinging Strike'}
 BANDWIDTHS = [0.30, 0.40, 0.50, 0.60, 0.75, 0.95, 1.20]
 QUALIFIED_MIN_PITCHES = 400   # vs-RHP pitches to enter the reliability pool
 PROJ_METRICS = ['whiff', 'chase', 'zcontact', 'csw']
+ARM_RANGE = (-10.0, 80.0)     # arm angles outside this are data errors
 
 
 # ── Small helpers ────────────────────────────────────────────────────────
@@ -67,6 +68,14 @@ def safe_float(x):
         return float(x)
     except (TypeError, ValueError):
         return None
+
+
+def arm_angle(p):
+    """Arm angle, or None if missing or an out-of-range data error."""
+    a = safe_float(p.get('ArmAngle'))
+    if a is None or not (ARM_RANGE[0] <= a <= ARM_RANGE[1]):
+        return None
+    return a
 
 
 def pearson(xs, ys):
@@ -97,7 +106,10 @@ def compute_norms(rhp_pitches):
     """Mean and SD of each feature over the RHP pitch universe (for z-scoring)."""
     norms = {}
     for f in ['velo', 'ivb', 'hb', 'ext', 'relx', 'relz', 'arm']:
-        vals = [safe_float(p.get(RAW[f])) for p in rhp_pitches]
+        if f == 'arm':
+            vals = [arm_angle(p) for p in rhp_pitches]
+        else:
+            vals = [safe_float(p.get(RAW[f])) for p in rhp_pitches]
         vals = [v for v in vals if v is not None]
         m = sum(vals) / len(vals)
         sd = math.sqrt(sum((v - m) ** 2 for v in vals) / len(vals))
@@ -114,7 +126,7 @@ def get_z(p, norms):
             return None
         m, sd = norms[f]
         z[f] = (v - m) / sd if sd > 0 else 0.0
-    a = safe_float(p.get('ArmAngle'))
+    a = arm_angle(p)
     if a is None:
         z['arm'] = None
     else:
@@ -130,7 +142,10 @@ def elder_centroids(elder_pitches, norms):
         grp = [p for p in elder_pitches if p.get('Pitch Type') == pt]
         raw = {}
         for f in ['velo', 'ivb', 'hb', 'ext', 'relx', 'relz', 'arm', 'spin']:
-            vals = [safe_float(p.get(RAW[f])) for p in grp]
+            if f == 'arm':
+                vals = [arm_angle(p) for p in grp]
+            else:
+                vals = [safe_float(p.get(RAW[f])) for p in grp]
             vals = [v for v in vals if v is not None]
             raw[f] = (sum(vals) / len(vals)) if vals else None
         z = {}
