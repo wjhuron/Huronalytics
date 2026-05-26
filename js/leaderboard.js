@@ -345,11 +345,49 @@ const Leaderboard = {
 
     const sortKey = col.sortKey || col.key;
 
+    // For numeric columns that carry a percentile, infer whether the stat is
+    // "lower is better" (SIERA, ERA, BB% for hitters, etc.) from the sample
+    // covariance between raw value and `_pctl`. The pipeline always encodes
+    // percentile so higher = better, so a negative covariance means low raw
+    // values pair with high pctls. We use this to set the default first-click
+    // sort direction so the BEST players land at the top regardless of which
+    // way the underlying scale runs. Same column clicked again toggles, as
+    // before. Non-percentile columns keep the existing high-to-low default.
+    // Cheap: two passes over the already-in-memory data (~ms on 1500 rows),
+    // and adapts automatically if a stat's direction ever flips per context
+    // (e.g. K% is good for pitchers, bad for hitters — same key, different
+    // table, correct direction inferred from the data on hand).
+    let lowerIsBetter = false;
+    if (col.sortType === 'numeric' && !col.noPercentile) {
+      const pctlKey = col.key + '_pctl';
+      let sumR = 0, sumP = 0, n = 0;
+      for (let r = 0; r < data.length; r++) {
+        const rv = data[r][sortKey];
+        const pv = data[r][pctlKey];
+        if (rv != null && pv != null) { sumR += rv; sumP += pv; n++; }
+      }
+      if (n >= 5) {
+        const meanR = sumR / n;
+        const meanP = sumP / n;
+        let cov = 0;
+        for (let r = 0; r < data.length; r++) {
+          const rv = data[r][sortKey];
+          const pv = data[r][pctlKey];
+          if (rv != null && pv != null) cov += (rv - meanR) * (pv - meanP);
+        }
+        lowerIsBetter = cov < 0;
+      }
+    }
+
     if (this.currentSort.key === columnKey) {
       this.currentSort.dir = this.currentSort.dir === 'desc' ? 'asc' : 'desc';
     } else {
       this.currentSort.key = columnKey;
-      this.currentSort.dir = col.sortType === 'string' ? 'asc' : 'desc';
+      if (col.sortType === 'string') {
+        this.currentSort.dir = 'asc';
+      } else {
+        this.currentSort.dir = lowerIsBetter ? 'asc' : 'desc';
+      }
     }
 
     const dir = this.currentSort.dir === 'asc' ? 1 : -1;
