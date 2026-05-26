@@ -28,12 +28,12 @@ var PlayerPage = {
 
   HITTING_STATS: [
     // Quality summary — headlines first
-    { key: 'hitterPlus',   label: 'Hitter+',     format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'hitterPlus',   label: 'Hitter+',     format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'xWRCplus',     label: 'xWRC+',       format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
     // Hitter+ components (weights: BB+ 65%, CT+ 28%, SD+ 7%)
-    { key: 'bbPlus',       label: 'BB+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'ctPlus',       label: 'CT+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
-    { key: 'sdPlus',       label: 'SD+',         format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'bbPlus',       label: 'BB+',         format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'ctPlus',       label: 'CT+',         format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'sdPlus',       label: 'SD+',         format: function(v) { return v != null ? Math.round(v) : '—'; } },
     // Expected outcomes (wOBA family)
     { key: 'xwOBA',        label: 'xwOBA',       format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
     { key: 'xwOBAcon',     label: 'xwOBAcon',    format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
@@ -75,7 +75,7 @@ var PlayerPage = {
     { key: 'wOBA', label: 'wOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; }, rocHide: true },
-    { key: 'hitterPlus', label: 'Hitter+', format: function(v) { return v != null ? Math.round(v) : '—'; }, rocHide: true },
+    { key: 'hitterPlus', label: 'Hitter+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbToK', label: 'BB/K', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
