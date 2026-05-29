@@ -433,6 +433,13 @@ const Leaderboard = {
 
     // Stats that should recalculate when contextual filters are active.
     // Everything else (pitch metrics, plate discipline) keeps precomputed values.
+    // Note (era/fip/xFIP/siera): the precomputed (no-filter) values come from
+    // the pipeline as the QUALIFIED-POOL MEDIAN, which exactly aligns with the
+    // percentile pool. The dynamic-filter branch below falls back to an
+    // IP-weighted MEAN of the FILTERED subset, since (a) percentiles don't
+    // re-rank against the filtered pool either way, and (b) computing a
+    // median over an arbitrary filtered slice has no canonical reference.
+    // Accepted small visual jump when toggling a filter on/off.
     var DYNAMIC_STATS = { runValue:1, rv100:1, xRunValue:1, xRv100:1, xBA:1, xSLG:1, wOBA:1, xwOBA:1, xwOBAcon:1, xwOBAsp:1, bbPlus:1,
                           era:1, fip:1, xFIP:1, siera:1,
                           avg:1, obp:1, slg:1, ops:1, iso:1 };

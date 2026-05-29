@@ -3526,6 +3526,42 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     print("  Percentiles computed and inversions applied.")
 
+    # ── Qualified-pool re-anchor for pitcher rate-stat league averages ──
+    # ERA / FIP / xFIP / SIERA were previously stored as raw-league-total
+    # rates (e.g. ERA = total_ER * 9 / total_IP across every MLB pitcher).
+    # That matches the conventional FanGraphs "season league ERA" number,
+    # but it's dragged ~0.5–0.7 ERA higher than the qualified-pool median
+    # by garbage-time outings (position players pitching, call-up rookies
+    # getting torched) that never accrue enough IP to enter the pool that
+    # defines the percentile distribution. Net effect: a pitcher could
+    # sit comfortably below the displayed "league avg" yet still land
+    # below the 50th percentile, because the percentile compared against
+    # the qualified pool (median 3.42) while the displayed avg reflected
+    # the raw rate (4.08) — the same broken intuition the "+" stat
+    # re-anchor fixed for bb/sd/ct/hitterPlus.
+    #
+    # Fix: re-anchor the displayed league avg to the MEDIAN of the same
+    # qualified MLB pool that compute_percentile_ranks_with_aaa builds
+    # the distribution from (so "value < displayed avg ⇔ above the 50th
+    # percentile" holds exactly). MEDIAN not MEAN to match the "+"-stat
+    # convention and because the percentile is a rank statistic — the
+    # rank's anchor point is by definition the median, not the mean.
+    # Scoped to the four advanced rate stats (ERA/FIP/xFIP/SIERA) where
+    # the gap is most visible; other rate stats (K%, BB%, etc.) can be
+    # added the same way if the same gap shows up there.
+    import statistics as _stats
+    _qual_mlb_pit = [r for r in pitcher_leaderboard
+                     if not r.get('_isROC') and not r.get('_isCombined')
+                     and _pitcher_qualified_for_pctl(r)]
+    _pit_avg_pre = {k: pitcher_league_avgs.get(k) for k in ('era', 'fip', 'xFIP', 'siera')}
+    for _stat in ('era', 'fip', 'xFIP', 'siera'):
+        _vals = [float(r[_stat]) for r in _qual_mlb_pit if r.get(_stat) is not None]
+        if len(_vals) >= 5:
+            pitcher_league_avgs[_stat] = round(_stats.median(_vals), 2)
+    print(f"  Pitcher rate-stat league avgs re-anchored (raw league rate -> qualified-pool median, n={len(_qual_mlb_pit)}):")
+    for _k in ('era', 'fip', 'xFIP', 'siera'):
+        print(f"    {_k:6s}: {_pit_avg_pre[_k]} -> {pitcher_league_avgs.get(_k)}")
+
     # runValue/rv100/xRunValue/xRv100 are kept at full (float) precision in the
     # JSON output. Display rounding (1 decimal in the leaderboard, 2 decimals on
     # the player page) happens in the JS layer at render time via toFixed().
