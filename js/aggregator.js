@@ -712,28 +712,18 @@ const Aggregator = {
       r._inPool = mtRow && r !== mtRow ? false : true;
     }
     // Set bipQual flag BEFORE percentiles so BIP stats can use it
-    const BIP_STATS = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
     for (let bqi = 0; bqi < rows.length; bqi++) {
       rows[bqi].bipQual = (rows[bqi].nBip || 0) >= QUAL.MIN_BIP_PCTL;
     }
-    // Use _qualified flag for percentile pool: only qualified pitchers get percentiles
-    // BIP-dependent stats additionally require bipQual (≥20 BIP)
+    // Pool: ALL MLB pitchers (no qualifier). Matches the pipeline's
+    // post-2026-05-29 design where displayed league avg and percentile pool
+    // are the same population, so "below league avg → above 50th pctl"
+    // reads correctly. Qualification (and bipQual for BIP-dependent stats)
+    // is a render-only gate — non-qualified rows still get a percentile
+    // rank stored for tooltip + sort, but the leaderboard suppresses cell
+    // coloring on them.
     for (let si = 0; si < STAT_KEYS.length; si++) {
-      if (BIP_STATS[STAT_KEYS[si]]) {
-        // Temporarily narrow _qualified to also require bipQual
-        const savedQual = [];
-        for (let sq = 0; sq < rows.length; sq++) {
-          savedQual.push(rows[sq]._qualified);
-          rows[sq]._qualified = rows[sq]._qualified && rows[sq].bipQual;
-        }
-        this._computePercentilesQualified(rows, STAT_KEYS[si]);
-        // Restore original _qualified
-        for (let rq = 0; rq < rows.length; rq++) {
-          rows[rq]._qualified = savedQual[rq];
-        }
-      } else {
-        this._computePercentilesQualified(rows, STAT_KEYS[si]);
-      }
+      this._computePercentiles(rows, STAT_KEYS[si]);
     }
     // Invert where lower is better
     for (let ri = 0; ri < rows.length; ri++) {
@@ -1633,19 +1623,15 @@ const Aggregator = {
       r._qualified = _tg > 0 && _pa >= _tg * Utils.hitterPaPerGame(Aggregator._isROCTeam(r.team));
     }
 
-    // Compute percentiles. Rate stats use the qualified pool only — short-
-    // sample hitters get an interpolated rank for tooltip display but do not
-    // pollute the distribution. Counting stats (hr, sb) keep the unfiltered
-    // pool because their values do not need a sample-size gate to be
-    // meaningful (a 5-PA hitter has 0 HR, naturally bottom of the pool).
-    const HITTER_COUNTING_PCTL = { hr: true, sb: true };
+    // Compute percentiles. Pool: ALL MLB hitters (no qualifier) — matches
+    // the displayed-league-avg pool so "below league avg → above 50th
+    // pctl" reads correctly. Qualification is enforced as a render-only
+    // gate (non-qualified rows store a rank for tooltip but get no
+    // coloring). Counting stats (hr, sb) were already using the full
+    // pool — unchanged.
     const self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
-      if (HITTER_COUNTING_PCTL[key]) {
-        self._computePercentiles(rows, key);
-      } else {
-        self._computePercentilesQualified(rows, key);
-      }
+      self._computePercentiles(rows, key);
     });
 
     // Set bipQual flag for each hitter

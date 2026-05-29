@@ -2773,49 +2773,38 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs['hitterPlus'] = 100.0
     print(f"  Hitter+ computed (BB+/SD+/CT+ composite, weights 65/7/28).")
 
-    # ── Qualified-pool re-anchor (all four "+" indices) ──────────────
-    # Before this pass, 100 was anchored to non-qualified means: bb/sd/ct
-    # to a broad all-MLB / eligibility-floor pool, hitterPlus to the
-    # qualified MEAN of a right-skewed composite. Net effect: a value of
-    # 100 landed at the ~41st–54th percentile of the qualified pool, not
-    # the 50th — so "100 = league average" actually read as below-typical
-    # for a regular (the Mead/Wood confusion). Re-anchor 100 to the
-    # qualified-pool MEDIAN of the SAME pool the leaderboard percentiles
-    # rank against (3.1 PA × team games, MLB), so 100 == exactly the 50th
-    # percentile. This is a pure monotone transform: ranks/percentiles are
-    # unchanged, only the displayed reference point moves. bb/sd/ct are
-    # ratio indices → rescale multiplicatively (×100/median). hitterPlus
-    # is an additive z-index (100 + 40·z) → recenter additively
-    # (+100−median) to preserve its SD≈40 spread. The bbPlus factor is
-    # published in metadata because the frontend recomputes bbPlus under
-    # filters and must mirror the same scale; sd/ct/hitterPlus are
-    # server-precomputed pass-through everywhere.
-    def _qual_median(_stat):
-        _vals = []
+    # ── All-MLB-mean re-anchor for the four "+" indices ──────────────
+    # Anchor 100 to the PA-weighted MEAN of ALL MLB hitters (matches the
+    # FanGraphs/Savant convention used for wRC+ and the rest of the
+    # pipeline's "league average" numbers: every player contributes to
+    # the mean, qualification only gates percentile coloring at render).
+    # bb/sd/ct are ratio indices → rescale multiplicatively (×100/mean).
+    # hitterPlus is an additive z-index (100 + 40·z) → recenter additively
+    # (+100−mean) to preserve its SD spread. The bbPlus factor is published
+    # in metadata because the frontend recomputes bbPlus under filters and
+    # must mirror the same scale; sd/ct/hitterPlus are server-precomputed
+    # pass-through. No medians used — Wally's rule.
+    def _all_mlb_pa_weighted_mean(_stat):
+        _pairs = []
         for _r in hitter_leaderboard:
             if _r.get('_isROC') or _r.get('_isCombined'):
                 continue
             _v = _r.get(_stat)
             if _v is None:
                 continue
-            _tg = team_games_played.get(_r.get('team'))
-            if _tg is None and team_games_played:
-                _tg = max(team_games_played.values())
-            if not _tg:
-                continue
-            if _r.get('pa', 0) >= _hitter_pa_per_game(bool(_r.get('_isROC'))) * _tg:
-                _vals.append(_v)
-        if not _vals:
+            _w = _r.get('pa') or 0
+            if _w > 0:
+                _pairs.append((_v, _w))
+        if not _pairs:
             return None
-        _vals.sort()
-        _n = len(_vals)
-        return _vals[_n // 2] if _n % 2 else (_vals[_n // 2 - 1] + _vals[_n // 2]) / 2.0
+        _wsum = sum(_w for _, _w in _pairs)
+        return sum(_v * _w for _v, _w in _pairs) / _wsum if _wsum > 0 else None
 
     plus_reanchor = {}
     for _stat in ('bbPlus', 'sdPlus', 'ctPlus'):
-        _med = _qual_median(_stat)
-        if _med and abs(_med) > 1e-9:
-            _f = 100.0 / _med
+        _mean = _all_mlb_pa_weighted_mean(_stat)
+        if _mean and abs(_mean) > 1e-9:
+            _f = 100.0 / _mean
             plus_reanchor[_stat] = round(_f, 6)
             for _r in hitter_leaderboard:
                 if _r.get(_stat) is not None:
@@ -2826,19 +2815,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             if _sd_meta:
                 _sd_meta['mean'] = round(_sd_meta['mean'] * _f, 3)
                 _sd_meta['sd'] = round(_sd_meta['sd'] * _f, 3)
-    _med_h = _qual_median('hitterPlus')
-    if _med_h is not None:
-        _shift = 100.0 - _med_h
+    _mean_h = _all_mlb_pa_weighted_mean('hitterPlus')
+    if _mean_h is not None:
+        _shift = 100.0 - _mean_h
         plus_reanchor['hitterPlusShift'] = round(_shift, 4)
         for _r in hitter_leaderboard:
             if _r.get('hitterPlus') is not None:
                 _r['hitterPlus'] = round(_r['hitterPlus'] + _shift, 1)
-    # 100 is still the displayed reference (now = qualified median).
+    # 100 = PA-weighted mean of ALL MLB hitters (FG/Savant convention).
     hitter_league_avgs['bbPlus'] = 100.0
     hitter_league_avgs['sdPlus'] = 100.0
     hitter_league_avgs['ctPlus'] = 100.0
     hitter_league_avgs['hitterPlus'] = 100.0
-    print(f"  Plus re-anchor (qualified-pool median -> 100): {plus_reanchor}")
+    print(f"  Plus re-anchor (all-MLB PA-weighted mean -> 100): {plus_reanchor}")
 
     # --- Metadata ---
     metadata = {
@@ -3450,23 +3439,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc, count_key=ck)
 
     # 2. Pitcher percentiles (all stats including boxscore-derived).
-    # All entries in PITCHER_ALL_PCTL are rate / shape / outcome metrics;
-    # there are no counting stats here, so every stat uses the qualified pool.
+    # Pool: ALL MLB pitchers (no qualifier). This matches the convention used
+    # for the displayed league average (PA/IP-weighted mean over every MLB
+    # pitcher) so "ERA below league avg" reads as "above the 50th percentile"
+    # for the reader. Qualification is enforced as a render-only gate: every
+    # row still gets a percentile RANK stored (for tooltip + sort), but the
+    # leaderboard suppresses cell coloring on non-qualified rows. Matches
+    # FanGraphs/Savant — they percentile-rank against the broader pool and
+    # only display percentile chips for players who clear sample minimums.
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
                         + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera', 'locPlus'])
     for stat in PITCHER_ALL_PCTL:
-        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0,
-                                          qualifier_fn=_pitcher_qualified_for_pctl)
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 
     # 3. Hitter percentiles (all stats including boxscore-derived).
-    # Rate stats use the qualified pool; counting stats (hr, sb) keep the
-    # full pool so non-qualified hitters don't artificially appear at top.
+    # Same pool change as pitchers: all MLB hitters define the distribution,
+    # qualification is a render-only gate for coloring. Counting stats
+    # (hr, sb) were already using the full pool — unchanged.
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        if stat in HITTER_COUNTING_PCTL:
-            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
-        else:
-            compute_percentile_ranks_with_aaa(hitter_leaderboard, stat,
-                                              qualifier_fn=_hitter_qualified_for_pctl)
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
 
     # 4. Hitter pitch-type percentiles (grouped by pitch type) — min 25 pitches
     # of that type; pitch-type-vs-hitter has no PA-style qualifier, just the
@@ -3525,42 +3516,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row[pctl_key] = 100 - row[pctl_key]
 
     print("  Percentiles computed and inversions applied.")
-
-    # ── Qualified-pool re-anchor for pitcher rate-stat league averages ──
-    # ERA / FIP / xFIP / SIERA were previously stored as raw-league-total
-    # rates (e.g. ERA = total_ER * 9 / total_IP across every MLB pitcher).
-    # That matches the conventional FanGraphs "season league ERA" number,
-    # but it's dragged ~0.5–0.7 ERA higher than the qualified-pool median
-    # by garbage-time outings (position players pitching, call-up rookies
-    # getting torched) that never accrue enough IP to enter the pool that
-    # defines the percentile distribution. Net effect: a pitcher could
-    # sit comfortably below the displayed "league avg" yet still land
-    # below the 50th percentile, because the percentile compared against
-    # the qualified pool (median 3.42) while the displayed avg reflected
-    # the raw rate (4.08) — the same broken intuition the "+" stat
-    # re-anchor fixed for bb/sd/ct/hitterPlus.
-    #
-    # Fix: re-anchor the displayed league avg to the MEDIAN of the same
-    # qualified MLB pool that compute_percentile_ranks_with_aaa builds
-    # the distribution from (so "value < displayed avg ⇔ above the 50th
-    # percentile" holds exactly). MEDIAN not MEAN to match the "+"-stat
-    # convention and because the percentile is a rank statistic — the
-    # rank's anchor point is by definition the median, not the mean.
-    # Scoped to the four advanced rate stats (ERA/FIP/xFIP/SIERA) where
-    # the gap is most visible; other rate stats (K%, BB%, etc.) can be
-    # added the same way if the same gap shows up there.
-    import statistics as _stats
-    _qual_mlb_pit = [r for r in pitcher_leaderboard
-                     if not r.get('_isROC') and not r.get('_isCombined')
-                     and _pitcher_qualified_for_pctl(r)]
-    _pit_avg_pre = {k: pitcher_league_avgs.get(k) for k in ('era', 'fip', 'xFIP', 'siera')}
-    for _stat in ('era', 'fip', 'xFIP', 'siera'):
-        _vals = [float(r[_stat]) for r in _qual_mlb_pit if r.get(_stat) is not None]
-        if len(_vals) >= 5:
-            pitcher_league_avgs[_stat] = round(_stats.median(_vals), 2)
-    print(f"  Pitcher rate-stat league avgs re-anchored (raw league rate -> qualified-pool median, n={len(_qual_mlb_pit)}):")
-    for _k in ('era', 'fip', 'xFIP', 'siera'):
-        print(f"    {_k:6s}: {_pit_avg_pre[_k]} -> {pitcher_league_avgs.get(_k)}")
 
     # runValue/rv100/xRunValue/xRv100 are kept at full (float) precision in the
     # JSON output. Display rounding (1 decimal in the leaderboard, 2 decimals on

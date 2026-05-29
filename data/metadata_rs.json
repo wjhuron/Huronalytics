@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-05-29 13:22",
+  "generatedAt": "2026-05-29 13:49",
   "totalPitches": 247580,
   "totalPitchers": 635,
   "totalHitters": 531,
@@ -392,11 +392,11 @@
     "xwOBAcon": 0.3657,
     "count": 635,
     "locPlus": 100.0,
-    "era": 3.42,
+    "era": 4.08,
     "hr9": 1.06,
-    "fip": 3.63,
-    "xFIP": 3.93,
-    "siera": 3.7
+    "fip": 4.05,
+    "xFIP": 4.05,
+    "siera": 3.94
   },
   "hitterLeagueAverages": {
     "babip": 0.287,
@@ -12860,16 +12860,16 @@
   },
   "hitterPlusStandardization": {
     "bbPlus": {
-      "mean": 101.665,
-      "sd": 11.663
+      "mean": 101.353,
+      "sd": 11.627
     },
     "sdPlus": {
-      "mean": 99.039,
-      "sd": 13.421
+      "mean": 100.763,
+      "sd": 13.654
     },
     "ctPlus": {
-      "mean": 99.771,
-      "sd": 6.483
+      "mean": 100.703,
+      "sd": 6.544
     },
     "weights": {
       "bb": 0.65,
@@ -12880,10 +12880,10 @@
     "nQualified": 165
   },
   "plusReanchor": {
-    "bbPlus": 0.983284,
-    "sdPlus": 0.97704,
-    "ctPlus": 0.985707,
-    "hitterPlusShift": 1.8
+    "bbPlus": 0.980269,
+    "sdPlus": 0.994049,
+    "ctPlus": 0.994915,
+    "hitterPlusShift": 3.2915
   },
   "xwOBA3DTable": {
     "ev0|la0|pull|R": {
