@@ -73,9 +73,13 @@ TEAM_NAME_TO_ABBREV = {
     'Texas Rangers':'TEX','Toronto Blue Jays':'TOR','Washington Nationals':'WSH',
 }
 
+# Pitch colors. The light hues (sinker, slider-gray, splitter-teal) are toned
+# DOWN from pure Statcast brights so they're readable on the warm cream cards
+# everywhere — the old #FFD700 sinker / #DDDDDD slider washed out. SI is a warm
+# gold (not yellow/mustard); the dark hues keep their saturated brand values.
 PITCH_COLORS = {
-    'FF':'#4488FF','SI':'#FFD700','FC':'#FFA500','SL':'#DDDDDD',
-    'ST':'#FF1493','CU':'#E03030','SV':'#32CD32','CH':'#CC66EE','FS':'#40E0D0','KN':'#AAAAAA',
+    'FF':'#4488FF','SI':'#E0A81E','FC':'#FFA500','SL':'#9E9E9E',
+    'ST':'#FF1493','CU':'#E03030','SV':'#32CD32','CH':'#CC66EE','FS':'#35BCAF','KN':'#9A9A9A',
     'EP':'#888888'
 }
 PITCH_NAMES = {
@@ -400,19 +404,6 @@ def _darken(hexc, factor):
     g = int(int(hexc[3:5], 16) * factor)
     b = int(int(hexc[5:7], 16) * factor)
     return f'#{max(0,min(255,r)):02x}{max(0,min(255,g)):02x}{max(0,min(255,b)):02x}'
-
-def _loc_pop(hexc):
-    """Darken only HIGH-luminance pitch colors (yellow sinker, light-gray
-    slider, turquoise splitter, light orange) so they're readable on the warm
-    cream LOCATION plots — they otherwise wash out. Already-dark colors (blue,
-    red, pink, green, purple) pass through unchanged. Scoped to the location
-    plots; the movement plot / table / legend keep the bright brand colors."""
-    r = int(hexc[1:3], 16); g = int(hexc[3:5], 16); b = int(hexc[5:7], 16)
-    lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0   # perceptual-ish
-    if lum > 0.60:
-        f = 0.55 / lum                                   # pull down to ~0.55
-        r, g, b = int(r * f), int(g * f), int(b * f)
-    return f'#{r:02x}{g:02x}{b:02x}'
 
 def _rgba(hexc, a):
     """#rrggbb -> (r,g,b,a) float tuple for independent fill/edge alphas."""
@@ -1158,7 +1149,7 @@ def render_card(config, pitches, output_file):
             _x0 = 0.035; _row_h = 0.072; _y_top = 0.965
             _cy = _y_top - 0.020
             for _pt, _cnt in _mix:
-                _col = _loc_pop(PITCH_COLORS.get(_pt, TEXT_SECONDARY))  # match popped ellipse
+                _col = PITCH_COLORS.get(_pt, TEXT_SECONDARY)
                 ax.add_patch(Rectangle((_x0, _cy - _row_h * 0.34), 0.095, _row_h * 0.68,
                                        transform=ax.transAxes, facecolor=_col,
                                        edgecolor='none', zorder=6))
@@ -1186,10 +1177,10 @@ def render_card(config, pitches, output_file):
                     mx, my = np.mean(xs), np.mean(ys)
                     e_alpha = 0.42 if is_season else 0.28
                     e_lw = 2.0 if is_season else 1.3
-                    _pc = _loc_pop(PITCH_COLORS[pt])
-                    # Popped fill (faint) + a bold darker edge so the ellipse
-                    # is defined even when the fill is light. Separate fill/edge
-                    # alphas, so no single `alpha=`.
+                    _pc = PITCH_COLORS[pt]
+                    # Faint fill + a bold darker edge so the ellipse is defined
+                    # even when the fill is light. Separate fill/edge alphas, so
+                    # no single `alpha=`.
                     ax.add_patch(Ellipse(
                         (mx, my),
                         2 * 1.0 * np.sqrt(vals[1]), 2 * 1.0 * np.sqrt(vals[0]),
@@ -1205,7 +1196,7 @@ def render_card(config, pitches, output_file):
         # Pitch dots and W/B annotations
         for pt in PITCH_ORDER:
             if pt not in locations[hand]: continue
-            color = _loc_pop(PITCH_COLORS[pt])   # popped so light colors read
+            color = PITCH_COLORS[pt]
             for px_val, pz_val, desc, barrel_flag in locations[hand][pt]:
                 if desc == 'Swinging Strike':
                     ax.text(px_val, pz_val, 'W', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
