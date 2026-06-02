@@ -394,6 +394,30 @@ def luminance(hc):
 def badge_text_color(hc):
     return 'black' if luminance(hc) > 0.25 else 'white'
 
+def _darken(hexc, factor):
+    """Multiply an #rrggbb color's channels by factor (<1 = darker)."""
+    r = int(int(hexc[1:3], 16) * factor)
+    g = int(int(hexc[3:5], 16) * factor)
+    b = int(int(hexc[5:7], 16) * factor)
+    return f'#{max(0,min(255,r)):02x}{max(0,min(255,g)):02x}{max(0,min(255,b)):02x}'
+
+def _loc_pop(hexc):
+    """Darken only HIGH-luminance pitch colors (yellow sinker, light-gray
+    slider, turquoise splitter, light orange) so they're readable on the warm
+    cream LOCATION plots — they otherwise wash out. Already-dark colors (blue,
+    red, pink, green, purple) pass through unchanged. Scoped to the location
+    plots; the movement plot / table / legend keep the bright brand colors."""
+    r = int(hexc[1:3], 16); g = int(hexc[3:5], 16); b = int(hexc[5:7], 16)
+    lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0   # perceptual-ish
+    if lum > 0.60:
+        f = 0.55 / lum                                   # pull down to ~0.55
+        r, g, b = int(r * f), int(g * f), int(b * f)
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+def _rgba(hexc, a):
+    """#rrggbb -> (r,g,b,a) float tuple for independent fill/edge alphas."""
+    return (int(hexc[1:3],16)/255.0, int(hexc[3:5],16)/255.0, int(hexc[5:7],16)/255.0, a)
+
 def is_barrel(ev, la):
     """Statcast barrel definition from baseballr code_barrel (EV >= 98 per MLB glossary)."""
     if ev is None or la is None:
@@ -1134,7 +1158,7 @@ def render_card(config, pitches, output_file):
             _x0 = 0.035; _row_h = 0.072; _y_top = 0.965
             _cy = _y_top - 0.020
             for _pt, _cnt in _mix:
-                _col = PITCH_COLORS.get(_pt, TEXT_SECONDARY)
+                _col = _loc_pop(PITCH_COLORS.get(_pt, TEXT_SECONDARY))  # match popped ellipse
                 ax.add_patch(Rectangle((_x0, _cy - _row_h * 0.34), 0.095, _row_h * 0.68,
                                        transform=ax.transAxes, facecolor=_col,
                                        edgecolor='none', zorder=6))
@@ -1161,28 +1185,34 @@ def render_card(config, pitches, output_file):
                     angle = np.degrees(np.arctan2(vecs[1, 1], vecs[0, 1]))
                     mx, my = np.mean(xs), np.mean(ys)
                     e_alpha = 0.42 if is_season else 0.28
-                    e_lw = 1.6 if is_season else 1.1
+                    e_lw = 2.0 if is_season else 1.3
+                    _pc = _loc_pop(PITCH_COLORS[pt])
+                    # Popped fill (faint) + a bold darker edge so the ellipse
+                    # is defined even when the fill is light. Separate fill/edge
+                    # alphas, so no single `alpha=`.
                     ax.add_patch(Ellipse(
                         (mx, my),
                         2 * 1.0 * np.sqrt(vals[1]), 2 * 1.0 * np.sqrt(vals[0]),
-                        angle=angle, fill=True, facecolor=PITCH_COLORS[pt],
-                        edgecolor=PITCH_COLORS[pt], linewidth=e_lw, alpha=e_alpha, zorder=1
+                        angle=angle, fill=True,
+                        facecolor=_rgba(_pc, e_alpha),
+                        edgecolor=_rgba(_darken(_pc, 0.6), 0.9),
+                        linewidth=e_lw, zorder=1
                     ))
                     # Season view: center dot at mean
                     if is_season:
-                        ax.scatter([mx], [my], c=PITCH_COLORS[pt], s=30, alpha=0.95,
-                                   edgecolors=TEXT_PRIMARY, linewidths=0.5, zorder=4)
+                        ax.scatter([mx], [my], c=_pc, s=32, alpha=1.0,
+                                   edgecolors=TEXT_PRIMARY, linewidths=0.6, zorder=4)
         # Pitch dots and W/B annotations
         for pt in PITCH_ORDER:
             if pt not in locations[hand]: continue
-            color = PITCH_COLORS[pt]
+            color = _loc_pop(PITCH_COLORS[pt])   # popped so light colors read
             for px_val, pz_val, desc, barrel_flag in locations[hand][pt]:
                 if desc == 'Swinging Strike':
                     ax.text(px_val, pz_val, 'W', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
                 elif barrel_flag:
                     ax.text(px_val, pz_val, 'B', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
                 elif not is_season:
-                    ax.scatter([px_val], [pz_val], c=color, s=55, alpha=1.0, edgecolors='none', zorder=3)
+                    ax.scatter([px_val], [pz_val], c=[color], s=55, alpha=1.0, edgecolors='none', zorder=3)
 
     ax_loc_l = fig.add_axes([LOC_L_X, LOC_BOTTOM, LOC_W, LOC_HEIGHT])
     ax_loc_r = fig.add_axes([LOC_R_X, LOC_BOTTOM, LOC_W, LOC_HEIGHT])
