@@ -720,7 +720,11 @@ def _percentile_color(pctl):
     # Vivid, saturated endpoints — these read bright on the warm cream bg.
     blue_dark  = (0.05, 0.36, 0.98)   # vivid blue (worst)
     blue_mid   = (0.36, 0.62, 0.98)
-    neutral    = (0.62, 0.62, 0.62)
+    # Neutral (~50th pctl): a darker, faintly-cool slate. The old light gray
+    # (0.62) washed out against the warm cream bg, so average bubbles read as
+    # muddy. Darker = more contrast; the whisper of cool separates it from the
+    # warm paper without leaning blue enough to imply "below average".
+    neutral    = (0.52, 0.54, 0.57)
     red_mid    = (0.98, 0.42, 0.38)
     red_dark   = (0.93, 0.08, 0.08)   # vivid red (best)
     def lerp(a, b, t):
@@ -1078,7 +1082,7 @@ def render_card(config, pitches, output_file):
                 angle=np.degrees(np.arctan2(vecs[1,1], vecs[0,1])), fill=False, edgecolor=color, linewidth=1.2, linestyle='--', alpha=0.7))
 
     legend_handles = [mpatches.Patch(color=PITCH_COLORS[pt], label=f'{pt} - {PITCH_NAMES[pt]}') for pt in sorted_types]
-    leg = ax_plot.legend(handles=legend_handles, loc='upper center', bbox_to_anchor=(0.5,-0.09), ncol=min(len(sorted_types),4), fontsize=7.5, frameon=False, handlelength=1.2, columnspacing=1.2)
+    leg = ax_plot.legend(handles=legend_handles, loc='upper center', bbox_to_anchor=(0.5,-0.09), ncol=min(len(sorted_types),5), fontsize=7.5, frameon=False, handlelength=1.2, columnspacing=1.2)
     for t in leg.get_texts(): t.set_color(TEXT_SECONDARY)
     # Add movement plot annotations
     if exp_movement:
@@ -1537,7 +1541,7 @@ def main():
     team            = "WSH"
     start_date      = None    # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
-    filter_pitchers = "Griffin, Foster"                 # Semicolon-separated "Last, First" names, or "" for all
+    filter_pitchers = "Cavalli, Cade"                 # Semicolon-separated "Last, First" names, or "" for all
     game_pk         = ""                 # Optional game PK for live/in-progress games
     output_dir      = OUTPUT_DIR
 
