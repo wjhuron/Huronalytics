@@ -610,21 +610,31 @@ var PlayerPage = {
 
 
   _findPitcherByMlbId: function (mlbId, preferTeam) {
+    return this._findPlayerByMlbId(window.PITCHER_DATA || [], mlbId, preferTeam);
+  },
+
+  // MLB priority: multi-team aggregate (2TM/3TM) > preferTeam match > any MLB
+  // match. Multi-team players open on their combined row so the page shows the
+  // full MLB season, not just games from whichever team filter was active.
+  // ROC rows live outside that aggregate (2TM/3TM combines MLB stints only),
+  // so a click from a ROC team must land on the ROC row, and an MLB-context
+  // click must never fall back onto one.
+  _findPlayerByMlbId: function (rows, mlbId, preferTeam) {
     mlbId = parseInt(mlbId, 10);
-    var pitcherData = window.PITCHER_DATA || [];
-    // Priority: multi-team aggregate (2TM/3TM) > preferTeam match > any match.
-    // Multi-team players always open on their combined row so the page shows
-    // the full season, not just games from whichever team filter was active.
-    var multiTeam = null, preferred = null, fallback = null;
+    var rocTeams = (DataStore.metadata && DataStore.metadata.rocTeams) || [];
+    var preferROC = preferTeam && rocTeams.indexOf(preferTeam) !== -1;
+    var multiTeam = null, preferred = null, fallback = null, rocFallback = null;
     var MULTI_RE = /^\d+TM$/;
-    for (var i = 0; i < pitcherData.length; i++) {
-      if (pitcherData[i].mlbId !== mlbId) continue;
-      var t = pitcherData[i].team;
-      if (MULTI_RE.test(t)) multiTeam = pitcherData[i];
-      else if (preferTeam && t === preferTeam) preferred = pitcherData[i];
-      else if (!fallback) fallback = pitcherData[i];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].mlbId !== mlbId) continue;
+      var t = rows[i].team;
+      if (MULTI_RE.test(t)) multiTeam = rows[i];
+      else if (preferTeam && t === preferTeam) preferred = rows[i];
+      else if (rocTeams.indexOf(t) !== -1) { if (!rocFallback) rocFallback = rows[i]; }
+      else if (!fallback) fallback = rows[i];
     }
-    return multiTeam || preferred || fallback;
+    if (preferROC) return preferred || rocFallback || multiTeam || fallback;
+    return multiTeam || preferred || fallback || rocFallback;
   },
 
   _getPitchRows: function (pitcherName, team) {
@@ -2719,20 +2729,7 @@ var PlayerPage = {
 
 
   _findHitterByMlbId: function (mlbId, preferTeam) {
-    mlbId = parseInt(mlbId, 10);
-    var hitterData = window.HITTER_DATA || [];
-    // Priority: multi-team aggregate (2TM/3TM) > preferTeam match > any match.
-    // Multi-team hitters always open on their combined row.
-    var multiTeam = null, preferred = null, fallback = null;
-    var MULTI_RE = /^\d+TM$/;
-    for (var i = 0; i < hitterData.length; i++) {
-      if (hitterData[i].mlbId !== mlbId) continue;
-      var t = hitterData[i].team;
-      if (MULTI_RE.test(t)) multiTeam = hitterData[i];
-      else if (preferTeam && t === preferTeam) preferred = hitterData[i];
-      else if (!fallback) fallback = hitterData[i];
-    }
-    return multiTeam || preferred || fallback;
+    return this._findPlayerByMlbId(window.HITTER_DATA || [], mlbId, preferTeam);
   },
 
 
