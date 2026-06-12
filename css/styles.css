@@ -266,6 +266,34 @@ header {
 #min-count { width: 80px; }
 .search-group input { width: 160px; }
 
+/* Player / Team view toggle */
+.view-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+.view-mode-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.view-mode-btn + .view-mode-btn {
+  border-left: 1px solid var(--border);
+}
+.view-mode-btn:hover { color: var(--accent); }
+.view-mode-btn.active {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Date range inputs */
 .date-range-inputs {
   display: flex;

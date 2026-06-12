@@ -409,11 +409,41 @@ const Aggregator = {
   },
 
 
+  // Build (and cache) pitcher SP/RP role map from pre-aggregated PITCHER_DATA.
+  _ensureRoleCache: function () {
+    if (this._roleCache) return this._roleCache;
+    this._roleCache = {};
+    const pd = window.PITCHER_DATA || [];
+    for (let i = 0; i < pd.length; i++) {
+      const rKey = pd[i].pitcher + '|' + pd[i].team;
+      const g = pd[i].g || 0, gs = pd[i].gs || 0;
+      this._roleCache[rKey] = g > 0 && (gs / g) > QUAL.SP_GS_RATIO ? 'SP' : 'RP';
+    }
+    return this._roleCache;
+  },
+
+  // Team mode: pitcher-attribute filters (throws / SP-RP role) must be applied
+  // to each micro row BEFORE rolling up into the team total, since the team row
+  // has no single hand or role of its own.
+  _teamModePitcherRowOk: function (filters, pitcherIdx, teamIdx, throws) {
+    if (filters.throws !== 'all' && throws !== filters.throws) return false;
+    if (filters.role && filters.role !== 'all') {
+      const lk = this.data.lookups;
+      const roleKey = lk.pitchers[pitcherIdx] + '|' + lk.teams[teamIdx];
+      if ((this._ensureRoleCache()[roleKey] || 'RP') !== filters.role) return false;
+    }
+    return true;
+  },
+
   /**
    * Group pitcherMicro rows by (pitcherIdx, teamIdx), applying date and hand filters.
    * Returns { groups, bipByPitcher } where groups maps "pitcherIdx|teamIdx" to
    * { pitcherIdx, teamIdx, throws, counts[] } and bipByPitcher maps pitcherIdx
    * to arrays of BIP records.
+   *
+   * Team mode (filters.viewMode === 'team'): groups by teamIdx alone, skipping
+   * combined 2TM/3TM micro rows (their counts duplicate the per-team rows) and
+   * applying the throws/role filters per micro row before accumulation.
    */
   _groupPitcherMicro: function (filters) {
     const d = this.data;
@@ -421,19 +451,33 @@ const Aggregator = {
     const micro = d.pitcherMicro;
     const validDates = this._getValidDateSet(filters);
     const vsHand = filters.vsHand || 'all';
+    const teamMode = filters.viewMode === 'team';
+    const teams = d.lookups.teams;
+
+    // Team mode: pitcherBip rows carry no throws column — map it from micro.
+    const throwsByPT = {};
+    if (teamMode) {
+      for (let ti = 0; ti < micro.length; ti++) {
+        throwsByPT[micro[ti][ci.pitcherIdx] + '|' + micro[ti][ci.teamIdx]] = micro[ti][ci.throws];
+      }
+    }
 
     const groups = {};
     for (let i = 0; i < micro.length; i++) {
       const row = micro[i];
       if (!validDates[row[ci.dateIdx]]) continue;
       if (vsHand !== 'all' && row[ci.batterHand] !== vsHand) continue;
+      if (teamMode) {
+        if (this._isCombinedTeam(teams[row[ci.teamIdx]])) continue;
+        if (!this._teamModePitcherRowOk(filters, row[ci.pitcherIdx], row[ci.teamIdx], row[ci.throws])) continue;
+      }
 
-      const gk = row[ci.pitcherIdx] + '|' + row[ci.teamIdx];
+      const gk = teamMode ? String(row[ci.teamIdx]) : (row[ci.pitcherIdx] + '|' + row[ci.teamIdx]);
       if (!groups[gk]) {
         groups[gk] = {
-          pitcherIdx: row[ci.pitcherIdx],
+          pitcherIdx: teamMode ? null : row[ci.pitcherIdx],
           teamIdx: row[ci.teamIdx],
-          throws: row[ci.throws],
+          throws: teamMode ? null : row[ci.throws],
           counts: new Array(31)
         };
         for (let z = 0; z < 31; z++) groups[gk].counts[z] = 0;
@@ -451,7 +495,15 @@ const Aggregator = {
       const brow = pitcherBipData[bi];
       if (!validDates[brow[pbci.dateIdx]]) continue;
       if (vsHand !== 'all' && brow[pbci.batterHand] !== vsHand) continue;
-      const pKey = brow[pbci.pitcherIdx] + '|' + brow[pbci.teamIdx];
+      let pKey;
+      if (teamMode) {
+        if (this._isCombinedTeam(teams[brow[pbci.teamIdx]])) continue;
+        const ptKey = brow[pbci.pitcherIdx] + '|' + brow[pbci.teamIdx];
+        if (!this._teamModePitcherRowOk(filters, brow[pbci.pitcherIdx], brow[pbci.teamIdx], throwsByPT[ptKey])) continue;
+        pKey = String(brow[pbci.teamIdx]);
+      } else {
+        pKey = brow[pbci.pitcherIdx] + '|' + brow[pbci.teamIdx];
+      }
       if (!bipByPitcher[pKey]) bipByPitcher[pKey] = [];
       bipByPitcher[pKey].push(brow);
     }
@@ -549,12 +601,12 @@ const Aggregator = {
     const fb_for_hrfb = fb_cnt + pu_cnt;
     const hrFbPct = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
-    const pitcherName = lookups.pitchers[g.pitcherIdx];
+    const pitcherName = g.pitcherIdx != null ? lookups.pitchers[g.pitcherIdx] : null;
     const teamName = lookups.teams[g.teamIdx];
     return {
       pitcher: pitcherName,
       team: teamName,
-      mlbId: mlbIdMap[pitcherName + '|' + teamName] || null,
+      mlbId: pitcherName != null ? (mlbIdMap[pitcherName + '|' + teamName] || null) : null,
       throws: g.throws,
       count: n,
       pa: pa,
@@ -591,6 +643,7 @@ const Aggregator = {
     const d = this.data;
     const lookups = d.lookups;
     const vsHand = filters.vsHand || 'all';
+    const teamMode = filters.viewMode === 'team';
 
     const grouped = this._groupPitcherMicro(filters);
     const groups = grouped.groups;
@@ -598,17 +651,35 @@ const Aggregator = {
 
     const mlbIdMap = this._getMlbIdMap('pitcher');
 
-    const STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'oneOneWinPct', 'earlyActionPct', 'hrFbPct',
+    let STAT_KEYS = ['strikePct', 'izPct', 'cswPct', 'izWhiffPct', 'swStrPct', 'chasePct', 'gbPct', 'kPct', 'bbPct', 'kbbPct', 'babip', 'fpsPct', 'oneOneWinPct', 'earlyActionPct', 'hrFbPct',
                      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'xwOBAsp'];
-    const INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
+    let INVERT = { bbPct: true, babip: true, hrFbPct: true, avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, xwOBAsp: true };
+    if (teamMode) {
+      // Boxscore-merged stats have no pre-aggregated _pctl at team level —
+      // rank them across the team pool here.
+      STAT_KEYS = STAT_KEYS.concat(['era', 'fip', 'xFIP', 'siera', 'hr9',
+        'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'twoStrikeWhiffPct', 'locPlus',
+        'runValue', 'rv100', 'xRunValue', 'xRv100']);
+      INVERT = Object.assign({}, INVERT, { era: true, fip: true, xFIP: true, siera: true, hr9: true,
+        wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true });
+    }
     let rows = [];
     const sacqMaps = this.buildSacqZoneMaps();
 
     for (let gk2 in groups) {
       const g = groups[gk2];
-      const bipRecs = bipByPitcher[g.pitcherIdx + '|' + g.teamIdx] || [];
+      const bipKey = teamMode ? String(g.teamIdx) : (g.pitcherIdx + '|' + g.teamIdx);
+      const bipRecs = bipByPitcher[bipKey] || [];
       const bipStats = this._computePitcherBipStats(bipRecs, sacqMaps);
       const obj = this._buildPitcherRow(g, lookups, mlbIdMap, bipStats);
+
+      if (teamMode) {
+        // Throws/role applied per micro row pre-rollup; player-level minimum
+        // sample filters are intentionally ignored for team totals.
+        obj._isTeamRow = true;
+        rows.push(obj);
+        continue;
+      }
 
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
@@ -618,6 +689,10 @@ const Aggregator = {
       if (filters.minPitcherSwings && (obj.nSwings || 0) < filters.minPitcherSwings) continue;
 
       rows.push(obj);
+    }
+
+    if (teamMode) {
+      return this._finishPitcherTeamRows(rows, filters, STAT_KEYS, INVERT);
     }
 
     // Merge boxscore stats (G, GS, IP, W, L, SV, HLD, TBF, ERA, HR/9, runValue)
@@ -773,6 +848,311 @@ const Aggregator = {
     return rows;
   },
 
+  // ---- Team view helpers ----
+
+  // Shared view-narrowing for team rows: specific team → that row only;
+  // All Teams → hide ROC (unless the user is searching, so "ROC" is findable);
+  // search matches the team code.
+  _narrowTeamRows: function (rows, filters) {
+    const self = this;
+    if (filters.team !== 'all') {
+      return rows.filter(function (r) { return r.team === filters.team; });
+    }
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      return rows.filter(function (r) { return r.team.toLowerCase().indexOf(q) !== -1; });
+    }
+    return rows.filter(function (r) { return !self._isROCTeam(r.team); });
+  },
+
+  // Mark team rows pool-eligible. ROC team rows are interpolated against the
+  // 30-team MLB pool by _computePercentilesUnified (via _isROCTeam) and the
+  // render layer suppresses their coloring.
+  _flagTeamRows: function (rows) {
+    for (let i = 0; i < rows.length; i++) {
+      rows[i]._isTeamRow = true;
+      rows[i]._qualified = true;
+      rows[i]._inPool = rows[i]._inPool !== false;
+      rows[i].bipQual = true;
+    }
+  },
+
+  _formatIPThirds: function (thirds) {
+    return Math.floor(thirds / 3) + '.' + (thirds % 3);
+  },
+
+  /**
+   * Aggregate season boxscore/pre-computed pitcher stats to team level from
+   * PITCHER_DATA. True totals where the components are recoverable (ERA, HR/9
+   * from ER/HR × IP; RV sums at full precision); weighted means elsewhere
+   * (FIP/xFIP/SIERA by IP, expected stats by TBF, Loc+ by its sample size).
+   * Respects throws/role filters so team rows match the micro-side rollup.
+   */
+  _teamPitcherBoxscore: function (filters) {
+    const roleCache = this._ensureRoleCache();
+    const pd = window.PITCHER_DATA || [];
+    const acc = {};
+    const IP_W = ['fip', 'xFIP', 'siera'];
+    const PA_W = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'];
+
+    function wadd(a, key, val, w) {
+      if (val == null || !(w > 0)) return;
+      a.sums[key] = (a.sums[key] || 0) + val * w;
+      a.wts[key] = (a.wts[key] || 0) + w;
+    }
+
+    for (let i = 0; i < pd.length; i++) {
+      const p = pd[i];
+      if (this._isCombinedTeam(p.team)) continue;
+      if (filters.throws !== 'all' && p.throws !== filters.throws) continue;
+      if (filters.role && filters.role !== 'all' &&
+          (roleCache[p.pitcher + '|' + p.team] || 'RP') !== filters.role) continue;
+
+      let a = acc[p.team];
+      if (!a) {
+        a = acc[p.team] = { ipThirds: 0, er: null, hrA: null, w: 0, l: 0, sv: 0, hld: 0, gs: 0,
+                            tbf: 0, count: 0, runValue: null, xRunValue: null, sums: {}, wts: {} };
+      }
+      const ipF = Utils.parseIP(p.ip);
+      a.ipThirds += Math.round(ipF * 3);
+      if (p.era != null && ipF > 0) a.er = (a.er || 0) + p.era * ipF / 9;
+      if (p.hr9 != null && ipF > 0) a.hrA = (a.hrA || 0) + p.hr9 * ipF / 9;
+      a.w += p.w || 0; a.l += p.l || 0; a.sv += p.sv || 0; a.hld += p.hld || 0;
+      a.gs += p.gs || 0; a.tbf += p.tbf || 0; a.count += p.count || 0;
+      // RV sums stay full precision; rounding happens only at display
+      if (p.runValue != null) a.runValue = (a.runValue || 0) + p.runValue;
+      if (p.xRunValue != null) a.xRunValue = (a.xRunValue || 0) + p.xRunValue;
+      for (let wi = 0; wi < IP_W.length; wi++) wadd(a, IP_W[wi], p[IP_W[wi]], ipF);
+      for (let pi = 0; pi < PA_W.length; pi++) wadd(a, PA_W[pi], p[PA_W[pi]], p.pa || p.tbf);
+      wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
+      wadd(a, 'locPlus', p.locPlus, p.locPlusN);
+      wadd(a, 'armAngle', p.armAngle, p.count);
+    }
+
+    const teamGames = this.getTeamGamesPlayed();
+    const out = {};
+    for (const team in acc) {
+      const a = acc[team];
+      const ipF = a.ipThirds / 3;
+      const o = {
+        ip: this._formatIPThirds(a.ipThirds),
+        g: teamGames[team] || null,
+        gs: a.gs, w: a.w, l: a.l, sv: a.sv, hld: a.hld, tbf: a.tbf,
+        era: (a.er != null && ipF > 0) ? a.er * 9 / ipF : null,
+        hr9: (a.hrA != null && ipF > 0) ? a.hrA * 9 / ipF : null,
+        runValue: a.runValue,
+        xRunValue: a.xRunValue,
+        rv100: (a.runValue != null && a.count > 0) ? a.runValue / a.count * 100 : null,
+        xRv100: (a.xRunValue != null && a.count > 0) ? a.xRunValue / a.count * 100 : null,
+        locPlusN: a.wts.locPlus || 0,
+      };
+      const W_KEYS = ['fip', 'xFIP', 'siera', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'twoStrikeWhiffPct', 'locPlus', 'armAngle'];
+      for (let ki = 0; ki < W_KEYS.length; ki++) {
+        const k = W_KEYS[ki];
+        o[k] = (a.wts[k] > 0) ? a.sums[k] / a.wts[k] : null;
+      }
+      out[team] = o;
+    }
+    return out;
+  },
+
+  // Team mode tail of _aggregatePitcher: merge team boxscore stats, compute
+  // percentiles over the team pool, invert lower-is-better, narrow the view.
+  _finishPitcherTeamRows: function (rows, filters, STAT_KEYS, INVERT) {
+    const box = this._teamPitcherBoxscore(filters);
+    for (let i = 0; i < rows.length; i++) {
+      const b = box[rows[i].team];
+      if (b) {
+        for (const k in b) rows[i][k] = b[k];
+      }
+    }
+    this._flagTeamRows(rows);
+    for (let si = 0; si < STAT_KEYS.length; si++) {
+      this._computePercentiles(rows, STAT_KEYS[si]);
+    }
+    for (let ri = 0; ri < rows.length; ri++) {
+      for (const inv in INVERT) {
+        const pk = inv + '_pctl';
+        if (rows[ri][pk] !== null && rows[ri][pk] !== undefined) {
+          rows[ri][pk] = 100 - rows[ri][pk];
+        }
+      }
+    }
+    return this._narrowTeamRows(rows, filters);
+  },
+
+  _PITCH_METRIC_MAP: [
+    { key: 'velocity', sum: 'sumVelo', cnt: 'nVelo', round: 1 },
+    { key: 'effectiveVelo', sum: 'sumEffVelo', cnt: 'nEffVelo', round: 1 },
+    { key: 'spinRate', sum: 'sumSpin', cnt: 'nSpin', round: 0 },
+    { key: 'indVertBrk', sum: 'sumIVB', cnt: 'nIVB', round: 1 },
+    { key: 'horzBrk', sum: 'sumHB', cnt: 'nHB', round: 1 },
+    { key: 'relPosZ', sum: 'sumRelZ', cnt: 'nRelZ', round: 1 },
+    { key: 'relPosX', sum: 'sumRelX', cnt: 'nRelX', round: 1 },
+    { key: 'extension', sum: 'sumExt', cnt: 'nExt', round: 1 },
+    { key: 'armAngle', sum: 'sumArmAngle', cnt: 'nArmAngle', round: 1 },
+    { key: 'vaa', sum: 'sumVAA', cnt: 'nVAA', round: 2 },
+    { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
+    { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
+    { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
+  ],
+
+  /**
+   * Team mode: roll per-(pitcher, team, pitchType) groups up to (team, pitchType).
+   * Counts and most metric sums add directly. Hand-mirrored metrics (HB, RelX,
+   * HAA) accumulate |per-pitcher mean| × n so LHP/RHP signs don't cancel — the
+   * team value reads as an average magnitude. Model-derived values (xIVB/xHB,
+   * IVBOE/HBOE, nHAA) are computed per pitcher (they depend on the pitcher's
+   * hand and release) and combined as pitch-count-weighted means; HBOE is
+   * sign-aligned to each pitch's natural break direction first.
+   */
+  _rollupPitchTeamGroups: function (groups, lookups) {
+    const self = this;
+    const MM = this._PITCH_METRIC_MAP;
+    const MIRRORED = { sumHB: true, sumRelX: true, sumHAA: true };
+    const haaRegs = DataStore.metadata && DataStore.metadata.haaRegressions;
+    const mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
+    const teamGroups = {};
+
+    for (const gk in groups) {
+      const g = groups[gk];
+      const ms = g.metricSums;
+      const tk = g.teamIdx + '|' + g.pitchTypeIdx;
+      let tg = teamGroups[tk];
+      if (!tg) {
+        tg = teamGroups[tk] = {
+          pitcherIdx: null, teamIdx: g.teamIdx, throws: null, pitchTypeIdx: g.pitchTypeIdx,
+          counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          metricSums: {},
+          _ovr: { nHaaS: 0, nHaaW: 0, xIvbS: 0, xIvbW: 0, ivbOeS: 0, ivbOeW: 0, xHbS: 0, xHbW: 0, hbOeS: 0, hbOeW: 0 }
+        };
+        for (const mk in ms) tg.metricSums[mk] = 0;
+      }
+      for (let f = 0; f < 22; f++) tg.counts[f] += g.counts[f];
+      for (let mi = 0; mi < MM.length; mi++) {
+        const m = MM[mi];
+        const cnt = ms[m.cnt] || 0;
+        if (!cnt) continue;
+        tg.metricSums[m.sum] += MIRRORED[m.sum] ? Math.abs(ms[m.sum] / cnt) * cnt : ms[m.sum];
+        tg.metricSums[m.cnt] += cnt;
+      }
+      tg.metricSums.sumTiltSin += ms.sumTiltSin || 0;
+      tg.metricSums.sumTiltCos += ms.sumTiltCos || 0;
+      tg.metricSums.nTilt += ms.nTilt || 0;
+
+      // Per-pitcher model values, weighted into the team accumulator
+      const w = g.counts[0];
+      if (!(w > 0)) continue;
+      const mean = function (s, c) { return (ms[c] || 0) > 0 ? ms[s] / ms[c] : null; };
+      const ptName = lookups.pitchTypes[g.pitchTypeIdx];
+
+      const haaMean = mean('sumHAA', 'nHAA');
+      const plateXMean = mean('sumPlateX', 'nPlateX');
+      const haaReg = haaRegs && haaRegs[ptName];
+      if (haaMean != null && plateXMean != null && haaReg && haaReg.leagueAvgPlateX != null) {
+        const nHAA_i = haaMean - haaReg.slope * (plateXMean - haaReg.leagueAvgPlateX);
+        tg._ovr.nHaaS += Math.abs(nHAA_i) * w;
+        tg._ovr.nHaaW += w;
+      }
+
+      const armMean = mean('sumArmAngle', 'nArmAngle');
+      const extMean = mean('sumExt', 'nExt');
+      const veloMean = mean('sumVelo', 'nVelo');
+      const relZMean = mean('sumRelZ', 'nRelZ');
+      const relXMean = mean('sumRelX', 'nRelX');
+      const ivbMean = mean('sumIVB', 'nIVB');
+      const hbMean = mean('sumHB', 'nHB');
+      const ptModel = mvnModels && mvnModels[ptName + '_' + g.throws];
+      let xIVB_i = null, xHB_i = null;
+      if (ptModel && ptModel.mlb && armMean != null && extMean != null && veloMean != null) {
+        const muBar = self._mvnConditional(ptModel.mlb, [armMean, extMean, veloMean]);
+        if (muBar) { xIVB_i = muBar[0]; xHB_i = muBar[1]; }
+      }
+      if (xIVB_i === null && ptModel && ptModel.roc && relZMean != null && relXMean != null && extMean != null && veloMean != null) {
+        const muBar2 = self._mvnConditional(ptModel.roc, [relZMean, relXMean, extMean, veloMean]);
+        if (muBar2) { xIVB_i = muBar2[0]; xHB_i = muBar2[1]; }
+      }
+      if (xIVB_i != null) {
+        tg._ovr.xIvbS += xIVB_i * w; tg._ovr.xIvbW += w;
+        if (ivbMean != null) { tg._ovr.ivbOeS += (ivbMean - xIVB_i) * w; tg._ovr.ivbOeW += w; }
+      }
+      if (xHB_i != null) {
+        tg._ovr.xHbS += Math.abs(xHB_i) * w; tg._ovr.xHbW += w;
+        if (hbMean != null) {
+          const sgn = xHB_i < 0 ? -1 : 1;
+          tg._ovr.hbOeS += (hbMean - xHB_i) * sgn * w; tg._ovr.hbOeW += w;
+        }
+      }
+    }
+    return teamGroups;
+  },
+
+  /**
+   * Team mode: aggregate the pre-computed pitch-type stats (run values, expected
+   * stats, batted-ball, Loc+, Stuff+) from PITCH_DATA to (team, pitchType) and
+   * merge into the team rows. RV totals are true sums kept at full precision;
+   * rates are weighted by their natural denominators (PA for expected stats,
+   * BIP for batted-ball, pitches for Strike%/Stuff+, sample N for Loc+).
+   */
+  _mergeTeamPitchPreAgg: function (rows, filters, PITCH_BB_KEYS, vsHand) {
+    const roleCache = this._ensureRoleCache();
+    const pd = window.PITCH_DATA || [];
+    const handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
+    const X_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
+    const acc = {};
+
+    function wadd(a, key, val, w) {
+      if (val == null || !(w > 0)) return;
+      a.sums[key] = (a.sums[key] || 0) + val * w;
+      a.wts[key] = (a.wts[key] || 0) + w;
+    }
+
+    for (let i = 0; i < pd.length; i++) {
+      const p = pd[i];
+      if (this._isCombinedTeam(p.team)) continue;
+      if (filters.throws !== 'all' && p.throws !== filters.throws) continue;
+      if (filters.role && filters.role !== 'all' &&
+          (roleCache[p.pitcher + '|' + p.team] || 'RP') !== filters.role) continue;
+
+      const k = p.team + '|' + p.pitchType;
+      let a = acc[k];
+      if (!a) a = acc[k] = { runValue: null, xRunValue: null, count: 0, maxVelo: null, sums: {}, wts: {} };
+
+      a.count += p.count || 0;
+      if (p.runValue != null) a.runValue = (a.runValue || 0) + p.runValue;
+      if (p.xRunValue != null) a.xRunValue = (a.xRunValue || 0) + p.xRunValue;
+      if (p.maxVelo != null && (a.maxVelo == null || p.maxVelo > a.maxVelo)) a.maxVelo = p.maxVelo;
+      wadd(a, 'strikePct', p.strikePct, p.count);
+      wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
+      wadd(a, 'stuffScore', p.stuffScore, p.count);
+      wadd(a, 'locPlus', p.locPlus, p.locPlusN);
+      for (let xi = 0; xi < X_KEYS.length; xi++) {
+        const xk = X_KEYS[xi];
+        const v = (handSfx && p[xk + handSfx] !== undefined) ? p[xk + handSfx] : p[xk];
+        wadd(a, xk, v, p.pa);
+      }
+      for (let bi = 0; bi < PITCH_BB_KEYS.length; bi++) {
+        const bk = PITCH_BB_KEYS[bi];
+        const bv = (handSfx && p[bk + handSfx] !== undefined) ? p[bk + handSfx] : p[bk];
+        wadd(a, bk, bv, p.nBip);
+      }
+    }
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const r = rows[ri];
+      const a = acc[r.team + '|' + r.pitchType];
+      if (!a) continue;
+      r.runValue = a.runValue;
+      r.xRunValue = a.xRunValue;
+      r.rv100 = (a.runValue != null && a.count > 0) ? a.runValue / a.count * 100 : null;
+      r.xRv100 = (a.xRunValue != null && a.count > 0) ? a.xRunValue / a.count * 100 : null;
+      r.maxVelo = a.maxVelo;
+      for (const sk in a.sums) {
+        if (a.wts[sk] > 0) r[sk] = a.sums[sk] / a.wts[sk];
+      }
+    }
+  },
+
   _aggregatePitch: function (filters) {
     const self = this;
     const d = this.data;
@@ -782,33 +1162,12 @@ const Aggregator = {
     const validDates = this._getValidDateSet(filters);
     const vsHand = filters.vsHand || 'all';
     const mlbIdMap = this._getMlbIdMap('pitcher');
+    const teamMode = filters.viewMode === 'team';
 
     // Build role cache upfront from PITCHER_DATA (SP vs RP based on GS/G ratio)
-    if (!this._roleCache) {
-      this._roleCache = {};
-      const pd = window.PITCHER_DATA || [];
-      for (let ri3 = 0; ri3 < pd.length; ri3++) {
-        const rKey = pd[ri3].pitcher + '|' + pd[ri3].team;
-        const pg2 = pd[ri3].g || 0, pgs2 = pd[ri3].gs || 0;
-        this._roleCache[rKey] = pg2 > 0 && (pgs2 / pg2) > QUAL.SP_GS_RATIO ? 'SP' : 'RP';
-      }
-    }
+    this._ensureRoleCache();
 
-    const METRIC_MAP = [
-      { key: 'velocity', sum: 'sumVelo', cnt: 'nVelo', round: 1 },
-      { key: 'effectiveVelo', sum: 'sumEffVelo', cnt: 'nEffVelo', round: 1 },
-      { key: 'spinRate', sum: 'sumSpin', cnt: 'nSpin', round: 0 },
-      { key: 'indVertBrk', sum: 'sumIVB', cnt: 'nIVB', round: 1 },
-      { key: 'horzBrk', sum: 'sumHB', cnt: 'nHB', round: 1 },
-      { key: 'relPosZ', sum: 'sumRelZ', cnt: 'nRelZ', round: 1 },
-      { key: 'relPosX', sum: 'sumRelX', cnt: 'nRelX', round: 1 },
-      { key: 'extension', sum: 'sumExt', cnt: 'nExt', round: 1 },
-      { key: 'armAngle', sum: 'sumArmAngle', cnt: 'nArmAngle', round: 1 },
-      { key: 'vaa', sum: 'sumVAA', cnt: 'nVAA', round: 2 },
-      { key: 'haa', sum: 'sumHAA', cnt: 'nHAA', round: 2 },
-      { key: '_plateZ', sum: 'sumPlateZ', cnt: 'nPlateZ', round: 2 },
-      { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
-    ];
+    const METRIC_MAP = Aggregator._PITCH_METRIC_MAP;
     const METRIC_KEYS_LIST = METRIC_MAP.map(function (m) { return m.key; }).filter(function (k) { return k !== '_plateZ' && k !== '_plateX'; });
     const NO_PCTL_METRICS = { relPosZ: true, relPosX: true, armAngle: true };
     const METRIC_PCTL_KEYS = METRIC_KEYS_LIST.filter(function (k) { return !NO_PCTL_METRICS[k]; });
@@ -817,15 +1176,25 @@ const Aggregator = {
     const PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true };
     const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
     const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
-    const PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    let PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    if (teamMode) {
+      // Stats merged from pre-agg data carry no team-level _pctl — rank them here
+      PITCH_PCTL_KEYS = PITCH_PCTL_KEYS.concat(['runValue', 'rv100', 'xRunValue', 'xRv100', 'strikePct', 'twoStrikeWhiffPct', 'locPlus']);
+    }
 
     const groups = {};
     const pitcherTotals = {};
+    const teamTotals = {};
 
     for (let i = 0; i < micro.length; i++) {
       const row = micro[i];
       if (!validDates[row[ci.dateIdx]]) continue;
       if (vsHand !== 'all' && row[ci.batterHand] !== vsHand) continue;
+      if (teamMode) {
+        if (this._isCombinedTeam(lookups.teams[row[ci.teamIdx]])) continue;
+        if (!this._teamModePitcherRowOk(filters, row[ci.pitcherIdx], row[ci.teamIdx], row[ci.throws])) continue;
+        teamTotals[row[ci.teamIdx]] = (teamTotals[row[ci.teamIdx]] || 0) + row[ci.n];
+      }
 
       const pitcherKey = row[ci.pitcherIdx] + '|' + row[ci.teamIdx];
       const gk = pitcherKey + '|' + row[ci.pitchTypeIdx];
@@ -864,8 +1233,9 @@ const Aggregator = {
     }
 
     let rows = [];
-    for (let gk2 in groups) {
-      const g = groups[gk2];
+    const buildGroups = teamMode ? this._rollupPitchTeamGroups(groups, lookups) : groups;
+    for (let gk2 in buildGroups) {
+      const g = buildGroups[gk2];
       const c = g.counts;
       const ms = g.metricSums;
       const n = c[0], iz = c[1], sw = c[2], wh = c[3], csw = c[4];
@@ -876,7 +1246,8 @@ const Aggregator = {
       const firstPitches = c[20], firstPitchStrikes = c[21];
       const ab = pa - bb - hbp - sf - sh - ci_val;
       const pitcherKey = g.pitcherIdx + '|' + g.teamIdx;
-      const pitcherTotal = pitcherTotals[pitcherKey] || 0;
+      // Usage% denominator: team mode uses ALL pitches thrown by the team
+      const pitcherTotal = teamMode ? (teamTotals[g.teamIdx] || 0) : (pitcherTotals[pitcherKey] || 0);
 
       const kPct = pa > 0 ? k / pa : null;
       const bbPct = pa > 0 ? bb / pa : null;
@@ -885,12 +1256,12 @@ const Aggregator = {
       const babip_val = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
       const fpsPct_val = firstPitches > 0 ? firstPitchStrikes / firstPitches : null;
 
-      const pitcherName2 = lookups.pitchers[g.pitcherIdx];
+      const pitcherName2 = g.pitcherIdx != null ? lookups.pitchers[g.pitcherIdx] : null;
       const teamName2 = lookups.teams[g.teamIdx];
       const obj = {
         pitcher: pitcherName2,
         team: teamName2,
-        mlbId: mlbIdMap[pitcherName2 + '|' + teamName2] || null,
+        mlbId: pitcherName2 != null ? (mlbIdMap[pitcherName2 + '|' + teamName2] || null) : null,
         throws: g.throws,
         pitchType: lookups.pitchTypes[g.pitchTypeIdx],
         count: n,
@@ -991,6 +1362,24 @@ const Aggregator = {
         obj.breakTiltMinutes = null;
       }
 
+      if (teamMode) {
+        // Hand-dependent model values: replace the team-sum versions with the
+        // per-pitcher weighted means accumulated during rollup.
+        const o = g._ovr;
+        obj.nHAA = o.nHaaW > 0 ? Number((o.nHaaS / o.nHaaW).toFixed(2)) : null;
+        obj.xIVB = o.xIvbW > 0 ? Number((o.xIvbS / o.xIvbW).toFixed(1)) : null;
+        obj.ivbOE = o.ivbOeW > 0 ? Number((o.ivbOeS / o.ivbOeW).toFixed(1)) : null;
+        obj.xHB = o.xHbW > 0 ? Number((o.xHbS / o.xHbW).toFixed(1)) : null;
+        obj.hbOE = o.hbOeW > 0 ? Number((o.hbOeS / o.hbOeW).toFixed(1)) : null;
+        obj._isTeamRow = true;
+        if (filters.pitchTypes && filters.pitchTypes.indexOf('all') === -1 && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
+        // Same default floor as player mode ('Qualified' = 25 pitches of the
+        // type): a team row built on a handful of pitches is noise.
+        if (obj.count < QUAL.MIN_PITCH_PCTL) continue;
+        rows.push(obj);
+        continue;
+      }
+
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.throws !== filters.throws) continue;
       if (filters.role && filters.role !== 'all') {
@@ -1006,6 +1395,10 @@ const Aggregator = {
       rows.push(obj);
     }
 
+    if (teamMode) {
+      this._mergeTeamPitchPreAgg(rows, filters, PITCH_BB_KEYS, vsHand);
+      this._flagTeamRows(rows);
+    } else {
     const pitchPreAgg = window.PITCH_DATA || [];
     const pitchPreMap = {};
     for (let ppi = 0; ppi < pitchPreAgg.length; ppi++) {
@@ -1074,6 +1467,7 @@ const Aggregator = {
       const rp = rows[pi2];
       rp._inPool = !(combinedByPitchRowEarly[rp.pitcher] && !Aggregator._isCombinedTeam(rp.team));
     }
+    } // end player-mode merge
 
     // Percentiles per pitch type
     const ptGroups = {};
@@ -1174,6 +1568,12 @@ const Aggregator = {
       });
     }
 
+    // Team mode: every team row is pool-qualified; player-level Q filters and
+    // multi-team handling don't apply.
+    if (teamMode) {
+      return this._narrowTeamRows(rows, filters);
+    }
+
     // Multi-team lookups (any row with team like "2TM"/"3TM" stands in for its player)
     const combinedByPitchRow = {};
     for (let cti = 0; cti < rows.length; cti++) {
@@ -1246,6 +1646,126 @@ const Aggregator = {
     return rows;
   },
 
+  // Team mode: hitter bats (stands) filter resolved per hitter — switch
+  // hitters are excluded from R/L views, matching player-mode semantics.
+  _buildHitterStandsMap: function (micro, ci) {
+    const sets = {};
+    for (let i = 0; i < micro.length; i++) {
+      const hk = micro[i][ci.hitterIdx] + '|' + micro[i][ci.teamIdx];
+      if (!sets[hk]) sets[hk] = {};
+      sets[hk][micro[i][ci.bats]] = true;
+    }
+    const map = {};
+    for (const hk in sets) {
+      const keys = Object.keys(sets[hk]);
+      map[hk] = keys.length > 1 ? 'S' : (keys[0] || null);
+    }
+    return map;
+  },
+
+  /**
+   * Team mode: aggregate season boxscore/pre-computed hitter stats from
+   * HITTER_DATA to team level. Counting stats are true sums (RV at full
+   * precision); rates are weighted by their natural denominators (PA for
+   * wOBA/wRC+/Hitter+, competitive swings for bat tracking, competitive runs
+   * for sprint speed, scored-pitch N for SD+/CT+). Respects the bats filter.
+   */
+  _teamHitterBoxscore: function (filters) {
+    const hd = window.HITTER_DATA || [];
+    const acc = {};
+
+    function wadd(a, key, val, w) {
+      if (val == null || !(w > 0)) return;
+      a.sums[key] = (a.sums[key] || 0) + val * w;
+      a.wts[key] = (a.wts[key] || 0) + w;
+    }
+
+    for (let i = 0; i < hd.length; i++) {
+      const h = hd[i];
+      if (this._isCombinedTeam(h.team)) continue;
+      if (filters.throws !== 'all' && h.stands !== filters.throws) continue;
+
+      let a = acc[h.team];
+      if (!a) {
+        a = acc[h.team] = { tb: 0, sb: 0, cs: 0, wRC: null, runValue: null,
+                            nCompSwings: 0, nCompRuns: 0, pa: 0, sums: {}, wts: {} };
+      }
+      a.tb += h.tb || 0; a.sb += h.sb || 0; a.cs += h.cs || 0;
+      a.pa += h.pa || 0;
+      a.nCompSwings += h.nCompSwings || 0;
+      a.nCompRuns += h.nCompRuns || 0;
+      if (h.wRC != null) a.wRC = (a.wRC || 0) + h.wRC;
+      // RV sums stay full precision; rounding happens only at display
+      if (h.runValue != null) a.runValue = (a.runValue || 0) + h.runValue;
+      wadd(a, 'wOBA', h.wOBA, h.pa);
+      wadd(a, 'wRCplus', h.wRCplus, h.pa);
+      wadd(a, 'xWRCplus', h.xWRCplus, h.pa);
+      wadd(a, 'hitterPlus', h.hitterPlus, h.pa);
+      wadd(a, 'sdPlus', h.sdPlus, h.sdPlusN);
+      wadd(a, 'ctPlus', h.ctPlus, h.ctPlusN);
+      const compW = h.nCompSwings;
+      wadd(a, 'batSpeed', h.batSpeed, compW);
+      wadd(a, 'swingLength', h.swingLength, compW);
+      wadd(a, 'attackAngle', h.attackAngle, compW);
+      wadd(a, 'attackDirection', h.attackDirection, compW);
+      wadd(a, 'swingPathTilt', h.swingPathTilt, compW);
+      wadd(a, 'blastPct', h.blastPct, compW);
+      wadd(a, 'squaredUpPct', h.squaredUpPct, compW);
+      wadd(a, 'idealAAPct', h.idealAAPct, compW);
+      wadd(a, 'sprintSpeed', h.sprintSpeed, h.nCompRuns);
+    }
+
+    const teamGames = this.getTeamGamesPlayed();
+    const out = {};
+    for (const team in acc) {
+      const a = acc[team];
+      const o = {
+        g: teamGames[team] || null,
+        tb: a.tb, sb: a.sb, cs: a.cs,
+        sbPct: (a.sb + a.cs) > 0 ? a.sb / (a.sb + a.cs) * 100 : null,
+        wRC: a.wRC,
+        runValue: a.runValue,
+        nCompSwings: a.nCompSwings,
+        nCompRuns: a.nCompRuns,
+        paAll: a.pa,
+        sprintQual: true,
+        sdPlusN: a.wts.sdPlus || 0,
+        ctPlusN: a.wts.ctPlus || 0,
+      };
+      for (const k in a.sums) {
+        if (a.wts[k] > 0) o[k] = a.sums[k] / a.wts[k];
+      }
+      out[team] = o;
+    }
+    return out;
+  },
+
+  // Team mode tail of _aggregateHitter: merge team boxscore stats, compute
+  // percentiles over the team pool, invert lower-is-better, narrow the view.
+  _finishHitterTeamRows: function (rows, filters, STAT_KEYS, INVERT) {
+    const box = this._teamHitterBoxscore(filters);
+    for (let i = 0; i < rows.length; i++) {
+      const b = box[rows[i].team];
+      if (b) {
+        for (const k in b) rows[i][k] = b[k];
+      }
+    }
+    this._flagTeamRows(rows);
+    const self = this;
+    STAT_KEYS.forEach(function (key) {
+      self._computePercentiles(rows, key);
+    });
+    for (let ri = 0; ri < rows.length; ri++) {
+      for (const inv in INVERT) {
+        const pk = inv + '_pctl';
+        if (rows[ri][pk] !== null && rows[ri][pk] !== undefined) {
+          rows[ri][pk] = 100 - rows[ri][pk];
+        }
+      }
+    }
+    return this._narrowTeamRows(rows, filters);
+  },
+
   _aggregateHitter: function (filters) {
     const d = this.data;
     const ci = this._colIdx.hitterCols;
@@ -1256,18 +1776,27 @@ const Aggregator = {
     const lookups = d.lookups;
     const validDates = this._getValidDateSet(filters);
     const vsHand = filters.vsHand || 'all';
+    const teamMode = filters.viewMode === 'team';
+    const standsMap = teamMode ? this._buildHitterStandsMap(micro, ci) : null;
+    const self2 = this;
+    const teamRowOk = function (hitterIdx, teamIdx) {
+      if (self2._isCombinedTeam(lookups.teams[teamIdx])) return false;
+      if (filters.throws !== 'all' && standsMap[hitterIdx + '|' + teamIdx] !== filters.throws) return false;
+      return true;
+    };
 
-    // Group by (hitterIdx, teamIdx)
+    // Group by (hitterIdx, teamIdx) — or by teamIdx alone in team mode
     const groups = {};
     for (let i = 0; i < micro.length; i++) {
       const row = micro[i];
       if (!validDates[row[ci.dateIdx]]) continue;
       if (vsHand !== 'all' && row[ci.pitcherHand] !== vsHand) continue;
+      if (teamMode && !teamRowOk(row[ci.hitterIdx], row[ci.teamIdx])) continue;
 
-      const gk = row[ci.hitterIdx] + '|' + row[ci.teamIdx];
+      const gk = teamMode ? String(row[ci.teamIdx]) : (row[ci.hitterIdx] + '|' + row[ci.teamIdx]);
       if (!groups[gk]) {
         groups[gk] = {
-          hitterIdx: row[ci.hitterIdx],
+          hitterIdx: teamMode ? null : row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           batsSet: {},
           counts: new Array(49)
@@ -1289,8 +1818,9 @@ const Aggregator = {
       const brow = bipData[bi];
       if (!validDates[brow[bci.dateIdx]]) continue;
       if (vsHand !== 'all' && brow[bci.pitcherHand] !== vsHand) continue;
+      if (teamMode && !teamRowOk(brow[bci.hitterIdx], brow[bci.teamIdx])) continue;
 
-      const hKey = brow[bci.hitterIdx] + '|' + brow[bci.teamIdx];
+      const hKey = teamMode ? String(brow[bci.teamIdx]) : (brow[bci.hitterIdx] + '|' + brow[bci.teamIdx]);
       if (!bipByHitter[hKey]) bipByHitter[hKey] = [];
       bipByHitter[hKey].push(brow);
     }
@@ -1371,7 +1901,7 @@ const Aggregator = {
       const hrFbPct_val = fb_for_hrfb > 0 ? nHrBip / fb_for_hrfb : null;
 
       // BIP medians
-      const bipRecords = bipByHitter[g.hitterIdx + '|' + g.teamIdx] || [];
+      const bipRecords = bipByHitter[teamMode ? String(g.teamIdx) : (g.hitterIdx + '|' + g.teamIdx)] || [];
       const evsAll = [], allLA = [];
       for (let bri = 0; bri < bipRecords.length; bri++) {
         const bev = bipRecords[bri][bci.exitVelo];
@@ -1405,12 +1935,14 @@ const Aggregator = {
           const shcX = bipRecords[sri][bci.hcX];
           const shcY = bipRecords[sri][bci.hcY];
           if (sla == null || shcX == null || shcY == null) continue;
+          // Team rows mix hitters of both hands — use the per-BIP bat side
+          const sBats = teamMode ? bipRecords[sri][bci.batSide] : stands;
           const sAngle = Aggregator.computeSprayAngle(shcX, shcY);
-          const sDir = Aggregator.sprayDirection(sAngle, stands);
+          const sDir = Aggregator.sprayDirection(sAngle, sBats);
           if (!sDir) continue;
           const sLaBin = Aggregator.getLABinIdx(sla);
           if (sLaBin == null) continue;
-          const zWoba = Aggregator.sacqLookup(sacqMaps, sDir, sLaBin, stands);
+          const zWoba = Aggregator.sacqLookup(sacqMaps, sDir, sLaBin, sBats);
           if (zWoba != null) {
             xwOBAsp_sum += zWoba;
             xwOBAsp_count++;
@@ -1419,13 +1951,13 @@ const Aggregator = {
         xwOBAsp_val = xwOBAsp_count > 0 ? xwOBAsp_sum / xwOBAsp_count : null;
       }
 
-      const hitterName = lookups.hitters[g.hitterIdx];
+      const hitterName = g.hitterIdx != null ? lookups.hitters[g.hitterIdx] : null;
       const hitterTeam = lookups.teams[g.teamIdx];
       const obj = {
         hitter: hitterName,
         team: hitterTeam,
-        mlbId: hitterMlbIdMap[hitterName + '|' + hitterTeam] || null,
-        stands: stands,
+        mlbId: hitterName != null ? (hitterMlbIdMap[hitterName + '|' + hitterTeam] || null) : null,
+        stands: teamMode ? null : stands,
         count: n_total,
         pa: pa,
         ab: ab,
@@ -1519,6 +2051,14 @@ const Aggregator = {
         obj.avgHrDist = hrDists.length > 0 ? Math.round(hrDists.reduce(function(a,b){return a+b;},0) / hrDists.length) : null;
       }
 
+      if (teamMode) {
+        // Bats filter applied per hitter pre-rollup; player-level minimum
+        // sample filters are intentionally ignored for team totals.
+        obj._isTeamRow = true;
+        rows.push(obj);
+        continue;
+      }
+
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
       if (filters.minCount !== 'Q' && (obj.pa || 0) < (filters.minCount || 1)) continue;
@@ -1526,6 +2066,10 @@ const Aggregator = {
       if (filters.minBip && (obj.nBip || 0) < filters.minBip) continue;
 
       rows.push(obj);
+    }
+
+    if (teamMode) {
+      return this._finishHitterTeamRows(rows, filters, HITTER_STAT_KEYS, HITTER_INVERT);
     }
 
     // Merge boxscore stats from pre-aggregated HITTER_DATA
@@ -1713,8 +2257,19 @@ const Aggregator = {
     const lookups = d.lookups;
     const validDates = this._getValidDateSet(filters);
     const vsHand = filters.vsHand || 'all';
+    const teamMode = filters.viewMode === 'team';
 
     if (!micro || !ci) return [];
+
+    // Team mode: bats filter resolved per hitter (switch hitters excluded from
+    // R/L views, matching player mode); combined 2TM/3TM rows skipped.
+    const standsMapHP = teamMode ? this._buildHitterStandsMap(micro, ci) : null;
+    const selfHP = this;
+    const teamRowOkHP = function (hitterIdx, teamIdx) {
+      if (selfHP._isCombinedTeam(lookups.teams[teamIdx])) return false;
+      if (filters.throws !== 'all' && standsMapHP[hitterIdx + '|' + teamIdx] !== filters.throws) return false;
+      return true;
+    };
 
     const selectedPitchTypes = filters.pitchTypes; // always array (e.g. ['all'], ['FF','SL'])
     const CATS = this.PITCH_CATEGORIES;
@@ -1763,16 +2318,18 @@ const Aggregator = {
       const row = micro[i];
       if (!validDates[row[ci.dateIdx]]) continue;
       if (vsHand !== 'all' && row[ci.pitcherHand] !== vsHand) continue;
+      if (teamMode && !teamRowOkHP(row[ci.hitterIdx], row[ci.teamIdx])) continue;
 
-      const hk = row[ci.hitterIdx] + '|' + row[ci.teamIdx];
+      const hIdx = teamMode ? null : row[ci.hitterIdx];
+      const hk = hIdx + '|' + row[ci.teamIdx];
       if (!hitterTotals[hk]) hitterTotals[hk] = { total: 0, batsSet: {} };
       hitterTotals[hk].total += row[6];
       hitterTotals[hk].batsSet[row[ci.bats]] = true;
 
-      const gk = row[ci.hitterIdx] + '|' + row[ci.teamIdx] + '|' + row[ci.pitchTypeIdx];
+      const gk = hIdx + '|' + row[ci.teamIdx] + '|' + row[ci.pitchTypeIdx];
       if (!perPT[gk]) {
         perPT[gk] = {
-          hitterIdx: row[ci.hitterIdx],
+          hitterIdx: hIdx,
           teamIdx: row[ci.teamIdx],
           pitchTypeIdx: row[ci.pitchTypeIdx],
           counts: new Array(49)
@@ -1791,8 +2348,9 @@ const Aggregator = {
         const brow = bipData[bi];
         if (!validDates[brow[bci.dateIdx]]) continue;
         if (vsHand !== 'all' && brow[bci.pitcherHand] !== vsHand) continue;
+        if (teamMode && !teamRowOkHP(brow[bci.hitterIdx], brow[bci.teamIdx])) continue;
 
-        const bipKey = brow[bci.hitterIdx] + '|' + brow[bci.teamIdx] + '|' + brow[bci.pitchTypeIdx];
+        const bipKey = (teamMode ? null : brow[bci.hitterIdx]) + '|' + brow[bci.teamIdx] + '|' + brow[bci.pitchTypeIdx];
         if (!bipByKey[bipKey]) bipByKey[bipKey] = [];
         bipByKey[bipKey].push(brow);
       }
@@ -1954,13 +2512,13 @@ const Aggregator = {
       // hardHitPct and barrelPct: use EV-valid count as denominator (not total BIP)
       const hardHitPct = evsAll2.length > 0 ? hardHit / evsAll2.length : null;
 
-      const hpName = lookups.hitters[gg2.hitterIdx];
+      const hpName = gg2.hitterIdx != null ? lookups.hitters[gg2.hitterIdx] : null;
       const hpTeam = lookups.teams[gg2.teamIdx];
       const obj = {
         hitter: hpName,
         team: hpTeam,
-        mlbId: hpMlbIdMap[hpName + '|' + hpTeam] || null,
-        stands: stands,
+        mlbId: hpName != null ? (hpMlbIdMap[hpName + '|' + hpTeam] || null) : null,
+        stands: teamMode ? null : stands,
         pitchType: gg2.outputName,
         count: n_total,
         seenPct: Math.round(n_total / hTotal * 10000) / 10000,
@@ -2001,6 +2559,17 @@ const Aggregator = {
         izSwChase: (izSwingPct !== null && chasePct_val !== null) ? Math.round((izSwingPct - chasePct_val) * 10000) / 10000 : null,
       };
 
+      if (teamMode) {
+        // Bats filter applied per hitter pre-rollup; player-level minimum
+        // sample filters are intentionally ignored for team totals, except a
+        // pitch-count floor matching player mode's qualified default — a team
+        // row built on a handful of pitches of a rare type is noise.
+        obj._isTeamRow = true;
+        if (obj.count < QUAL.MIN_HITTER_PT) continue;
+        rows.push(obj);
+        continue;
+      }
+
       // Apply baseball-context filters (comparison group — affects percentiles)
       if (filters.throws !== 'all' && obj.stands !== filters.throws) continue;
       if (obj.count < (filters.minCount || 1)) continue;
@@ -2010,6 +2579,10 @@ const Aggregator = {
       rows.push(obj);
     }
 
+    if (teamMode) {
+      this._mergeTeamHitterPitchPreAgg(rows, filters);
+      this._flagTeamRows(rows);
+    } else {
     // Merge expected stats from pre-aggregated HITTER_PITCH_LB
     const hpPreAgg = window.HITTER_PITCH_LB || [];
     const hpPreMap = {};
@@ -2034,10 +2607,12 @@ const Aggregator = {
         rows[hpmi].rv100 = rows[hpmi].runValue / rows[hpmi].count * 100;
       }
     }
+    } // end player-mode merge
 
     // Multi-team pool handling: per-team rows of hitters with a 2TM row are
     // marked non-pool so the combined row is the pool representative.
     const combinedByHitterPT = {};
+    if (!teamMode) {
     for (let hci = 0; hci < rows.length; hci++) {
       if (Aggregator._isCombinedTeam(rows[hci].team)) {
         combinedByHitterPT[rows[hci].hitter] = true;
@@ -2046,6 +2621,7 @@ const Aggregator = {
     for (let hpi2 = 0; hpi2 < rows.length; hpi2++) {
       const rp = rows[hpi2];
       rp._inPool = !(combinedByHitterPT[rp.hitter] && !Aggregator._isCombinedTeam(rp.team));
+    }
     }
 
     // Compute percentiles per pitch type (output group name)
@@ -2076,6 +2652,10 @@ const Aggregator = {
       }
     }
 
+    if (teamMode) {
+      return this._narrowTeamRows(rows, filters);
+    }
+
     // Apply view-narrowing filters AFTER percentiles (don't change comparison group).
     // All Teams: drop ROC + per-team rows of multi-team hitters. Specific team:
     // drop combined rows and keep only the selected team's per-team rows.
@@ -2095,6 +2675,62 @@ const Aggregator = {
     }
 
     return rows;
+  },
+
+  /**
+   * Team mode: aggregate pre-computed hitter-vs-pitch-type stats from
+   * HITTER_PITCH_LB to (team, pitchType). RV totals are true sums at full
+   * precision; wOBA weights by PA, distance/spray-adjusted stats by BIP.
+   * Category/All output groups have no pre-agg rows (same as player mode) —
+   * only individual pitch types merge.
+   */
+  _mergeTeamHitterPitchPreAgg: function (rows, filters) {
+    const hp = window.HITTER_PITCH_LB || [];
+    // Hitter stands per (hitter, team) for the bats filter
+    const standsByHitter = {};
+    const hd = window.HITTER_DATA || [];
+    for (let hi = 0; hi < hd.length; hi++) {
+      standsByHitter[hd[hi].hitter + '|' + hd[hi].team] = hd[hi].stands;
+    }
+    const acc = {};
+
+    function wadd(a, key, val, w) {
+      if (val == null || !(w > 0)) return;
+      a.sums[key] = (a.sums[key] || 0) + val * w;
+      a.wts[key] = (a.wts[key] || 0) + w;
+    }
+
+    for (let i = 0; i < hp.length; i++) {
+      const p = hp[i];
+      if (this._isCombinedTeam(p.team)) continue;
+      if (filters.throws !== 'all' &&
+          standsByHitter[p.hitter + '|' + p.team] !== filters.throws) continue;
+
+      const k = p.team + '|' + p.pitchType;
+      let a = acc[k];
+      if (!a) a = acc[k] = { runValue: null, xRunValue: null, count: 0, sums: {}, wts: {} };
+      a.count += p.count || 0;
+      // RV sums stay full precision; rounding happens only at display
+      if (p.runValue != null) a.runValue = (a.runValue || 0) + p.runValue;
+      if (p.xRunValue != null) a.xRunValue = (a.xRunValue || 0) + p.xRunValue;
+      wadd(a, 'wOBA', p.wOBA, p.pa);
+      wadd(a, 'xwOBAsp', p.xwOBAsp, p.nBip);
+      wadd(a, 'avgFbDist', p.avgFbDist, p.nBip);
+      wadd(a, 'avgHrDist', p.avgHrDist, p.nBip);
+    }
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const r = rows[ri];
+      const a = acc[r.team + '|' + r.pitchType];
+      if (!a) continue;
+      r.runValue = a.runValue;
+      r.xRunValue = a.xRunValue;
+      r.rv100 = (a.runValue != null && a.count > 0) ? a.runValue / a.count * 100 : null;
+      r.xRv100 = (a.xRunValue != null && a.count > 0) ? a.xRunValue / a.count * 100 : null;
+      for (const sk in a.sums) {
+        if (a.wts[sk] > 0) r[sk] = a.sums[sk] / a.wts[sk];
+      }
+    }
   },
 
   //  Team games played (distinct game dates per team)

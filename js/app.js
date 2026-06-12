@@ -1,6 +1,7 @@
 (function () {
   let currentTab = 'pitcherStats';
   let currentSection = 'pitchers';  // 'home', 'pitchers', 'hitters'
+  let viewMode = 'player'; // 'player' | 'team'
   let selectedPitchTypes = []; // empty = all; or array of selected types
   let allData = []; // current filtered + sorted data (full, before pagination)
   let columnRangeFilters = {}; // { colKey: { min: number|null, max: number|null } }
@@ -192,6 +193,7 @@
             if (sel.options[oi].value === val) { sel.value = val; return; }
           }
         }
+        viewMode = (qp.view === 'team' && Aggregator.loaded) ? 'team' : 'player';
         if (qp.team) _setIfValid(teamSelect, qp.team);
         if (qp.throws) _setIfValid(throwsSelect, qp.throws);
         if (qp.vsHand) _setIfValid(vsHandSelect, qp.vsHand);
@@ -360,11 +362,41 @@
       }
     }
 
+    applyViewModeUI();
+
     refresh();
     scrollTableToTop();
     } finally {
       _navigating = false;
     }
+  }
+
+  // Sync toggle buttons + filter-control visibility with the player/team view.
+  // Re-applies the tab-specific rules for the controls that team view hides,
+  // so flipping back to player view restores them without a tab change.
+  function applyViewModeUI() {
+    const team = viewMode === 'team';
+    document.querySelectorAll('#view-mode-toggle .view-mode-btn').forEach(function (b) {
+      const active = b.getAttribute('data-mode') === viewMode;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.getElementById('compare-btn').style.display =
+      (team || isHitterTab(currentTab)) ? 'none' : '';
+    document.getElementById('min-count').parentElement.style.display =
+      (team || currentTab === 'pitcherStats') ? 'none' : '';
+    document.getElementById('min-swings-filter-group').style.display =
+      (!team && isHitterTab(currentTab) && currentTab !== 'hitterPitch' && currentTab !== 'hitterBattedBall') ? '' : 'none';
+    document.getElementById('min-ip-filter-group').style.display =
+      (!team && currentTab === 'pitcherStats') ? '' : 'none';
+    document.getElementById('min-tbf-filter-group').style.display =
+      (!team && currentTab === 'pitcherStats') ? '' : 'none';
+    document.getElementById('min-bip-filter-group').style.display =
+      (!team && (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall')) ? '' : 'none';
+    document.getElementById('min-pitcher-swings-filter-group').style.display =
+      (!team && currentTab === 'pitcherSwingDecisions') ? '' : 'none';
+    searchInput.placeholder = team ? 'Team...' :
+      (isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...');
   }
 
   function setupDOM() {
@@ -439,7 +471,23 @@
       dateEndInput.disabled = true;
       dateStartInput.title = 'Requires micro data';
       dateEndInput.title = 'Requires micro data';
+      // Team aggregation also needs micro data
+      const vmGroup = document.getElementById('view-mode-group');
+      if (vmGroup) vmGroup.style.display = 'none';
+      viewMode = 'player';
     }
+
+    document.querySelectorAll('#view-mode-toggle .view-mode-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const mode = btn.getAttribute('data-mode');
+        if (mode === viewMode) return;
+        viewMode = mode;
+        Leaderboard.currentPage = 1;
+        Leaderboard.keyboardFocusIndex = -1;
+        applyViewModeUI();
+        refresh();
+      });
+    });
 
     teamSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     throwsSelect.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
@@ -682,7 +730,51 @@
     return parseFloat(val) || 0;
   }
 
+  // Team view: drop player-identity columns and promote Team to the primary
+  // sticky column. Player-level minimum-sample filters don't apply.
+  const TEAM_VIEW_DROP_KEYS = { _compare: true, pitcher: true, hitter: true, throws: true, stands: true };
+  const _teamColumnsCache = {};
+  function teamColumns(tab) {
+    if (_teamColumnsCache[tab]) return _teamColumnsCache[tab];
+    const out = [];
+    COLUMNS[tab].forEach(function (c) {
+      if (TEAM_VIEW_DROP_KEYS[c.key]) return;
+      if (c.key === 'team') {
+        const tc = Object.assign({}, c);
+        tc.sticky = true;
+        delete tc.stickyIdx;
+        tc.align = 'left';
+        tc.cls = 'col-pitcher';
+        tc.noToggle = true;
+        out.push(tc);
+      } else {
+        out.push(c);
+      }
+    });
+    _teamColumnsCache[tab] = out;
+    return out;
+  }
+
+  function activeColumns() {
+    return viewMode === 'team' ? teamColumns(currentTab) : COLUMNS[currentTab];
+  }
+
   function getFilters() {
+    const f = _getFiltersBase();
+    f.viewMode = viewMode;
+    if (viewMode === 'team') {
+      // Player-level sample-size gates don't apply to team totals
+      f.minCount = 0;
+      f.minSwings = 0;
+      f.minIp = 0;
+      f.minTbf = 0;
+      f.minBip = 0;
+      f.minPitcherSwings = 0;
+    }
+    return f;
+  }
+
+  function _getFiltersBase() {
     return {
       team: teamSelect.value,
       pitchTypes: (selectedPitchTypes.length === 0 || (selectedPitchTypes.length === 1 && selectedPitchTypes[0] === 'All')) ? ['all'] : selectedPitchTypes.slice(),
@@ -753,7 +845,7 @@
     }
 
     let data = DataStore.getFilteredDataV2(dataTab, filters);
-    const columns = COLUMNS[currentTab];
+    const columns = activeColumns();
 
     data = applyRangeFilters(data, columns);
 
@@ -804,6 +896,7 @@
       vsHand: filters.vsHand,
       throws: filters.throws,
       role: filters.role,
+      viewMode: viewMode,
     });
     saveURLState();
   }
@@ -825,7 +918,7 @@
     })();
 
     document.getElementById('export-csv-btn').addEventListener('click', function () {
-      const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab], allData).filter(function (c) {
+      const visCols = Leaderboard.getVisibleColumns(activeColumns(), allData).filter(function (c) {
         return c.key !== '_rank' && !c.isCompare;
       });
       const csv = Utils.toCSV(allData, visCols);
@@ -837,7 +930,7 @@
     });
 
     document.getElementById('copy-clipboard-btn').addEventListener('click', function () {
-      const visCols = Leaderboard.getVisibleColumns(COLUMNS[currentTab], allData).filter(function (c) {
+      const visCols = Leaderboard.getVisibleColumns(activeColumns(), allData).filter(function (c) {
         return c.key !== '_rank' && !c.isCompare;
       });
       const tsv = Utils.toTSV(allData, visCols);
@@ -1248,7 +1341,7 @@
     const panel = document.getElementById('range-filter-panel');
     panel.innerHTML = '';
 
-    const columns = COLUMNS[currentTab];
+    const columns = activeColumns();
     let currentGroup = '';
 
     columns.forEach(function (col) {
@@ -1396,7 +1489,7 @@
     const panel = document.getElementById('col-settings-panel');
     panel.innerHTML = '';
 
-    const columns = COLUMNS[currentTab];
+    const columns = activeColumns();
     let currentGroup = '';
 
     columns.forEach(function (col) {
@@ -1436,6 +1529,7 @@
     if (PlayerPage.isOpen) return;
     const route = TAB_ROUTE[currentTab] || 'pitchers/stats';
     const parts = [];
+    if (viewMode === 'team') parts.push('view=team');
     if (teamSelect.value !== 'all') parts.push('team=' + teamSelect.value);
     if (throwsSelect.value !== 'all') parts.push('throws=' + throwsSelect.value);
     if (vsHandSelect.value !== 'all') parts.push('vsHand=' + vsHandSelect.value);

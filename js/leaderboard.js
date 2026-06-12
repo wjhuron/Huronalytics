@@ -686,6 +686,7 @@ const Leaderboard = {
       const leagueAvgRow = this.computeLeagueAvgRow(leagueAvgData, visCols, opts);
       leagueAvgRow.pitcher = 'League Avg';
       leagueAvgRow.hitter = 'League Avg';
+      if (opts.viewMode === 'team') leagueAvgRow.team = 'League Avg';
       const leagueTr = this._createRow(leagueAvgRow, visCols, -1, isDark, true);
       leagueTr.classList.add('league-avg-row');
       pinnedBody.appendChild(leagueTr);
@@ -726,6 +727,7 @@ const Leaderboard = {
         if (e.target.type === 'checkbox') return;
         const tr = e.target.closest('tr.clickable-row');
         if (!tr || !tr._rowData) return;
+        if (tr._rowData._isTeamRow) return; // no player side panel for team rows
         const prev = tbody.querySelectorAll('.active-row');
         for (let k = 0; k < prev.length; k++) prev[k].classList.remove('active-row');
         const personName = tr._playerName;
@@ -874,7 +876,11 @@ const Leaderboard = {
           // sprintSpeed: running skill; no PA threshold makes sense.
           const HITTER_ALWAYS_COLOR = { maxEV: true, hr: true, sb: true, sprintSpeed: true };
 
-          if (isPitcherPitchType) {
+          if (row._isTeamRow) {
+            // Team rows: every MLB team is pool-qualified. ROC keeps its
+            // interpolated rank for the tooltip but renders uncolored.
+            showColor = !(Aggregator.loaded && Aggregator._isROCTeam(row.team));
+          } else if (isPitcherPitchType) {
             // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
             showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
           } else if (isPitcherRow) {

@@ -103,6 +103,11 @@ const DataStore = {
    * @returns {(PitcherRow|PitchRow|HitterRow)[]} Filtered row array.
    */
   getFilteredDataV2: function (tab, filters) {
+    if (filters.viewMode === 'team') {
+      // Team aggregation requires micro data; the toggle is hidden when the
+      // Aggregator failed to load, so this is just a safety net.
+      return Aggregator.loaded ? Aggregator.aggregate(tab, filters) : [];
+    }
     if (Aggregator.needsReaggregation(filters)) {
       return Aggregator.aggregate(tab, filters);
     }
