@@ -542,10 +542,13 @@ class BaseballSavantFocusedDownloader:
             print(f"Error getting team games: {str(e)}")
             return []
 
-    def download_game_data(self, game_pk, filter_team=None):
+    def download_game_data(self, game_pk, filter_team=None, filter_player_id=None):
         """
         Download pitch-by-pitch data using the MLB Stats API
         Returns the DataFrame directly rather than saving to a file
+
+        filter_player_id: optional MLB player ID — keep only plays where that
+        player was the pitcher or the batter.
         """
         print(f"Downloading data for game {game_pk}...")
 
@@ -669,6 +672,10 @@ class BaseballSavantFocusedDownloader:
 
                 # If filtering by team and this pitcher is not from that team, skip this play
                 if filter_team and pitcher_team != filter_team:
+                    continue
+
+                # If filtering by player ID, keep only plays where that player pitched or batted
+                if filter_player_id and pitcher_id != filter_player_id and batter_id != filter_player_id:
                     continue
 
                 # Get pitch hand from the matchup data
@@ -883,7 +890,8 @@ class BaseballSavantFocusedDownloader:
             print(f"Error downloading game data: {str(e)}")
             return None
 
-    def download_statcast_supplement(self, team_abbrev, start_date, end_date):
+    def download_statcast_supplement(self, team_abbrev, start_date, end_date,
+                                     player_id=None, player_type='pitcher'):
         """
         Download supplemental data from Statcast Search CSV endpoint.
         Provides columns not available in the live feed API:
@@ -896,12 +904,13 @@ class BaseballSavantFocusedDownloader:
         - delta_pitcher_run_exp (RunExp)
         - on_1b, on_2b, on_3b (Runners)
 
+        Queries by team (team_abbrev) by default. If player_id is given, the
+        team filter is replaced with a single-player lookup: player_type
+        'pitcher' → pitches thrown, 'batter' → pitches faced.
+
         Returns a DataFrame keyed on game_pk, at_bat_number, pitch_number
         for merging with live feed data, or None if the request fails.
         """
-        statcast_team = self.get_statcast_team_abbrev(team_abbrev)
-        print(f"Downloading Statcast Search supplement for {team_abbrev} ({statcast_team})...")
-
         url = "https://baseballsavant.mlb.com/statcast_search/csv"
 
         params = {
@@ -909,13 +918,21 @@ class BaseballSavantFocusedDownloader:
             'type': 'details',
             'game_date_gt': start_date,
             'game_date_lt': end_date,
-            'team': statcast_team,
-            'player_type': 'pitcher',
+            'player_type': player_type,
             'min_pitches': '0',
             'min_results': '0',
             'sort_col': 'pitches',
             'sort_order': 'desc',
         }
+
+        if player_id:
+            lookup_key = 'batters_lookup[]' if player_type == 'batter' else 'pitchers_lookup[]'
+            params[lookup_key] = str(player_id)
+            print(f"Downloading Statcast Search supplement for player {player_id} ({player_type})...")
+        else:
+            statcast_team = self.get_statcast_team_abbrev(team_abbrev)
+            params['team'] = statcast_team
+            print(f"Downloading Statcast Search supplement for {team_abbrev} ({statcast_team})...")
 
         try:
             response = self.session.get(url, params=params, timeout=60)
@@ -1383,21 +1400,237 @@ class BaseballSavantFocusedDownloader:
 
         return output_filename
 
+    def get_player_info(self, player_id):
+        """
+        Look up a player's full name and primary position code from the MLB Stats API.
+
+        Returns (full_name, position_code) — e.g., ("Paul Skenes", "1").
+        Position codes: "1" = pitcher, "Y" = two-way player, anything else = position player.
+        Returns (None, None) if the lookup fails.
+        """
+        url = f"https://statsapi.mlb.com/api/v1/people/{player_id}"
+
+        try:
+            response = self.session.get(url, timeout=30)
+
+            if response.status_code != 200:
+                print(f"Error: player lookup returned status code {response.status_code}")
+                return None, None
+
+            people = response.json().get('people', [])
+            if not people:
+                print(f"Error: no player found for ID {player_id}")
+                return None, None
+
+            person = people[0]
+            full_name = person.get('fullName', str(player_id))
+            position_code = person.get('primaryPosition', {}).get('code', '')
+            return full_name, position_code
+
+        except Exception as e:
+            print(f"Error looking up player {player_id}: {str(e)}")
+            return None, None
+
+    def get_player_games(self, player_id, season, group):
+        """
+        Get all games a player appeared in for a season from their MLB game log.
+
+        group: "pitching" or "hitting" — which game log to pull.
+        Uses the same game types as team mode (spring training through World Series).
+
+        Returns a list of (date, game_pk) tuples.
+        """
+        url = f"https://statsapi.mlb.com/api/v1/people/{player_id}/stats"
+
+        params = {
+            "stats": "gameLog",
+            "season": season,
+            "group": group,
+            "gameType": "E,S,R,F,D,L,W",
+        }
+
+        try:
+            response = self.session.get(url, params=params, timeout=30)
+
+            if response.status_code != 200:
+                print(f"Error: {group} game log returned status code {response.status_code}")
+                return []
+
+            games = []
+            for stat in response.json().get('stats', []):
+                for split in stat.get('splits', []):
+                    game_pk = split.get('game', {}).get('gamePk')
+                    if game_pk:
+                        games.append((split.get('date', ''), game_pk))
+            return games
+
+        except Exception as e:
+            print(f"Error getting {group} game log: {str(e)}")
+            return []
+
+    def download_player_games(self, player_id, season, output_name=None, save_csv=True):
+        """
+        Download every game a player appeared in for a season and save as a single CSV.
+
+        Looks up the player's game log via the MLB Stats API, downloads each game's
+        live feed data filtered to that player's plays, then merges the Statcast
+        Search supplement via single-player lookup.
+
+        Pitchers get every pitch they threw; hitters get every pitch they faced.
+        Two-way players get both.
+
+        Args:
+            player_id: MLB player ID (e.g., 694973)
+            season: Season year (e.g., "2026")
+            output_name: Optional filename stem. Defaults to the player's name.
+        """
+        try:
+            player_id = int(str(player_id).strip())
+        except (ValueError, TypeError):
+            print(f"Error: invalid player ID '{player_id}'")
+            return None
+
+        player_name, position_code = self.get_player_info(player_id)
+        if player_name is None:
+            return None
+
+        is_pitcher = position_code in ('1', 'Y')  # pitcher or two-way player
+        is_hitter = position_code != '1'          # everyone except pure pitchers
+
+        role = {'1': 'pitcher', 'Y': 'two-way player'}.get(position_code, 'hitter')
+        print(f"Player: {player_name} (ID {player_id}, {role})")
+
+        # Collect game PKs from the applicable game logs (a two-way player
+        # appears in both); dedupe and keep chronological order
+        entries = []
+        if is_pitcher:
+            entries.extend(self.get_player_games(player_id, season, 'pitching'))
+        if is_hitter:
+            entries.extend(self.get_player_games(player_id, season, 'hitting'))
+
+        game_pks = []
+        seen = set()
+        for date, game_pk in sorted(set(entries)):
+            if game_pk not in seen:
+                seen.add(game_pk)
+                game_pks.append(game_pk)
+
+        if not game_pks:
+            print(f"No {season} games found for {player_name}")
+            return None
+
+        print(f"Found {len(game_pks)} games for {player_name} in {season}")
+
+        # Download and process each game, keeping only this player's plays
+        all_dfs = []
+        for game_pk in game_pks:
+            df = self.download_game_data(game_pk, filter_player_id=player_id)
+
+            if df is not None:
+                # Fetch real-time bat speed from Savant game feed
+                df = self.merge_bat_speed(df, game_pk)
+                all_dfs.append(df)
+                print(f"Successfully downloaded data for game {game_pk}")
+            else:
+                print(f"Failed to download data for game {game_pk}")
+
+            # Add a small delay to avoid rate limiting
+            time.sleep(1)
+
+        print(f"Downloaded {len(all_dfs)} out of {len(game_pks)} games for {player_name}")
+
+        if not all_dfs:
+            print(f"Failed to download any games for {player_name}")
+            return None
+
+        combined_df = pd.concat(all_dfs, ignore_index=True)
+
+        # Statcast Search supplement via single-player lookup, bounded by the
+        # dates actually downloaded (two-way players need both perspectives)
+        print("\nAttempting Statcast Search supplement download...")
+        sup_start = combined_df['Game Date'].min()
+        sup_end = combined_df['Game Date'].max()
+
+        supplement_frames = []
+        if is_pitcher:
+            sup = self.download_statcast_supplement(None, sup_start, sup_end,
+                                                    player_id=player_id, player_type='pitcher')
+            if sup is not None:
+                supplement_frames.append(sup)
+        if is_hitter:
+            sup = self.download_statcast_supplement(None, sup_start, sup_end,
+                                                    player_id=player_id, player_type='batter')
+            if sup is not None:
+                supplement_frames.append(sup)
+
+        if supplement_frames:
+            supplement_df = pd.concat(supplement_frames, ignore_index=True)
+            supplement_df = supplement_df.drop_duplicates(
+                subset=['game_pk', 'at_bat_number', 'pitch_number'])
+        else:
+            supplement_df = None
+
+        combined_df = self.merge_statcast_supplement(combined_df, supplement_df)
+
+        # Enforce final column order
+        final_columns = [
+            'Game Date', 'PTeam', 'Pitcher', 'Throws', 'Pitch Type',
+            'Velocity', 'Spin Rate', 'RTilt', 'OTilt', 'IndVertBrk', 'HorzBrk',
+            'xIndVrtBrk', 'xHorzBrk',
+            'RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'EffectiveVelo',
+            'PlateZ', 'PlateX', 'SzTop', 'SzBot',
+            'VAA', 'HAA', 'PlateTime',
+            'BTeam', 'Batter', 'Bats', 'Count', 'Runners', 'Outs',
+            'Description', 'Event',
+            'ExitVelo', 'LaunchAngle', 'Distance', 'BBType',
+            'HC_X', 'HC_Y', 'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom', 'RunExp',
+            'BatSpeed', 'SwingLength',
+            'AttackAngle', 'AttackDirection', 'SwingPathTilt',
+            'Int_X', 'Int_Y',
+            'PitchID',
+            'Barrel',
+        ]
+        final_columns = [c for c in final_columns if c in combined_df.columns]
+        combined_df = combined_df[final_columns]
+
+        # ROC/AAA normalization (no-op for MLB downloads)
+        combined_df = self.normalize_aaa_labels(combined_df)
+
+        stem = output_name if output_name else str(player_name).replace('/', '_')
+        output_filename = os.path.join(self.download_dir, f"{stem}.csv")
+        if save_csv:
+            combined_df.to_csv(output_filename, index=False)
+
+        print(f"\nCombined {len(all_dfs)} games with {len(combined_df)} total pitches")
+        if save_csv:
+            print(f"Data saved to: {output_filename}")
+
+        # Stash for downstream Sheets push (caller passes flag to main)
+        self._last_combined_df = combined_df
+
+        return output_filename
+
 
 def main():
     """Main function to download pitcher data"""
 
     # ── Settings (edit these directly or override via command line) ──
     team_abbrev     = ""
-    start_date      = "2026-05-09"
-    end_date        = "2026-05-09"
+    start_date      = "2026-06-12"
+    end_date        = "2026-06-12"
     pitchers_only   = True
 
-    game_id         = "815678"          # Game PK (e.g., "831437") — leave blank for team/date lookup
+    game_id         = ""          # Game PK (e.g., "831437") — leave blank for team/date lookup
     filter_team     = None        # Optional team filter for game ID mode (e.g., "CAN")
     output_name     = ""          # Optional custom filename (without .csv)
 
-    push_to_sheets  = False       # True → also append to AL/NL 2026 Google Sheets after CSV save
+    player_id       = ""          # MLB player ID (e.g., "694973") — pulls ALL of the player's games
+                                  # for the season (year of start_date), with Statcast supplement.
+                                  # Pitchers → every pitch thrown; hitters → every pitch faced.
+                                  # Saves a CSV named after the player (or output_name); never
+                                  # pushes to Sheets (would duplicate rows from daily team pulls).
+
+    push_to_sheets  = True       # True → also append to AL/NL 2026 Google Sheets after CSV save
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
     parser = argparse.ArgumentParser(description='Download pitch data from Baseball Savant')
@@ -1408,6 +1641,7 @@ def main():
     parser.add_argument('--no-pitchers-only', dest='pitchers_only', action='store_false')
     parser.add_argument('--game-id', default=None, help='Game PK (e.g., 831437)')
     parser.add_argument('--filter-team', default=None, help='Team filter for game ID mode')
+    parser.add_argument('--player-id', default=None, help='MLB player ID — pull all of their games for the season')
     parser.add_argument('--output-name', default=None, help='Custom filename (without .csv)')
     parser.add_argument('--push-to-sheets', dest='push_to_sheets', action='store_true', default=None,
                         help='After saving the CSV, append the data into the matching tab '
@@ -1422,16 +1656,34 @@ def main():
     if args.pitchers_only is not None: pitchers_only = args.pitchers_only
     if args.game_id is not None: game_id = args.game_id
     if args.filter_team is not None: filter_team = args.filter_team
+    if args.player_id is not None: player_id = args.player_id
     if args.push_to_sheets is not None: push_to_sheets = args.push_to_sheets
     if args.output_name is not None: output_name = args.output_name
 
     downloader = BaseballSavantFocusedDownloader()
 
+    # Player ID mode always writes a local CSV and never pushes to Sheets —
+    # a season-long single-player pull would duplicate rows already appended
+    # to the team tabs by the daily pulls.
+    if player_id and push_to_sheets:
+        print("Player ID mode: skipping Sheets push — writing local CSV instead.")
+        push_to_sheets = False
+
     # When pushing to Sheets, the local CSV is redundant — skip writing it.
     save_csv = not push_to_sheets
 
-    # ── Logic: game_id takes priority, otherwise fall back to team/date lookup ──
-    if game_id:
+    # ── Logic: player_id first, then game_id, then team/date lookup ──
+    if player_id:
+        result = downloader.download_player_games(
+            player_id=player_id,
+            season=start_date[:4],
+            output_name=output_name if output_name else None,
+        )
+
+        if not result:
+            print("\nFailed to download player data")
+
+    elif game_id:
         result = downloader.download_games_by_id(
             game_pks=game_id,
             filter_team=filter_team,
@@ -1461,7 +1713,7 @@ def main():
             print(f"\nFailed to download any games for {team_abbrev}")
 
     else:
-        print("Error: Please set either game_id or team_abbrev")
+        print("Error: Please set player_id, game_id, or team_abbrev")
         return
 
     # Push to Google Sheets if requested. The dataframe is grouped by PTeam,
