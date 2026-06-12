@@ -576,6 +576,12 @@
     container.appendChild(_createChip('All', function (item) { toggleHitterPitchChip(item); }, true));
     _appendDivider(container);
 
+    // Category chips combine member pitch types into one row per pitcher/team
+    ['Hard', 'Breaking', 'Offspeed'].forEach(function (item) {
+      container.appendChild(_createChip(item, function (it) { toggleHitterPitchChip(it); }, false));
+    });
+    _appendDivider(container);
+
     PITCH_TYPE_ORDER.forEach(function (item) {
       if (item === '|') { _appendDivider(container); return; }
       if (available.indexOf(item) === -1) return;

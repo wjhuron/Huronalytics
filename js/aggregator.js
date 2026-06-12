@@ -997,21 +997,81 @@ const Aggregator = {
     { key: '_plateX', sum: 'sumPlateX', cnt: 'nPlateX', round: 2 },
   ],
 
+  _newPitchOvr: function () {
+    return { nVaaS: 0, nVaaW: 0, nHaaS: 0, nHaaW: 0, xIvbS: 0, xIvbW: 0,
+             ivbOeS: 0, ivbOeW: 0, xHbS: 0, xHbW: 0, hbOeS: 0, hbOeW: 0 };
+  },
+
+  /**
+   * Model-derived values for a per-(pitcher, pitchType) micro group: nVAA/nHAA
+   * (location-normalized approach angles via per-type regressions) and
+   * xIVB/xHB + IVBOE/HBOE (MVN conditional movement model, hand-specific).
+   * All values signed from the pitcher's POV; callers decide whether to
+   * magnitude/align them when mixing hands.
+   */
+  _pitchGroupModel: function (g, lookups) {
+    const ms = g.metricSums;
+    const mean = function (s, c) { return (ms[c] || 0) > 0 ? ms[s] / ms[c] : null; };
+    const ptName = lookups.pitchTypes[g.pitchTypeIdx];
+    const out = { w: g.counts[0] || 0, nVAA: null, nHAA: null, xIVB: null, xHB: null, ivbOE: null, hbOE: null };
+
+    const vaaRegs = DataStore.metadata && DataStore.metadata.vaaRegressions;
+    const vaaReg = vaaRegs && vaaRegs[ptName];
+    const vaaMean = mean('sumVAA', 'nVAA');
+    const plateZMean = mean('sumPlateZ', 'nPlateZ');
+    if (vaaMean != null && plateZMean != null && vaaReg && vaaReg.leagueAvgPlateZ != null) {
+      out.nVAA = vaaMean - vaaReg.slope * (plateZMean - vaaReg.leagueAvgPlateZ);
+    }
+
+    const haaRegs = DataStore.metadata && DataStore.metadata.haaRegressions;
+    const haaReg = haaRegs && haaRegs[ptName];
+    const haaMean = mean('sumHAA', 'nHAA');
+    const plateXMean = mean('sumPlateX', 'nPlateX');
+    if (haaMean != null && plateXMean != null && haaReg && haaReg.leagueAvgPlateX != null) {
+      out.nHAA = haaMean - haaReg.slope * (plateXMean - haaReg.leagueAvgPlateX);
+    }
+
+    const mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
+    const ptModel = mvnModels && mvnModels[ptName + '_' + g.throws];
+    const armMean = mean('sumArmAngle', 'nArmAngle');
+    const extMean = mean('sumExt', 'nExt');
+    const veloMean = mean('sumVelo', 'nVelo');
+    const relZMean = mean('sumRelZ', 'nRelZ');
+    const relXMean = mean('sumRelX', 'nRelX');
+    const ivbMean = mean('sumIVB', 'nIVB');
+    const hbMean = mean('sumHB', 'nHB');
+    let xIVB_i = null, xHB_i = null;
+    if (ptModel && ptModel.mlb && armMean != null && extMean != null && veloMean != null) {
+      const muBar = this._mvnConditional(ptModel.mlb, [armMean, extMean, veloMean]);
+      if (muBar) { xIVB_i = muBar[0]; xHB_i = muBar[1]; }
+    }
+    if (xIVB_i === null && ptModel && ptModel.roc && relZMean != null && relXMean != null && extMean != null && veloMean != null) {
+      const muBar2 = this._mvnConditional(ptModel.roc, [relZMean, relXMean, extMean, veloMean]);
+      if (muBar2) { xIVB_i = muBar2[0]; xHB_i = muBar2[1]; }
+    }
+    if (xIVB_i != null) {
+      out.xIVB = xIVB_i;
+      if (ivbMean != null) out.ivbOE = ivbMean - xIVB_i;
+    }
+    if (xHB_i != null) {
+      out.xHB = xHB_i;
+      if (hbMean != null) out.hbOE = hbMean - xHB_i;
+    }
+    return out;
+  },
+
   /**
    * Team mode: roll per-(pitcher, team, pitchType) groups up to (team, pitchType).
    * Counts and most metric sums add directly. Hand-mirrored metrics (HB, RelX,
    * HAA) accumulate |per-pitcher mean| × n so LHP/RHP signs don't cancel — the
    * team value reads as an average magnitude. Model-derived values (xIVB/xHB,
-   * IVBOE/HBOE, nHAA) are computed per pitcher (they depend on the pitcher's
-   * hand and release) and combined as pitch-count-weighted means; HBOE is
-   * sign-aligned to each pitch's natural break direction first.
+   * IVBOE/HBOE, nVAA/nHAA) are computed per pitcher (they depend on the
+   * pitcher's hand and release) and combined as pitch-count-weighted means;
+   * HBOE is sign-aligned to each pitch's natural break direction first.
    */
   _rollupPitchTeamGroups: function (groups, lookups) {
-    const self = this;
     const MM = this._PITCH_METRIC_MAP;
     const MIRRORED = { sumHB: true, sumRelX: true, sumHAA: true };
-    const haaRegs = DataStore.metadata && DataStore.metadata.haaRegressions;
-    const mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
     const teamGroups = {};
 
     for (const gk in groups) {
@@ -1024,7 +1084,7 @@ const Aggregator = {
           pitcherIdx: null, teamIdx: g.teamIdx, throws: null, pitchTypeIdx: g.pitchTypeIdx,
           counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
           metricSums: {},
-          _ovr: { nHaaS: 0, nHaaW: 0, xIvbS: 0, xIvbW: 0, ivbOeS: 0, ivbOeW: 0, xHbS: 0, xHbW: 0, hbOeS: 0, hbOeW: 0 }
+          _ovr: this._newPitchOvr()
         };
         for (const mk in ms) tg.metricSums[mk] = 0;
       }
@@ -1040,51 +1100,87 @@ const Aggregator = {
       tg.metricSums.sumTiltCos += ms.sumTiltCos || 0;
       tg.metricSums.nTilt += ms.nTilt || 0;
 
-      // Per-pitcher model values, weighted into the team accumulator
-      const w = g.counts[0];
+      // Per-pitcher model values, weighted into the team accumulator.
+      // Magnitude for hand-mirrored values (nHAA, xHB); HBOE aligned to the
+      // pitch's natural break direction; nVAA/xIVB/IVBOE are not mirrored.
+      const mv = this._pitchGroupModel(g, lookups);
+      const w = mv.w;
       if (!(w > 0)) continue;
-      const mean = function (s, c) { return (ms[c] || 0) > 0 ? ms[s] / ms[c] : null; };
-      const ptName = lookups.pitchTypes[g.pitchTypeIdx];
-
-      const haaMean = mean('sumHAA', 'nHAA');
-      const plateXMean = mean('sumPlateX', 'nPlateX');
-      const haaReg = haaRegs && haaRegs[ptName];
-      if (haaMean != null && plateXMean != null && haaReg && haaReg.leagueAvgPlateX != null) {
-        const nHAA_i = haaMean - haaReg.slope * (plateXMean - haaReg.leagueAvgPlateX);
-        tg._ovr.nHaaS += Math.abs(nHAA_i) * w;
-        tg._ovr.nHaaW += w;
-      }
-
-      const armMean = mean('sumArmAngle', 'nArmAngle');
-      const extMean = mean('sumExt', 'nExt');
-      const veloMean = mean('sumVelo', 'nVelo');
-      const relZMean = mean('sumRelZ', 'nRelZ');
-      const relXMean = mean('sumRelX', 'nRelX');
-      const ivbMean = mean('sumIVB', 'nIVB');
-      const hbMean = mean('sumHB', 'nHB');
-      const ptModel = mvnModels && mvnModels[ptName + '_' + g.throws];
-      let xIVB_i = null, xHB_i = null;
-      if (ptModel && ptModel.mlb && armMean != null && extMean != null && veloMean != null) {
-        const muBar = self._mvnConditional(ptModel.mlb, [armMean, extMean, veloMean]);
-        if (muBar) { xIVB_i = muBar[0]; xHB_i = muBar[1]; }
-      }
-      if (xIVB_i === null && ptModel && ptModel.roc && relZMean != null && relXMean != null && extMean != null && veloMean != null) {
-        const muBar2 = self._mvnConditional(ptModel.roc, [relZMean, relXMean, extMean, veloMean]);
-        if (muBar2) { xIVB_i = muBar2[0]; xHB_i = muBar2[1]; }
-      }
-      if (xIVB_i != null) {
-        tg._ovr.xIvbS += xIVB_i * w; tg._ovr.xIvbW += w;
-        if (ivbMean != null) { tg._ovr.ivbOeS += (ivbMean - xIVB_i) * w; tg._ovr.ivbOeW += w; }
-      }
-      if (xHB_i != null) {
-        tg._ovr.xHbS += Math.abs(xHB_i) * w; tg._ovr.xHbW += w;
-        if (hbMean != null) {
-          const sgn = xHB_i < 0 ? -1 : 1;
-          tg._ovr.hbOeS += (hbMean - xHB_i) * sgn * w; tg._ovr.hbOeW += w;
-        }
+      const o = tg._ovr;
+      if (mv.nVAA != null) { o.nVaaS += mv.nVAA * w; o.nVaaW += w; }
+      if (mv.nHAA != null) { o.nHaaS += Math.abs(mv.nHAA) * w; o.nHaaW += w; }
+      if (mv.xIVB != null) { o.xIvbS += mv.xIVB * w; o.xIvbW += w; }
+      if (mv.ivbOE != null) { o.ivbOeS += mv.ivbOE * w; o.ivbOeW += w; }
+      if (mv.xHB != null) { o.xHbS += Math.abs(mv.xHB) * w; o.xHbW += w; }
+      if (mv.hbOE != null && mv.xHB != null) {
+        const sgn = mv.xHB < 0 ? -1 : 1;
+        o.hbOeS += mv.hbOE * sgn * w; o.hbOeW += w;
       }
     }
     return teamGroups;
+  },
+
+  /**
+   * Add combined category groups (Hard / Breaking / Offspeed) built from the
+   * base per-type groups. Player mode combines within a pitcher (one hand, so
+   * raw sums are safe); team mode combines already-rolled-up team groups whose
+   * metric sums are magnitude-corrected and whose _ovr accumulators are
+   * additive. Category rows carry catName instead of a pitchTypeIdx.
+   */
+  _addCategoryPitchGroups: function (base, lookups, selectedPitchTypes, teamMode) {
+    const CATS = this.PITCH_CATEGORIES;
+    const cats = selectedPitchTypes.filter(function (s) { return !!CATS[s]; });
+    if (cats.length === 0) return base;
+
+    const out = {};
+    for (const bk in base) out[bk] = base[bk];
+
+    for (let ci = 0; ci < cats.length; ci++) {
+      const cat = cats[ci];
+      const typeSet = {};
+      for (let ti = 0; ti < CATS[cat].length; ti++) typeSet[CATS[cat][ti]] = true;
+
+      for (const gk in base) {
+        const g = base[gk];
+        if (g.catName) continue;
+        if (!typeSet[lookups.pitchTypes[g.pitchTypeIdx]]) continue;
+
+        const ck = (teamMode ? String(g.teamIdx) : (g.pitcherIdx + '|' + g.teamIdx)) + '|cat|' + cat;
+        let cg = out[ck];
+        if (!cg) {
+          cg = out[ck] = {
+            pitcherIdx: g.pitcherIdx, teamIdx: g.teamIdx, throws: g.throws,
+            pitchTypeIdx: null, catName: cat,
+            counts: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            metricSums: {},
+            _ovr: this._newPitchOvr()
+          };
+          for (const mk in g.metricSums) cg.metricSums[mk] = 0;
+        }
+        for (let f = 0; f < 22; f++) cg.counts[f] += g.counts[f];
+        for (const mk2 in g.metricSums) cg.metricSums[mk2] += g.metricSums[mk2] || 0;
+
+        if (teamMode) {
+          // Team base groups carry additive _ovr accumulators
+          const so = g._ovr, co = cg._ovr;
+          for (const ok in so) co[ok] += so[ok];
+        } else {
+          // Per-pitcher per-type model values, signed (single hand)
+          const mv = this._pitchGroupModel(g, lookups);
+          const w = mv.w;
+          if (w > 0) {
+            const o = cg._ovr;
+            if (mv.nVAA != null) { o.nVaaS += mv.nVAA * w; o.nVaaW += w; }
+            if (mv.nHAA != null) { o.nHaaS += mv.nHAA * w; o.nHaaW += w; }
+            if (mv.xIVB != null) { o.xIvbS += mv.xIVB * w; o.xIvbW += w; }
+            if (mv.ivbOE != null) { o.ivbOeS += mv.ivbOE * w; o.ivbOeW += w; }
+            if (mv.xHB != null) { o.xHbS += mv.xHB * w; o.xHbW += w; }
+            if (mv.hbOE != null) { o.hbOeS += mv.hbOE * w; o.hbOeW += w; }
+          }
+        }
+      }
+    }
+    return out;
   },
 
   /**
@@ -1094,18 +1190,67 @@ const Aggregator = {
    * rates are weighted by their natural denominators (PA for expected stats,
    * BIP for batted-ball, pitches for Strike%/Stuff+, sample N for Loc+).
    */
-  _mergeTeamPitchPreAgg: function (rows, filters, PITCH_BB_KEYS, vsHand) {
-    const roleCache = this._ensureRoleCache();
-    const pd = window.PITCH_DATA || [];
-    const handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
-    const X_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
-    const acc = {};
+  // Categories (Hard/Breaking/Offspeed) containing the given pitch type that
+  // are present in the user's selection.
+  _selectedCatsForType: function (selectedPitchTypes, pitchType) {
+    const CATS = this.PITCH_CATEGORIES;
+    const out = [];
+    for (let i = 0; i < selectedPitchTypes.length; i++) {
+      const sel = selectedPitchTypes[i];
+      if (CATS[sel] && CATS[sel].indexOf(pitchType) !== -1) out.push(sel);
+    }
+    return out;
+  },
 
+  // Accumulate one PITCH_DATA row into a (team|type) or (entity|category)
+  // pre-agg bucket. RV sums stay full precision; rates weight by their
+  // natural denominators.
+  _accumPitchPreAgg: function (acc, k, p, handSfx, PITCH_BB_KEYS) {
+    const X_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
     function wadd(a, key, val, w) {
       if (val == null || !(w > 0)) return;
       a.sums[key] = (a.sums[key] || 0) + val * w;
       a.wts[key] = (a.wts[key] || 0) + w;
     }
+    let a = acc[k];
+    if (!a) a = acc[k] = { runValue: null, xRunValue: null, count: 0, maxVelo: null, sums: {}, wts: {} };
+    a.count += p.count || 0;
+    if (p.runValue != null) a.runValue = (a.runValue || 0) + p.runValue;
+    if (p.xRunValue != null) a.xRunValue = (a.xRunValue || 0) + p.xRunValue;
+    if (p.maxVelo != null && (a.maxVelo == null || p.maxVelo > a.maxVelo)) a.maxVelo = p.maxVelo;
+    wadd(a, 'strikePct', p.strikePct, p.count);
+    wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
+    wadd(a, 'stuffScore', p.stuffScore, p.count);
+    wadd(a, 'locPlus', p.locPlus, p.locPlusN);
+    for (let xi = 0; xi < X_KEYS.length; xi++) {
+      const xk = X_KEYS[xi];
+      const v = (handSfx && p[xk + handSfx] !== undefined) ? p[xk + handSfx] : p[xk];
+      wadd(a, xk, v, p.pa);
+    }
+    for (let bi = 0; bi < PITCH_BB_KEYS.length; bi++) {
+      const bk = PITCH_BB_KEYS[bi];
+      const bv = (handSfx && p[bk + handSfx] !== undefined) ? p[bk + handSfx] : p[bk];
+      wadd(a, bk, bv, p.nBip);
+    }
+  },
+
+  _assignPitchPreAgg: function (r, a) {
+    r.runValue = a.runValue;
+    r.xRunValue = a.xRunValue;
+    r.rv100 = (a.runValue != null && a.count > 0) ? a.runValue / a.count * 100 : null;
+    r.xRv100 = (a.xRunValue != null && a.count > 0) ? a.xRunValue / a.count * 100 : null;
+    r.maxVelo = a.maxVelo;
+    for (const sk in a.sums) {
+      if (a.wts[sk] > 0) r[sk] = a.sums[sk] / a.wts[sk];
+    }
+  },
+
+  _mergeTeamPitchPreAgg: function (rows, filters, PITCH_BB_KEYS, vsHand) {
+    const roleCache = this._ensureRoleCache();
+    const pd = window.PITCH_DATA || [];
+    const handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
+    const selected = filters.pitchTypes || ['all'];
+    const acc = {};
 
     for (let i = 0; i < pd.length; i++) {
       const p = pd[i];
@@ -1114,42 +1259,46 @@ const Aggregator = {
       if (filters.role && filters.role !== 'all' &&
           (roleCache[p.pitcher + '|' + p.team] || 'RP') !== filters.role) continue;
 
-      const k = p.team + '|' + p.pitchType;
-      let a = acc[k];
-      if (!a) a = acc[k] = { runValue: null, xRunValue: null, count: 0, maxVelo: null, sums: {}, wts: {} };
-
-      a.count += p.count || 0;
-      if (p.runValue != null) a.runValue = (a.runValue || 0) + p.runValue;
-      if (p.xRunValue != null) a.xRunValue = (a.xRunValue || 0) + p.xRunValue;
-      if (p.maxVelo != null && (a.maxVelo == null || p.maxVelo > a.maxVelo)) a.maxVelo = p.maxVelo;
-      wadd(a, 'strikePct', p.strikePct, p.count);
-      wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
-      wadd(a, 'stuffScore', p.stuffScore, p.count);
-      wadd(a, 'locPlus', p.locPlus, p.locPlusN);
-      for (let xi = 0; xi < X_KEYS.length; xi++) {
-        const xk = X_KEYS[xi];
-        const v = (handSfx && p[xk + handSfx] !== undefined) ? p[xk + handSfx] : p[xk];
-        wadd(a, xk, v, p.pa);
+      this._accumPitchPreAgg(acc, p.team + '|' + p.pitchType, p, handSfx, PITCH_BB_KEYS);
+      // Selected category groups aggregate the same rows under the category key
+      const cats = this._selectedCatsForType(selected, p.pitchType);
+      for (let ci = 0; ci < cats.length; ci++) {
+        this._accumPitchPreAgg(acc, p.team + '|' + cats[ci], p, handSfx, PITCH_BB_KEYS);
       }
-      for (let bi = 0; bi < PITCH_BB_KEYS.length; bi++) {
-        const bk = PITCH_BB_KEYS[bi];
-        const bv = (handSfx && p[bk + handSfx] !== undefined) ? p[bk + handSfx] : p[bk];
-        wadd(a, bk, bv, p.nBip);
+    }
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const a = acc[rows[ri].team + '|' + rows[ri].pitchType];
+      if (a) this._assignPitchPreAgg(rows[ri], a);
+    }
+  },
+
+  /**
+   * Player mode: category rows (Hard/Breaking/Offspeed) have no pre-agg
+   * PITCH_DATA row — aggregate the member pitch types per pitcher and merge.
+   * Individual-type rows keep their season pre-agg values (and _pctl) from the
+   * regular merge.
+   */
+  _mergePlayerCatPitchPreAgg: function (rows, filters, PITCH_BB_KEYS, vsHand) {
+    const CATS = this.PITCH_CATEGORIES;
+    const pd = window.PITCH_DATA || [];
+    const handSfx = (vsHand === 'L') ? '_vsL' : (vsHand === 'R') ? '_vsR' : '';
+    const selected = filters.pitchTypes || ['all'];
+    const acc = {};
+
+    for (let i = 0; i < pd.length; i++) {
+      const p = pd[i];
+      const cats = this._selectedCatsForType(selected, p.pitchType);
+      for (let ci = 0; ci < cats.length; ci++) {
+        this._accumPitchPreAgg(acc, p.pitcher + '|' + p.team + '|' + cats[ci], p, handSfx, PITCH_BB_KEYS);
       }
     }
 
     for (let ri = 0; ri < rows.length; ri++) {
       const r = rows[ri];
-      const a = acc[r.team + '|' + r.pitchType];
-      if (!a) continue;
-      r.runValue = a.runValue;
-      r.xRunValue = a.xRunValue;
-      r.rv100 = (a.runValue != null && a.count > 0) ? a.runValue / a.count * 100 : null;
-      r.xRv100 = (a.xRunValue != null && a.count > 0) ? a.xRunValue / a.count * 100 : null;
-      r.maxVelo = a.maxVelo;
-      for (const sk in a.sums) {
-        if (a.wts[sk] > 0) r[sk] = a.sums[sk] / a.wts[sk];
-      }
+      if (!CATS[r.pitchType]) continue;
+      const a = acc[r.pitcher + '|' + r.team + '|' + r.pitchType];
+      if (a) this._assignPitchPreAgg(r, a);
     }
   },
 
@@ -1233,7 +1382,10 @@ const Aggregator = {
     }
 
     let rows = [];
-    const buildGroups = teamMode ? this._rollupPitchTeamGroups(groups, lookups) : groups;
+    const selectedPT = filters.pitchTypes || ['all'];
+    let buildGroups = teamMode ? this._rollupPitchTeamGroups(groups, lookups) : groups;
+    buildGroups = this._addCategoryPitchGroups(buildGroups, lookups, selectedPT, teamMode);
+    const hasCats = selectedPT.some(function (s) { return !!Aggregator.PITCH_CATEGORIES[s]; });
     for (let gk2 in buildGroups) {
       const g = buildGroups[gk2];
       const c = g.counts;
@@ -1263,7 +1415,7 @@ const Aggregator = {
         team: teamName2,
         mlbId: pitcherName2 != null ? (mlbIdMap[pitcherName2 + '|' + teamName2] || null) : null,
         throws: g.throws,
-        pitchType: lookups.pitchTypes[g.pitchTypeIdx],
+        pitchType: g.catName || lookups.pitchTypes[g.pitchTypeIdx],
         count: n,
         nSwings: sw,
         nBip: bip,
@@ -1362,15 +1514,22 @@ const Aggregator = {
         obj.breakTiltMinutes = null;
       }
 
-      if (teamMode) {
-        // Hand-dependent model values: replace the team-sum versions with the
-        // per-pitcher weighted means accumulated during rollup.
+      if (g._ovr) {
+        // Model-derived values for team and category rows: replace the
+        // generic group-sum versions with the per-(pitcher, type) weighted
+        // means accumulated during rollup/combination (the per-type
+        // regressions and hand-specific MVN models don't apply to mixed
+        // groups directly).
         const o = g._ovr;
+        obj.nVAA = o.nVaaW > 0 ? Number((o.nVaaS / o.nVaaW).toFixed(2)) : null;
         obj.nHAA = o.nHaaW > 0 ? Number((o.nHaaS / o.nHaaW).toFixed(2)) : null;
         obj.xIVB = o.xIvbW > 0 ? Number((o.xIvbS / o.xIvbW).toFixed(1)) : null;
         obj.ivbOE = o.ivbOeW > 0 ? Number((o.ivbOeS / o.ivbOeW).toFixed(1)) : null;
         obj.xHB = o.xHbW > 0 ? Number((o.xHbS / o.xHbW).toFixed(1)) : null;
         obj.hbOE = o.hbOeW > 0 ? Number((o.hbOeS / o.hbOeW).toFixed(1)) : null;
+      }
+
+      if (teamMode) {
         obj._isTeamRow = true;
         if (filters.pitchTypes && filters.pitchTypes.indexOf('all') === -1 && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
         // Same default floor as player mode ('Qualified' = 25 pitches of the
@@ -1455,6 +1614,11 @@ const Aggregator = {
       }
     }
 
+    // Category rows aggregate their member types' pre-agg stats per pitcher
+    if (hasCats) {
+      this._mergePlayerCatPitchPreAgg(rows, filters, PITCH_BB_KEYS, vsHand);
+    }
+
     // Multi-team _inPool: per-team rows of players with a 2TM/3TM row interpolate
     // against the combined-row pool rather than participating as pool members.
     const combinedByPitchRowEarly = {};
@@ -1487,12 +1651,28 @@ const Aggregator = {
       }
     });
 
+    // Player-mode category rows merge their RV/discipline stats client-side
+    // (no pre-agg _pctl exists for a category) — rank them within the
+    // category's own group. Team mode already ranks these keys for all groups.
+    if (!teamMode && hasCats) {
+      const CAT_MERGED_KEYS = ['runValue', 'rv100', 'xRunValue', 'xRv100', 'strikePct', 'twoStrikeWhiffPct', 'locPlus'];
+      for (let ptc in ptGroups) {
+        if (!Aggregator.PITCH_CATEGORIES[ptc]) continue;
+        CAT_MERGED_KEYS.forEach(function (key) {
+          self._computePercentiles(ptGroups[ptc], key, MIN_PITCH_TYPE_PCTL, 'count', false);
+        });
+      }
+    }
+
     // --- Pitch-type-specific percentile inversions ---
+    // Category groups follow their dominant convention: Hard reads like a
+    // fastball (FF), Offspeed like CH/FS; Breaking mixes IVB conventions so
+    // its IVB percentile is suppressed.
 
     // IVB: FF/FC = higher is better (default). SI/CU/CH/FS = lower is better (invert).
     // SL/ST/SV = IVB not meaningful, suppress percentile.
-    const IVB_INVERT = { SI: true, CU: true, CH: true, FS: true };
-    const IVB_SUPPRESS = { SL: true, ST: true, SV: true };
+    const IVB_INVERT = { SI: true, CU: true, CH: true, FS: true, Offspeed: true };
+    const IVB_SUPPRESS = { SL: true, ST: true, SV: true, Breaking: true };
     for (let ptIVB in ptGroups) {
       if (IVB_INVERT[ptIVB]) {
         ptGroups[ptIVB].forEach(function (r) {
@@ -1508,7 +1688,7 @@ const Aggregator = {
     }
 
     // Spin: higher is better for all EXCEPT CH/FS where lower spin = better (invert)
-    const SPIN_INVERT = { CH: true, FS: true };
+    const SPIN_INVERT = { CH: true, FS: true, Offspeed: true };
     for (let ptSpin in ptGroups) {
       if (SPIN_INVERT[ptSpin]) {
         ptGroups[ptSpin].forEach(function (r) {
@@ -1521,7 +1701,7 @@ const Aggregator = {
 
     // VAA/nVAA: FF/FC = closer to 0 is better (default higher = higher pctl, no inversion)
     // All others: further from 0 = better (invert)
-    const VAA_NO_INVERT = { FF: true, FC: true };
+    const VAA_NO_INVERT = { FF: true, FC: true, Hard: true };
     for (let ptV in ptGroups) {
       if (!VAA_NO_INVERT[ptV]) {
         ptGroups[ptV].forEach(function (r) {
