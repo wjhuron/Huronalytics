@@ -1616,11 +1616,11 @@ def main():
 
     # ── Settings (edit these directly or override via command line) ──
     team_abbrev     = ""
-    start_date      = "2026-06-12"
-    end_date        = "2026-06-12"
+    start_date      = "2026-02-13"
+    end_date        = "2026-06-13"
     pitchers_only   = True
 
-    game_id         = ""          # Game PK (e.g., "831437") — leave blank for team/date lookup
+    game_id         = "844171"          # Game PK (e.g., "831437") — leave blank for team/date lookup
     filter_team     = None        # Optional team filter for game ID mode (e.g., "CAN")
     output_name     = ""          # Optional custom filename (without .csv)
 
@@ -1720,10 +1720,11 @@ def main():
     # so a ROC download (PTeam ∈ {ROC, AAA}) splits across the ROC and AAA
     # tabs of NL 2026; an MLB download goes to its single matching tab.
     if push_to_sheets and getattr(downloader, '_last_combined_df', None) is not None:
+        combined = downloader._last_combined_df
         try:
             from sheets_append import push_csv_to_sheets
             print("\nPushing to Google Sheets...")
-            push_csv_to_sheets(downloader._last_combined_df)
+            unmapped_teams = push_csv_to_sheets(combined)
         except Exception as e:
             print(f"\nSheets push failed: {e}")
             # Fallback: write the CSV locally so the data isn't lost.
@@ -1731,10 +1732,25 @@ def main():
             # so this is the only on-disk copy if Sheets is down.
             if not save_csv and result:
                 try:
-                    downloader._last_combined_df.to_csv(result, index=False)
+                    combined.to_csv(result, index=False)
                     print(f"Wrote fallback CSV to: {result}")
                 except Exception as e2:
                     print(f"Could not write fallback CSV either: {e2}")
+        else:
+            # Teams with no NL/AL/ROC mapping (FCL / complex-league or
+            # international games) can't be pushed to a workbook. Write just
+            # those rows to a local CSV named after the teams so the data
+            # isn't silently lost. output_name overrides the auto-name.
+            if unmapped_teams:
+                unmapped_rows = combined[combined['PTeam'].astype(str).isin(unmapped_teams)]
+                stem = output_name if output_name else " vs ".join(sorted(unmapped_teams))
+                csv_path = os.path.join(downloader.download_dir, f"{stem}.csv")
+                try:
+                    unmapped_rows.to_csv(csv_path, index=False)
+                    print(f"\nSkipped Sheets for {len(unmapped_teams)} unmapped "
+                          f"team(s); wrote {len(unmapped_rows)} rows to: {csv_path}")
+                except Exception as e:
+                    print(f"\nCould not write unmapped-team CSV: {e}")
 
 
 if __name__ == "__main__":

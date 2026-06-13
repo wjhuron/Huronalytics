@@ -254,6 +254,15 @@ def push_team_data(df, team, gc=None, verbose=True):
     end_col = _col_letter(len(df.columns))
     range_name = f"A{next_row}:{end_col}{end_row}"
 
+    # Grow the tab's grid if the new block would run past its last row.
+    # Sheets tabs have a fixed row count (new tabs default to 1000), and
+    # ws.update() with a range beyond that ceiling fails with "exceeds grid
+    # limits" — the same wall that forces the manual "add 1000 rows" step.
+    # Resize first, with a 1000-row buffer so back-to-back pushes don't have
+    # to resize every single time.
+    if end_row > ws.row_count:
+        ws.add_rows(end_row - ws.row_count + 1000)
+
     ws.update(range_name, rows, value_input_option='USER_ENTERED')
 
     # Inherit per-column number formats from an existing data row so values
@@ -328,11 +337,19 @@ def push_csv_to_sheets(df, verbose=True):
     Most downloads have a single PTeam — one tab gets one update. ROC
     downloads (after Pitcher2026.py normalization) have PTeam ∈ {ROC, AAA},
     so they split cleanly across the ROC and AAA tabs of NL 2026.
+
+    Teams with no NL/AL/ROC mapping (FCL / complex-league or international
+    games) can't be routed to a workbook. They're collected and returned so
+    the caller can fall back to a local CSV instead of silently dropping the
+    data. Auth is deferred until a mappable team is found, so an all-unmapped
+    push needs no Google credentials at all.
+
+    Returns the list of unmapped (un-pushed) team names.
     """
     if 'PTeam' not in df.columns:
         if verbose:
             print("  [sheets] dataframe has no PTeam column; skipping push")
-        return
+        return []
 
     # Drop rows with no PTeam — they can't be routed
     valid = df.dropna(subset=['PTeam'])
@@ -340,8 +357,19 @@ def push_csv_to_sheets(df, verbose=True):
     if len(valid) == 0:
         if verbose:
             print("  [sheets] no rows with a PTeam value; skipping push")
-        return
+        return []
 
-    gc = _get_client()  # auth once for all groups
+    gc = None  # lazy: only authenticate once we hit a mappable team
+    unmapped = []
     for team, group in valid.groupby('PTeam', sort=False):
-        push_team_data(group, str(team), gc=gc, verbose=verbose)
+        team = str(team)
+        if _workbook_id_for_team(team) is None:
+            if verbose:
+                print(f"  [sheets] team {team!r} not in NL/AL/ROC mapping; "
+                      f"skipping push (will write CSV)")
+            unmapped.append(team)
+            continue
+        if gc is None:
+            gc = _get_client()  # auth once, shared across the mappable groups
+        push_team_data(group, team, gc=gc, verbose=verbose)
+    return unmapped
