@@ -11,7 +11,7 @@ import urllib.parse
 from guts import scrape_guts
 from pipeline_utils import (
     DATA_DIR, MLB_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
-    _today_et, _fullname_to_lastfirst, box_key,
+    _today_et, _fullname_to_lastfirst, box_key, is_barrel,
 )
 
 # ── Config ───────────────────────────────────────────────────────────────
@@ -244,6 +244,17 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
                 pitch['xIndVrtBrk'] = pitch['IndVertBrk']
             if pitch.get('xHorzBrk') is None and pitch.get('HorzBrk') is not None:
                 pitch['xHorzBrk'] = pitch['HorzBrk']
+            # Barrel is no longer stored in the sheet — recompute the barrel
+            # flag from ExitVelo + LaunchAngle (Statcast barrel definition) so
+            # every downstream reader (cards, leaderboard, dynamic filters)
+            # still sees Barrel == '6' for barrels.
+            if not pitch.get('Barrel'):
+                try:
+                    _ev = float(pitch['ExitVelo']) if pitch.get('ExitVelo') not in (None, '') else None
+                    _la = float(pitch['LaunchAngle']) if pitch.get('LaunchAngle') not in (None, '') else None
+                except (ValueError, TypeError):
+                    _ev = _la = None
+                pitch['Barrel'] = '6' if is_barrel(_ev, _la) else ''
             pitches.append(pitch)
     return pitches
 

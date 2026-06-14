@@ -10,7 +10,6 @@ const COLUMNS = {
     { key: 'usagePct',    label: 'Usage%',   format: Utils.formatPct, sortType: 'numeric', noPercentile: true, desc: 'Pct of pitcher\'s total pitches', group: 'info' },
     // Metrics (stuff first)
     { key: 'velocity',       label: 'Velo',     format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Average velocity (mph)', group: 'metrics' },
-    { key: 'effectiveVelo', label: 'EffVelo',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Effective velocity (mph) — perceived speed accounting for extension', group: 'metrics' },
     { key: 'maxVelo',       label: 'Max Velo', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: 'Maximum velocity (mph)', group: 'metrics' },
     { key: 'spinRate',    label: 'Spin',     format: Utils.formatInt, sortType: 'numeric', desc: 'Average spin rate (rpm)', group: 'metrics' },
     { key: 'breakTilt',   label: 'OTilt',    format: Utils.formatTilt, sortType: 'numeric', sortKey: 'breakTiltMinutes', noPercentile: true, desc: 'Observed break tilt (clock notation) — direction of total break', group: 'metrics' },
@@ -279,7 +278,7 @@ const Leaderboard = {
   _tabDefaultHidden: {},  // tracks which keys were hidden by tab defaults
 
   _TAB_HIDDEN_DEFAULTS: {
-    pitchMetrics:       ['maxVelo', 'relPosZ', 'relPosX', 'effectiveVelo', 'runValue', 'xRunValue', 'xBA', 'xSLG'],
+    pitchMetrics:       ['maxVelo', 'relPosZ', 'relPosX', 'runValue', 'xRunValue', 'xBA', 'xSLG'],
     pitcherStats:       ['w', 'l', 'sv', 'hld', 'tbf', 'fip', 'xFIP'],
     pitcherBattedBall:  ['xBA', 'xSLG', 'maxEVAgainst', 'xwOBAsp'],
     hitterStats:        ['g', 'ab', 'doubles', 'triples', 'cs', 'sbPct', 'xBA', 'xSLG'],
@@ -850,7 +849,7 @@ const Leaderboard = {
           // Pitch shape metrics always show color on pitch-type views (no min count)
           const PITCH_SHAPE_ALWAYS_COLOR = {
             velocity: true, spinRate: true, indVertBrk: true, horzBrk: true,
-            extension: true, effectiveVelo: true,
+            extension: true,
             vaa: true, haa: true, nVAA: true
           };
           // Hitter BIP-gated stats: none by design.

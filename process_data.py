@@ -53,6 +53,24 @@ GUTS_EXTRA = None
 PARK_FACTORS = None
 
 
+def _bip_woba_value(event):
+    """wOBA-numerator value for a batted ball, reproducing the (now-deleted)
+    Statcast 'wOBAval' column that SACQ / xwOBAsp were built on.
+
+    Uses Statcast's woba_value weights (single 0.9, double 1.25, triple 1.6,
+    HR 2.0), under which reaching on error or a fielder's choice counts as a
+    single (0.9) — matching the stored values exactly so the zone-wOBA tables
+    are unchanged. All outs contribute 0. The matching wOBA denominator is
+    always 1 for a non-bunt batted ball.
+    """
+    if event in ('Single', 'Field Error', 'Fielders Choice'):
+        return 0.9
+    if event == 'Double':   return 1.25
+    if event == 'Triple':   return 1.6
+    if event == 'Home Run': return 2.0
+    return 0.0
+
+
 def generate_micro_data(all_pitches, mlb_id_cache=None):
     """Generate micro-aggregate data for client-side date and opponent-hand filtering.
 
@@ -233,7 +251,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
         ('Velocity', 22), ('Spin Rate', 24), ('xIndVrtBrk', 26),
         ('xHorzBrk', 28), ('RelPosZ', 30), ('RelPosX', 32),
         ('Extension', 34), ('ArmAngle', 36), ('VAA', 38), ('HAA', 40),
-        ('PlateZ', 42), ('PlateX', 47), ('EffectiveVelo', 49),
+        ('PlateZ', 42), ('PlateX', 47),
     ]
 
     pitch_micro = defaultdict(lambda: [0.0] * 51)
@@ -581,7 +599,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
         ev_enc = EVENT_ENCODE.get(p.get('Event'), 0)
 
         dist = safe_float(p.get('Distance'))
-        woba_val = safe_float(p.get('wOBAval'))
+        woba_val = _bip_woba_value(p.get('Event'))
         bat_side = p.get('Bats')
         if not bat_side:
             bat_side = 'R'  # default to RHB if Bats field missing
@@ -2121,8 +2139,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         hc_x = safe_float(p.get('HC_X'))
         hc_y = safe_float(p.get('HC_Y'))
         la = safe_float(p.get('LaunchAngle'))
-        woba_val = safe_float(p.get('wOBAval'))
-        woba_dom = safe_float(p.get('wOBAdom'))
+        woba_val = _bip_woba_value(p.get('Event'))
+        woba_dom = 1.0
         xwoba_val = safe_float(p.get('xwOBA'))
         bats = p.get('Bats')
         if la is None or hc_x is None or hc_y is None or not bats:

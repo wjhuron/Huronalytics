@@ -41,21 +41,15 @@ SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.
 # Spreadsheet column name -> Statcast CSV column name
 SUPPLEMENT_MAP = {
     'ArmAngle': 'arm_angle',
-    'EffectiveVelo': 'effective_speed',
     'BatSpeed': 'bat_speed',
     'SwingLength': 'swing_length',
     'AttackAngle': 'attack_angle',
     'AttackDirection': 'attack_direction',
     'SwingPathTilt': 'swing_path_tilt',
-    'Int_X': 'intercept_ball_minus_batter_pos_x_inches',
-    'Int_Y': 'intercept_ball_minus_batter_pos_y_inches',
     'RunExp': 'delta_pitcher_run_exp',
     'xBA': 'estimated_ba_using_speedangle',
     'xSLG': 'estimated_slg_using_speedangle',
     'xwOBA': 'estimated_woba_using_speedangle',
-    'wOBAval': 'woba_value',
-    'wOBAdom': 'woba_denom',
-    'Barrel': 'launch_speed_angle',
     'Outs': 'outs_when_up',
     'Event': 'events',
 }
@@ -63,17 +57,17 @@ SUPPLEMENT_MAP = {
 # Swing-tracking cluster: if BatSpeed is missing or sub-50, the entire
 # cluster is treated as invalid and dropped together (matches Pitcher2026).
 SWING_CLUSTER_COLS = {'BatSpeed', 'SwingLength', 'AttackAngle',
-                      'AttackDirection', 'SwingPathTilt', 'Int_X', 'Int_Y'}
+                      'AttackDirection', 'SwingPathTilt'}
 
 # Columns that store raw integer values from Statcast (no rounding needed)
-INT_COLS = {'Barrel', 'Outs'}  # Raw integer values
+INT_COLS = {'Outs'}  # Raw integer values
 
 # Columns that store free-form strings (no numeric coercion, custom translator).
 STRING_COLS = {'Event'}
 
 # Columns where official Statcast data should always overwrite estimates
 # (even if the cell already has a value from the initial download)
-ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel'}
+ALWAYS_OVERWRITE_COLS = {'ArmAngle'}
 
 # Columns that only ever OVERWRITE existing values; they are never used to
 # fill a blank cell. Intended for scoring-change corrections (e.g., official
@@ -115,20 +109,15 @@ STATCAST_TO_MLB_EVENT = {
 # Per-column rounding (default is 1 decimal for anything not listed)
 ROUND_DECIMALS = {
     'ArmAngle': 1,
-    'EffectiveVelo': 1,
     'BatSpeed': 1,
     'SwingLength': 1,
     'AttackAngle': 1,
     'AttackDirection': 1,
     'SwingPathTilt': 1,
-    'Int_X': 2,
-    'Int_Y': 2,
     'RunExp': 3,
     'xBA': 3,
     'xSLG': 3,
     'xwOBA': 3,
-    'wOBAval': 3,
-    'wOBAdom': 3,
 }
 
 # Team abbreviation mapping: spreadsheet tab name -> Statcast Search abbreviation
@@ -462,7 +451,6 @@ def main():
             # OR has an always-overwrite column that might contain an estimate)
             needs_fill = []  # (row_index_1based, pitch_id, cols_to_update)
             # cols_to_update entries: (sheet_col, existing_value) — empty string means new fill
-            legacy_barrel_fixes = []  # Cells to convert "yes" -> "6"
             game_dates = set()
             date_col = col_idx.get('Game Date')
 
@@ -470,16 +458,6 @@ def main():
                 pid = row[pitch_id_col] if pitch_id_col < len(row) else ''
                 if not pid or '_' not in pid:
                     continue
-
-                # Convert legacy Barrel "yes" -> "6" on ALL rows (not date-filtered)
-                if 'Barrel' in supp_col_idx:
-                    barrel_val = row[supp_col_idx['Barrel']] if supp_col_idx['Barrel'] < len(row) else ''
-                    if barrel_val.strip().lower() == 'yes':
-                        legacy_barrel_fixes.append(gspread.Cell(
-                            row=r_idx,
-                            col=supp_col_idx['Barrel'] + 1,
-                            value='6',
-                        ))
 
                 # Apply date range filter for supplement backfill
                 if date_col is not None:
@@ -510,14 +488,6 @@ def main():
                         gd = row[date_col] if date_col < len(row) else ''
                         if gd:
                             game_dates.add(gd)
-
-            # Write legacy barrel "yes" -> "6" conversions regardless of other work
-            if legacy_barrel_fixes:
-                print(f"  Converting {len(legacy_barrel_fixes)} Barrel values "
-                      f"from 'yes' to '6'...")
-                update_cells_with_retry(ws, legacy_barrel_fixes, value_input_option='RAW')
-                total_filled += len(legacy_barrel_fixes)
-                time.sleep(2)
 
             if not needs_fill:
                 print(f"  All rows filled — nothing to do")
