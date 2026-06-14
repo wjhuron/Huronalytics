@@ -22,6 +22,8 @@ VENUE_ELEVATION_FT_OVERRIDE = {
     5150: 125,   # Gocheok Sky Dome, Seoul
     5160: 144,   # Tokyo Dome, Tokyo
     4895: 16,    # London Stadium, London
+    5355: 3010,  # Las Vegas Ballpark, Summerlin (Athletics temp. home) — high on
+                 # the valley's western bench; MLB feed omits the elevation
 }
 
 
