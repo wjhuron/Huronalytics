@@ -112,6 +112,11 @@ _DECIMALS = {'num1': 1, 'num2': 2, 'num3': 3}
 # MLB. (Cosmetic only — R reads them as doubles either way.)
 _PLATE_COORDS = {'PlateZ', 'PlateX', 'SzTop', 'SzBot'}
 
+# Numeric columns use a FIXED scale so DB clients (Postico, etc.) display the
+# right number of decimals (78.0 not 78, -9.0 not -9, 5.10 not 5.1). Each maps
+# to its Sheet precision: num1 -> 1dp, num2 -> 2dp, num3 -> 3dp.
+_FIXED_NUM_TYPE = {'num1': 'numeric(8,1)', 'num2': 'numeric(8,2)', 'num3': 'numeric(8,3)'}
+
 
 # ---------------------------------------------------------------------------
 # Connection
@@ -176,8 +181,10 @@ def table_for_team(team):
 # DDL
 # ---------------------------------------------------------------------------
 def create_table_sql(table):
-    """One table per team: exactly the 47 Sheet columns, PitchID as primary key."""
-    lines = [f'  "{name}" {pgtype}' for name, pgtype, _ in COLUMN_SPEC]
+    """One table per team: the 47 Sheet columns at their Sheet decimal scale
+    (numeric(8,N) so clients display the right precision), PitchID primary key."""
+    lines = [f'  "{name}" {_FIXED_NUM_TYPE.get(kind, pgtype)}'
+             for name, pgtype, kind in COLUMN_SPEC]
     body = ',\n'.join(lines)
     return (f'CREATE TABLE IF NOT EXISTS "{table}" (\n{body},\n'
             f'  PRIMARY KEY ("PitchID")\n)')
