@@ -1143,6 +1143,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'hitter_swing_locations': {},
         }
 
+    # ─── Drop position-player pitching (EP / Eephus) at the source ───
+    # Wally tags EVERY pitch of a position player's blowout mop-up as EP, so an
+    # EP pitch marks a non-pitcher appearance (in practice these appearances are
+    # 100% EP). EP must not contribute to ANY count anywhere — team totals,
+    # micro-data used for client-side filtering, league averages, percentile
+    # pools, hitter pitch-quality metrics — and any pitcher who threw an EP pitch
+    # must never surface on a leaderboard under any filter. Removing every pitch
+    # by an EP pitcher here, before the pickle dump / reclassification / micro-
+    # data / all stat computation, makes that true globally and filter-proof: an
+    # EP pitcher ends up with zero micro rows, so no client-side filter can
+    # resurrect them. The per-leaderboard ep_pitchers guards further below are
+    # left in place as a now-redundant safety net.
+    ep_pitcher_ids = {(p.get('Pitcher'), p.get('PTeam'))
+                      for p in all_pitches if p.get('Pitch Type') == 'EP'}
+    if ep_pitcher_ids:
+        _before = len(all_pitches)
+        all_pitches = [p for p in all_pitches
+                       if (p.get('Pitcher'), p.get('PTeam')) not in ep_pitcher_ids]
+        print(f"  [{label}] Dropped {_before - len(all_pitches)} EP pitch(es) "
+              f"from {len(ep_pitcher_ids)} position-player pitching appearance(s)")
+
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
     for p in all_pitches:
         p['InZone'] = compute_in_zone(p)
@@ -1313,6 +1334,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     print(f"  MLB ID cache: {len(mlb_id_cache)} entries ({new_lookups} new lookups)")
 
     # --- Exclude position players (anyone who threw EP/Eephus) ---
+    # Redundant safety net: EP pitches are already dropped at the top of this
+    # function, so this set is normally empty. Kept as defense-in-depth.
     ep_pitchers = set()
     for p in all_pitches:
         if p.get('Pitch Type') == 'EP':
