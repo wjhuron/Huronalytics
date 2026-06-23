@@ -1,5 +1,8 @@
 # Secrets
 service_account.json
+.env
+.env.*
+!.env.example
 
 # Local data / caches
 *.xlsx

@@ -383,9 +383,10 @@ generate_pitcher_reports <- function(input_file, output_dir,
                                      pitcher_filter = NULL, 
                                      start_date = NULL, 
                                      end_date = NULL) {
-  # Read data - specify Tilt as character to prevent time parsing
+  # Read data (Supabase for known team codes, CSV otherwise). OTilt stays
+  # character to prevent time parsing — handled inside load_pitch_data().
   message("Reading pitch data from: ", input_file)
-  pitch_data <- read_csv(input_file, col_types = cols(OTilt = col_character()))
+  pitch_data <- load_pitch_data(input_file)
 
   # Compute InZone from plate location and strike zone boundaries
   # (Description is already simplified by the Python downloader — no re-mapping needed)

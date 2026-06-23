@@ -69,6 +69,106 @@ resolve_team_path <- function(input, year = 2026, base_dir = "/Users/wallyhuron/
   paste0(base_dir, league, " ", year, " - ", team, ".csv")
 }
 
+# ---- Supabase (Postgres) data source ----
+# During the Sheets -> Supabase migration, team data is read from the Supabase
+# `pitches` table instead of per-team CSV exports. read_team_from_supabase()
+# returns a tibble byte-identical to the old
+#   read_csv("<LG> <YR> - <TEAM>.csv", col_types = cols(OTilt = col_character()))
+# by round-tripping the query result through a temp CSV, so readr infers the
+# exact same column types it always did.
+
+# Canonical 47 columns, in Sheet order (must match supabase_append.COLUMNS).
+SUPABASE_COLUMNS <- c(
+  "Game Date", "PTeam", "Pitcher", "Throws", "Pitch Type", "Velocity",
+  "Spin Rate", "RTilt", "OTilt", "IndVertBrk", "HorzBrk", "xIndVrtBrk",
+  "xHorzBrk", "RelPosZ", "RelPosX", "Extension", "ArmAngle", "PlateZ", "PlateX",
+  "SzTop", "SzBot", "VAA", "HAA", "BTeam", "Batter", "Bats", "Count", "Runners",
+  "Outs", "Description", "Event", "ExitVelo", "LaunchAngle", "Distance",
+  "BBType", "HC_X", "HC_Y", "xBA", "xSLG", "xwOBA", "RunExp", "BatSpeed",
+  "SwingLength", "AttackAngle", "AttackDirection", "SwingPathTilt", "PitchID"
+)
+
+# Read SUPABASE_DB_URL from the environment, falling back to the repo .env file.
+.read_supabase_url <- function() {
+  url <- Sys.getenv("SUPABASE_DB_URL", "")
+  if (nzchar(url)) return(url)
+  env_path <- Sys.getenv("HURONALYTICS_ENV", "/Users/wallyhuron/Huronalytics/.env")
+  if (file.exists(env_path)) {
+    lines <- readLines(env_path, warn = FALSE)
+    hit <- grep("^SUPABASE_DB_URL=", lines, value = TRUE)
+    if (length(hit) > 0) {
+      val <- sub("^SUPABASE_DB_URL=", "", hit[[1]])
+      return(trimws(gsub('^["\']|["\']$', "", val)))
+    }
+  }
+  stop("SUPABASE_DB_URL not found in environment or ", env_path)
+}
+
+# Parse a postgres URL into its connection components.
+.parse_pg_url <- function(url) {
+  m <- regmatches(url, regexec(
+    "^postgres(?:ql)?://([^:]+):(.+)@([^:@/]+):([0-9]+)/([^?]+)", url))[[1]]
+  if (length(m) != 6) stop("Could not parse SUPABASE_DB_URL")
+  list(user = m[[2]], password = m[[3]], host = m[[4]],
+       port = as.integer(m[[5]]), dbname = m[[6]])
+}
+
+# Open a DBI connection to the Supabase Postgres (TLS required).
+supabase_connect <- function() {
+  if (!requireNamespace("DBI", quietly = TRUE) ||
+      !requireNamespace("RPostgres", quietly = TRUE)) {
+    stop("DBI and RPostgres are required to read from Supabase. ",
+         "Install with: install.packages(c('DBI','RPostgres'))")
+  }
+  p <- .parse_pg_url(.read_supabase_url())
+  DBI::dbConnect(RPostgres::Postgres(),
+                 host = p$host, port = p$port, dbname = p$dbname,
+                 user = p$user, password = p$password, sslmode = "require")
+}
+
+# Read one team's pitches from Supabase. Returns a tibble identical to the old
+# per-team CSV read (same columns, types, and values).
+read_team_from_supabase <- function(team) {
+  con <- supabase_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  collist <- paste(sprintf('"%s"', SUPABASE_COLUMNS), collapse = ", ")
+  q <- sprintf('SELECT %s FROM pitches WHERE "PTeam" = $1 ORDER BY id', collist)
+  df <- DBI::dbGetQuery(con, q, params = list(team))
+  # Round-trip through a temp CSV so readr guesses column types EXACTLY as the
+  # old read_csv(... cols(OTilt = col_character())) path did.
+  tmp <- tempfile(fileext = ".csv")
+  on.exit(unlink(tmp), add = TRUE)
+  readr::write_csv(df, tmp, na = "")
+  readr::read_csv(tmp, col_types = readr::cols(OTilt = readr::col_character()))
+}
+
+# Extract a team code from a bare code ("PIT") or a CSV path
+# (".../NL 2026 - PIT.csv" -> "PIT"). Returns NA if none can be derived.
+extract_team_code <- function(input) {
+  s <- trimws(input)
+  if (grepl("\\.csv$", s, ignore.case = TRUE)) {
+    base <- sub("\\.csv$", "", basename(s), ignore.case = TRUE)
+    if (grepl(" - ", base)) return(toupper(trimws(sub(".* - ", "", base))))
+    return(NA_character_)
+  }
+  toupper(s)
+}
+
+# Load a team's pitch data. Known team codes (and the team-CSV filename pattern
+# produced by resolve_team_path) read from Supabase; any other existing .csv
+# path still reads from disk, so ad-hoc CSV files keep working unchanged.
+load_pitch_data <- function(input) {
+  team <- extract_team_code(input)
+  if (!is.na(team) && team %in% names(TEAM_LEAGUE)) {
+    return(read_team_from_supabase(team))
+  }
+  if (file.exists(input)) {
+    return(readr::read_csv(input, col_types = readr::cols(OTilt = readr::col_character())))
+  }
+  stop("load_pitch_data: '", input,
+       "' is neither a known team code nor an existing CSV file")
+}
+
 # ---- Shared Helper Functions ----
 
 # Compute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment

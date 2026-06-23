@@ -621,21 +621,24 @@ create_statline_table <- function(statline) {
 }
 
 # ---- Main Processing Function ----
-generate_pitcher_reports <- function(input_file, output_dir,
+generate_pitcher_reports <- function(input_file,
+                                     output_dir,
                                      pitcher_filter = NULL,
                                      start_date = NULL,
                                      end_date = NULL) {
-  # Read data
+  # Read data (Supabase for known team codes, CSV otherwise)
   message("Reading pitch data from: ", input_file)
-  pitch_data <- read_csv(input_file, col_types = cols(`OTilt` = col_character()))
-
+  pitch_data <- load_pitch_data(input_file)
+  
   # Compute InZone from plate location and strike zone boundaries
   # (Description is already simplified by the Python downloader — no re-mapping needed)
   if (all(c("PlateX", "PlateZ", "SzTop", "SzBot") %in% names(pitch_data))) {
-    pitch_data$InZone <- compute_in_zone(pitch_data$PlateX, pitch_data$PlateZ,
-                                          pitch_data$SzTop, pitch_data$SzBot)
+    pitch_data$InZone <- compute_in_zone(pitch_data$PlateX,
+                                         pitch_data$PlateZ,
+                                         pitch_data$SzTop,
+                                         pitch_data$SzBot)
   }
-
+  
   # Extract team from filename
   filename <- basename(input_file)
   # Updated pattern to match "2025 Playoffs - CLE.csv" format
