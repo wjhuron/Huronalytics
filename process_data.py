@@ -28,7 +28,7 @@ from pipeline_utils import (
 from pipeline_fetch import (
     fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
     fetch_hitter_positions,
-    read_pitches_from_sheet,
+    read_pitches_from_sheet, read_pitches_from_supabase,
     lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache,
     fetch_and_aggregate_boxscores, fetch_and_aggregate_milb_boxscores,
     SPREADSHEET_IDS, SERVICE_ACCOUNT_FILE,
@@ -3802,11 +3802,12 @@ def main():
         creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
     gc = gspread.authorize(creds)
 
-    # Read Regular Season data
-    print("\n=== Reading Regular Season data ===")
-    rs_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
-    rs_pitches += read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'], extra_tabs={'ROC', 'AAA'})
-    print(f"  Read {len(rs_pitches)} RS pitches")
+    # Read Regular Season data from Supabase (post-cutover source of truth:
+    # pitches are pulled by Pitcher2026 and retagged in Postico/Supabase, not the
+    # Sheets). Verified field-for-field identical to the old Sheets read.
+    print("\n=== Reading Regular Season data (Supabase) ===")
+    rs_pitches = read_pitches_from_supabase()
+    print(f"  Read {len(rs_pitches)} RS pitches from Supabase")
 
     # Shared MLB ID cache
     mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')

@@ -259,6 +259,77 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
     return pitches
 
 
+def read_pitches_from_supabase(teams=None):
+    """Read all RS pitches from the Supabase per-team tables (the database
+    mirror of the AL/NL 2026 Sheets). Returns the SAME list-of-pitch-dicts shape
+    as read_pitches_from_sheet: column-name -> string value, blanks -> None,
+    plus a `_source` tag ('MLB' | 'ROC' | 'AAA') and a recomputed Barrel.
+
+    Post-cutover source of truth: pitches are pulled by Pitcher2026 and retagged
+    in Postico/Supabase, so the website reads them here instead of the Sheets.
+    Reads the same team set the Sheets path did (30 MLB + ROC + AAA; FCL excluded).
+    """
+    import datetime as _dt
+    import psycopg2
+
+    if teams is None:
+        teams = sorted(MLB_TEAMS | {'ROC', 'AAA'})
+
+    url = os.environ.get('SUPABASE_DB_URL')
+    if not url:
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+        if os.path.exists(env_path):
+            with open(env_path) as fh:
+                for line in fh:
+                    line = line.strip()
+                    if line.startswith('SUPABASE_DB_URL'):
+                        url = line.split('=', 1)[1].strip().strip('"').strip("'")
+                        break
+    if not url:
+        raise RuntimeError('SUPABASE_DB_URL not set (environment or repo .env)')
+    kw = {'connect_timeout': 30}
+    if 'sslmode=' not in url:
+        kw['sslmode'] = 'require'
+
+    conn = psycopg2.connect(url, **kw)
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT * FROM all_pitches WHERE "PTeam" = ANY(%s)', (list(teams),))
+            colnames = [d[0] for d in cur.description]
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    print(f"  Supabase all_pitches: {len(rows)} pitches across {len(teams)} teams")
+
+    pitches = []
+    for row in rows:
+        pitch = {}
+        for ci, name in enumerate(colnames):
+            v = row[ci]
+            if v is None:
+                pitch[name] = None
+            elif isinstance(v, _dt.date):           # date -> 'YYYY-MM-DD'
+                pitch[name] = v.isoformat()
+            else:                                   # numeric/int -> str (matches Sheet text)
+                pitch[name] = str(v)
+        pteam = pitch.get('PTeam')
+        pitch['_source'] = pteam if pteam in ('ROC', 'AAA') else 'MLB'
+        # identical fallbacks to read_pitches_from_sheet
+        if pitch.get('xIndVrtBrk') is None and pitch.get('IndVertBrk') is not None:
+            pitch['xIndVrtBrk'] = pitch['IndVertBrk']
+        if pitch.get('xHorzBrk') is None and pitch.get('HorzBrk') is not None:
+            pitch['xHorzBrk'] = pitch['HorzBrk']
+        if not pitch.get('Barrel'):
+            try:
+                _ev = float(pitch['ExitVelo']) if pitch.get('ExitVelo') not in (None, '') else None
+                _la = float(pitch['LaunchAngle']) if pitch.get('LaunchAngle') not in (None, '') else None
+            except (ValueError, TypeError):
+                _ev = _la = None
+            pitch['Barrel'] = '6' if is_barrel(_ev, _la) else ''
+        pitches.append(pitch)
+    return pitches
+
+
 # ── MLB ID lookup ────────────────────────────────────────────────────────
 
 def load_mlb_id_cache(cache_path):
