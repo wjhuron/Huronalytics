@@ -165,15 +165,6 @@ def get_conn(connect_timeout=15):
     return conn
 
 
-def _league_for_team(team):
-    t = ('' if team is None else str(team)).strip().upper()
-    if t in AL_TEAMS:
-        return 'AL'
-    if t in NL_TEAMS or t in ROC_AAA_TEAMS:
-        return 'NL'
-    return None
-
-
 def table_for_team(team):
     """Per-team table name = the (sanitized) uppercase team code: 'PIT', 'NYY',
     'AAA', 'ROC', 'FCL', ... — one table per Sheets tab."""
@@ -185,22 +176,18 @@ def table_for_team(team):
 # DDL
 # ---------------------------------------------------------------------------
 def create_table_sql(table):
-    lines = ['  id bigserial PRIMARY KEY']
-    for name, pgtype, _ in COLUMN_SPEC:
-        lines.append(f'  "{name}" {pgtype}')
-    lines.append('  "league" text')
-    lines.append('  "inserted_at" timestamptz NOT NULL DEFAULT now()')
+    """One table per team: exactly the 47 Sheet columns, PitchID as primary key."""
+    lines = [f'  "{name}" {pgtype}' for name, pgtype, _ in COLUMN_SPEC]
     body = ',\n'.join(lines)
-    return f'CREATE TABLE IF NOT EXISTS "{table}" (\n{body}\n)'
+    return (f'CREATE TABLE IF NOT EXISTS "{table}" (\n{body},\n'
+            f'  PRIMARY KEY ("PitchID")\n)')
 
 
 def ensure_team_table(conn, table):
-    """Create one team's table (surrogate id PK, UNIQUE PitchID for idempotent
-    upserts, plus read indexes) if absent. Idempotent."""
+    """Create one team's table (PitchID primary key for idempotent upserts, plus
+    read indexes) if absent. Idempotent."""
     with conn.cursor() as cur:
         cur.execute(create_table_sql(table))
-        cur.execute(f'CREATE UNIQUE INDEX IF NOT EXISTS "{table}_pitchid_key" '
-                    f'ON "{table}" ("PitchID")')
         cur.execute(f'CREATE INDEX IF NOT EXISTS "{table}_pitcher_idx" '
                     f'ON "{table}" ("Pitcher")')
         cur.execute(f'CREATE INDEX IF NOT EXISTS "{table}_gamedate_idx" '
@@ -230,7 +217,7 @@ def create_union_view(conn, view=VIEW, teams=None):
     teams = _existing_tables(conn, teams or ALL_TEAMS)
     if not teams:
         return
-    collist = ', '.join(f'"{c}"' for c in COLUMNS + ['league'])
+    collist = ', '.join(f'"{c}"' for c in COLUMNS)
     selects = '\nUNION ALL\n'.join(f'  SELECT {collist} FROM "{t}"' for t in teams)
     with conn.cursor() as cur:
         cur.execute(f'CREATE OR REPLACE VIEW "{view}" AS\n{selects}')
@@ -258,17 +245,17 @@ def _is_blank(v):
 def prepare_rows(df):
     """Coerce a Pitcher2026-style DataFrame to typed rows matching the table.
 
-    Returns (columns, rows) where columns includes the 47 data columns plus
-    'league', and rows is a list of tuples ready for execute_values. Every
-    numeric column is rounded to its canonical precision (mirroring the Sheet
-    display), blanks become None, dates become datetime.date.
+    Returns (columns, rows) where columns is the 47 data columns and rows is a
+    list of tuples ready for execute_values. Every numeric column is rounded to
+    its canonical precision (mirroring the Sheet display), blanks become None,
+    dates become datetime.date.
     """
     df = df.copy()
     for name in COLUMNS:
         if name not in df.columns:
             df[name] = None
 
-    out_cols = COLUMNS + ['league']
+    out_cols = COLUMNS
     series = {}
     # Per-row AAA/ROC flag, for the plate-coordinate 2-vs-3 decimal rule.
     is_aaa = [(('' if t is None else str(t)).strip().upper() in ROC_AAA_TEAMS)
@@ -295,8 +282,6 @@ def prepare_rows(df):
             d = _DECIMALS[kind]
             num = pd.to_numeric(col, errors='coerce')
             series[name] = [None if pd.isna(v) else Decimal(f'{float(v):.{d}f}') for v in num]
-
-    series['league'] = [_league_for_team(t) for t in df['PTeam']]
 
     rows = list(zip(*[series[c] for c in out_cols]))
     return out_cols, rows

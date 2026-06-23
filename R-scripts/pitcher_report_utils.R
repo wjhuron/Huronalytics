@@ -134,7 +134,7 @@ read_team_from_supabase <- function(team) {
   # Each team is its own table (matches supabase_append.table_for_team()).
   tbl <- gsub("[^A-Z0-9_]", "_", toupper(trimws(team)))
   collist <- paste(sprintf('"%s"', SUPABASE_COLUMNS), collapse = ", ")
-  q <- sprintf('SELECT %s FROM "%s" ORDER BY id', collist, tbl)
+  q <- sprintf('SELECT %s FROM "%s" ORDER BY "PitchID"', collist, tbl)
   df <- DBI::dbGetQuery(con, q)
   # Round-trip through a temp CSV so readr guesses column types EXACTLY as the
   # old read_csv(... cols(OTilt = col_character())) path did.
