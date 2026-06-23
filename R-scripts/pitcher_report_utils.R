@@ -51,7 +51,7 @@ TEAM_LEAGUE <- c(
   ARI = "NL", ATL = "NL", CHC = "NL", CIN = "NL", COL = "NL",
   LAD = "NL", MIA = "NL", MIL = "NL", NYM = "NL", PHI = "NL",
   PIT = "NL", SDP = "NL", SFG = "NL", STL = "NL", WSH = "NL",
-  ROC = "NL", AAA = "NL"
+  ROC = "NL", AAA = "NL", FCL = "NL"
 )
 
 # Build the full CSV path from just a team code.
@@ -131,9 +131,11 @@ supabase_connect <- function() {
 read_team_from_supabase <- function(team) {
   con <- supabase_connect()
   on.exit(DBI::dbDisconnect(con), add = TRUE)
+  # Each team is its own table (matches supabase_append.table_for_team()).
+  tbl <- gsub("[^A-Z0-9_]", "_", toupper(trimws(team)))
   collist <- paste(sprintf('"%s"', SUPABASE_COLUMNS), collapse = ", ")
-  q <- sprintf('SELECT %s FROM pitches WHERE "PTeam" = $1 ORDER BY id', collist)
-  df <- DBI::dbGetQuery(con, q, params = list(team))
+  q <- sprintf('SELECT %s FROM "%s" ORDER BY id', collist, tbl)
+  df <- DBI::dbGetQuery(con, q)
   # Round-trip through a temp CSV so readr guesses column types EXACTLY as the
   # old read_csv(... cols(OTilt = col_character())) path did.
   tmp <- tempfile(fileext = ".csv")

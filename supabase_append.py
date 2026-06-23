@@ -1,5 +1,7 @@
-"""Append Pitcher2026 download output into the Supabase Postgres `pitches`
-table — the database mirror of the AL 2026 / NL 2026 Google Sheets.
+"""Append Pitcher2026 download output into Supabase: one table per team
+(`PIT`, `NYY`, `AAA`, `ROC`, `FCL`, ...), mirroring the per-team tabs of the
+AL 2026 / NL 2026 Google Sheets. A cross-team UNION view (`all_pitches`) spans
+all of them for queries that need every pitch at once.
 
 This is the Supabase counterpart to sheets_append.py. It is used two ways:
   1. Pitcher2026.py calls push_csv_to_supabase(combined_df) to append new
@@ -26,6 +28,7 @@ in the repo root (gitignored). Use the Supabase "Session pooler" URI.
 """
 
 import os
+import re
 import math
 import datetime
 from decimal import Decimal
@@ -37,7 +40,10 @@ import pandas as pd
 # lazily inside sheets_append, so this import stays cheap.)
 from sheets_append import NL_TEAMS, AL_TEAMS, ROC_AAA_TEAMS
 
-TABLE = 'pitches'
+VIEW = 'all_pitches'   # cross-team UNION ALL of the per-team tables
+
+# One table per Sheets tab: 30 MLB teams + ROC + AAA + FCL = 33.
+ALL_TEAMS = sorted(NL_TEAMS | AL_TEAMS | {'ROC', 'AAA', 'FCL'})
 
 # ---------------------------------------------------------------------------
 # Canonical schema: the 47 columns Pitcher2026 writes, in order, each with its
@@ -168,10 +174,17 @@ def _league_for_team(team):
     return None
 
 
+def table_for_team(team):
+    """Per-team table name = the (sanitized) uppercase team code: 'PIT', 'NYY',
+    'AAA', 'ROC', 'FCL', ... — one table per Sheets tab."""
+    t = ('' if team is None else str(team)).strip().upper()
+    return re.sub(r'[^A-Z0-9_]', '_', t)
+
+
 # ---------------------------------------------------------------------------
 # DDL
 # ---------------------------------------------------------------------------
-def create_table_sql(table=TABLE):
+def create_table_sql(table):
     lines = ['  id bigserial PRIMARY KEY']
     for name, pgtype, _ in COLUMN_SPEC:
         lines.append(f'  "{name}" {pgtype}')
@@ -181,23 +194,46 @@ def create_table_sql(table=TABLE):
     return f'CREATE TABLE IF NOT EXISTS "{table}" (\n{body}\n)'
 
 
-def ensure_table(conn, table=TABLE):
-    """Create the table (surrogate id PK) and read indexes if absent. Idempotent."""
+def ensure_team_table(conn, table):
+    """Create one team's table (surrogate id PK, UNIQUE PitchID for idempotent
+    upserts, plus read indexes) if absent. Idempotent."""
     with conn.cursor() as cur:
         cur.execute(create_table_sql(table))
-        cur.execute(f'CREATE INDEX IF NOT EXISTS {table}_pteam_idx ON "{table}" ("PTeam")')
-        cur.execute(f'CREATE INDEX IF NOT EXISTS {table}_pteam_date_idx '
-                    f'ON "{table}" ("PTeam", "Game Date")')
-        cur.execute(f'CREATE INDEX IF NOT EXISTS {table}_pitcher_idx ON "{table}" ("Pitcher")')
+        cur.execute(f'CREATE UNIQUE INDEX IF NOT EXISTS "{table}_pitchid_key" '
+                    f'ON "{table}" ("PitchID")')
+        cur.execute(f'CREATE INDEX IF NOT EXISTS "{table}_pitcher_idx" '
+                    f'ON "{table}" ("Pitcher")')
+        cur.execute(f'CREATE INDEX IF NOT EXISTS "{table}_gamedate_idx" '
+                    f'ON "{table}" ("Game Date")')
     conn.commit()
 
 
-def ensure_pitchid_unique(conn, table=TABLE):
-    """Create the UNIQUE index on PitchID that upserts conflict-target. Call
-    only once PitchID has been verified unique + non-blank in the data."""
+def setup_team_tables(conn, teams=None):
+    """Create all per-team tables (empty if new). Idempotent."""
+    for t in (teams or ALL_TEAMS):
+        ensure_team_table(conn, t)
+
+
+def _existing_tables(conn, teams):
+    """Subset of `teams` whose base table currently exists in public schema."""
     with conn.cursor() as cur:
-        cur.execute(f'CREATE UNIQUE INDEX IF NOT EXISTS {table}_pitchid_key '
-                    f'ON "{table}" ("PitchID")')
+        cur.execute("SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
+        present = {r[0] for r in cur.fetchall()}
+    return [t for t in teams if t in present]
+
+
+def create_union_view(conn, view=VIEW, teams=None):
+    """(Re)create the cross-team UNION view over whichever per-team tables exist,
+    so cross-team queries / the website pipeline can read every pitch in one
+    statement: SELECT ... FROM all_pitches WHERE ..."""
+    teams = _existing_tables(conn, teams or ALL_TEAMS)
+    if not teams:
+        return
+    collist = ', '.join(f'"{c}"' for c in COLUMNS + ['league'])
+    selects = '\nUNION ALL\n'.join(f'  SELECT {collist} FROM "{t}"' for t in teams)
+    with conn.cursor() as cur:
+        cur.execute(f'CREATE OR REPLACE VIEW "{view}" AS\n{selects}')
     conn.commit()
 
 
@@ -269,10 +305,9 @@ def prepare_rows(df):
 # ---------------------------------------------------------------------------
 # Upsert
 # ---------------------------------------------------------------------------
-def upsert_rows(conn, columns, rows, on_conflict='PitchID', page_size=1000,
-                table=TABLE):
-    """Insert rows, upserting on `on_conflict` (or plain insert if None).
-    Commits on success. Returns the number of rows sent."""
+def upsert_rows(conn, columns, rows, table, on_conflict='PitchID', page_size=1000):
+    """Insert rows into `table`, upserting on `on_conflict` (or plain insert if
+    None). Commits on success. Returns the number of rows sent."""
     if not rows:
         return 0
     from psycopg2.extras import execute_values
@@ -291,15 +326,13 @@ def upsert_rows(conn, columns, rows, on_conflict='PitchID', page_size=1000,
 
 
 def push_csv_to_supabase(df, conn=None, verbose=True):
-    """Append `df` to the Supabase `pitches` table, upserting on PitchID.
-
-    Mirrors sheets_append.push_csv_to_sheets so Pitcher2026 can dual-write.
-    Unlike the Sheets path there's no per-team tab routing — every row lands in
-    one table tagged with PTeam + league. Returns the number of rows upserted.
+    """Append `df` to Supabase, routing each PTeam's rows to that team's table
+    (upsert on PitchID). Mirrors sheets_append.push_csv_to_sheets, which groups
+    by PTeam and pushes each group to its tab. Returns total rows upserted.
     """
-    if 'PitchID' not in df.columns:
+    if 'PitchID' not in df.columns or 'PTeam' not in df.columns:
         if verbose:
-            print('  [supabase] dataframe has no PitchID column; skipping push')
+            print('  [supabase] dataframe missing PitchID/PTeam column; skipping push')
         return 0
 
     # Rows with no usable PitchID can't be upserted idempotently — drop them.
@@ -314,13 +347,20 @@ def push_csv_to_supabase(df, conn=None, verbose=True):
     if own:
         conn = get_conn()
     try:
-        ensure_table(conn)
-        ensure_pitchid_unique(conn)
-        cols, rows = prepare_rows(df)
-        n = upsert_rows(conn, cols, rows, on_conflict='PitchID')
-        if verbose:
-            print(f'  [supabase] upserted {n} rows into {TABLE}')
-        return n
+        total = 0
+        for team, group in df.groupby('PTeam', sort=False):
+            table = table_for_team(team)
+            if not table:
+                if verbose:
+                    print(f'  [supabase] blank team for {len(group)} rows; skipping')
+                continue
+            ensure_team_table(conn, table)
+            cols, rows = prepare_rows(group)
+            n = upsert_rows(conn, cols, rows, table=table, on_conflict='PitchID')
+            total += n
+            if verbose:
+                print(f'  [supabase] {team}: upserted {n} rows into "{table}"')
+        return total
     finally:
         if own:
             conn.close()

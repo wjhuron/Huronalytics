@@ -123,19 +123,14 @@ def main():
 
     conn = sa.get_conn()
     try:
-        sa.ensure_table(conn)
-        sa.ensure_pitchid_unique(conn)
-        cols, rows = sa.prepare_rows(allp)
-        total = 0
-        for i in range(0, len(rows), args.chunk):
-            chunk = rows[i:i + args.chunk]
-            sa.upsert_rows(conn, cols, chunk, on_conflict='PitchID')
-            total += len(chunk)
-            print(f'    upserted {total:,}/{len(rows):,}')
+        sa.setup_team_tables(conn)                          # ensure all 33 tables exist
+        total = sa.push_csv_to_supabase(allp, conn=conn)    # routes each PTeam -> its table
+        sa.create_union_view(conn)                          # (re)build the all_pitches view
         with conn.cursor() as cur:
-            cur.execute(f'select count(*) from "{sa.TABLE}"')
+            cur.execute(f'select count(*) from "{sa.VIEW}"')
             db_count = cur.fetchone()[0]
-        print(f'Done. Upserted {total:,} rows; pitches table now has {db_count:,} rows.')
+        print(f'Done. Upserted {total:,} rows across per-team tables; '
+              f'{sa.VIEW} now spans {db_count:,} rows.')
     finally:
         conn.close()
 

@@ -62,11 +62,12 @@ def main():
             continue
         sheet_by_id[str(pid).strip()] = r
 
-    # DB rows keyed by PitchID (typed Python values)
+    # DB rows keyed by PitchID (typed Python values), read from the team's table
     conn = sa.get_conn()
+    db_table = sa.table_for_team(team)
     cols_sql = ', '.join(f'"{c}"' for c in sa.COLUMNS)
     with conn.cursor() as cur:
-        cur.execute(f'select {cols_sql} from "{sa.TABLE}" where "PTeam" = %s', (team,))
+        cur.execute(f'select {cols_sql} from "{db_table}"')
         db_rows = cur.fetchall()
     conn.close()
     db_by_id = {row[pid_i]: row for row in db_rows}
