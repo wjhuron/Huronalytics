@@ -320,7 +320,8 @@ _TRANSIENT_SHEETS_CODES = ('429', '500', '502', '503', '504')
 
 
 def _retry_sheets_call(fn, label, max_retries=5):
-    """Retry a Sheets API call on rate-limit (429) and transient 5xx errors."""
+    """Retry a Sheets API call on rate-limit (429), transient 5xx errors, and
+    network-level drops (connection reset, timeout)."""
     for attempt in range(max_retries):
         try:
             return fn()
@@ -331,6 +332,23 @@ def _retry_sheets_call(fn, label, max_retries=5):
                 wait = min(60, 5 * (2 ** attempt))  # 5, 10, 20, 40, 60 s
                 kind = 'Rate limited' if code == '429' else f'Transient {code}'
                 print(f"    {kind} during {label}, waiting {wait}s before retry "
+                      f"({attempt + 1}/{max_retries - 1})...")
+                time.sleep(wait)
+            else:
+                raise
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.ChunkedEncodingError) as e:
+            # Transient network blip (e.g. ConnectionResetError [Errno 54] from a
+            # dropped TLS connection during a write). gspread surfaces these as
+            # requests errors, not APIError, so they need their own retry path.
+            # The Sheets writes are idempotent (same cells and values), so
+            # resending after a reset is safe even if Google applied the lost
+            # request.
+            if attempt < max_retries - 1:
+                wait = min(60, 5 * (2 ** attempt))  # 5, 10, 20, 40, 60 s
+                print(f"    Connection error during {label} "
+                      f"({type(e).__name__}), waiting {wait}s before retry "
                       f"({attempt + 1}/{max_retries - 1})...")
                 time.sleep(wait)
             else:
