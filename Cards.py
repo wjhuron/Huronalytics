@@ -210,6 +210,32 @@ def _compute_pitch_xrv(pitches_list):
                 vals.append(rv)
     return vals
 
+# wOBA weights (FanGraphs Guts 2026, matching pipeline_fetch fallback) for the
+# actual-outcome run value. Outs / SF / etc. map to 0.
+_EVENT_WOBA = {'Single': 0.884, 'Double': 1.256, 'Triple': 1.591, 'Home Run': 2.048}
+
+# Pitch-type qualification minimum (matches MIN_PITCH_TYPE_OUTCOME in
+# process_data.py): per-pitch RV needs >= 25 pitches of that type. Below it the
+# per-100 rate is noise (e.g. a 1-pitch changeup), so the RV cells show '—'.
+PITCH_QUAL_MIN = 25
+
+def _compute_pitch_rv(pitches_list):
+    """Per-pitch ACTUAL run value, pitcher perspective. The actual-outcome twin of
+    _compute_pitch_xrv: for each BIP use the outcome's wOBA weight (hit value, else
+    0 for outs) in place of xwOBA. Non-BIP fall back to RunExp (empty for ROC, so
+    ROC is contact-only — apples-to-apples with the BIP-only xPitchRV)."""
+    vals = []
+    for p in pitches_list:
+        is_bip = p.get('Description') == 'In Play'
+        if is_bip:
+            w = _EVENT_WOBA.get(p.get('Event'), 0.0)
+            vals.append(-(w - GUTS_LG_WOBA) / GUTS_WOBA_SCALE)
+        else:
+            rv = sf(p.get('RunExp'))
+            if rv is not None:
+                vals.append(rv)
+    return vals
+
 def pct_cell_color(value_str, league_avg, row_bg_hex, higher_is_better=True):
     """Return cell background color based on how a percentage compares to league average.
     value_str: cell text like '65.3%'
@@ -792,7 +818,79 @@ def _pitcher_stat_cell_color(value_str, league_avg, scale, higher_is_better,
     return f'#{r:02x}{g:02x}{b:02x}'
 
 
-def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid_bot):
+def _pctl_cell_color(pctl, row_bg_hex):
+    """Table-cell tint driven directly by an already-directional percentile
+    (0-100, high = good), in the same blue→red family as _pitcher_stat_cell_color.
+    Used for nVAA, whose 'good' direction flips by pitch type and is baked into
+    the precomputed nVAA_pctl (FF: flatter/closer-to-zero better; SI: steeper)."""
+    if pctl is None:
+        return None
+    intensity = max(-1.0, min(1.0, (pctl - 50) / 50.0))
+    anchor = _percentile_color(100 if intensity >= 0 else 0)[0]
+    target = tuple(int(round(ch * 255)) for ch in anchor)
+    alpha = abs(intensity) * 0.72
+    rb = int(row_bg_hex[1:3], 16); rg = int(row_bg_hex[3:5], 16); rbb = int(row_bg_hex[5:7], 16)
+    r = int(rb * (1 - alpha) + target[0] * alpha)
+    g = int(rg * (1 - alpha) + target[1] * alpha)
+    b = int(rbb * (1 - alpha) + target[2] * alpha)
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
+def _velo_pctl_vs_ff(velo, config):
+    """Approximate percentile of a velo vs the league FF velo distribution. Used
+    only for the rare FC-only fallback bubble (a pitcher with no FF and no SI).
+    Normal-CDF approx with the league FF mean and an assumed ~2.2 mph SD."""
+    import math
+    la = (config.get('league_avgs') or {}).get('FF') or {}
+    mean = la.get('velocity')
+    if mean is None or velo is None:
+        return None
+    sd = 2.2
+    z = (velo - mean) / (sd * math.sqrt(2))
+    return max(0.0, min(100.0, 100 * 0.5 * (1 + math.erf(z))))
+
+
+def _bubble_columns_for(config, p_row):
+    """ROC cards: split the single 'Velocity' bubble into FF/SI velo bubbles
+    (graded vs MLB same-pitch-type velo). FC-only pitchers fall back to a Cutter
+    velo bubble graded vs league FF velo. MLB cards keep the default columns."""
+    if config.get('team') not in MILB_TEAMS:
+        return BUBBLE_COLUMNS
+    pitch_lb = config.get('pitch_lb') or {}
+    def _vel(pt):
+        d = pitch_lb.get(pt) or {}
+        return d.get('velocity'), d.get('velocity_pctl')
+    velo_rows = []
+    ff_v, ff_p = _vel('FF')
+    si_v, si_p = _vel('SI')
+    if ff_v is not None:
+        p_row['ffVelo'], p_row['ffVelo_pctl'] = ff_v, ff_p
+        velo_rows.append(('FF Velo', 'ffVelo', 'ffVelo_pctl', 'mph'))
+    if si_v is not None:
+        p_row['siVelo'], p_row['siVelo_pctl'] = si_v, si_p
+        velo_rows.append(('SI Velo', 'siVelo', 'siVelo_pctl', 'mph'))
+    if not velo_rows:
+        fc_v, _ = _vel('FC')
+        if fc_v is not None:
+            p_row['fcVelo'] = fc_v
+            p_row['fcVelo_pctl'] = _velo_pctl_vs_ff(fc_v, config)
+            velo_rows.append(('FC Velo', 'fcVelo', 'fcVelo_pctl', 'mph'))
+    if not velo_rows:
+        return BUBBLE_COLUMNS
+    # Rebuild columns, swapping the single 'Velocity' row for the velo rows.
+    new_cols = []
+    for name, metrics in BUBBLE_COLUMNS:
+        new_metrics = []
+        for m in metrics:
+            if m[1] == 'fbVelo':
+                new_metrics.extend(velo_rows)
+            else:
+                new_metrics.append(m)
+        new_cols.append((name, new_metrics))
+    return new_cols
+
+
+def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid_bot, columns=None):
     """Left-column percentile panel (mirrors the website PERCENTILE RANKINGS
     sidebar). Vertical stack of section sub-headers + pill-bar rows. Grid bounds
     are passed in (fig coords) so the layout can be tuned from the call site.
@@ -805,7 +903,7 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
     # pitchers are missing the Statcast-derived bubbles — show nothing rather
     # than a column of dashes).
     _columns = []
-    for name, metrics in BUBBLE_COLUMNS:
+    for name, metrics in (columns or BUBBLE_COLUMNS):
         if any(p_row.get(vk) is not None for _l, vk, _pk, _f in metrics):
             _columns.append((name, metrics))
     total_rows = sum(len(m) for _h, m in _columns)
@@ -1067,6 +1165,10 @@ def render_card(config, pitches, output_file):
             exp_movement[pt]['sum_hb'] += xhb
             exp_movement[pt]['n'] += 1
 
+    # ROC/MiLB cards: drop the shaded expected-movement ellipses + caption.
+    if config.get('team') in MILB_TEAMS:
+        exp_movement = {}
+
     # Draw expected movement ellipses first (behind scatter points, min 6 pitches)
     for pt in PITCH_ORDER:
         if pt not in exp_movement or pt not in groups:
@@ -1219,9 +1321,10 @@ def render_card(config, pitches, output_file):
     # Sourced from the pitcher leaderboard row attached as config['pctl_row'].
     p_row = config.get('pctl_row') or {}
     if p_row:
+        bubble_cols = _bubble_columns_for(config, p_row)
         _render_percentile_bubbles(fig, p_row,
                                    grid_left=0.015, grid_right=0.405,
-                                   grid_top=0.790, grid_bot=0.235)
+                                   grid_top=0.790, grid_bot=0.235, columns=bubble_cols)
 
     # Metrics table — full-width bottom band.
     ax_table = fig.add_axes([TABLE_LEFT_FIG, 0.015, TABLE_RIGHT_FIG-TABLE_LEFT_FIG, 0.205])
@@ -1234,6 +1337,18 @@ def render_card(config, pitches, output_file):
     # from the pitch-level leaderboard via config; the card can't recompute it
     # (needs the league zone-quality tables). Empty dict → column auto-drops.
     locplus_by_pt = config.get('pitch_locplus') or {}
+    pitch_lb = config.get('pitch_lb') or {}
+    is_milb = config.get('team') in MILB_TEAMS
+    nvaa_by_pt = {pt: d.get('nVAA') for pt, d in pitch_lb.items()}
+    nvaa_pctl_by_pt = {pt: d.get('nVAA_pctl') for pt, d in pitch_lb.items()}
+    xrv_by_pt = {pt: d.get('xRunValue') for pt, d in pitch_lb.items()}
+    xrv100_by_pt = {pt: d.get('xRv100') for pt, d in pitch_lb.items()}
+    # RV columns. ROC shows the actual + expected per-100 pair (PitchRV/100 from
+    # BIP outcomes, xPitchRV/100 from the leaderboard). MLB unchanged (expected only).
+    if is_milb:
+        rv_cols = ['PitchRV/100', 'xPitchRV/100']
+    else:
+        rv_cols = ['xPitchRV'] + (['xPitchRV/100'] if is_season else [])
 
     # Sort pitch types by usage (descending), with PITCH_ORDER as tiebreaker
     pitch_counts = {}
@@ -1265,13 +1380,25 @@ def render_card(config, pitches, output_file):
             r = compute_iz(p)
             if r is None: continue
             if r: iz_n+=1
-        # Expected run value (xRV): xwOBA-based on BIP, actual RunExp otherwise.
-        # Chosen over actual RV because it's 2-3x more reliable at the pitch-
-        # type level (small samples — see scripts/rv_vs_xrv_reliability.py) and
-        # consistent with the xwOBAcon column. Cumulative xPitchRV + per-100.
-        rvs_x = _compute_pitch_xrv(pp)
-        rv_cum = (round(sum(rvs_x), 1) + 0.0) if rvs_x else None   # +0.0 kills -0.0
-        rv_100 = (round(sum(rvs_x) / len(pp) * 100, 1) + 0.0) if rvs_x else None
+        # Run value. ROC: xPitchRV (expected) from the leaderboard; PitchRV (actual)
+        # from this pitch type's BIP outcomes. MLB: expected only, in-card.
+        if is_milb:
+            _xc = xrv_by_pt.get(pt); _xr = xrv100_by_pt.get(pt)
+            xrv_cum = (round(_xc, 1) + 0.0) if _xc is not None else None
+            xrv_100 = (round(_xr, 1) + 0.0) if _xr is not None else None
+            _prv = _compute_pitch_rv(pp)
+            prv_cum = (round(sum(_prv), 1) + 0.0) if _prv else None
+            prv_100 = (round(sum(_prv) / len(pp) * 100, 1) + 0.0) if _prv else None
+        else:
+            rvs_x = _compute_pitch_xrv(pp)
+            xrv_cum = (round(sum(rvs_x), 1) + 0.0) if rvs_x else None   # +0.0 kills -0.0
+            xrv_100 = (round(sum(rvs_x) / len(pp) * 100, 1) + 0.0) if rvs_x else None
+            prv_cum = prv_100 = None
+        # Qualification gate: below the pitch-type minimum the RV rate is noise.
+        if is_milb and n < PITCH_QUAL_MIN:
+            prv_cum = prv_100 = xrv_cum = xrv_100 = None
+        _rvmap = {'PitchRV': prv_cum, 'xPitchRV': xrv_cum,
+                  'PitchRV/100': prv_100, 'xPitchRV/100': xrv_100}
         # Chase% — swings on out-of-zone pitches over OoZ pitches.
         oop_swings_n = sum(1 for p in pp if p.get('Description') in SWING_DESC and compute_iz(p) == False)
         oop_pitches_n = sum(1 for p in pp if compute_iz(p) == False)
@@ -1280,10 +1407,12 @@ def render_card(config, pitches, output_file):
         bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pp if p.get('Description') == 'In Play') if v is not None]
         xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else None
         pt_name='Fastball' if pt=='FF' else PITCH_NAMES.get(pt,pt)
+        _nvaa = nvaa_by_pt.get(pt)
         row=[pt_name,str(n),f"{n/tc*100:.1f}%",
             f"{sum(velos)/len(velos):.1f}" if velos else '—',f"{max(velos):.1f}" if velos else '—',
             f"{int(sum(spins)/len(spins))}" if spins else '—',
             f'{sum(ivbs)/len(ivbs):.1f}"' if ivbs else '—',f'{sum(hbs)/len(hbs):.1f}"' if hbs else '—',
+            f"{_nvaa:.1f}" if _nvaa is not None else '—',
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
@@ -1291,10 +1420,10 @@ def render_card(config, pitches, output_file):
             (f"{int(round(locplus_by_pt[pt]))}" if locplus_by_pt.get(pt) is not None else '—'),
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
             f"{chase_pct*100:.1f}%" if chase_pct is not None else '—',
-            f"{xwobacon:.3f}".replace('0.', '.') if xwobacon is not None else '—',
-            str(rv_cum) if rv_cum is not None else '—']
-        if is_season:
-            row.append(str(rv_100) if rv_100 is not None else '—')
+            f"{xwobacon:.3f}".replace('0.', '.') if xwobacon is not None else '—']
+        for _h in rv_cols:
+            _v = _rvmap.get(_h)
+            row.append(str(_v) if _v is not None else '—')
         pitch_stats.append((pt, row))
 
     t_sw=[p for p in pitches if p.get('Description') in SWING_DESC]
@@ -1316,10 +1445,22 @@ def render_card(config, pitches, output_file):
     t_xwobacon = sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw else None
     # Pitcher-level Loc+ for the Total row (from the bubble's leaderboard row).
     _total_locplus = (config.get('pctl_row') or {}).get('locPlus')
-    # xRV totals — cumulative + per-100 (expected). +0.0 kills -0.0.
-    total_rv_cum = (round(sum(t_rvs_x), 1) + 0.0) if t_rvs_x else None
-    total_rv_100 = (round(sum(t_rvs_x) / tc * 100, 1) + 0.0) if (t_rvs_x and tc) else None
-    total_row=['Total',str(tc),'100.0%','—','—','—','—','—',
+    # RV totals. ROC: expected from the leaderboard (matches the xRV/100 bubble),
+    # actual summed from all BIP outcomes. MLB: expected only.
+    if is_milb:
+        _pr = config.get('pctl_row') or {}
+        total_xrv_cum = (round(_pr['xRunValue'], 1) + 0.0) if _pr.get('xRunValue') is not None else None
+        total_xrv_100 = (round(_pr['xRv100'], 1) + 0.0) if _pr.get('xRv100') is not None else None
+        _tprv = _compute_pitch_rv(pitches)
+        total_prv_cum = (round(sum(_tprv), 1) + 0.0) if _tprv else None
+        total_prv_100 = (round(sum(_tprv) / tc * 100, 1) + 0.0) if (_tprv and tc) else None
+    else:
+        total_xrv_cum = (round(sum(t_rvs_x), 1) + 0.0) if t_rvs_x else None
+        total_xrv_100 = (round(sum(t_rvs_x) / tc * 100, 1) + 0.0) if (t_rvs_x and tc) else None
+        total_prv_cum = total_prv_100 = None
+    _trvmap = {'PitchRV': total_prv_cum, 'xPitchRV': total_xrv_cum,
+               'PitchRV/100': total_prv_100, 'xPitchRV/100': total_xrv_100}
+    total_row=['Total',str(tc),'100.0%','—','—','—','—','—','—',
         fmt_fi(sum(t_relzs)/len(t_relzs)) if t_relzs else '—',
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
         fmt_fi(sum(t_exts)/len(t_exts)) if t_exts else '—',
@@ -1328,29 +1469,26 @@ def render_card(config, pitches, output_file):
         (f"{int(round(_total_locplus))}" if _total_locplus is not None else '—'),
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
         f"{t_chase*100:.1f}%" if t_chase is not None else '—',
-        f"{t_xwobacon:.3f}".replace('0.', '.') if t_xwobacon is not None else '—',
-        str(total_rv_cum) if total_rv_cum is not None else '—']
-    if is_season:
-        total_row.append(str(total_rv_100) if total_rv_100 is not None else '—')
+        f"{t_xwobacon:.3f}".replace('0.', '.') if t_xwobacon is not None else '—']
+    for _h in rv_cols:
+        _v = _trvmap.get(_h)
+        total_row.append(str(_v) if _v is not None else '—')
 
     # Source-data presence check — RV needs RunExp on at least one pitch.
     has_pitchrv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
 
-    # Expected run-value columns: cumulative xPitchRV always; xPitchRV/100
-    # added on season cards (per-100 is noise on a single game).
-    rv_cum_header = 'xPitchRV'
-    rv_rate_header = 'xPitchRV/100'
-    rv_headers = [rv_cum_header]
-    if is_season:
-        rv_headers.append(rv_rate_header)
-
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','RelZ','RelX','Ext','Arm Angle','Zone%','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_headers
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','RelZ','RelX','Ext','Arm Angle','Zone%','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_cols
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
     # Columns to force-exclude based on data availability and card type.
     force_exclude = set()
-    if not has_pitchrv_data:
-        force_exclude.add(rv_cum_header); force_exclude.add(rv_rate_header)
+    _have_xrv = any(v is not None for v in xrv_by_pt.values()) if is_milb else has_pitchrv_data
+    if not _have_xrv:
+        for _h in ('PitchRV', 'xPitchRV', 'PitchRV/100', 'xPitchRV/100'):
+            force_exclude.add(_h)
+    # nVAA column is ROC-only — MLB cards keep their existing layout.
+    if not is_milb:
+        force_exclude.add('nVAA')
     # If no xwOBA on any BIP, xwOBAcon column drops too.
     has_xwoba_bip = any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' for p in pitches)
     if not has_xwoba_bip: force_exclude.add('xwOBAcon')
@@ -1358,7 +1496,9 @@ def render_card(config, pitches, output_file):
     # exclude only when Arm Angle data exists (Arm Angle conveys the same release
     # info more compactly); keep RelZ/RelX as a fallback when Arm Angle is missing.
     has_arm_angle = any(sf(p.get('ArmAngle')) is not None for p in pitches)
-    if is_season or (not is_season and has_arm_angle):
+    # ROC: always show RelZ/RelX (no arm angle at AAA). MLB: unchanged — exclude on
+    # season cards and on single-game cards that have Arm Angle.
+    if not is_milb and (is_season or has_arm_angle):
         force_exclude.add('RelZ')
         force_exclude.add('RelX')
 
@@ -1489,7 +1629,7 @@ def render_card(config, pitches, output_file):
     # xPitchRV coloring — higher is better for pitcher, centered at 0. The
     # per-100 rate gets scale 2.0; the cumulative column spans wider (a full
     # season of one pitch type), so it uses scale 3.0.
-    RV_COL_NAMES = ('xPitchRV', 'xPitchRV/100')
+    RV_COL_NAMES = ('PitchRV', 'xPitchRV', 'PitchRV/100', 'xPitchRV/100')
     for c, col_name in enumerate(col_headers):
         if col_name not in RV_COL_NAMES:
             continue
@@ -1511,6 +1651,22 @@ def render_card(config, pitches, output_file):
             tinted = _pitcher_stat_cell_color(val_str, 100.0, 10.0, True, row_bg, False)
             if tinted:
                 table.get_celld()[(r, lp_col_idx)].set_facecolor(tinted)
+
+    # nVAA coloring — FF and SI only (per spec). nVAA_pctl is already directional
+    # (FF: flatter/closer-to-zero better; SI: steeper better), computed vs MLB.
+    if 'nVAA' in col_headers:
+        nvaa_col_idx = col_headers.index('nVAA')
+        for r in range(1, len(cell_data)):   # pitch rows only; skip Total
+            pc = pt_codes[r - 1]
+            if pc not in ('FF', 'SI'):
+                continue
+            pctl = nvaa_pctl_by_pt.get(pc)
+            if pctl is None:
+                continue
+            row_bg = DARK_CELL if r % 2 == 1 else ALT_ROW_BG
+            tinted = _pctl_cell_color(pctl, row_bg)
+            if tinted:
+                table.get_celld()[(r, nvaa_col_idx)].set_facecolor(tinted)
 
     # Divider + borders
     fig.canvas.draw()
@@ -1652,13 +1808,21 @@ def main():
     # Per-pitch-type Loc+ for the metrics table — from the pitch-level
     # leaderboard, keyed (pitcher, team) -> {pitchType: locPlus}.
     locplus_by_pitcher = defaultdict(dict)
+    pitch_lb_by_pitcher = defaultdict(dict)   # ROC cards: nVAA, per-type velo, xRV from leaderboard
     _pl_path = os.path.join(os.path.dirname(METADATA_PATH), 'pitch_leaderboard_rs.json')
     if os.path.exists(_pl_path):
         try:
             with open(_pl_path) as f:
                 for _r in json.load(f):
+                    _lbkey = (_r.get('pitcher'), _r.get('team'))
+                    _lbpt = _r.get('pitchType')
                     if _r.get('locPlus') is not None:
-                        locplus_by_pitcher[(_r.get('pitcher'), _r.get('team'))][_r.get('pitchType')] = _r['locPlus']
+                        locplus_by_pitcher[_lbkey][_lbpt] = _r['locPlus']
+                    pitch_lb_by_pitcher[_lbkey][_lbpt] = {
+                        'nVAA': _r.get('nVAA'), 'nVAA_pctl': _r.get('nVAA_pctl'),
+                        'velocity': _r.get('velocity'), 'velocity_pctl': _r.get('velocity_pctl'),
+                        'xRunValue': _r.get('xRunValue'), 'xRv100': _r.get('xRv100'),
+                    }
         except Exception as _e:
             print(f"  WARNING: could not load pitch leaderboard for Loc+: {_e}")
 
@@ -1854,6 +2018,7 @@ def main():
             'mvn_models': mvn_models if is_multi_game else {},
             'pctl_row': pctl_row,
             'pitch_locplus': (locplus_by_pitcher.get((pitcher_name, team), {}) if is_multi_game else {}),
+            'pitch_lb': (pitch_lb_by_pitcher.get((pitcher_name, team), {}) if is_multi_game else {}),
         }
 
         # Output file — DateSlug-LastFirst format
