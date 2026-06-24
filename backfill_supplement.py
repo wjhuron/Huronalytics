@@ -12,7 +12,6 @@ Configuration: edit the variables below before running.
 
 import argparse
 import gspread
-from google.oauth2.service_account import Credentials
 import requests
 import pandas as pd
 from io import StringIO
@@ -32,11 +31,17 @@ filter_teams = None
 produce_report = "no"
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Six 2026 per-division workbooks (huronalytics account), replacing the two old
+# AL/NL books. main() opens each book and walks its team tabs, so pointing at the
+# six is all the routing this script needs; NLE2026 also carries ROC/AAA/FCL.
 SPREADSHEET_IDS = {
-    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',   # AL 2026
-    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',   # NL 2026
+    'ALE2026': '1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI',
+    'ALC2026': '14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E',
+    'ALW2026': '1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs',
+    'NLE2026': '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA',
+    'NLC2026': '1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w',
+    'NLW2026': '1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0',
 }
-SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 
 # Spreadsheet column name -> Statcast CSV column name
 SUPPLEMENT_MAP = {
@@ -388,9 +393,12 @@ def main():
     if filter_teams:
         print(f"Teams: {', '.join(sorted(filter_teams))}")
 
-    scopes = ['https://www.googleapis.com/auth/spreadsheets']
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    gc = gspread.authorize(creds)
+    # Default gspread service account (~/.config/gspread/service_account.json =
+    # huronalytics), the writer on all six division books and the same account
+    # the append path (sheets_append.py) uses. The old repo-local
+    # service_account.json was the st-leaderboard reader, which has neither
+    # access to nor write permission on the new books.
+    gc = gspread.service_account()
 
     session = requests.Session()
     session.headers.update({
