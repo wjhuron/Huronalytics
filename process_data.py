@@ -28,7 +28,7 @@ from pipeline_utils import (
 from pipeline_fetch import (
     fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
     fetch_hitter_positions,
-    read_pitches_from_sheet, read_pitches_from_supabase,
+    read_pitches_from_sheet, read_all_pitches_from_sheets,
     lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache,
     fetch_and_aggregate_boxscores, fetch_and_aggregate_milb_boxscores,
     SPREADSHEET_IDS, SERVICE_ACCOUNT_FILE,
@@ -3787,27 +3787,12 @@ def main():
         print(f"  WARNING: Could not fetch park factors ({e}), defaulting to 1.0")
         PARK_FACTORS = {}
 
-    # Connect to Google Sheets
-    print("Connecting to Google Sheets...")
-    scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if sa_json:
-        try:
-            sa_info = json.loads(sa_json)
-        except json.JSONDecodeError as e:
-            print(f"FATAL: GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON: {e}")
-            sys.exit(1)
-        creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-    else:
-        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    gc = gspread.authorize(creds)
-
-    # Read Regular Season data from Supabase (post-cutover source of truth:
-    # pitches are pulled by Pitcher2026 and retagged in Postico/Supabase, not the
-    # Sheets). Verified field-for-field identical to the old Sheets read.
-    print("\n=== Reading Regular Season data (Supabase) ===")
-    rs_pitches = read_pitches_from_supabase()
-    print(f"  Read {len(rs_pitches)} RS pitches from Supabase")
+    # Read Regular Season data from the six 2026 division workbooks (Sheets, on
+    # the huronalytics account). Pitcher2026 appends here and retagging happens
+    # here, so this is the source of truth.
+    print("\n=== Reading Regular Season data (Sheets) ===")
+    rs_pitches = read_all_pitches_from_sheets()
+    print(f"  Read {len(rs_pitches)} RS pitches from the 6 division workbooks")
 
     # Shared MLB ID cache
     mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')

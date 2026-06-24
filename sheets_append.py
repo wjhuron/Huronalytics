@@ -44,7 +44,7 @@ import math
 
 import pandas as pd
 
-# Workbook IDs (hardcoded for 2026)
+# Legacy 2-workbook IDs (kept for old imports; no longer written to).
 SHEETS_NL = '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE'
 SHEETS_AL = '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U'
 
@@ -52,17 +52,34 @@ NL_TEAMS = {'ARI', 'ATL', 'CHC', 'CIN', 'COL', 'LAD', 'MIA', 'MIL',
             'NYM', 'PHI', 'PIT', 'SDP', 'SFG', 'STL', 'WSH'}
 AL_TEAMS = {'BAL', 'BOS', 'CWS', 'CLE', 'DET', 'HOU', 'KCR', 'LAA',
             'MIN', 'NYY', 'ATH', 'SEA', 'TBR', 'TEX', 'TOR'}
-
-# ROC + AAA both live in NL 2026
 ROC_AAA_TEAMS = {'ROC', 'AAA'}
+
+# 2026 layout: six per-division workbooks (replaces the two AL/NL books to stay
+# under the Sheets cell limit). Each team appends to its division's workbook;
+# ROC/AAA/FCL live in NL East.
+WORKBOOKS = {
+    'ALE2026': '1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI',
+    'ALC2026': '14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E',
+    'ALW2026': '1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs',
+    'NLE2026': '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA',
+    'NLC2026': '1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w',
+    'NLW2026': '1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0',
+}
+TEAM_DIVISION = {
+    'BAL': 'ALE2026', 'BOS': 'ALE2026', 'NYY': 'ALE2026', 'TBR': 'ALE2026', 'TOR': 'ALE2026',
+    'CLE': 'ALC2026', 'CWS': 'ALC2026', 'DET': 'ALC2026', 'KCR': 'ALC2026', 'MIN': 'ALC2026',
+    'ATH': 'ALW2026', 'HOU': 'ALW2026', 'LAA': 'ALW2026', 'SEA': 'ALW2026', 'TEX': 'ALW2026',
+    'ATL': 'NLE2026', 'MIA': 'NLE2026', 'NYM': 'NLE2026', 'PHI': 'NLE2026', 'WSH': 'NLE2026',
+    'ROC': 'NLE2026', 'AAA': 'NLE2026', 'FCL': 'NLE2026',
+    'CHC': 'NLC2026', 'CIN': 'NLC2026', 'MIL': 'NLC2026', 'PIT': 'NLC2026', 'STL': 'NLC2026',
+    'ARI': 'NLW2026', 'COL': 'NLW2026', 'LAD': 'NLW2026', 'SDP': 'NLW2026', 'SFG': 'NLW2026',
+}
+WORKBOOK_LABEL = {wid: name for name, wid in WORKBOOKS.items()}
 
 
 def _workbook_id_for_team(team):
-    if team in NL_TEAMS or team in ROC_AAA_TEAMS:
-        return SHEETS_NL
-    if team in AL_TEAMS:
-        return SHEETS_AL
-    return None
+    div = TEAM_DIVISION.get(('' if team is None else str(team)).strip())
+    return WORKBOOKS.get(div) if div else None
 
 
 def _get_client():
@@ -325,7 +342,7 @@ def push_team_data(df, team, gc=None, verbose=True):
                       f"({type(e).__name__}: {e}); continuing")
 
     if verbose:
-        wb_label = 'NL 2026' if wb_id == SHEETS_NL else 'AL 2026'
+        wb_label = WORKBOOK_LABEL.get(wb_id, wb_id)
         print(f"  [sheets] {team}: appended {len(rows)} rows to {wb_label} → "
               f"{team} (rows {next_row}-{end_row})")
     return next_row, len(rows)

@@ -54,19 +54,29 @@ TEAM_LEAGUE <- c(
   ROC = "NL", AAA = "NL", FCL = "NL"
 )
 
-# Build the full CSV path from just a team code.
-# Usage: resolve_team_path("PIT")  =>  "/Users/wallyhuron/Downloads/NL 2026 - PIT.csv"
-#        resolve_team_path("/Users/wallyhuron/Downloads/NL 2026 - PIT.csv")  =>  unchanged
-resolve_team_path <- function(input, year = 2026, base_dir = "/Users/wallyhuron/Downloads/") {
-  # If it already looks like a full path, return as-is
+# 2026 layout: each team's data lives in its division workbook. The CSV you
+# export from Google ("download as CSV") is named "<workbook> - <tab>.csv".
+TEAM_WORKBOOK <- c(
+  BAL="ALE2026", BOS="ALE2026", NYY="ALE2026", TBR="ALE2026", TOR="ALE2026",
+  CLE="ALC2026", CWS="ALC2026", DET="ALC2026", KCR="ALC2026", MIN="ALC2026",
+  ATH="ALW2026", HOU="ALW2026", LAA="ALW2026", SEA="ALW2026", TEX="ALW2026",
+  ATL="NLE2026", MIA="NLE2026", NYM="NLE2026", PHI="NLE2026", WSH="NLE2026",
+  ROC="NLE2026", AAA="NLE2026", FCL="NLE2026",
+  CHC="NLC2026", CIN="NLC2026", MIL="NLC2026", PIT="NLC2026", STL="NLC2026",
+  ARI="NLW2026", COL="NLW2026", LAD="NLW2026", SDP="NLW2026", SFG="NLW2026"
+)
+
+# Build the CSV path from a team code, using its division workbook.
+# Usage: resolve_team_path("PIT")  =>  "/Users/wallyhuron/Downloads/NLC2026 - PIT.csv"
+#        resolve_team_path("/Users/.../NLC2026 - PIT.csv")  =>  unchanged
+resolve_team_path <- function(input, base_dir = "/Users/wallyhuron/Downloads/") {
   if (grepl("/", input) || grepl("\\.csv$", input, ignore.case = TRUE)) {
     return(input)
   }
-  # Treat input as a team code
   team <- toupper(trimws(input))
-  league <- TEAM_LEAGUE[team]
-  if (is.na(league)) stop("Unknown team code: ", team, ". Expected one of: ", paste(names(TEAM_LEAGUE), collapse = ", "))
-  paste0(base_dir, league, " ", year, " - ", team, ".csv")
+  wb <- TEAM_WORKBOOK[team]
+  if (is.na(wb)) stop("Unknown team code: ", team, ". Expected one of: ", paste(names(TEAM_WORKBOOK), collapse = ", "))
+  paste0(base_dir, wb, " - ", team, ".csv")
 }
 
 # ---- Supabase (Postgres) data source ----
@@ -156,19 +166,15 @@ extract_team_code <- function(input) {
   toupper(s)
 }
 
-# Load a team's pitch data. Known team codes (and the team-CSV filename pattern
-# produced by resolve_team_path) read from Supabase; any other existing .csv
-# path still reads from disk, so ad-hoc CSV files keep working unchanged.
+# Load a team's pitch data from its exported CSV in ~/Downloads. `input` is the
+# path produced by resolve_team_path (e.g. ".../NLC2026 - PIT.csv") or any .csv.
+# (The Supabase reader above is retained but unused after the move back to Sheets.)
 load_pitch_data <- function(input) {
-  team <- extract_team_code(input)
-  if (!is.na(team) && team %in% names(TEAM_LEAGUE)) {
-    return(read_team_from_supabase(team))
+  if (!file.exists(input)) {
+    stop("load_pitch_data: file not found: ", input,
+         "\n  Export the team's tab from its division workbook to ~/Downloads first.")
   }
-  if (file.exists(input)) {
-    return(readr::read_csv(input, col_types = readr::cols(OTilt = readr::col_character())))
-  }
-  stop("load_pitch_data: '", input,
-       "' is neither a known team code nor an existing CSV file")
+  readr::read_csv(input, col_types = readr::cols(OTilt = readr::col_character()))
 }
 
 # ---- Shared Helper Functions ----

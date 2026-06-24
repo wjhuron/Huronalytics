@@ -330,6 +330,30 @@ def read_pitches_from_supabase(teams=None):
     return pitches
 
 
+# Six 2026 per-division workbooks (replaced the two AL/NL books, on the
+# huronalytics account). NLE2026 also holds ROC/AAA/FCL.
+DIVISION_WORKBOOK_IDS = {
+    'ALE2026': '1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI',
+    'ALC2026': '14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E',
+    'ALW2026': '1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs',
+    'NLE2026': '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA',
+    'NLC2026': '1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w',
+    'NLW2026': '1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0',
+}
+
+
+def read_all_pitches_from_sheets():
+    """Read all RS pitches from the six 2026 division workbooks (the Sheets the
+    site reads). NLE2026's ROC/AAA tabs come in via extra_tabs; FCL is skipped
+    (not in MLB_TEAMS). Uses the huronalytics service account."""
+    gc = gspread.service_account()
+    pitches = []
+    for name, wid in DIVISION_WORKBOOK_IDS.items():
+        extra = {'ROC', 'AAA'} if name == 'NLE2026' else None
+        pitches += read_pitches_from_sheet(gc, wid, extra_tabs=extra)
+    return pitches
+
+
 # ── MLB ID lookup ────────────────────────────────────────────────────────
 
 def load_mlb_id_cache(cache_path):

@@ -1628,10 +1628,10 @@ def main():
 
     push_to_sheets  = True       # True → also append to AL/NL 2026 Google Sheets after CSV save
 
-    push_to_supabase = True      # True → also upsert into the Supabase `pitches` table.
-                                 # Dual-write during the Sheets→Supabase parallel-run so both
-                                 # stay in sync. Idempotent (keyed on PitchID). Credentials
-                                 # come from SUPABASE_DB_URL / the repo .env.
+    push_to_supabase = False     # Retired: moved back to Sheets (6 division workbooks).
+                                 # Left as a flag (and supabase_append.py kept) in case the
+                                 # Supabase mirror is ever revived; default off — Sheets is
+                                 # the source of truth again.
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
     parser = argparse.ArgumentParser(description='Download pitch data from Baseball Savant')
