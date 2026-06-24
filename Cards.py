@@ -1741,17 +1741,23 @@ def main():
         filter_pitchers = [p.strip() for p in filter_pitchers.split(';') if p.strip()]
     # ──────────────────────────────────────────────────────────
 
-    # Determine league / spreadsheet
-    if team in AL_TEAMS:
-        league = 'AL'
-    elif team in NL_TEAMS:
-        league = 'NL'
-    elif team in MILB_TEAMS:
-        league = 'MiLB'
-    else:
-        print(f"Error: Unknown team '{team}'")
+    # Teams: a comma-separated --team (e.g. TOR,LAD) combines a multi-team
+    # pitcher's full season. Pitch data is read from each team's worksheet; the
+    # bubbles use the pipeline's synthetic 2TM/3TM combined leaderboard row.
+    teams = [t.strip() for t in str(team).split(',') if t.strip()]
+    if not teams:
+        print("Error: no team specified")
         sys.exit(1)
-    sheet_key = _workbook_id_for_team(team)
+    for t in teams:
+        if t not in AL_TEAMS and t not in NL_TEAMS and t not in MILB_TEAMS:
+            print(f"Error: Unknown team '{t}'")
+            sys.exit(1)
+    if len(teams) > 1:
+        league = 'MLB'
+        team = f"{len(teams)}TM"   # combined label = leaderboard 2TM/3TM key
+    else:
+        team = teams[0]
+        league = 'AL' if team in AL_TEAMS else ('NL' if team in NL_TEAMS else 'MiLB')
     # Resolve date range
     if start_date is None and end_date is None:
         # Full season — no date filter
@@ -1829,25 +1835,31 @@ def main():
     # Multi-game mode: date range or full season
     is_multi_game = (start_date is None) or (end_date is not None)
 
-    # Step 1: Load pitch data from Google Sheets
+    # Step 1: Load pitch data from Google Sheets (one worksheet per team)
     print("Step 1: Loading pitch data from Google Sheets...")
     gc = gspread.service_account()
-    sh = gc.open_by_key(sheet_key)
-    ws = sh.worksheet(team)
-    for attempt in range(3):
-        try:
-            all_rows = ws.get_all_records()
-            break
-        except Exception as e:
-            if attempt < 2:
-                print(f"  Sheets API error, retrying ({attempt+1}/3): {e}")
-                time_module.sleep(2 ** attempt)
-            else:
-                raise
+    all_rows = []
+    for t in teams:
+        ws = gc.open_by_key(_workbook_id_for_team(t)).worksheet(t)
+        for attempt in range(3):
+            try:
+                t_rows = ws.get_all_records()
+                break
+            except Exception as e:
+                if attempt < 2:
+                    print(f"  Sheets API error ({t}), retrying ({attempt+1}/3): {e}")
+                    time_module.sleep(2 ** attempt)
+                else:
+                    raise
+        for r in t_rows:
+            r['_card_team'] = t      # tag source team for per-team boxscore fetch
+        all_rows.extend(t_rows)
+        print(f"  {t}: {len(t_rows)} rows")
 
     # Filter by date range (and optionally by pitcher name)
     pitches_by_pitcher = defaultdict(list)
     game_dates_seen = set()
+    team_dates = defaultdict(set)   # source team -> game dates (per-team boxscores)
     for row in all_rows:
         row_date = row.get('Game Date', '')
         if date_filter is not None:
@@ -1860,6 +1872,7 @@ def main():
             pitches_by_pitcher[pitcher_name].append(row)
             if row_date:
                 game_dates_seen.add(row_date)
+                team_dates[row.get('_card_team', team)].add(row_date)
 
     pitcher_names = sorted(pitches_by_pitcher.keys())
     print(f"  Found {len(pitcher_names)} pitchers across {len(game_dates_seen)} game dates: {', '.join(pitcher_names)}")
@@ -1879,12 +1892,14 @@ def main():
             print(f"  (filter_pitchers was set to: {filter_pitchers})")
         sys.exit(0)
 
-    # Step 2: Fetch boxscore stats (aggregate across all game dates in range)
+    # Step 2: Fetch boxscore stats (per source team, aggregated across game dates)
     print("\nStep 2: Fetching boxscore stats from MLB API...")
     box_stats = {}
-    for gd in sorted(game_dates_seen):
-        print(f"  Fetching boxscores for {gd}...")
-        day_box = fetch_boxscores_for_team(gd, team, include_live=bool(game_pk), game_pk=game_pk if len(game_dates_seen) == 1 else None)
+    _single_date = len(game_dates_seen) == 1
+    for t in teams:
+      for gd in sorted(team_dates.get(t, ())):
+        print(f"  Fetching boxscores for {gd} ({t})...")
+        day_box = fetch_boxscores_for_team(gd, t, include_live=bool(game_pk), game_pk=game_pk if _single_date else None)
         for pname, pbox in day_box.items():
             nk = _normalize_name(pname)
             if nk not in box_stats:
@@ -1916,7 +1931,7 @@ def main():
         hand = pitches[0].get('Throws', 'R') if pitches else 'R'
 
         # Look up MLB ID
-        mlb_id = lookup_mlb_id(pitcher_name, team, mlb_cache)
+        mlb_id = lookup_mlb_id(pitcher_name, teams[0], mlb_cache)
         print(f"  MLB ID: {mlb_id}")
 
         # Get age from MLB API
@@ -1998,8 +2013,11 @@ def main():
         # percentile context); pass None otherwise so the panel renders empty.
         pctl_row = None
         if is_multi_game:
-            pctl_row = (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None) \
-                       or pctl_by_name.get((pitcher_name, team))
+            if len(teams) > 1:
+                pctl_row = pctl_by_name.get((pitcher_name, team))   # 2TM/3TM combined row
+            else:
+                pctl_row = (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None) \
+                           or pctl_by_name.get((pitcher_name, team))
 
         # Build config
         config = {
