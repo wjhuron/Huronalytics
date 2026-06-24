@@ -342,11 +342,29 @@ DIVISION_WORKBOOK_IDS = {
 }
 
 
+def _gspread_client():
+    """Authorize gspread to read the division workbooks.
+
+    In CI (the update-leaderboard workflow) the service-account key arrives in
+    the GOOGLE_SERVICE_ACCOUNT_JSON env var (GitHub secret SERVICE_ACCOUNT_JSON);
+    locally it falls back to the default gspread file (~/.config/gspread/
+    service_account.json — the huronalytics account the six books are shared
+    with). The SA used here must have at least read access to all six books.
+    """
+    sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+    if sa_json:
+        from google.oauth2.service_account import Credentials
+        scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        creds = Credentials.from_service_account_info(json.loads(sa_json), scopes=scopes)
+        return gspread.authorize(creds)
+    return gspread.service_account()
+
+
 def read_all_pitches_from_sheets():
     """Read all RS pitches from the six 2026 division workbooks (the Sheets the
     site reads). NLE2026's ROC/AAA tabs come in via extra_tabs; FCL is skipped
-    (not in MLB_TEAMS). Uses the huronalytics service account."""
-    gc = gspread.service_account()
+    (not in MLB_TEAMS)."""
+    gc = _gspread_client()
     pitches = []
     for name, wid in DIVISION_WORKBOOK_IDS.items():
         extra = {'ROC', 'AAA'} if name == 'NLE2026' else None
