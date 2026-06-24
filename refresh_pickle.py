@@ -38,27 +38,8 @@ import sys
 # Add script dir to path so we can import the shared pipeline modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import gspread
-from google.oauth2.service_account import Credentials
-
-from pipeline_fetch import read_pitches_from_sheet, SPREADSHEET_IDS, SERVICE_ACCOUNT_FILE
+from pipeline_fetch import read_all_pitches_from_sheets
 from pipeline_utils import DATA_DIR, MLB_TEAMS, compute_in_zone
-
-
-def _connect_sheets():
-    """Same auth path as process_data.py main()."""
-    scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if sa_json:
-        try:
-            sa_info = json.loads(sa_json)
-        except json.JSONDecodeError as e:
-            print(f"FATAL: GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON: {e}")
-            sys.exit(1)
-        creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-    else:
-        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    return gspread.authorize(creds)
 
 
 def _apply_pre_pickle_cleanup(all_pitches):
@@ -117,13 +98,8 @@ def _apply_pre_pickle_cleanup(all_pitches):
 
 
 def main():
-    print("Connecting to Google Sheets…")
-    gc = _connect_sheets()
-
-    print("\n=== Reading Regular Season data ===")
-    rs_pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
-    rs_pitches += read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'],
-                                            extra_tabs={'ROC', 'AAA'})
+    print("\n=== Reading Regular Season data (6 division workbooks) ===")
+    rs_pitches = read_all_pitches_from_sheets()
     print(f"  Read {len(rs_pitches)} RS pitches")
 
     print("\n=== Applying pre-pickle cleanup ===")

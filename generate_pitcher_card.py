@@ -22,14 +22,13 @@ import numpy as np
 from collections import defaultdict
 from math import atan2, sin, cos
 import gspread
-from google.oauth2.service_account import Credentials
+from sheets_append import _workbook_id_for_team
 
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION — change these for different pitchers/games
 # ═══════════════════════════════════════════════════════════════
 PITCHER_NAME = 'Irvin, Jake'
-SHEET_KEY = '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE'
-WORKSHEET_NAME = 'WSH'
+WORKSHEET_NAME = 'WSH'   # team tab; its division workbook is resolved automatically
 PLAYER_ID = '663623'
 DISPLAY_NAME = 'JAKE IRVIN'
 HAND = 'RHP'
@@ -177,11 +176,9 @@ def is_barrel(ev, la):
 # DATA LOADING
 # ═══════════════════════════════════════════════════════════════
 print("Loading data...")
-creds = Credentials.from_service_account_file(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'service_account.json'),
-    scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
-gc = gspread.authorize(creds)
-fried = [r for r in gc.open_by_key(SHEET_KEY).worksheet(WORKSHEET_NAME).get_all_records()
+gc = gspread.service_account()
+sheet_key = _workbook_id_for_team(WORKSHEET_NAME)
+fried = [r for r in gc.open_by_key(sheet_key).worksheet(WORKSHEET_NAME).get_all_records()
          if r.get('Pitcher') == PITCHER_NAME and r.get('Game Date') == GAME_DATE_FILTER]
 
 print("Fetching headshot...")
