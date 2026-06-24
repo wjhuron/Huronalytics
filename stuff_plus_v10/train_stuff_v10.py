@@ -267,23 +267,22 @@ def compute_expected_movement(mvn_models, pitch_type, throws, arm_angle, extensi
 def load_pitch_data_from_sheets():
     sys.path.insert(0, LEADERBOARD_DIR)
     import gspread
-    from google.oauth2.service_account import Credentials
 
-    SERVICE_ACCOUNT_FILE = os.path.join(LEADERBOARD_DIR, 'service_account.json')
-    SPREADSHEET_IDS = {
-        'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',
-        'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',
-    }
-
-    scopes = [
-        'https://www.googleapis.com/auth/spreadsheets.readonly',
-        'https://www.googleapis.com/auth/drive.readonly',
+    # Six 2026 division workbooks (huronalytics). Pair each with its league so
+    # the _league tag stays 'AL'/'NL'; NLE2026 also carries ROC/AAA/FCL ('NL').
+    DIVISION_BOOKS = [
+        ('AL', '1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI'),  # ALE2026
+        ('AL', '14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E'),  # ALC2026
+        ('AL', '1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs'),  # ALW2026
+        ('NL', '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'),  # NLE2026
+        ('NL', '1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w'),  # NLC2026
+        ('NL', '1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0'),  # NLW2026
     ]
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    gc = gspread.authorize(creds)
+
+    gc = gspread.service_account()
 
     all_pitches = []
-    for league, sid in SPREADSHEET_IDS.items():
+    for league, sid in DIVISION_BOOKS:
         print(f"Reading {league} spreadsheet...")
         ss = gc.open_by_key(sid)
         worksheets = ss.worksheets()

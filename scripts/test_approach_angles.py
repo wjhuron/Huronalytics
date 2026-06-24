@@ -156,45 +156,13 @@ def build_pitcher_level_df():
 
 # ── Sheets fetch (lazy, only when Test 3 runs) ──────────────────────────
 
-def _locate_service_account():
-    candidates = [
-        os.environ.get('GOOGLE_SERVICE_ACCOUNT_FILE'),
-        str(ROOT / 'service_account.json'),
-        str(Path.home() / 'Huronalytics' / 'service_account.json'),
-    ]
-    for c in candidates:
-        if c and Path(c).exists():
-            return c
-    raise FileNotFoundError(
-        "Could not find service_account.json. Set GOOGLE_SERVICE_ACCOUNT_FILE "
-        f"env var or place it at one of: {candidates[1:]}"
-    )
-
-
 def fetch_pitches_from_sheets():
-    sa_path = _locate_service_account()
-    print(f"  service account: {sa_path}")
-    os.environ['GOOGLE_SERVICE_ACCOUNT_FILE'] = sa_path
-
     sys.path.insert(0, str(ROOT))
-    import gspread
-    from google.oauth2.service_account import Credentials
-    from pipeline_fetch import read_pitches_from_sheet, SPREADSHEET_IDS
+    from pipeline_fetch import read_all_pitches_from_sheets
 
-    scopes = [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive',
-    ]
-    creds = Credentials.from_service_account_file(sa_path, scopes=scopes)
-    gc = gspread.authorize(creds)
-
-    print("  fetching AL...")
-    pitches = read_pitches_from_sheet(gc, SPREADSHEET_IDS['AL'])
+    print("  reading the six division workbooks (huronalytics)...")
+    pitches = read_all_pitches_from_sheets()
     print(f"    {len(pitches)} pitches")
-    print("  fetching NL...")
-    nl = read_pitches_from_sheet(gc, SPREADSHEET_IDS['NL'])
-    print(f"    {len(nl)} pitches")
-    pitches.extend(nl)
     return pitches
 
 

@@ -19,14 +19,26 @@ import sys
 from pathlib import Path
 
 import gspread
-from google.oauth2.service_account import Credentials
 
 REPO = Path(__file__).resolve().parents[1]
-SERVICE_ACCOUNT_FILE = REPO / "service_account.json"
 
-SPREADSHEET_IDS = {
-    "AL": "1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U",
-    "NL": "1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE",
+# Six 2026 per-division workbooks (huronalytics), replacing the old AL/NL books.
+WORKBOOKS = {
+    "ALE": "1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI",
+    "ALC": "14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E",
+    "ALW": "1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs",
+    "NLE": "1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA",
+    "NLC": "1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w",
+    "NLW": "1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0",
+}
+TEAM_DIVISION = {
+    "BAL": "ALE", "BOS": "ALE", "NYY": "ALE", "TBR": "ALE", "TOR": "ALE",
+    "CLE": "ALC", "CWS": "ALC", "DET": "ALC", "KCR": "ALC", "MIN": "ALC",
+    "ATH": "ALW", "HOU": "ALW", "LAA": "ALW", "SEA": "ALW", "TEX": "ALW",
+    "ATL": "NLE", "MIA": "NLE", "NYM": "NLE", "PHI": "NLE", "WSH": "NLE",
+    "ROC": "NLE", "AAA": "NLE", "FCL": "NLE",
+    "CHC": "NLC", "CIN": "NLC", "MIL": "NLC", "PIT": "NLC", "STL": "NLC",
+    "ARI": "NLW", "COL": "NLW", "LAD": "NLW", "SDP": "NLW", "SFG": "NLW",
 }
 
 # Pitcher's MLB team -> (league, tab)
@@ -68,9 +80,9 @@ CONTEXT_COLS = ["PitchID", "Game Date", "Pitcher", "Pitch Type", "Count",
 
 
 def auth_gspread() -> gspread.Client:
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    return gspread.authorize(creds)
+    # Default gspread service account (~/.config/gspread = huronalytics), the
+    # account the six division books are shared with.
+    return gspread.service_account()
 
 
 def col_indices(header: list[str], wanted: list[str]) -> dict[str, int]:
@@ -82,7 +94,9 @@ def col_indices(header: list[str], wanted: list[str]) -> dict[str, int]:
 
 
 def rows_for_tab(gc: gspread.Client, league: str, tab: str) -> list[list[str]]:
-    sh = gc.open_by_key(SPREADSHEET_IDS[league])
+    # `league` is kept for the caller's signature; the book is the team's
+    # division workbook, resolved from the tab (team code).
+    sh = gc.open_by_key(WORKBOOKS[TEAM_DIVISION[tab]])
     ws = sh.worksheet(tab)
     return ws.get_all_values()
 
