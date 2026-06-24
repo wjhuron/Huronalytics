@@ -8,6 +8,7 @@ import time as time_module
 import urllib.request
 import urllib.parse
 from datetime import timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from guts import scrape_guts
 from pipeline_utils import (
@@ -45,6 +46,15 @@ MILB_BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'milb_boxscore_cache.json')
 # are served from the committed cache instead of refetching the whole season.
 # MLB scoring corrections settle within days, so 14 is comfortably safe.
 BOXSCORE_REFRESH_WINDOW_DAYS = 14
+
+# A cached hitter position stays valid this many days. Position is "most games
+# at a spot this season" (stable midseason), so a few days' staleness avoids
+# refetching ~600 hitters every day. New (uncached) players are always fetched.
+HITTER_POSITION_CACHE_DAYS = 7
+
+# Concurrency for MLB Stats API fetches (boxscores, positions). _fetch_with_retry
+# backs off on transient throttling; lower this if the API starts rate-limiting.
+FETCH_MAX_WORKERS = 8
 
 # ── MiLB team configuration ─────────────────────────────────────────────
 MILB_TEAMS_CONFIG = {
@@ -479,22 +489,36 @@ def fetch_hitter_positions(hitters, season=2026):
     """
     cache = load_hitter_position_cache()
     today = _today_et().strftime('%Y-%m-%d')
-    n_fetched = 0
+    cutoff = (_today_et() - timedelta(days=HITTER_POSITION_CACHE_DAYS)).strftime('%Y-%m-%d')
     n_cache_hit = 0
+
+    # Collect the unique players whose cached position is older than the window
+    # (or absent); a player faced by many pitchers is only fetched once.
+    to_fetch, seen = [], set()
     for _name, mlb_id in hitters:
         if not mlb_id:
             continue
         key = str(mlb_id)
-        cached = cache.get(key)
-        if cached and cached.get('fetched') == today:
-            n_cache_hit += 1
+        if key in seen:
             continue
-        pos = _fetch_player_position(mlb_id, season)
-        cache[key] = {'position': pos, 'fetched': today}
-        n_fetched += 1
-        time_module.sleep(0.05)  # politeness — MLB API tolerates this rate
+        seen.add(key)
+        cached = cache.get(key)
+        if cached and cached.get('fetched', '') >= cutoff:
+            n_cache_hit += 1
+        else:
+            to_fetch.append(key)
+
+    # Fetch the stale/new positions concurrently (independent MLB API calls).
+    if to_fetch:
+        with ThreadPoolExecutor(max_workers=FETCH_MAX_WORKERS) as ex:
+            futures = {ex.submit(_fetch_player_position, int(k), season): k
+                       for k in to_fetch}
+            for fut in as_completed(futures):
+                cache[futures[fut]] = {'position': fut.result(), 'fetched': today}
+
     save_hitter_position_cache(cache)
-    print(f"  Hitter positions: {n_cache_hit} cached today, {n_fetched} fetched fresh")
+    print(f"  Hitter positions: {n_cache_hit} fresh in cache "
+          f"(<= {HITTER_POSITION_CACHE_DAYS}d), {len(to_fetch)} fetched")
     return {int(k): (v.get('position') if v else None) for k, v in cache.items()}
 
 
@@ -740,18 +764,21 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
         n_cached = len(set(game_dates)) - len(dates_to_fetch)
         print(f"  Refreshing MiLB boxscores for {team_abbrev}: {len(dates_to_fetch)} "
               f"recent/missing date(s) (window {BOXSCORE_REFRESH_WINDOW_DAYS}d), {n_cached} from cache")
+        def _milb_pks(d):
+            return fetch_milb_game_pks_for_date(d, sport_id=config['sport_id'],
+                                                team_filter=config['search_name'])
+        with ThreadPoolExecutor(max_workers=FETCH_MAX_WORKERS) as ex:
+            pks_by_date = dict(zip(dates_to_fetch, ex.map(_milb_pks, dates_to_fetch)))
         for d in dates_to_fetch:
-            ck = cache_key_prefix + d
-            game_pks = fetch_milb_game_pks_for_date(d, sport_id=config['sport_id'],
-                                                      team_filter=config['search_name'])
-            cache[ck] = []
-            for gpk in game_pks:
-                box = fetch_boxscore(gpk)
+            cache[cache_key_prefix + d] = []
+        work = [(d, gpk) for d in dates_to_fetch for gpk in pks_by_date.get(d, [])]
+        with ThreadPoolExecutor(max_workers=FETCH_MAX_WORKERS) as ex:
+            futures = {ex.submit(fetch_boxscore, gpk): d for (d, gpk) in work}
+            for fut in as_completed(futures):
+                box = fut.result()
                 if box:
-                    cache[ck].append(box)
+                    cache[cache_key_prefix + futures[fut]].append(box)
                     new_fetches += 1
-                time_module.sleep(0.1)
-            time_module.sleep(0.5)
         save_milb_boxscore_cache(cache)
         print(f"  Fetched {new_fetches} MiLB boxscores for {team_abbrev}")
     else:
@@ -831,16 +858,20 @@ def fetch_and_aggregate_boxscores(game_dates):
         n_cached = len(game_dates) - len(dates_to_fetch)
         print(f"  Refreshing {len(dates_to_fetch)} recent/missing boxscore date(s) "
               f"(window {BOXSCORE_REFRESH_WINDOW_DAYS}d), {n_cached} served from cache")
+        # Schedules first (one call per date), then all boxscores concurrently.
+        with ThreadPoolExecutor(max_workers=FETCH_MAX_WORKERS) as ex:
+            pks_by_date = dict(zip(dates_to_fetch,
+                                   ex.map(fetch_game_pks_for_date, dates_to_fetch)))
         for d in dates_to_fetch:
-            game_pks = fetch_game_pks_for_date(d)
             cache[d] = []
-            for gpk in game_pks:
-                box = fetch_boxscore(gpk)
+        work = [(d, gpk) for d in dates_to_fetch for gpk in pks_by_date.get(d, [])]
+        with ThreadPoolExecutor(max_workers=FETCH_MAX_WORKERS) as ex:
+            futures = {ex.submit(fetch_boxscore, gpk): d for (d, gpk) in work}
+            for fut in as_completed(futures):
+                box = fut.result()
                 if box:
-                    cache[d].append(box)
+                    cache[futures[fut]].append(box)
                     new_fetches += 1
-                time_module.sleep(0.1)
-            time_module.sleep(0.5)
         save_boxscore_cache(cache)
         print(f"  Fetched {new_fetches} boxscores, cache now has {len(cache)} dates")
     else:
