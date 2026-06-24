@@ -7,6 +7,7 @@ import os
 import time as time_module
 import urllib.request
 import urllib.parse
+from datetime import timedelta
 
 from guts import scrape_guts
 from pipeline_utils import (
@@ -38,6 +39,12 @@ MANUAL_MLB_IDS = {
 # ── Boxscore cache paths ────────────────────────────────────────────────
 BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'boxscore_cache.json')
 MILB_BOXSCORE_CACHE_PATH = os.path.join(DATA_DIR, 'milb_boxscore_cache.json')
+
+# Boxscores on/after (today - this many days) are refetched every run so late
+# scoring changes (hits/errors, earned/unearned runs) get picked up; older dates
+# are served from the committed cache instead of refetching the whole season.
+# MLB scoring corrections settle within days, so 14 is comfortably safe.
+BOXSCORE_REFRESH_WINDOW_DAYS = 14
 
 # ── MiLB team configuration ─────────────────────────────────────────────
 MILB_TEAMS_CONFIG = {
@@ -722,14 +729,17 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
     new_fetches = 0
     cache_key_prefix = team_abbrev + '|'
 
-    # Re-fetch every game date every run so the MiLB boxscore data is
-    # never frozen — late scoring changes and any date that fetched
-    # wrong all get corrected. The cache is the in-run store only; it
-    # no longer gates what gets fetched.
-    dates_to_fetch = sorted(game_dates)
+    # Refetch only recent dates so late scoring changes are picked up; serve
+    # older dates from the committed cache. An older date missing from the cache
+    # is still fetched so a gap never silently drops data.
+    cutoff = (_today_et() - timedelta(days=BOXSCORE_REFRESH_WINDOW_DAYS)).strftime('%Y-%m-%d')
+    dates_to_fetch = sorted(d for d in set(game_dates)
+                            if d >= cutoff or (cache_key_prefix + d) not in cache)
 
     if dates_to_fetch:
-        print(f"  Fetching MiLB boxscores for {team_abbrev}: {len(dates_to_fetch)} date(s): {dates_to_fetch}")
+        n_cached = len(set(game_dates)) - len(dates_to_fetch)
+        print(f"  Refreshing MiLB boxscores for {team_abbrev}: {len(dates_to_fetch)} "
+              f"recent/missing date(s) (window {BOXSCORE_REFRESH_WINDOW_DAYS}d), {n_cached} from cache")
         for d in dates_to_fetch:
             ck = cache_key_prefix + d
             game_pks = fetch_milb_game_pks_for_date(d, sport_id=config['sport_id'],
@@ -810,14 +820,17 @@ def fetch_and_aggregate_boxscores(game_dates):
     cache = load_boxscore_cache()
     new_fetches = 0
 
-    # Re-fetch every game date every run so the boxscore data is never
-    # frozen: late scoring changes (hits ↔ errors, earned/unearned) and
-    # any date that fetched wrong all get corrected. The cache is the
-    # in-run store only; it no longer gates what gets fetched.
-    dates_to_fetch = sorted(game_dates)
+    # Refetch only recent dates so late scoring changes (hits/errors,
+    # earned/unearned) are picked up; serve older dates from the committed
+    # cache. An older date missing from the cache is still fetched so a gap
+    # never silently drops data.
+    cutoff = (_today_et() - timedelta(days=BOXSCORE_REFRESH_WINDOW_DAYS)).strftime('%Y-%m-%d')
+    dates_to_fetch = sorted(d for d in game_dates if d >= cutoff or d not in cache)
 
     if dates_to_fetch:
-        print(f"  Fetching boxscores for {len(dates_to_fetch)} new date(s): {dates_to_fetch}")
+        n_cached = len(game_dates) - len(dates_to_fetch)
+        print(f"  Refreshing {len(dates_to_fetch)} recent/missing boxscore date(s) "
+              f"(window {BOXSCORE_REFRESH_WINDOW_DAYS}d), {n_cached} served from cache")
         for d in dates_to_fetch:
             game_pks = fetch_game_pks_for_date(d)
             cache[d] = []
