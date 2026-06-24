@@ -27,15 +27,12 @@ from PIL import Image
 from io import BytesIO
 import numpy as np
 import gspread
-from google.oauth2.service_account import Credentials
+from sheets_append import _workbook_id_for_team
 
 # ═══════════════════════════════════════════════════════════════
 # CONSTANTS
 # ═══════════════════════════════════════════════════════════════
-SPREADSHEET_IDS = {
-    'AL': '1hzAtZ_Wqi8ZuUHaGvgjJcQMU5jj5CzGXuBtjYmPOj9U',
-    'NL': '1DH3NI-3bSXW7dl98tdg5uFgJ4O6aWRvRB_XnVb340YE',
-}
+# Sheet routing comes from sheets_append._workbook_id_for_team (per team).
 
 AL_TEAMS = {'ATH','BAL','BOS','CLE','CWS','DET','HOU','KCR','LAA','MIN','NYY','SEA','TBR','TEX','TOR'}
 NL_TEAMS = {'ARI','ATL','CHC','CIN','COL','LAD','MIA','MIL','NYM','PHI','PIT','SDP','SFG','STL','WSH'}
@@ -1591,16 +1588,14 @@ def main():
     # Determine league / spreadsheet
     if team in AL_TEAMS:
         league = 'AL'
-        sheet_key = SPREADSHEET_IDS['AL']
     elif team in NL_TEAMS:
         league = 'NL'
-        sheet_key = SPREADSHEET_IDS['NL']
     elif team in MILB_TEAMS:
         league = 'MiLB'
-        sheet_key = SPREADSHEET_IDS[MILB_TEAMS[team]['sheet_key']]
     else:
         print(f"Error: Unknown team '{team}'")
         sys.exit(1)
+    sheet_key = _workbook_id_for_team(team)
     # Resolve date range
     if start_date is None and end_date is None:
         # Full season — no date filter
@@ -1672,10 +1667,7 @@ def main():
 
     # Step 1: Load pitch data from Google Sheets
     print("Step 1: Loading pitch data from Google Sheets...")
-    creds = Credentials.from_service_account_file(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'service_account.json'),
-        scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
-    gc = gspread.authorize(creds)
+    gc = gspread.service_account()
     sh = gc.open_by_key(sheet_key)
     ws = sh.worksheet(team)
     for attempt in range(3):
