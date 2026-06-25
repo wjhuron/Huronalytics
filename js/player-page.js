@@ -1192,25 +1192,8 @@ var PlayerPage = {
     }
     if (Object.keys(groups).length === 0) return;
 
-    // Build expected movement from per-pitch xivb/xhb (dynamic by arm angle)
-    var expectedMovement = {};
-    var xAccum = {};  // { pitchType: { sumIVB, sumHB, n } }
-    for (var xi = 0; xi < filteredPitches.length; xi++) {
-      var xp = filteredPitches[xi];
-      if (xp.xivb != null && xp.xhb != null) {
-        if (!xAccum[xp.pt]) xAccum[xp.pt] = { sumIVB: 0, sumHB: 0, n: 0 };
-        xAccum[xp.pt].sumIVB += xp.xivb;
-        xAccum[xp.pt].sumHB += xp.xhb;
-        xAccum[xp.pt].n++;
-      }
-    }
-    for (var xpt in xAccum) {
-      var xa = xAccum[xpt];
-      expectedMovement[xpt] = { xHB: xa.sumHB / xa.n, xIVB: xa.sumIVB / xa.n };
-    }
-
     var datasets = [];
-    var expectedMeta = [];
+    var ellipseMeta = [];
     var pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
 
     for (var j = 0; j < pitchTypes.length; j++) {
@@ -1223,22 +1206,15 @@ var PlayerPage = {
         label: label,
         data: pts,
         backgroundColor: color.bg,
-        borderColor: color.border,
-        borderWidth: 1.5,
+        borderWidth: 0,
         pointRadius: 5,
         pointHoverRadius: 7,
       });
 
-      // Expected movement ellipse (from xIVB/xHB regressions)
-      if (expectedMovement[pt]) {
-        expectedMeta.push({
-          color: color.border,
-          cx: expectedMovement[pt].xHB,
-          cy: expectedMovement[pt].xIVB,
-          label: pt,
-          xIVB: expectedMovement[pt].xIVB,
-          xHB: expectedMovement[pt].xHB,
-        });
+      // Actual-spread ellipse (covariance, dashed/unfilled, pitch-colored) — matches the cards
+      var ellipse = ScatterChart.computeEllipse(pts);
+      if (ellipse) {
+        ellipseMeta.push({ color: color.bg, ellipse: ellipse });
       }
     }
 
@@ -1289,42 +1265,23 @@ var PlayerPage = {
           var xAxis = chart.scales.x;
           var yAxis = chart.scales.y;
 
-          // Expected movement zones (hatched ellipses at xIVB/xHB, drawn first)
-          var expRadiusX = Math.abs(xAxis.getPixelForValue(3.5) - xAxis.getPixelForValue(0));
-          var expRadiusY = Math.abs(yAxis.getPixelForValue(0) - yAxis.getPixelForValue(3.5));
-          for (var ei = 0; ei < expectedMeta.length; ei++) {
-            var exp = expectedMeta[ei];
-            var expCx = xAxis.getPixelForValue(exp.cx);
-            var expCy = yAxis.getPixelForValue(exp.cy);
-
-            // Create diagonal hatch pattern for this color
-            var patCanvas = document.createElement('canvas');
-            patCanvas.width = 8;
-            patCanvas.height = 8;
-            var patCtx = patCanvas.getContext('2d');
-            patCtx.strokeStyle = exp.color;
-            patCtx.lineWidth = 1.5;
-            patCtx.globalAlpha = 0.4;
-            patCtx.beginPath();
-            patCtx.moveTo(0, 8);
-            patCtx.lineTo(8, 0);
-            patCtx.moveTo(-2, 2);
-            patCtx.lineTo(2, -2);
-            patCtx.moveTo(6, 10);
-            patCtx.lineTo(10, 6);
-            patCtx.stroke();
-            var hatchPattern = ctx.createPattern(patCanvas, 'repeat');
-
+          // Actual-spread ellipses (dashed, unfilled, pitch-colored) — matches the cards
+          for (var ei = 0; ei < ellipseMeta.length; ei++) {
+            var em = ellipseMeta[ei];
+            if (!em.ellipse) continue;
+            var ecx = xAxis.getPixelForValue(em.ellipse.cx);
+            var ecy = yAxis.getPixelForValue(em.ellipse.cy);
+            var erx = Math.abs(xAxis.getPixelForValue(em.ellipse.rx) - xAxis.getPixelForValue(0));
+            var ery = Math.abs(yAxis.getPixelForValue(em.ellipse.ry) - yAxis.getPixelForValue(0));
             ctx.save();
-            // Hatched fill
-            ctx.fillStyle = hatchPattern;
+            ctx.strokeStyle = em.color;
+            ctx.lineWidth = 1.3;
+            ctx.globalAlpha = 0.7;
+            ctx.setLineDash([6, 4]);
+            ctx.translate(ecx, ecy);
+            ctx.rotate(-em.ellipse.angle);
             ctx.beginPath();
-            ctx.ellipse(expCx, expCy, expRadiusX, expRadiusY, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Solid border
-            ctx.strokeStyle = exp.color;
-            ctx.globalAlpha = 0.4;
-            ctx.lineWidth = 1.5;
+            ctx.ellipse(0, 0, erx, ery, 0, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
           }
@@ -1344,92 +1301,10 @@ var PlayerPage = {
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.restore();
-
-          // Annotation: "Shaded = expected movement"
-          if (expectedMeta.length > 0) {
-            ctx.save();
-            ctx.font = '10px Barlow, sans-serif';
-            ctx.fillStyle = crossColor;
-            ctx.textAlign = 'left';
-            ctx.fillText('Shaded = expected movement', xAxis.left + 6, yAxis.bottom - 6);
-            ctx.restore();
-          }
-
-          // Store pixel positions for ellipse hover detection
-          chart._ellipseHitAreas = [];
-          for (var hi = 0; hi < expectedMeta.length; hi++) {
-            var he = expectedMeta[hi];
-            chart._ellipseHitAreas.push({
-              px: xAxis.getPixelForValue(he.cx),
-              py: yAxis.getPixelForValue(he.cy),
-              rx: expRadiusX,
-              ry: expRadiusY,
-              label: he.label,
-              xIVB: he.xIVB,
-              xHB: he.xHB,
-              color: he.color,
-            });
-          }
         },
       }],
     });
 
-    // Ellipse hover tooltip
-    var ellipseTooltip = document.getElementById('ellipse-tooltip');
-    if (!ellipseTooltip) {
-      ellipseTooltip = document.createElement('div');
-      ellipseTooltip.id = 'ellipse-tooltip';
-      ellipseTooltip.style.cssText = 'position:absolute;pointer-events:none;display:none;padding:6px 10px;border-radius:4px;font:12px Barlow,sans-serif;z-index:1000;white-space:nowrap;';
-      document.body.appendChild(ellipseTooltip);
-    }
-    var chartRef = this.chart;
-    // Remove prior mousemove listener to prevent accumulation on re-render
-    if (canvas._ellipseMousemove) canvas.removeEventListener('mousemove', canvas._ellipseMousemove);
-    canvas._ellipseMousemove = function (e) {
-      var rect = canvas.getBoundingClientRect();
-      var mx = e.clientX - rect.left;
-      var my = e.clientY - rect.top;
-      var areas = chartRef._ellipseHitAreas;
-      if (!areas) return;
-      var hit = null;
-      for (var ai = 0; ai < areas.length; ai++) {
-        var a = areas[ai];
-        var dx = (mx - a.px) / a.rx;
-        var dy = (my - a.py) / a.ry;
-        if (dx * dx + dy * dy <= 1) {
-          hit = a;
-          break;
-        }
-      }
-      // Hide ellipse tooltip if hovering over an actual data point
-      var nearPoint = chartRef.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
-      if (hit && nearPoint.length === 0) {
-        var isDk = document.body.classList.contains('dark');
-        ellipseTooltip.style.background = isDk ? 'rgba(30,33,40,0.95)' : 'rgba(255,255,255,0.95)';
-        ellipseTooltip.style.color = isDk ? '#eee' : '#333';
-        ellipseTooltip.style.border = '1px solid ' + hit.color;
-        ellipseTooltip.textContent = '';
-        var ttB = document.createElement('b');
-        ttB.textContent = hit.label + ' Expected';
-        ellipseTooltip.appendChild(ttB);
-        ellipseTooltip.appendChild(document.createElement('br'));
-        ellipseTooltip.appendChild(document.createTextNode('xIVB: ' + hit.xIVB.toFixed(1) + '"'));
-        ellipseTooltip.appendChild(document.createElement('br'));
-        ellipseTooltip.appendChild(document.createTextNode('xHB: ' + hit.xHB.toFixed(1) + '"'));
-        ellipseTooltip.style.display = 'block';
-        ellipseTooltip.style.left = (e.pageX + 12) + 'px';
-        ellipseTooltip.style.top = (e.pageY - 10) + 'px';
-        canvas.style.cursor = 'pointer';
-      } else {
-        ellipseTooltip.style.display = 'none';
-        canvas.style.cursor = '';
-      }
-    };
-    canvas.addEventListener('mousemove', canvas._ellipseMousemove);
-    canvas.addEventListener('mouseleave', function () {
-      ellipseTooltip.style.display = 'none';
-      canvas.style.cursor = '';
-    });
   },
 
 

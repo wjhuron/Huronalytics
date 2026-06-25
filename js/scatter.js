@@ -66,18 +66,9 @@ const ScatterChart = {
           const rpxX = Math.abs(xScale.getPixelForValue(e.ellipse.rx) - xScale.getPixelForValue(0));
           const rpxY = Math.abs(yScale.getPixelForValue(e.ellipse.ry) - yScale.getPixelForValue(0));
           ctx.strokeStyle = e.color;
-          ctx.lineWidth = 1.5;
-          // Vary dash pattern by pitch category
-          const fastballs = { FF: 1, SI: 1 };
-          const breaking = { FC: 1, SL: 1, ST: 1, CU: 1, SV: 1 };
-          // offspeed: CH, FS, KN (default)
-          if (e.pitchType && fastballs[e.pitchType]) {
-            ctx.setLineDash([]);         // solid
-          } else if (e.pitchType && breaking[e.pitchType]) {
-            ctx.setLineDash([6, 4]);     // dashed
-          } else {
-            ctx.setLineDash([2, 4]);     // dotted (offspeed / unknown)
-          }
+          ctx.lineWidth = 1.3;
+          ctx.globalAlpha = 0.7;
+          ctx.setLineDash([6, 4]);
           ctx.beginPath();
           ctx.save();
           ctx.translate(cpx, cpy);
@@ -126,14 +117,13 @@ const ScatterChart = {
         label: label,
         data: pts,
         backgroundColor: color.bg,
-        borderColor: color.border,
-        borderWidth: 1.5,
+        borderWidth: 0,
         pointRadius: 6,
         pointHoverRadius: 8,
       });
 
       const ellipse = this.computeEllipse(pts);
-      ellipseMeta.push({ color: color.border, ellipse: ellipse, pitchType: pt });
+      ellipseMeta.push({ color: color.bg, ellipse: ellipse });
     }
 
     this.destroyMain();
@@ -213,8 +203,7 @@ const ScatterChart = {
           label: name + ' - ' + pt,
           data: groups[pt],
           backgroundColor: color.bg,
-          borderColor: color.border,
-          borderWidth: 1.5,
+          borderWidth: 0,
           pointRadius: 6,
           pointHoverRadius: 8,
           pointStyle: markerStyle,
