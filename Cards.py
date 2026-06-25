@@ -94,7 +94,7 @@ STRIKE_DESC = ['Called Strike','Swinging Strike','Foul','Foul Bunt','In Play']
 
 # Batted ball type colors (for distribution chart)
 BB_COLORS = {
-    'ground_ball': '#00d4ff',   # cyan (matches card accent)
+    'ground_ball': '#2E8FA8',   # steel teal
     'line_drive':  '#FF6B6B',   # soft coral
     'fly_ball':    '#7B68EE',   # medium slate blue
     'popup':       '#FF9F43',   # warm amber
@@ -1007,6 +1007,139 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
                     color=TEXT_PRIMARY)
 
 
+# Batted-ball palette tuned for the warm-paper theme.
+_BB_TYPES = ['ground_ball', 'line_drive', 'fly_ball', 'popup']
+_BB_COLORS = {'ground_ball': '#2E8FA8', 'line_drive': '#FF6B6B',
+              'fly_ball': '#7B68EE', 'popup': '#FF9F43'}
+_BB_LABELS = {'ground_ball': 'Ground Ball', 'line_drive': 'Line Drive',
+              'fly_ball': 'Fly Ball', 'popup': 'Popup'}
+
+
+def _render_single_game_panel(fig, pitches):
+    """Single-game extras in the old layout (warm-paper palette): a batted-ball
+    donut + per-pitch stacked bars top-left (below the stat strip), and per-hand
+    usage bars on the right (below the movement plot). Location plots are placed
+    on the left by render_card; the percentile-bubble panel is skipped."""
+    from matplotlib.patches import Rectangle, FancyBboxPatch
+    import matplotlib.patches as mpatches
+    TRACK = '#d8ccb4'   # warm bar track
+
+    # Batted-ball counts per pitch type
+    bb = defaultdict(lambda: {**{k: 0 for k in _BB_TYPES}, 'brl': 0})
+    for p in pitches:
+        pt = p.get('Pitch Type', '')
+        if not pt or p.get('Description') != 'In Play':
+            continue
+        bbt = str(p.get('BBType', '')).strip()
+        if not bbt or bbt.startswith('bunt'):
+            continue
+        if bbt in _BB_TYPES:
+            bb[pt][bbt] += 1
+        if str(p.get('Barrel', '')).strip() == '6':
+            bb[pt]['brl'] += 1
+    overall = {t: sum(bb[pt][t] for pt in bb) for t in _BB_TYPES}
+    total_bip = sum(overall.values())
+    order = sorted([pt for pt in bb if sum(bb[pt][t] for t in _BB_TYPES) > 0],
+                   key=lambda pt: -sum(bb[pt][t] for t in _BB_TYPES))
+
+    # ── donut (top-left) ──
+    ax_d = fig.add_axes([0.012, 0.625, 0.115, 0.13]); ax_d.set_facecolor(BG)
+    if total_bip > 0:
+        vals = [overall[t] for t in _BB_TYPES]
+        ax_d.pie(vals, colors=[_BB_COLORS[t] for t in _BB_TYPES], startangle=90,
+                 counterclock=False, wedgeprops=dict(width=0.32, edgecolor=BG, linewidth=2.0))
+        ax_d.text(0, 0, f'{total_bip}\nBIP', ha='center', va='center', fontsize=10,
+                  fontweight='bold', color=TEXT_PRIMARY, linespacing=1.1)
+        ang = 90
+        for t, v in zip(_BB_TYPES, vals):
+            if not v:
+                continue
+            span = v / total_bip * 360
+            mid = np.radians(ang - span / 2)
+            ax_d.text(0.84 * np.cos(mid), 0.84 * np.sin(mid), str(v), ha='center',
+                      va='center', fontsize=7.5, fontweight='bold',
+                      color=badge_text_color(_BB_COLORS[t]))
+            ang -= span
+    else:
+        ax_d.axis('off')
+
+    # ── stacked bars (right of donut) ──
+    _bb_btm, _bb_h = 0.625, 0.13
+    ax_b = fig.add_axes([0.135, _bb_btm, 0.335, _bb_h])
+    ax_b.set_xlim(0, 1); ax_b.set_ylim(0, 1); ax_b.axis('off')
+    if order:
+        n = len(order); gap = 0.04
+        rh = min(0.16, (0.94 - (n - 1) * gap) / n)
+        for i, pt in enumerate(order):
+            y = 0.94 - i * (rh + gap) - rh / 2
+            color = PITCH_COLORS.get(pt, '#999'); tcb = badge_text_color(color)
+            tot_pt = sum(bb[pt][t] for t in _BB_TYPES); brl = bb[pt]['brl']
+            ax_b.add_patch(FancyBboxPatch((0.02, y - rh * 0.42), 0.085, rh * 0.84,
+                           boxstyle="round,pad=0.006", facecolor=color, edgecolor='none'))
+            ax_b.text(0.0625, y, pt, fontsize=8, ha='center', va='center', color=tcb, fontweight='bold')
+            tl, tw = 0.135, 0.50
+            ax_b.add_patch(Rectangle((tl, y - rh * 0.30), tw, rh * 0.60, facecolor=TRACK, edgecolor='none'))
+            left = tl
+            for t in _BB_TYPES:
+                cnt = bb[pt][t]
+                if cnt:
+                    w = tw * cnt / tot_pt
+                    ax_b.add_patch(Rectangle((left, y - rh * 0.30), w, rh * 0.60,
+                                   facecolor=_BB_COLORS[t], edgecolor=BG, linewidth=0.5))
+                    ax_b.text(left + w / 2, y, str(cnt), ha='center', va='center', fontsize=7,
+                              color=badge_text_color(_BB_COLORS[t]), fontweight='bold')
+                    left += w
+            lbl = str(tot_pt) + (f'  ({brl} Brl)' if brl else '')
+            ax_b.text(0.66, y, lbl, fontsize=8, va='center', ha='left', color=TEXT_PRIMARY, fontweight='bold')
+        # Bottom edge of the lowest bar in figure fraction, so the legend hugs
+        # the stack regardless of how many pitch types are shown.
+        y_last = 0.94 - (n - 1) * (rh + gap) - rh / 2
+        bars_bottom_fig = _bb_btm + (y_last - rh * 0.30) * _bb_h
+    else:
+        bars_bottom_fig = _bb_btm + _bb_h
+
+    # ── batted-ball legend (right below the stacked bars) ──
+    if total_bip > 0:
+        axl = fig.add_axes([0, 0, 1, 1]); axl.set_xlim(0, 1); axl.set_ylim(0, 1)
+        axl.axis('off'); axl.set_zorder(6)
+        pat = [mpatches.Patch(color=_BB_COLORS[t], label=f'{_BB_LABELS[t]} ({overall[t]})')
+               for t in _BB_TYPES if overall[t] > 0]
+        axl.legend(handles=pat, loc='upper left', bbox_to_anchor=(0.135, bars_bottom_fig - 0.012), ncol=2,
+                   fontsize=7.5, frameon=False, labelcolor=TEXT_MUTED, handlelength=1.0, columnspacing=0.8)
+
+    # ── usage bars (right, below the movement plot) ──
+    usage = {'L': defaultdict(int), 'R': defaultdict(int)}
+    tot = {'L': 0, 'R': 0}
+    for p in pitches:
+        bh, pt = p.get('Bats', ''), p.get('Pitch Type', '')
+        if bh in ('L', 'R') and pt:
+            usage[bh][pt] += 1; tot[bh] += 1
+
+    def _usage(rect, data, total, title):
+        ax = fig.add_axes(rect); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+        ax.axis('off'); ax.set_facecolor(BG)
+        ax.text(0.5, 0.99, title, fontsize=12, fontweight='bold', ha='center', va='top',
+                color=TEXT_SECONDARY, fontfamily='DIN Condensed')
+        spts = sorted(data, key=lambda x: (-data[x], PITCH_ORDER.index(x) if x in PITCH_ORDER else 99))
+        if not spts:
+            return
+        n = len(spts); rh = min(0.13, 0.78 / n); gap = 0.02
+        for i, pt in enumerate(spts):
+            y = 0.80 - i * (rh + gap); pct = data[pt] / total if total else 0
+            color = PITCH_COLORS.get(pt, '#999'); tcb = badge_text_color(color)
+            ax.add_patch(FancyBboxPatch((0.04, y - rh * 0.4), 0.10, rh * 0.8,
+                         boxstyle="round,pad=0.006", facecolor=color, edgecolor='none'))
+            ax.text(0.09, y, pt, fontsize=8, ha='center', va='center', color=tcb, fontweight='bold')
+            ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58, rh * 0.56, facecolor=TRACK, edgecolor='none'))
+            if pct > 0:
+                ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58 * pct, rh * 0.56, facecolor=color, edgecolor='none'))
+            ax.text(0.78, y, f'{pct*100:.1f}%', fontsize=10, va='center', ha='left',
+                    color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
+
+    _usage([0.55, 0.32, 0.22, 0.17], usage['R'], tot['R'], 'VS RHH')
+    _usage([0.77, 0.32, 0.22, 0.17], usage['L'], tot['L'], 'VS LHH')
+
+
 def render_card(config, pitches, output_file):
     """Render a single pitcher card. config has display_name, hand, team, age, game_date, stat_headers, stat_values, headshot, mlb_id."""
     headshot = config['headshot']
@@ -1060,16 +1193,17 @@ def render_card(config, pitches, output_file):
         print(f"  WARNING: No pitch type data for {config['display_name']}, skipping")
         return False
 
-    fig = plt.figure(figsize=(FIG_W, FIG_H), dpi=DPI)
+    fig_h = 14.3 if not config.get('mvn_models') else FIG_H   # single-game = old wider frame (~1.22 ratio)
+    fig = plt.figure(figsize=(FIG_W, fig_h), dpi=DPI)
     fig.patch.set_facecolor(BG)
     ax_main = fig.add_axes([0,0,1,1])
-    ax_main.set_xlim(0, FIG_W); ax_main.set_ylim(0, FIG_H)
+    ax_main.set_xlim(0, FIG_W); ax_main.set_ylim(0, fig_h)
     ax_main.axis('off'); ax_main.set_facecolor(BG)
 
     # Stripe — usage-ordered, equal widths, aligned with photo. Anchored near
     # the top of the (taller) figure.
     photo_left = TABLE_LEFT_FIG * FIG_W
-    stripe_bottom = FIG_H - 0.20
+    stripe_bottom = fig_h - 0.20
     stripe_height = 0.22
     stripe_x = photo_left
     total_w = FIG_W * TABLE_RIGHT_FIG - photo_left
@@ -1084,7 +1218,7 @@ def render_card(config, pitches, output_file):
 
     # Photo
     photo_w = 1.4; photo_h = photo_w * headshot.size[1] / headshot.size[0]
-    photo_top = FIG_H - 0.25; photo_bottom = photo_top - photo_h
+    photo_top = fig_h - 0.25; photo_bottom = photo_top - photo_h
     ax_main.imshow(np.array(headshot), extent=[photo_left, photo_left+photo_w, photo_bottom, photo_top], aspect='auto', zorder=2, interpolation='antialiased')
     ax_main.add_patch(Rectangle((photo_left, photo_bottom), photo_w, photo_h, fill=False, edgecolor=PHOTO_BORDER, linewidth=1.5, alpha=0.8, zorder=3))
 
@@ -1122,14 +1256,16 @@ def render_card(config, pitches, output_file):
         ax_main.text(x+col_w/2, stat_y_value+cell_h/2, val_str, fontsize=14, ha='center', va='center', color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
     ax_main.add_patch(Rectangle((photo_left, stat_y_value), len(config['stat_headers'])*col_w, stat_y_header+cell_h-stat_y_value, fill=False, edgecolor=ACCENT, linewidth=2, zorder=5))
 
-    # Movement plot — right-upper. Kept near-square (movement is read to-scale,
-    # so no horizontal stretch) and CENTERED over the location block beneath it
-    # (locations span 0.445–0.985, center 0.715) so the right column reads as
-    # one cohesive unit instead of a right-inset plot.
-    ax_plot = fig.add_axes([0.5125, 0.575, 0.405, 0.355])
+    # Movement plot — right-upper, near-square (movement is read to-scale). Season
+    # centers over the location block beneath it; single-game uses the old wider
+    # frame that fills to the right edge.
+    if config.get('mvn_models'):
+        ax_plot = fig.add_axes([0.5125, 0.575, 0.405, 0.355]); _mv_cx, _mv_ty = 0.715, 0.947
+    else:
+        ax_plot = fig.add_axes([0.585, 0.575, 0.405, 0.385]); _mv_cx, _mv_ty = 0.7875, 0.975
     ax_plot.set_xlim(-25,25); ax_plot.set_ylim(-25,25)
     # Title — parity with the hitter card's titled hero viz.
-    fig.text(0.715, 0.947, 'PITCH MOVEMENT', ha='center', va='center',
+    fig.text(_mv_cx, _mv_ty, 'PITCH MOVEMENT', ha='center', va='center',
              fontsize=15, fontweight='bold', color=TEXT_SECONDARY,
              fontfamily='DIN Condensed')
     ax_plot.axhline(y=0, color=GRID_COLOR, linestyle='--', linewidth=0.6)
@@ -1201,11 +1337,16 @@ def render_card(config, pitches, output_file):
     ax_plot.text(0.02, 0.005, 'Min. 6 pitches for ellipse', transform=ax_plot.transAxes,
                  fontsize=6.5, color=TEXT_FAINT, fontfamily='Avenir Next', va='bottom', fontstyle='italic')
 
-    # Location plots — relocated to the right-lower quadrant, beneath the
-    # movement plot (the left column is now the percentile-bubble panel).
-    LOC_TITLE_Y=0.498; LOC_BOTTOM=0.255; LOC_HEIGHT=0.225
-    LOC_L_X=0.445; LOC_R_X=0.720; LOC_W=0.265
+    # Location plots. Season: lower-right quadrant under the movement plot (left
+    # column holds the bubbles). Single-game: left side (old layout), with the
+    # donut/bars above and the usage bars on the right.
     is_season_loc = bool(config.get('mvn_models'))
+    if is_season_loc:
+        LOC_TITLE_Y=0.498; LOC_BOTTOM=0.255; LOC_HEIGHT=0.225
+        LOC_L_X=0.445; LOC_R_X=0.720; LOC_W=0.265
+    else:
+        LOC_TITLE_Y=0.555; LOC_BOTTOM=0.25; LOC_HEIGHT=0.29
+        LOC_L_X=0.01; LOC_R_X=0.26; LOC_W=0.245
 
     # Per-hand pitch usage (for the small mix readout in each plot corner).
     hand_usage = {'L': defaultdict(int), 'R': defaultdict(int)}
@@ -1238,8 +1379,10 @@ def render_card(config, pitches, output_file):
         # each row is a solid pitch-color chip + the usage % in dark bold text,
         # over a translucent backing panel that lifts it off the ellipses.
         # STUB placement pending Wally's example.
+        # Season cards show the pitch-mix readout in-plot; single-game cards have
+        # dedicated usage bars right beside the locations, so skip it there.
         _u = hand_usage[hand]; _tot = hand_tot[hand]
-        if _tot > 0:
+        if is_season_loc and _tot > 0:
             _mix = sorted(_u.items(), key=lambda kv: -kv[1])
             _x0 = 0.035; _row_h = 0.072; _y_top = 0.965
             _cy = _y_top - 0.020
@@ -1306,21 +1449,31 @@ def render_card(config, pitches, output_file):
     fig.text(LOC_L_X+LOC_W/2, LOC_TITLE_Y, 'VS RHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='DIN Condensed', ha='center', va='center')
     fig.text(LOC_R_X+LOC_W/2, LOC_TITLE_Y, 'VS LHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='DIN Condensed', ha='center', va='center')
 
-    # W/B legend — single centered line beneath the two location plots.
-    _loc_mid_x = (LOC_L_X + LOC_R_X + LOC_W) / 2
-    fig.text(_loc_mid_x, LOC_BOTTOM - 0.018,
-        f'W = Whiff    ·    B = Barrel    ·    Min. {zone_ellipse_min} pitches for ellipse',
-        fontsize=8, color=TEXT_MUTED, va='top', ha='center', fontfamily='Avenir Next', fontweight='bold')
+    # W/B legend. Season: one centered line beneath the plots. Single-game (old
+    # layout): stacked to the right of the location plots.
+    if is_season_loc:
+        _loc_mid_x = (LOC_L_X + LOC_R_X + LOC_W) / 2
+        fig.text(_loc_mid_x, LOC_BOTTOM - 0.018,
+            f'W = Whiff    ·    B = Barrel    ·    Min. {zone_ellipse_min} pitches for ellipse',
+            fontsize=8, color=TEXT_MUTED, va='top', ha='center', fontfamily='Avenir Next', fontweight='bold')
+    else:
+        _wx = LOC_R_X + LOC_W + 0.012
+        for _dy, _txt in [(0.055, 'W = Whiff'), (0.033, 'B = Barrel'),
+                          (0.011, f'Min. {zone_ellipse_min} pitches for ellipse')]:
+            fig.text(_wx, LOC_BOTTOM + _dy, _txt, fontsize=8, color=TEXT_MUTED,
+                     va='bottom', ha='left', fontfamily='Avenir Next', fontweight='bold')
 
-    # ── Percentile bubble panel (left column) ──
-    # Replaces the old BIP donut + batted-ball stacked bars + usage bars.
-    # Sourced from the pitcher leaderboard row attached as config['pctl_row'].
+    # ── Left column: season cards get the percentile bubble panel; single-game
+    # cards (no season pool) get the batted-ball donut + stacked bars + usage. ──
     p_row = config.get('pctl_row') or {}
-    if p_row:
-        bubble_cols = _bubble_columns_for(config, p_row)
-        _render_percentile_bubbles(fig, p_row,
-                                   grid_left=0.015, grid_right=0.405,
-                                   grid_top=0.790, grid_bot=0.235, columns=bubble_cols)
+    if config.get('mvn_models'):
+        if p_row:
+            bubble_cols = _bubble_columns_for(config, p_row)
+            _render_percentile_bubbles(fig, p_row,
+                                       grid_left=0.015, grid_right=0.405,
+                                       grid_top=0.790, grid_bot=0.235, columns=bubble_cols)
+    else:
+        _render_single_game_panel(fig, pitches)
 
     # Metrics table — full-width bottom band.
     ax_table = fig.add_axes([TABLE_LEFT_FIG, 0.015, TABLE_RIGHT_FIG-TABLE_LEFT_FIG, 0.205])
@@ -1987,9 +2140,9 @@ def main():
             # PitchRV/xPitchRV in the metrics table; no need to duplicate it
             # in the box-score header.
             whiff_count = sum(1 for p in pitches if p.get('Description') == 'Swinging Strike')
-            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'H', 'K', 'BB', 'HR', 'Whiffs']
-            stat_values = [ip_str, str(pitch_count), str(box['tbf']), str(box['r']), str(box['er']),
-                           str(box['h']), str(box['so']), str(box['bb']), str(box['hr']), str(whiff_count)]
+            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'Whiffs']
+            stat_values = [ip_str, str(pitch_count), str(box['tbf']), str(box['r']),
+                           str(box['er']), str(whiff_count)]
 
         print(f"  Stat line: {' | '.join(f'{h}:{v}' for h,v in zip(stat_headers, stat_values))}")
 
