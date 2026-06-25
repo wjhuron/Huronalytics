@@ -20,15 +20,15 @@ pitch_names <- c(
 
 # Colors for pitch-type visualizations
 pitch_colors <- c(
-  "FF" = "#0072B2",
-  "SI" = "#E0A81E",
-  "FC" = "#8B5A2B",
-  "CU" = "#332288",
-  "SL" = "#D55E00",
-  "SV" = "#882255",
-  "ST" = "#56B4E9",
-  "CH" = "#009E73",
-  "FS" = "#CC79A7",
+  "FF" = "#0086D2",
+  "SI" = "#FFB500",
+  "FC" = "#A45B16",
+  "CU" = "#230AA0",
+  "SL" = "#FB6E00",
+  "SV" = "#A00A55",
+  "ST" = "#35B6FF",
+  "CH" = "#00BA87",
+  "FS" = "#F076BA",
   "KN" = "black",
   "EP" = "gray50"
 )
