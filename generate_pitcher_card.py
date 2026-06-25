@@ -44,7 +44,7 @@ OUTPUT_FILE = '/Users/wallyhuron/Downloads/03292026-IrvinJake.png'
 # PITCH CONSTANTS
 # ═══════════════════════════════════════════════════════════════
 PITCH_COLORS = {
-    'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#FFA500',
+    'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#8B5A2B',
     'SL': '#DDDDDD', 'ST': '#FF1493', 'CU': '#E03030', 'SV': '#32CD32',
     'CH': '#CC66EE', 'FS': '#40E0D0', 'KN': '#AAAAAA'
 }

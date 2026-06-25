@@ -75,7 +75,7 @@ TEAM_NAME_TO_ABBREV = {
 # everywhere — the old #FFD700 sinker / #DDDDDD slider washed out. SI is a warm
 # gold (not yellow/mustard); the dark hues keep their saturated brand values.
 PITCH_COLORS = {
-    'FF':'#4488FF','SI':'#E0A81E','FC':'#FFA500','SL':'#9E9E9E',
+    'FF':'#4488FF','SI':'#E0A81E','FC':'#8B5A2B','SL':'#9E9E9E',
     'ST':'#FF1493','CU':'#E03030','SV':'#32CD32','CH':'#CC66EE','FS':'#35BCAF','KN':'#9A9A9A',
     'EP':'#888888'
 }
@@ -1907,6 +1907,11 @@ def main():
     else:
         team = teams[0]
         league = 'AL' if team in AL_TEAMS else ('NL' if team in NL_TEAMS else 'MiLB')
+    # A same-day range (--start X --end X) is one game, not a multi-game span:
+    # collapse it to a single date so it renders the daily card format.
+    if end_date is not None and end_date == start_date:
+        end_date = None
+
     # Resolve date range
     if start_date is None and end_date is None:
         # Full season — no date filter

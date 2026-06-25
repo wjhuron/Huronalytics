@@ -165,7 +165,7 @@ const Utils = {
 
   // Pitch type colors — single source of truth (used by scatter.js, leaderboard, player page)
   PITCH_COLORS: {
-    FF: '#4488FF', SI: '#FFD700', FC: '#FFA500', SL: '#DDDDDD',
+    FF: '#4488FF', SI: '#FFD700', FC: '#8B5A2B', SL: '#DDDDDD',
     ST: '#FF1493', SV: '#32CD32', CU: '#E03030', CH: '#CC66EE',
     FS: '#40E0D0', KN: '#AAAAAA', SC: '#999999', CS: '#666666',
   },
