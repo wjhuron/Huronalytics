@@ -1,5 +1,5 @@
 # ---- Configuration ----
-input_file_path <- ""  # Team code (e.g., "PIT", "WSH") or full path
+input_file_path <- "PIT" # Team code (e.g., "PIT", "WSH") or full path
 output_directory <- "/Users/wallyhuron/Downloads/"
 # ---- Optional Filtering Parameters ----
 # Set these to NULL to disable filtering
@@ -20,22 +20,50 @@ source("/Users/wallyhuron/Huronalytics/R-scripts/pitcher_report_utils.R")
 
 # Allow command-line overrides: Rscript Daily.R "/path/to/file.csv" "2026-04-08" "2026-04-08" "Bieber, Shane"
 cli_args <- commandArgs(trailingOnly = TRUE)
-if (length(cli_args) >= 1) input_file_path <- cli_args[1]
-if (length(cli_args) >= 2) start_date_filter <- cli_args[2]
-if (length(cli_args) >= 3) end_date_filter <- cli_args[3]
-if (length(cli_args) >= 4) selected_pitcher_filter <- cli_args[4]
+if (length(cli_args) >= 1)
+  input_file_path <- cli_args[1]
+if (length(cli_args) >= 2)
+  start_date_filter <- cli_args[2]
+if (length(cli_args) >= 3)
+  end_date_filter <- cli_args[3]
+if (length(cli_args) >= 4)
+  selected_pitcher_filter <- cli_args[4]
 
 # Resolve team code to full path (e.g., "PIT" -> "/Users/wallyhuron/Downloads/NL 2026 - PIT.csv")
 input_file_path <- resolve_team_path(input_file_path)
 
 # ---- MLB Team ID Mapping ----
 mlb_team_ids <- c(
-  "ARI" = 109, "ATL" = 144, "BAL" = 110, "BOS" = 111, "CHC" = 112,
-  "CWS" = 145, "CIN" = 113, "CLE" = 114, "COL" = 115, "DET" = 116,
-  "HOU" = 117, "KCR" = 118, "LAA" = 108, "LAD" = 119, "MIA" = 146,
-  "MIL" = 158, "MIN" = 142, "NYM" = 121, "NYY" = 147, "ATH" = 133,
-  "PHI" = 143, "PIT" = 134, "SDP" = 135, "SFG" = 137, "SEA" = 136,
-  "STL" = 138, "TBR" = 139, "TEX" = 140, "TOR" = 141, "WSH" = 120
+  "ARI" = 109,
+  "ATL" = 144,
+  "BAL" = 110,
+  "BOS" = 111,
+  "CHC" = 112,
+  "CWS" = 145,
+  "CIN" = 113,
+  "CLE" = 114,
+  "COL" = 115,
+  "DET" = 116,
+  "HOU" = 117,
+  "KCR" = 118,
+  "LAA" = 108,
+  "LAD" = 119,
+  "MIA" = 146,
+  "MIL" = 158,
+  "MIN" = 142,
+  "NYM" = 121,
+  "NYY" = 147,
+  "ATH" = 133,
+  "PHI" = 143,
+  "PIT" = 134,
+  "SDP" = 135,
+  "SFG" = 137,
+  "SEA" = 136,
+  "STL" = 138,
+  "TBR" = 139,
+  "TEX" = 140,
+  "TOR" = 141,
+  "WSH" = 120
 )
 
 # ---- Data Processing Functions ----
@@ -55,13 +83,21 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
   
   # --- Determine which conditional pitch metric columns have data ---
   conditional_cols <- c(
-    "Velocity", "Spin Rate", "OTilt", "xIndVrtBrk", "xHorzBrk",
-    "RelPosZ", "RelPosX", "Extension", "ArmAngle", "VAA", "HAA"
+    "Velocity",
+    "Spin Rate",
+    "OTilt",
+    "xIndVrtBrk",
+    "xHorzBrk",
+    "RelPosZ",
+    "RelPosX",
+    "Extension",
+    "ArmAngle",
+    "VAA",
+    "HAA"
   )
-  has_col <- setNames(
-    sapply(conditional_cols, function(col) col_has_data(data, pitcher_name, col)),
-    conditional_cols
-  )
+  has_col <- setNames(sapply(conditional_cols, function(col)
+    col_has_data(data, pitcher_name, col)),
+    conditional_cols)
   
   # Check for Stuff+ column (added by Python scorer)
   has_stuff_plus <- col_has_data(data, pitcher_name, "Stuff+")
@@ -78,29 +114,74 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
       percent_thrown = sprintf("%.1f%%", n() / total_pitches * 100),
       
       # Conditional pitch metric columns
-      avg_velo = if (has_col["Velocity"]) sprintf("%.1f mph", mean(Velocity, na.rm = TRUE)) else NA_character_,
-      max_velo = if (has_col["Velocity"]) sprintf("%.1f mph", max(Velocity, na.rm = TRUE)) else NA_character_,
-      avg_spin = if (has_col["Spin Rate"]) sprintf("%.0f rpm", round(mean(`Spin Rate`, na.rm = TRUE))) else NA_character_,
-      avg_tilt = if (has_col["OTilt"]) avg_tilt_clock(`OTilt`) else NA_character_,
-      avg_ivb = if (has_col["xIndVrtBrk"]) sprintf("%.1f\"", mean(xIndVrtBrk, na.rm = TRUE)) else NA_character_,
-      avg_hb = if (has_col["xHorzBrk"]) sprintf("%.1f\"", mean(xHorzBrk, na.rm = TRUE)) else NA_character_,
-      avg_height = if (has_col["RelPosZ"]) sprintf("%.1f'", mean(RelPosZ, na.rm = TRUE)) else NA_character_,
-      avg_side = if (has_col["RelPosX"]) sprintf("%.1f'", mean(RelPosX, na.rm = TRUE)) else NA_character_,
-      avg_extension = if (has_col["Extension"]) sprintf("%.1f'", mean(Extension, na.rm = TRUE)) else NA_character_,
-      avg_arm_angle = if (has_col["ArmAngle"]) sprintf("%.1f", mean(ArmAngle, na.rm = TRUE)) else NA_character_,
-      avg_vaa = if (has_col["VAA"]) sprintf("%.2f", mean(VAA, na.rm = TRUE)) else NA_character_,
-      avg_haa = if (has_col["HAA"]) sprintf("%.2f", mean(HAA, na.rm = TRUE)) else NA_character_,
+      avg_velo = if (has_col["Velocity"])
+        sprintf("%.1f mph", mean(Velocity, na.rm = TRUE))
+      else
+        NA_character_,
+      max_velo = if (has_col["Velocity"])
+        sprintf("%.1f mph", max(Velocity, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_spin = if (has_col["Spin Rate"])
+        sprintf("%.0f rpm", round(mean(
+          `Spin Rate`, na.rm = TRUE
+        )))
+      else
+        NA_character_,
+      avg_tilt = if (has_col["OTilt"])
+        avg_tilt_clock(`OTilt`)
+      else
+        NA_character_,
+      avg_ivb = if (has_col["xIndVrtBrk"])
+        sprintf("%.1f\"", mean(xIndVrtBrk, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_hb = if (has_col["xHorzBrk"])
+        sprintf("%.1f\"", mean(xHorzBrk, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_height = if (has_col["RelPosZ"])
+        sprintf("%.1f'", mean(RelPosZ, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_side = if (has_col["RelPosX"])
+        sprintf("%.1f'", mean(RelPosX, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_extension = if (has_col["Extension"])
+        sprintf("%.1f'", mean(Extension, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_arm_angle = if (has_col["ArmAngle"])
+        sprintf("%.1f", mean(ArmAngle, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_vaa = if (has_col["VAA"])
+        sprintf("%.2f", mean(VAA, na.rm = TRUE))
+      else
+        NA_character_,
+      avg_haa = if (has_col["HAA"])
+        sprintf("%.2f", mean(HAA, na.rm = TRUE))
+      else
+        NA_character_,
       
       # Stuff+ (conditional on column existing in CSV)
-      avg_stuff_plus = if (has_stuff_plus) sprintf("%.0f", round(mean(`Stuff+`, na.rm = TRUE))) else NA_character_,
+      avg_stuff_plus = if (has_stuff_plus)
+        sprintf("%.0f", round(mean(`Stuff+`, na.rm = TRUE)))
+      else
+        NA_character_,
       
       # Always-present outcome columns
       iz_percent = sprintf("%.1f%%", sum(InZone == "Yes", na.rm = TRUE) / n() * 100),
-      csw_percent = sprintf("%.1f%%", sum(Description %in% csw_events, na.rm = TRUE) / n() * 100),
+      csw_percent = sprintf(
+        "%.1f%%",
+        sum(Description %in% csw_events, na.rm = TRUE) / n() * 100
+      ),
       swstr_percent = {
         total_swings <- sum(Description %in% swing_events, na.rm = TRUE)
         if (total_swings > 0) {
-          sprintf("%.1f%%", sum(Description %in% swstr_events, na.rm = TRUE) / total_swings * 100)
+          sprintf("%.1f%%",
+                  sum(Description %in% swstr_events, na.rm = TRUE) / total_swings * 100)
         } else {
           "---"
         }
@@ -108,7 +189,8 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
       chase_percent = {
         ooz_pitches <- sum(InZone == "No", na.rm = TRUE)
         if (ooz_pitches > 0) {
-          ooz_swings <- sum(Description %in% swing_events & (InZone == "No"), na.rm = TRUE)
+          ooz_swings <- sum(Description %in% swing_events &
+                              (InZone == "No"), na.rm = TRUE)
           sprintf("%.1f%%", ooz_swings / ooz_pitches * 100)
         } else {
           "---"
@@ -152,14 +234,43 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
     avg_vaa = NA_character_,
     avg_haa = NA_character_,
     avg_stuff_plus = NA_character_,
-    iz_percent = sprintf("%.1f%%", sum(pitcher_data$InZone == "Yes", na.rm = TRUE) / total_pitches * 100),
-    csw_percent = sprintf("%.1f%%", sum(pitcher_data$Description %in% csw_events, na.rm = TRUE) / total_pitches * 100),
-    swstr_percent = if (total_swings_all > 0) sprintf("%.1f%%", sum(pitcher_data$Description %in% swstr_events, na.rm = TRUE) / total_swings_all * 100) else "---",
+    iz_percent = sprintf(
+      "%.1f%%",
+      sum(pitcher_data$InZone == "Yes", na.rm = TRUE) / total_pitches * 100
+    ),
+    csw_percent = sprintf(
+      "%.1f%%",
+      sum(pitcher_data$Description %in% csw_events, na.rm = TRUE) / total_pitches * 100
+    ),
+    swstr_percent = if (total_swings_all > 0)
+      sprintf(
+        "%.1f%%",
+        sum(pitcher_data$Description %in% swstr_events, na.rm = TRUE) / total_swings_all * 100
+      )
+    else
+      "---",
     chase_percent = {
       ooz_all <- sum(pitcher_data$InZone == "No", na.rm = TRUE)
-      if (ooz_all > 0) sprintf("%.1f%%", sum(pitcher_data$Description %in% swing_events & (pitcher_data$InZone == "No"), na.rm = TRUE) / ooz_all * 100) else "---"
+      if (ooz_all > 0)
+        sprintf(
+          "%.1f%%",
+          sum(
+            pitcher_data$Description %in% swing_events &
+              (pitcher_data$InZone == "No"),
+            na.rm = TRUE
+          ) / ooz_all * 100
+        )
+      else
+        "---"
     },
-    gb_percent = if (has_bb_type && total_bip_all > 0) sprintf("%.1f%%", sum(pitcher_data$BBType == "ground_ball", na.rm = TRUE) / total_bip_all * 100) else "---"
+    gb_percent = if (has_bb_type &&
+                     total_bip_all > 0)
+      sprintf(
+        "%.1f%%",
+        sum(pitcher_data$BBType == "ground_ball", na.rm = TRUE) / total_bip_all * 100
+      )
+    else
+      "---"
   )
   
   result <- bind_rows(result, total_row)
@@ -172,24 +283,42 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
   cols_to_keep <- c("Pitch Type", "num_thrown", "percent_thrown")
   
   # Add Stuff+ if present
-  if (has_stuff_plus) cols_to_keep <- c(cols_to_keep, "avg_stuff_plus")
+  if (has_stuff_plus)
+    cols_to_keep <- c(cols_to_keep, "avg_stuff_plus")
   
   # Add conditional pitch metric columns (only if they have data)
-  if (has_col["Velocity"])   cols_to_keep <- c(cols_to_keep, "avg_velo", "max_velo")
-  if (has_col["Spin Rate"])  cols_to_keep <- c(cols_to_keep, "avg_spin")
-  if (has_col["OTilt"]) cols_to_keep <- c(cols_to_keep, "avg_tilt")
-  if (has_col["xIndVrtBrk"]) cols_to_keep <- c(cols_to_keep, "avg_ivb")
-  if (has_col["xHorzBrk"])    cols_to_keep <- c(cols_to_keep, "avg_hb")
-  if (has_col["RelPosZ"])    cols_to_keep <- c(cols_to_keep, "avg_height")
-  if (has_col["RelPosX"])    cols_to_keep <- c(cols_to_keep, "avg_side")
-  if (has_col["Extension"])  cols_to_keep <- c(cols_to_keep, "avg_extension")
-  if (has_col["ArmAngle"])  cols_to_keep <- c(cols_to_keep, "avg_arm_angle")
-  if (has_col["VAA"])        cols_to_keep <- c(cols_to_keep, "avg_vaa")
-  if (has_col["HAA"])        cols_to_keep <- c(cols_to_keep, "avg_haa")
+  if (has_col["Velocity"])
+    cols_to_keep <- c(cols_to_keep, "avg_velo", "max_velo")
+  if (has_col["Spin Rate"])
+    cols_to_keep <- c(cols_to_keep, "avg_spin")
+  if (has_col["OTilt"])
+    cols_to_keep <- c(cols_to_keep, "avg_tilt")
+  if (has_col["xIndVrtBrk"])
+    cols_to_keep <- c(cols_to_keep, "avg_ivb")
+  if (has_col["xHorzBrk"])
+    cols_to_keep <- c(cols_to_keep, "avg_hb")
+  if (has_col["RelPosZ"])
+    cols_to_keep <- c(cols_to_keep, "avg_height")
+  if (has_col["RelPosX"])
+    cols_to_keep <- c(cols_to_keep, "avg_side")
+  if (has_col["Extension"])
+    cols_to_keep <- c(cols_to_keep, "avg_extension")
+  if (has_col["ArmAngle"])
+    cols_to_keep <- c(cols_to_keep, "avg_arm_angle")
+  if (has_col["VAA"])
+    cols_to_keep <- c(cols_to_keep, "avg_vaa")
+  if (has_col["HAA"])
+    cols_to_keep <- c(cols_to_keep, "avg_haa")
   
   # Always-present outcome columns
-  cols_to_keep <- c(cols_to_keep, "iz_percent", "csw_percent",
-                    "swstr_percent", "chase_percent", "gb_percent")
+  cols_to_keep <- c(
+    cols_to_keep,
+    "iz_percent",
+    "csw_percent",
+    "swstr_percent",
+    "chase_percent",
+    "gb_percent"
+  )
   
   result <- result %>% select(all_of(cols_to_keep))
   
@@ -244,7 +373,7 @@ format_table <- function(tbl, stats_df, pitch_names) {
     "SV" = list(fill = alpha("limegreen"), text = "white"),
     "EP" = list(fill = alpha("gray50"), text = "white")
   )
-
+  
   # Color the backgrounds and text for first column cells
   for (i in seq_len(nrow(stats_df))) {
     pitch_full <- stats_df$`Pitch Type`[i]
@@ -271,23 +400,36 @@ format_table <- function(tbl, stats_df, pitch_names) {
   tbl <- gtable::gtable_add_grob(
     tbl,
     grobs = rectGrob(gp = gpar(fill = NA, col = "black")),
-    t = 1, b = nrow(tbl), l = 1, r = ncol(tbl)
+    t = 1,
+    b = nrow(tbl),
+    l = 1,
+    r = ncol(tbl)
   )
   
   # Add internal borders
   for (i in 1:nrow(tbl)) {
     tbl <- gtable::gtable_add_grob(
       tbl,
-      grobs = rectGrob(gp = gpar(fill = NA, col = "black")),
-      t = i, b = i, l = 1, r = ncol(tbl)
+      grobs = rectGrob(gp = gpar(
+        fill = NA, col = "black"
+      )),
+      t = i,
+      b = i,
+      l = 1,
+      r = ncol(tbl)
     )
   }
   
   for (j in 1:ncol(tbl)) {
     tbl <- gtable::gtable_add_grob(
       tbl,
-      grobs = rectGrob(gp = gpar(fill = NA, col = "black")),
-      t = 1, b = nrow(tbl), l = j, r = j
+      grobs = rectGrob(gp = gpar(
+        fill = NA, col = "black"
+      )),
+      t = 1,
+      b = nrow(tbl),
+      l = j,
+      r = j
     )
   }
   
@@ -296,19 +438,23 @@ format_table <- function(tbl, stats_df, pitch_names) {
     header_indices <- which(grepl("colhead", tbl$layout$name))
     if (length(header_indices) >= i) {
       tbl$grobs[[header_indices[i]]]$gp <-
-        gpar(col = "black", fontface = "bold", fontsize = 12)
+        gpar(col = "black",
+             fontface = "bold",
+             fontsize = 12)
     }
   }
   
   return(tbl)
 }
 # Function to create pitch movement plot
-create_pitch_plot <- function(pitch_data_filtered, pitcher_name, game_date = NULL) {
-  
+create_pitch_plot <- function(pitch_data_filtered,
+                              pitcher_name,
+                              game_date = NULL) {
   # Calculate average arm angle for each pitch type for arm angle lines
   arm_angle_data <- pitch_data_filtered %>%
     group_by(`Pitch Type`) %>%
-    summarise(avg_arm_angle = mean(ArmAngle, na.rm = TRUE), .groups = "drop") %>%
+    summarise(avg_arm_angle = mean(ArmAngle, na.rm = TRUE),
+              .groups = "drop") %>%
     filter(!is.na(avg_arm_angle))
   
   # Determine if pitcher is RHP or LHP based on average arm side release
@@ -355,55 +501,99 @@ create_pitch_plot <- function(pitch_data_filtered, pitcher_name, game_date = NUL
       }
       
       # Add segment data
-      arm_angle_segments <- rbind(arm_angle_segments,
-                                  data.frame(x = 0, y = 0, xend = x_end, yend = y_end,
-                                             `Pitch Type` = pitch_type_current, check.names = FALSE))
+      arm_angle_segments <- rbind(
+        arm_angle_segments,
+        data.frame(
+          x = 0,
+          y = 0,
+          xend = x_end,
+          yend = y_end,
+          `Pitch Type` = pitch_type_current,
+          check.names = FALSE
+        )
+      )
     }
   }
   
   # Create the base plot
   p <- ggplot(
     pitch_data_filtered,
-    aes(x = xHorzBrk, y = xIndVrtBrk, color = `Pitch Type`, fill = `Pitch Type`)
+    aes(
+      x = xHorzBrk,
+      y = xIndVrtBrk,
+      color = `Pitch Type`,
+      fill = `Pitch Type`
+    )
   ) +
-    geom_hline(yintercept = 0, color = "black", linetype = "dashed", linewidth = 0.5) +
-    geom_vline(xintercept = 0, color = "black", linetype = "dashed", linewidth = 0.5)
+    geom_hline(
+      yintercept = 0,
+      color = "black",
+      linetype = "dashed",
+      linewidth = 0.5
+    ) +
+    geom_vline(
+      xintercept = 0,
+      color = "black",
+      linetype = "dashed",
+      linewidth = 0.5
+    )
   
   # Add arm angle lines (only if we have data)
   if (nrow(arm_angle_segments) > 0) {
-    p <- p + geom_segment(data = arm_angle_segments,
-                          aes(x = x, y = y, xend = xend, yend = yend, color = `Pitch Type`),
-                          linetype = "longdash",
-                          alpha = 1,
-                          linewidth = 0.8,
-                          inherit.aes = FALSE)
+    p <- p + geom_segment(
+      data = arm_angle_segments,
+      aes(
+        x = x,
+        y = y,
+        xend = xend,
+        yend = yend,
+        color = `Pitch Type`
+      ),
+      linetype = "longdash",
+      alpha = 1,
+      linewidth = 0.8,
+      inherit.aes = FALSE
+    )
   }
   
   # Add the rest of the plot elements
   p <- p +
-    stat_ellipse(geom = "polygon", alpha = 0, level = 0.68, type = "norm", linetype = "longdash") +
+    stat_ellipse(
+      geom = "polygon",
+      alpha = 0,
+      level = 0.68,
+      type = "norm",
+      linetype = "longdash"
+    ) +
     geom_point(size = 3.5, alpha = 1) +
     scale_color_manual(values = pitch_colors) +
     scale_fill_manual(values = pitch_colors) +
     scale_x_continuous(breaks = c(-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25)) +
     scale_y_continuous(breaks = c(-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25)) +
-    labs(
-      x = "Horizontal Break (in.)",
-      y = "Induced Vertical Break (in.)"
-    ) +
+    labs(x = "Horizontal Break (in.)", y = "Induced Vertical Break (in.)") +
     coord_cartesian(xlim = c(-25, 25), ylim = c(-25, 25)) +
     theme_minimal(base_size = 5) +
     theme(
       plot.background = element_rect(fill = "white", color = NA),
       panel.background = element_rect(fill = "white", color = NA),
       panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
-      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+      panel.border = element_rect(
+        color = "black",
+        fill = NA,
+        linewidth = 0.5
+      ),
       legend.position = "bottom",
       legend.background = element_rect(fill = "white"),
       plot.title = element_blank(),
       axis.title = element_text(size = 16),
       axis.text = element_text(size = 10),
-      plot.margin = margin(t = 20, r = 10, b = 10, l = 10, unit = "pt")
+      plot.margin = margin(
+        t = 20,
+        r = 10,
+        b = 10,
+        l = 10,
+        unit = "pt"
+      )
     )
   
   return(p)
@@ -420,15 +610,14 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   
   # Handle case where no stats are available
   if (nrow(stats_df) == 0) {
-    return(grid.text("No pitch data available", gp = gpar(fontsize = 16, fontface = "bold")))
+    return(grid.text(
+      "No pitch data available",
+      gp = gpar(fontsize = 16, fontface = "bold")
+    ))
   }
   
   # Replace pitch codes with full names (preserve "Total" as-is)
-  stats_df$`Pitch Type` <- ifelse(
-    stats_df$`Pitch Type` == "Total",
-    "Total",
-    pitch_names[stats_df$`Pitch Type`]
-  )
+  stats_df$`Pitch Type` <- ifelse(stats_df$`Pitch Type` == "Total", "Total", pitch_names[stats_df$`Pitch Type`])
   
   # Sort by usage (descending), Total always last
   total_mask <- stats_df$`Pitch Type` == "Total"
@@ -457,11 +646,7 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   )
   
   # Create the table (auto-size column widths to fit content)
-  tbl <- tableGrob(
-    stats_df,
-    rows = NULL,
-    theme = tt
-  )
+  tbl <- tableGrob(stats_df, rows = NULL, theme = tt)
   
   # Apply formatting to the table
   tbl <- format_table(tbl, stats_df, pitch_names)
@@ -484,20 +669,26 @@ fetch_pitcher_statline <- function(game_date, team_code, pitcher_name) {
     
     # Get schedule for this team on this date
     schedule_url <- paste0(
-      "https://statsapi.mlb.com/api/v1/schedule?date=", api_date,
-      "&sportId=1&teamId=", team_id
+      "https://statsapi.mlb.com/api/v1/schedule?date=",
+      api_date,
+      "&sportId=1&teamId=",
+      team_id
     )
     schedule <- fromJSON(schedule_url)
     
-    if (length(schedule$dates) == 0) return(NULL)
+    if (length(schedule$dates) == 0)
+      return(NULL)
     
     games <- schedule$dates$games[[1]]
-    if (is.null(games) || nrow(games) == 0) return(NULL)
+    if (is.null(games) || nrow(games) == 0)
+      return(NULL)
     
     game_pk <- games$gamePk[1]
     
     # Get boxscore
-    box_url <- paste0("https://statsapi.mlb.com/api/v1/game/", game_pk, "/boxscore")
+    box_url <- paste0("https://statsapi.mlb.com/api/v1/game/",
+                      game_pk,
+                      "/boxscore")
     boxscore <- fromJSON(box_url)
     
     # Convert "Last, First" to "First Last" for matching
@@ -511,30 +702,56 @@ fetch_pitcher_statline <- function(game_date, team_code, pitcher_name) {
     # Search both sides for the pitcher
     for (side in c("away", "home")) {
       players <- boxscore$teams[[side]]$players
-      if (is.null(players)) next
+      if (is.null(players))
+        next
       
       for (pkey in names(players)) {
         p <- players[[pkey]]
         full_name <- p$person$fullName
-        if (is.null(full_name)) next
+        if (is.null(full_name))
+          next
         
         if (tolower(full_name) == search_name) {
           ps <- p$stats$pitching
-          if (is.null(ps) || length(ps) == 0) return(NULL)
+          if (is.null(ps) || length(ps) == 0)
+            return(NULL)
           
-          return(list(
-            ip = if (!is.null(ps$inningsPitched)) ps$inningsPitched else "---",
-            h  = if (!is.null(ps$hits)) as.character(ps$hits) else "---",
-            r  = if (!is.null(ps$runs)) as.character(ps$runs) else "---",
-            er = if (!is.null(ps$earnedRuns)) as.character(ps$earnedRuns) else "---",
-            so = if (!is.null(ps$strikeOuts)) as.character(ps$strikeOuts) else "---",
-            bb = if (!is.null(ps$baseOnBalls)) as.character(ps$baseOnBalls) else "---"
-          ))
+          return(
+            list(
+              ip = if (!is.null(ps$inningsPitched))
+                ps$inningsPitched
+              else
+                "---",
+              h  = if (!is.null(ps$hits))
+                as.character(ps$hits)
+              else
+                "---",
+              r  = if (!is.null(ps$runs))
+                as.character(ps$runs)
+              else
+                "---",
+              er = if (!is.null(ps$earnedRuns))
+                as.character(ps$earnedRuns)
+              else
+                "---",
+              so = if (!is.null(ps$strikeOuts))
+                as.character(ps$strikeOuts)
+              else
+                "---",
+              bb = if (!is.null(ps$baseOnBalls))
+                as.character(ps$baseOnBalls)
+              else
+                "---"
+            )
+          )
         }
       }
     }
     
-    message("Pitcher '", pitcher_name, "' not found in boxscore for game ", game_pk)
+    message("Pitcher '",
+            pitcher_name,
+            "' not found in boxscore for game ",
+            game_pk)
     return(NULL)
   }, error = function(e) {
     message("MLB API error: ", e$message)
@@ -549,11 +766,11 @@ create_title_grob <- function(pitcher_name, game_date = NULL) {
   if (!is.null(game_date)) {
     # Format date as M-DD-YYYY (no leading zero on month)
     date_obj <- as.Date(game_date)
-    date_str <- paste0(
-      as.integer(format(date_obj, "%m")), "-",
-      format(date_obj, "%d"), "-",
-      format(date_obj, "%Y")
-    )
+    date_str <- paste0(as.integer(format(date_obj, "%m")),
+                       "-",
+                       format(date_obj, "%d"),
+                       "-",
+                       format(date_obj, "%Y"))
     title_text <- paste0(pitcher_name_fmt, " (", date_str, ")")
   } else {
     title_text <- pitcher_name_fmt
@@ -564,7 +781,8 @@ create_title_grob <- function(pitcher_name, game_date = NULL) {
 
 # Create a clean statline table (similar style to pitch metrics)
 create_statline_table <- function(statline) {
-  if (is.null(statline)) return(NULL)
+  if (is.null(statline))
+    return(NULL)
   
   stat_df <- data.frame(
     IP = statline$ip,
@@ -584,7 +802,11 @@ create_statline_table <- function(statline) {
       padding = unit(c(10, 7), "mm")
     ),
     colhead = list(
-      fg_params = list(col = "black", fontface = "bold", fontsize = 13),
+      fg_params = list(
+        col = "black",
+        fontface = "bold",
+        fontsize = 13
+      ),
       bg_params = list(fill = "gray90"),
       padding = unit(c(10, 7), "mm")
     )
@@ -596,15 +818,23 @@ create_statline_table <- function(statline) {
   tbl <- gtable::gtable_add_grob(
     tbl,
     grobs = rectGrob(gp = gpar(fill = NA, col = "black")),
-    t = 1, b = nrow(tbl), l = 1, r = ncol(tbl)
+    t = 1,
+    b = nrow(tbl),
+    l = 1,
+    r = ncol(tbl)
   )
   
   # Add row borders
   for (i in 1:nrow(tbl)) {
     tbl <- gtable::gtable_add_grob(
       tbl,
-      grobs = rectGrob(gp = gpar(fill = NA, col = "black")),
-      t = i, b = i, l = 1, r = ncol(tbl)
+      grobs = rectGrob(gp = gpar(
+        fill = NA, col = "black"
+      )),
+      t = i,
+      b = i,
+      l = 1,
+      r = ncol(tbl)
     )
   }
   
@@ -612,8 +842,13 @@ create_statline_table <- function(statline) {
   for (j in 1:ncol(tbl)) {
     tbl <- gtable::gtable_add_grob(
       tbl,
-      grobs = rectGrob(gp = gpar(fill = NA, col = "black")),
-      t = 1, b = nrow(tbl), l = j, r = j
+      grobs = rectGrob(gp = gpar(
+        fill = NA, col = "black"
+      )),
+      t = 1,
+      b = nrow(tbl),
+      l = j,
+      r = j
     )
   }
   
@@ -648,7 +883,9 @@ generate_pitcher_reports <- function(input_file,
     team_match <- str_extract(filename, "^[A-Z]{3}(?=\\.csv)")
   }
   if (is.na(team_match)) {
-    stop("Could not extract team code from filename. Expected format: 'ARI.csv' or '... - ARI.csv'")
+    stop(
+      "Could not extract team code from filename. Expected format: 'ARI.csv' or '... - ARI.csv'"
+    )
   }
   
   team_filter <- team_match
@@ -658,8 +895,13 @@ generate_pitcher_reports <- function(input_file,
   message("Filtering for team: ", team_filter)
   original_count <- nrow(pitch_data)
   pitch_data <- pitch_data %>% filter(PTeam == team_filter)
-  message("Team filtering: ", original_count - nrow(pitch_data), " rows removed, ",
-          nrow(pitch_data), " rows remaining")
+  message(
+    "Team filtering: ",
+    original_count - nrow(pitch_data),
+    " rows removed, ",
+    nrow(pitch_data),
+    " rows remaining"
+  )
   
   # Apply date filtering if specified
   if (!is.null(start_date) || !is.null(end_date)) {
@@ -671,8 +913,13 @@ generate_pitcher_reports <- function(input_file,
       start_date_dt <- as.Date(start_date)
       original_count <- nrow(pitch_data)
       pitch_data <- pitch_data %>% filter(Game_Date_dt >= start_date_dt)
-      message("Start date filtering: ", original_count - nrow(pitch_data), " rows removed, ",
-              nrow(pitch_data), " rows remaining")
+      message(
+        "Start date filtering: ",
+        original_count - nrow(pitch_data),
+        " rows removed, ",
+        nrow(pitch_data),
+        " rows remaining"
+      )
       message("Filtered data to start from: ", start_date)
     }
     
@@ -681,8 +928,13 @@ generate_pitcher_reports <- function(input_file,
       end_date_dt <- as.Date(end_date)
       original_count <- nrow(pitch_data)
       pitch_data <- pitch_data %>% filter(Game_Date_dt <= end_date_dt)
-      message("End date filtering: ", original_count - nrow(pitch_data), " rows removed, ",
-              nrow(pitch_data), " rows remaining")
+      message(
+        "End date filtering: ",
+        original_count - nrow(pitch_data),
+        " rows removed, ",
+        nrow(pitch_data),
+        " rows remaining"
+      )
       message("Filtered data to end at: ", end_date)
     }
   }
@@ -695,14 +947,17 @@ generate_pitcher_reports <- function(input_file,
   
   # Add date info to suffix if filtered
   if (!is.null(start_date) || !is.null(end_date)) {
-    if (!is.null(start_date) && !is.null(end_date) && start_date == end_date) {
+    if (!is.null(start_date) &&
+        !is.null(end_date) && start_date == end_date) {
       date_suffix <- format(as.Date(start_date), "_%Y%m%d")
     } else {
-      date_range <- paste0(
-        ifelse(is.null(start_date), "Start", format(as.Date(start_date), "%Y%m%d")),
-        "_to_",
-        ifelse(is.null(end_date), "End", format(as.Date(end_date), "%Y%m%d"))
-      )
+      date_range <- paste0(ifelse(
+        is.null(start_date),
+        "Start",
+        format(as.Date(start_date), "%Y%m%d")
+      ),
+      "_to_",
+      ifelse(is.null(end_date), "End", format(as.Date(end_date), "%Y%m%d")))
       date_suffix <- paste0("_", date_range)
     }
     filter_suffix <- paste0(filter_suffix, date_suffix)
@@ -717,7 +972,9 @@ generate_pitcher_reports <- function(input_file,
     pitcher_data <- pitch_data %>% filter(Pitcher == pitcher_filter)
     
     if (nrow(pitcher_data) == 0) {
-      message("No data found for pitcher: ", pitcher_filter, " with the current filters")
+      message("No data found for pitcher: ",
+              pitcher_filter,
+              " with the current filters")
       return(NULL)
     }
     
@@ -731,12 +988,28 @@ generate_pitcher_reports <- function(input_file,
     
     # Create pitcher-specific PDF
     # Build filename: "Last_First BAL 2-20-2026 Pitcher Report.pdf"
-    if (!is.null(start_date) && !is.null(end_date) && start_date == end_date) {
+    if (!is.null(start_date) &&
+        !is.null(end_date) && start_date == end_date) {
       date_obj <- as.Date(start_date)
-      date_str <- paste0(as.integer(format(date_obj, "%m")), "-", format(date_obj, "%d"), "-", format(date_obj, "%Y"))
-      pdf_filename <- paste0(output_dir, clean_pitcher_name, " ", team_filter, " ", date_str, " Pitcher Report.pdf")
+      date_str <- paste0(as.integer(format(date_obj, "%m")),
+                         "-",
+                         format(date_obj, "%d"),
+                         "-",
+                         format(date_obj, "%Y"))
+      pdf_filename <- paste0(
+        output_dir,
+        clean_pitcher_name,
+        " ",
+        team_filter,
+        " ",
+        date_str,
+        " Pitcher Report.pdf"
+      )
     } else {
-      pdf_filename <- paste0(output_dir, clean_pitcher_name, filter_suffix, " Pitcher Report.pdf")
+      pdf_filename <- paste0(output_dir,
+                             clean_pitcher_name,
+                             filter_suffix,
+                             " Pitcher Report.pdf")
     }
     message("Creating PDF: ", pdf_filename)
     pdf(pdf_filename, width = 15, height = 18)
@@ -767,13 +1040,25 @@ generate_pitcher_reports <- function(input_file,
         # Combine: title -> statline -> space -> plot -> space -> metrics
         if (!is.null(statline_table)) {
           combined_plot <- plot_grid(
-            title_grob, nullGrob(), statline_table, nullGrob(), pitch_plot, nullGrob(), table_plot,
-            ncol = 1, rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
+            title_grob,
+            nullGrob(),
+            statline_table,
+            nullGrob(),
+            pitch_plot,
+            nullGrob(),
+            table_plot,
+            ncol = 1,
+            rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
           )
         } else {
           combined_plot <- plot_grid(
-            title_grob, nullGrob(), pitch_plot, nullGrob(), table_plot,
-            ncol = 1, rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
+            title_grob,
+            nullGrob(),
+            pitch_plot,
+            nullGrob(),
+            table_plot,
+            ncol = 1,
+            rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
           )
         }
         
@@ -785,20 +1070,25 @@ generate_pitcher_reports <- function(input_file,
       }
     } else {
       # If there are multiple dates, create a separate page for each date
-      message(paste("Found", length(game_dates), "different game dates for", pitcher_filter))
+      message(paste(
+        "Found",
+        length(game_dates),
+        "different game dates for",
+        pitcher_filter
+      ))
       
       # Sort game dates chronologically (earliest to latest)
       game_dates <- as.character(sort(game_dates))
-
+      
       for (game_date in game_dates) {
         # Filter data for this specific date
         date_data <- pitcher_data %>%
           filter(`Game Date` == game_date)
-
+        
         # Filter for movement data
         pitch_data_filtered <- date_data %>%
           drop_na(xHorzBrk, xIndVrtBrk)
-
+        
         if (nrow(pitch_data_filtered) > 0) {
           # Create title grob
           title_grob <- create_title_grob(pitcher_filter, game_date)
@@ -816,13 +1106,25 @@ generate_pitcher_reports <- function(input_file,
           # Combine: title -> statline -> space -> plot -> space -> metrics
           if (!is.null(statline_table)) {
             combined_plot <- plot_grid(
-              title_grob, nullGrob(), statline_table, nullGrob(), pitch_plot, nullGrob(), table_plot,
-              ncol = 1, rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
+              title_grob,
+              nullGrob(),
+              statline_table,
+              nullGrob(),
+              pitch_plot,
+              nullGrob(),
+              table_plot,
+              ncol = 1,
+              rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
             )
           } else {
             combined_plot <- plot_grid(
-              title_grob, nullGrob(), pitch_plot, nullGrob(), table_plot,
-              ncol = 1, rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
+              title_grob,
+              nullGrob(),
+              pitch_plot,
+              nullGrob(),
+              table_plot,
+              ncol = 1,
+              rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
             )
           }
           
@@ -830,14 +1132,27 @@ generate_pitcher_reports <- function(input_file,
           print(combined_plot)
           message(paste("Created plot for", pitcher_filter, "on", game_date))
         } else {
-          message(paste("Skipping", pitcher_filter, "on", game_date, "- no valid movement data"))
+          message(
+            paste(
+              "Skipping",
+              pitcher_filter,
+              "on",
+              game_date,
+              "- no valid movement data"
+            )
+          )
         }
       }
     }
     
     # Close the PDF
     dev.off()
-    message(paste("Pitcher report for", pitcher_filter, "saved to", pdf_filename))
+    message(paste(
+      "Pitcher report for",
+      pitcher_filter,
+      "saved to",
+      pdf_filename
+    ))
     
   } else {
     # Original functionality - create team-based reports
@@ -849,12 +1164,26 @@ generate_pitcher_reports <- function(input_file,
     for (current_team in all_teams) {
       # Create team-specific PDF
       # Build filename: "BAL 2-20-2026 Pitcher Reports.pdf"
-      if (!is.null(start_date) && !is.null(end_date) && start_date == end_date) {
+      if (!is.null(start_date) &&
+          !is.null(end_date) && start_date == end_date) {
         date_obj <- as.Date(start_date)
-        date_str <- paste0(as.integer(format(date_obj, "%m")), "-", format(date_obj, "%d"), "-", format(date_obj, "%Y"))
-        pdf_filename <- paste0(output_dir, current_team, " ", date_str, " Pitcher Reports.pdf")
+        date_str <- paste0(
+          as.integer(format(date_obj, "%m")),
+          "-",
+          format(date_obj, "%d"),
+          "-",
+          format(date_obj, "%Y")
+        )
+        pdf_filename <- paste0(output_dir,
+                               current_team,
+                               " ",
+                               date_str,
+                               " Pitcher Reports.pdf")
       } else if (!is.null(start_date) || !is.null(end_date)) {
-        pdf_filename <- paste0(output_dir, current_team, filter_suffix, " Pitcher Reports.pdf")
+        pdf_filename <- paste0(output_dir,
+                               current_team,
+                               filter_suffix,
+                               " Pitcher Reports.pdf")
       } else {
         pdf_filename <- paste0(output_dir, current_team, " Pitcher Reports.pdf")
       }
@@ -867,7 +1196,10 @@ generate_pitcher_reports <- function(input_file,
       # Get pitchers for this team
       team_data <- pitch_data %>% filter(PTeam == current_team)
       all_pitchers <- sort(unique(team_data$Pitcher))
-      message("Processing ", length(all_pitchers), " pitchers for ", current_team)
+      message("Processing ",
+              length(all_pitchers),
+              " pitchers for ",
+              current_team)
       
       # Loop through each pitcher
       for (selected_pitcher in all_pitchers) {
@@ -884,7 +1216,11 @@ generate_pitcher_reports <- function(input_file,
             drop_na(xHorzBrk, xIndVrtBrk)
           
           if (nrow(pitch_data_filtered) == 0) {
-            message(paste("Skipping", selected_pitcher, "- no valid movement data"))
+            message(paste(
+              "Skipping",
+              selected_pitcher,
+              "- no valid movement data"
+            ))
             next
           }
           
@@ -904,13 +1240,25 @@ generate_pitcher_reports <- function(input_file,
           # Combine: title -> statline -> space -> plot -> space -> metrics
           if (!is.null(statline_table)) {
             combined_plot <- plot_grid(
-              title_grob, nullGrob(), statline_table, nullGrob(), pitch_plot, nullGrob(), table_plot,
-              ncol = 1, rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
+              title_grob,
+              nullGrob(),
+              statline_table,
+              nullGrob(),
+              pitch_plot,
+              nullGrob(),
+              table_plot,
+              ncol = 1,
+              rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
             )
           } else {
             combined_plot <- plot_grid(
-              title_grob, nullGrob(), pitch_plot, nullGrob(), table_plot,
-              ncol = 1, rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
+              title_grob,
+              nullGrob(),
+              pitch_plot,
+              nullGrob(),
+              table_plot,
+              ncol = 1,
+              rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
             )
           }
           
@@ -919,11 +1267,16 @@ generate_pitcher_reports <- function(input_file,
           message(paste("Created plot for", selected_pitcher))
         } else {
           # If there are multiple dates, create a separate page for each date
-          message(paste("Found", length(game_dates), "different game dates for", selected_pitcher))
+          message(paste(
+            "Found",
+            length(game_dates),
+            "different game dates for",
+            selected_pitcher
+          ))
           
           # Sort game dates chronologically (earliest to latest)
           game_dates <- as.character(sort(game_dates))
-
+          
           for (game_date in game_dates) {
             # Filter data for this specific date
             date_data <- pitcher_data %>%
@@ -934,7 +1287,15 @@ generate_pitcher_reports <- function(input_file,
               drop_na(xHorzBrk, xIndVrtBrk)
             
             if (nrow(pitch_data_filtered) == 0) {
-              message(paste("Skipping", selected_pitcher, "on", game_date, "- no valid movement data"))
+              message(
+                paste(
+                  "Skipping",
+                  selected_pitcher,
+                  "on",
+                  game_date,
+                  "- no valid movement data"
+                )
+              )
               next
             }
             
@@ -947,7 +1308,9 @@ generate_pitcher_reports <- function(input_file,
             statline_table <- create_statline_table(statline)
             
             # Create the pitch movement plot
-            pitch_plot <- create_pitch_plot(pitch_data_filtered, selected_pitcher, date_string)
+            pitch_plot <- create_pitch_plot(pitch_data_filtered,
+                                            selected_pitcher,
+                                            date_string)
             
             # Create the stats table for this date
             table_plot <- create_pitcher_tables(date_data, selected_pitcher)
@@ -955,26 +1318,48 @@ generate_pitcher_reports <- function(input_file,
             # Combine: title -> statline -> space -> plot -> space -> metrics
             if (!is.null(statline_table)) {
               combined_plot <- plot_grid(
-                title_grob, nullGrob(), statline_table, nullGrob(), pitch_plot, nullGrob(), table_plot,
-                ncol = 1, rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
+                title_grob,
+                nullGrob(),
+                statline_table,
+                nullGrob(),
+                pitch_plot,
+                nullGrob(),
+                table_plot,
+                ncol = 1,
+                rel_heights = c(0.08, 0.04, 0.1, 0.03, 1.2, 0.03, 1)
               )
             } else {
               combined_plot <- plot_grid(
-                title_grob, nullGrob(), pitch_plot, nullGrob(), table_plot,
-                ncol = 1, rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
+                title_grob,
+                nullGrob(),
+                pitch_plot,
+                nullGrob(),
+                table_plot,
+                ncol = 1,
+                rel_heights = c(0.08, 0.03, 1.2, 0.03, 1)
               )
             }
             
             # Print the plot to the current PDF page
             print(combined_plot)
-            message(paste("Created plot for", selected_pitcher, "on", game_date))
+            message(paste(
+              "Created plot for",
+              selected_pitcher,
+              "on",
+              game_date
+            ))
           }
         }
       }
       
       # Close the PDF device for this team
       dev.off()
-      message(paste("Pitcher report for team", current_team, "saved to", pdf_filename))
+      message(paste(
+        "Pitcher report for team",
+        current_team,
+        "saved to",
+        pdf_filename
+      ))
     }
     
     message("All team pitcher reports have been created")
