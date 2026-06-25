@@ -7,7 +7,6 @@
 pitch_names <- c(
   "FF" = "Fastball",
   "SI" = "Sinker",
-  "CF" = "Cut-Fastball",
   "CU" = "Curveball",
   "SV" = "Slurve",
   "SL" = "Slider",
@@ -21,23 +20,22 @@ pitch_names <- c(
 
 # Colors for pitch-type visualizations
 pitch_colors <- c(
-  "FF" = "blue",
-  "SI" = "gold1",
-  "CF" = "saddlebrown",
-  "FC" = "orange",
-  "CU" = "firebrick3",
-  "SL" = "darkgreen",
-  "SV" = "limegreen",
-  "ST" = "deeppink",
-  "CH" = "purple",
-  "FS" = "turquoise",
+  "FF" = "#0072B2",
+  "SI" = "#E0A81E",
+  "FC" = "#8B5A2B",
+  "CU" = "#332288",
+  "SL" = "#D55E00",
+  "SV" = "#882255",
+  "ST" = "#56B4E9",
+  "CH" = "#009E73",
+  "FS" = "#CC79A7",
   "KN" = "black",
   "EP" = "gray50"
 )
 
 # Display order for pitch types
 pitch_order <- c(
-  "Fastball", "Sinker", "Cut-Fastball", "Cutter",
+  "Fastball", "Sinker", "Cutter",
   "Slider", "Sweeper", "Curveball", "Slurve",
   "Changeup", "Splitter", "Knuckleball"
 )

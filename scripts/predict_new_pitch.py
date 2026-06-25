@@ -109,9 +109,9 @@ OUTCOME_DIST_SIGMA = 1.0
 
 # Pitch colors matching js/utils.js site palette
 PITCH_COLORS = {
-    'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#8B5A2B', 'SL': '#DDDDDD',
-    'ST': '#FF1493', 'SV': '#32CD32', 'CU': '#E03030', 'CH': '#CC66EE',
-    'FS': '#40E0D0', 'KN': '#AAAAAA', 'SC': '#999999', 'CS': '#666666',
+    'FF': '#0072B2', 'SI': '#FFD700', 'FC': '#8B5A2B', 'SL': '#D55E00',
+    'ST': '#56B4E9', 'SV': '#882255', 'CU': '#332288', 'CH': '#009E73',
+    'FS': '#CC79A7', 'KN': '#AAAAAA', 'SC': '#999999', 'CS': '#666666',
 }
 PITCH_FULL_NAMES = {
     'FF': 'Four-Seam', 'SI': 'Sinker', 'FC': 'Cutter', 'SL': 'Slider',

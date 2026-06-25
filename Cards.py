@@ -75,8 +75,8 @@ TEAM_NAME_TO_ABBREV = {
 # everywhere — the old #FFD700 sinker / #DDDDDD slider washed out. SI is a warm
 # gold (not yellow/mustard); the dark hues keep their saturated brand values.
 PITCH_COLORS = {
-    'FF':'#4488FF','SI':'#E0A81E','FC':'#8B5A2B','SL':'#9E9E9E',
-    'ST':'#FF1493','CU':'#E03030','SV':'#32CD32','CH':'#CC66EE','FS':'#35BCAF','KN':'#9A9A9A',
+    'FF':'#0072B2','SI':'#E0A81E','FC':'#8B5A2B','SL':'#D55E00',
+    'ST':'#56B4E9','CU':'#332288','SV':'#882255','CH':'#009E73','FS':'#CC79A7','KN':'#9A9A9A',
     'EP':'#888888'
 }
 PITCH_NAMES = {
