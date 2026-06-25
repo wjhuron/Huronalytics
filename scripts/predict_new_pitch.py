@@ -109,7 +109,7 @@ OUTCOME_DIST_SIGMA = 1.0
 
 # Pitch colors matching js/utils.js site palette
 PITCH_COLORS = {
-    'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#FFA500', 'SL': '#DDDDDD',
+    'FF': '#4488FF', 'SI': '#FFD700', 'FC': '#8B5A2B', 'SL': '#DDDDDD',
     'ST': '#FF1493', 'SV': '#32CD32', 'CU': '#E03030', 'CH': '#CC66EE',
     'FS': '#40E0D0', 'KN': '#AAAAAA', 'SC': '#999999', 'CS': '#666666',
 }
@@ -1041,9 +1041,9 @@ def _draw_arsenal_table(ax, rows):
 
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    pitcher  = "Littell, Zack"   # Pitcher name, "Last, First" format
+    pitcher  = "Granillo, Andre"   # Pitcher name, "Last, First" format
     team     = "WSH"                 # Team abbreviation
-    pitches  = ["CU"]          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
+    pitches  = []          # Target pitch types; empty = auto (all common pitches he doesn't already throw)
 
     no_plot   = False                # True to skip plot generation
     plot_only = False                # True to write plot but skip printed text
