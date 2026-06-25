@@ -360,17 +360,16 @@ format_table <- function(tbl, stats_df, pitch_names) {
   
   # Color mapping for pitch types
   pitch_colors <- list(
-    "FF" = list(fill = alpha("blue"), text = "white"),
-    "SL" = list(fill = alpha("darkgreen"), text = "white"),
-    "ST" = list(fill = alpha("deeppink"), text = "white"),
-    "CU" = list(fill = alpha("firebrick3"), text = "white"),
-    "CF" = list(fill = alpha("saddlebrown"), text = "white"),
-    "FC" = list(fill = alpha("orange"), text = "white"),
-    "SI" = list(fill = alpha("gold1"), text = "white"),
-    "CH" = list(fill = alpha("purple"), text = "white"),
-    "FS" = list(fill = alpha("turquoise"), text = "white"),
+    "FF" = list(fill = alpha("#0072B2"), text = "white"),
+    "SL" = list(fill = alpha("#D55E00"), text = "white"),
+    "ST" = list(fill = alpha("#56B4E9"), text = "black"),
+    "CU" = list(fill = alpha("#332288"), text = "white"),
+    "FC" = list(fill = alpha("#8B5A2B"), text = "white"),
+    "SI" = list(fill = alpha("#E0A81E"), text = "black"),
+    "CH" = list(fill = alpha("#009E73"), text = "white"),
+    "FS" = list(fill = alpha("#CC79A7"), text = "black"),
     "KN" = list(fill = alpha("black"), text = "white"),
-    "SV" = list(fill = alpha("limegreen"), text = "white"),
+    "SV" = list(fill = alpha("#882255"), text = "white"),
     "EP" = list(fill = alpha("gray50"), text = "white")
   )
   
