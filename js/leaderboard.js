@@ -25,9 +25,9 @@ const COLUMNS = {
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Horizontal approach angle at the plate (degrees)', group: 'metrics' },
     { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', desc: 'Stuff+ quality score from physical characteristics only (100 = avg, higher = better for pitcher)', group: 'metrics' },
     // Outcomes
-    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'xRunValue',   label: 'xRV',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'outcomes' },
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
-    { key: 'xRunValue',   label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'outcomes' },
     { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
     { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+ for this pitch type — xRV-weighted location quality standardized within the pitch-type group (FF, SI, FC, SL, CB, CH). 100 = group avg, +10 = 1 SD better. ROC pitchers scored against the MLB baseline.', group: 'outcomes' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on swings (whiffs / swings) for this pitch type', group: 'outcomes' },
@@ -63,7 +63,10 @@ const COLUMNS = {
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / TBF)', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', desc: 'K% minus BB%', group: 'stats' },
     // Pitch Quality
-    { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Expected run value per 100 pitches', group: 'run_value' },
+    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Run value — runs saved vs league average (positive = better for pitcher)', group: 'run_value' },
+    { key: 'xRunValue',   label: 'xRV',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'run_value' },
+    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'run_value' },
+    { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches', group: 'run_value' },
   ],
   pitcherBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -278,7 +281,7 @@ const Leaderboard = {
   _tabDefaultHidden: {},  // tracks which keys were hidden by tab defaults
 
   _TAB_HIDDEN_DEFAULTS: {
-    pitchMetrics:       ['maxVelo', 'relPosZ', 'relPosX', 'runValue', 'xRunValue', 'xBA', 'xSLG'],
+    pitchMetrics:       ['maxVelo', 'relPosZ', 'relPosX', 'xBA', 'xSLG'],
     pitcherStats:       ['w', 'l', 'sv', 'hld', 'tbf', 'fip', 'xFIP'],
     pitcherBattedBall:  ['xBA', 'xSLG', 'maxEVAgainst', 'xwOBAsp'],
     hitterStats:        ['g', 'ab', 'doubles', 'triples', 'cs', 'sbPct', 'xBA', 'xSLG'],
