@@ -1319,7 +1319,7 @@ def render_card(config, pitches, output_file):
     for pt in PITCH_ORDER:
         if pt not in groups: continue
         xs, ys = zip(*groups[pt]); color = PITCH_COLORS[pt]
-        ax_plot.scatter(xs, ys, c=color, s=65, alpha=1.0, edgecolors='none', zorder=3)
+        ax_plot.scatter(xs, ys, c=color, s=65, alpha=1.0, edgecolors=PLOT_PANEL, linewidths=0.5, zorder=3)
         if len(groups[pt]) >= 6:
             cov = np.cov(xs, ys); vals, vecs = np.linalg.eigh(cov)
             if vals[0] <= 0 or vals[1] <= 0:

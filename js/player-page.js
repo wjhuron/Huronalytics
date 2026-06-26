@@ -3135,7 +3135,8 @@ var PlayerPage = {
     var datasets = [{
       data: points,
       backgroundColor: pointColors,
-      borderWidth: 0,
+      borderColor: 'rgba(0,0,0,0.5)',
+      borderWidth: 1,
       pointRadius: pointRadii,
       pointHoverRadius: pointHoverRadii,
     }];
