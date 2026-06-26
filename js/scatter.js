@@ -106,6 +106,7 @@ const ScatterChart = {
     const datasets = [];
     const ellipseMeta = [];
     const pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
+    const dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
 
     for (let j = 0; j < pitchTypes.length; j++) {
       const pt = pitchTypes[j];
@@ -117,7 +118,8 @@ const ScatterChart = {
         label: label,
         data: pts,
         backgroundColor: color.bg,
-        borderWidth: 0,
+        borderColor: dotEdge,
+        borderWidth: 1,
         pointRadius: 6,
         pointHoverRadius: 8,
       });
@@ -195,6 +197,7 @@ const ScatterChart = {
 
       const pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
       const markerStyle = this.MARKER_STYLES[pi % this.MARKER_STYLES.length];
+      const dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
 
       for (let j = 0; j < pitchTypes.length; j++) {
         const pt = pitchTypes[j];
@@ -203,7 +206,8 @@ const ScatterChart = {
           label: name + ' - ' + pt,
           data: groups[pt],
           backgroundColor: color.bg,
-          borderWidth: 0,
+          borderColor: dotEdge,
+          borderWidth: 1,
           pointRadius: 6,
           pointHoverRadius: 8,
           pointStyle: markerStyle,

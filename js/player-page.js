@@ -1195,6 +1195,8 @@ var PlayerPage = {
     var datasets = [];
     var ellipseMeta = [];
     var pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
+    // Hairline edge matching the panel bg — de-blobs dense clusters without a contrasting ring
+    var dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
 
     for (var j = 0; j < pitchTypes.length; j++) {
       var pt = pitchTypes[j];
@@ -1206,7 +1208,8 @@ var PlayerPage = {
         label: label,
         data: pts,
         backgroundColor: color.bg,
-        borderWidth: 0,
+        borderColor: dotEdge,
+        borderWidth: 1,
         pointRadius: 5,
         pointHoverRadius: 7,
       });
