@@ -1565,7 +1565,7 @@ def render_card(config, pitches, output_file):
             f"{sum(velos)/len(velos):.1f}" if velos else '—',f"{max(velos):.1f}" if velos else '—',
             f"{int(sum(spins)/len(spins))}" if spins else '—',
             f'{sum(ivbs)/len(ivbs):.1f}"' if ivbs else '—',f'{sum(hbs)/len(hbs):.1f}"' if hbs else '—',
-            f"{_nvaa:.1f}" if _nvaa is not None else '—',
+            f"{_nvaa:.2f}" if _nvaa is not None else '—',
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
