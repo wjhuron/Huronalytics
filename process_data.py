@@ -1052,7 +1052,6 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             'sumVAA', 'nVAA', 'sumHAA', 'nHAA',
             'sumPlateZ', 'nPlateZ',
             'sumPlateX', 'nPlateX',
-            'sumEffVelo', 'nEffVelo',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
         ],
         'pitchMicro': pitch_rows,
