@@ -142,8 +142,11 @@ MLB_TEAMS = {
     'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY',
     'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
 }
-ROC_TEAMS = {'ROC'}  # MiLB/affiliate teams tracked alongside MLB
-ALL_TRACKED_TEAMS = MLB_TEAMS | ROC_TEAMS
+# Baseball Savant only publishes the Statcast supplement (arm_angle, swing
+# tracking, launch_speed_angle, etc.) for MLB. The MiLB/affiliate tabs
+# (ROC/AAA/FCL in NLE2026) never return supplement data, so the backfill skips
+# them entirely rather than wasting a download attempt per run.
+ALL_TRACKED_TEAMS = set(MLB_TEAMS)
 
 
 def date_in_range(date_str):
