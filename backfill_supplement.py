@@ -57,6 +57,7 @@ SUPPLEMENT_MAP = {
     'xwOBA': 'estimated_woba_using_speedangle',
     'Outs': 'outs_when_up',
     'Event': 'events',
+    'Barrel': 'launch_speed_angle',
 }
 
 # Swing-tracking cluster: if BatSpeed is missing or sub-50, the entire
@@ -65,14 +66,16 @@ SWING_CLUSTER_COLS = {'BatSpeed', 'SwingLength', 'AttackAngle',
                       'AttackDirection', 'SwingPathTilt'}
 
 # Columns that store raw integer values from Statcast (no rounding needed)
-INT_COLS = {'Outs'}  # Raw integer values
+INT_COLS = {'Outs', 'Barrel'}  # Raw integer values (Barrel = launch_speed_angle 1-6)
 
 # Columns that store free-form strings (no numeric coercion, custom translator).
 STRING_COLS = {'Event'}
 
 # Columns where official Statcast data should always overwrite estimates
-# (even if the cell already has a value from the initial download)
-ALWAYS_OVERWRITE_COLS = {'ArmAngle'}
+# (even if the cell already has a value from the initial download). Barrel is
+# included because Pitcher2026 seeds it with the code_barrel estimate (6 or
+# blank), which the official launch_speed_angle (1-6) should replace.
+ALWAYS_OVERWRITE_COLS = {'ArmAngle', 'Barrel'}
 
 # Columns that only ever OVERWRITE existing values; they are never used to
 # fill a blank cell. Intended for scoring-change corrections (e.g., official

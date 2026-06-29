@@ -734,10 +734,6 @@ class BaseballSavantFocusedDownloader:
                         # Calculate approach angles (at plate)
                         VAA, HAA = self.calculate_approach_angles(vy0, vz0, vx0, ay, az, ax)
 
-                        # Plate time (flight time from release to plate)
-                        plate_time_raw = pitch.get('pitchData', {}).get('plateTime')
-                        plate_time = round(plate_time_raw, 3) if plate_time_raw is not None else None
-
                         # Count BEFORE this pitch is thrown
                         count_str = f"{pre_pitch_balls}-{pre_pitch_strikes}"
 
@@ -800,14 +796,12 @@ class BaseballSavantFocusedDownloader:
                             'RelPosX': pitch.get('pitchData', {}).get('coordinates', {}).get('x0'),
                             'Extension': extension,
                             'ArmAngle': None,  # filled by Statcast supplement
-                            'EffectiveVelo': None,  # filled by Statcast supplement
                             'PlateZ': plate_z,
                             'PlateX': plate_x,
                             'SzTop': sz_top,
                             'SzBot': sz_bot,
                             'VAA': VAA,
                             'HAA': HAA,
-                            'PlateTime': plate_time,
                             'BTeam': b_team,
                             'Batter': batter_name,
                             'Bats': bats,
@@ -825,8 +819,6 @@ class BaseballSavantFocusedDownloader:
                             'xBA': None,    # filled by Statcast supplement (estimated_ba_using_speedangle)
                             'xSLG': None,   # filled by Statcast supplement (estimated_slg_using_speedangle)
                             'xwOBA': None,  # filled by Statcast supplement (estimated_woba_using_speedangle)
-                            'wOBAval': None,  # filled by Statcast supplement (woba_value)
-                            'wOBAdom': None,  # filled by Statcast supplement (woba_denom)
                             'RunExp': None,  # filled by Statcast supplement (delta_pitcher_run_exp)
                             'Barrel': estimated_barrel,  # estimate from code_barrel formula; overwritten by Statcast launch_speed_angle if available
                             # Merge keys for Statcast Search supplement (dropped before final CSV)
@@ -861,11 +853,11 @@ class BaseballSavantFocusedDownloader:
             numeric_round_1 = ['Velocity', 'IndVertBrk', 'HorzBrk', 'xIndVrtBrk', 'xHorzBrk',
                                'ExitVelo', 'BatSpeed', 'SwingLength',
                                'AttackAngle', 'AttackDirection', 'SwingPathTilt',
-                               'ArmAngle', 'EffectiveVelo']
+                               'ArmAngle']
             numeric_round_2 = ['VAA', 'HAA', 'HC_X', 'HC_Y',
                                'RelPosZ', 'RelPosX', 'Extension']
             numeric_round_3 = ['PlateZ', 'PlateX', 'SzTop', 'SzBot',
-                               'RunExp', 'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom']
+                               'RunExp', 'xBA', 'xSLG', 'xwOBA']
             numeric_int = ['LaunchAngle', 'Distance']
 
             for col in numeric_round_1:
@@ -959,21 +951,16 @@ class BaseballSavantFocusedDownloader:
             merge_cols = ['game_pk', 'at_bat_number', 'pitch_number']
             supplement_cols = [
                 'arm_angle',
-                'effective_speed',
                 'release_pos_y',
                 'bat_speed',
                 'swing_length',
                 'attack_angle',
                 'attack_direction',
                 'swing_path_tilt',
-                'intercept_ball_minus_batter_pos_x_inches',
-                'intercept_ball_minus_batter_pos_y_inches',
                 'delta_pitcher_run_exp',
                 'estimated_ba_using_speedangle',
                 'estimated_slg_using_speedangle',
                 'estimated_woba_using_speedangle',
-                'woba_value',
-                'woba_denom',
                 'on_1b',
                 'on_2b',
                 'on_3b',
@@ -1015,20 +1002,15 @@ class BaseballSavantFocusedDownloader:
         # Column name mapping from Statcast CSV names to our display names
         rename_map = {
             'arm_angle': 'ArmAngle',
-            'effective_speed': 'EffectiveVelo',
             'bat_speed': 'BatSpeed',
             'swing_length': 'SwingLength',
             'attack_angle': 'AttackAngle',
             'attack_direction': 'AttackDirection',
             'swing_path_tilt': 'SwingPathTilt',
-            'intercept_ball_minus_batter_pos_x_inches': 'Int_X',
-            'intercept_ball_minus_batter_pos_y_inches': 'Int_Y',
             'delta_pitcher_run_exp': 'RunExp',
             'estimated_ba_using_speedangle': 'xBA',
             'estimated_slg_using_speedangle': 'xSLG',
             'estimated_woba_using_speedangle': 'xwOBA',
-            'woba_value': 'wOBAval',
-            'woba_denom': 'wOBAdom',
             'launch_speed_angle': 'Barrel',
         }
         # on_1b/on_2b/on_3b are not renamed — they're consumed to build the Runners column
@@ -1082,7 +1064,7 @@ class BaseballSavantFocusedDownloader:
             merged = merged.drop(columns=['release_pos_y'])
 
         # Overwrite placeholder columns with Statcast supplement values
-        for col in ['RunExp', 'xBA', 'xSLG', 'xwOBA', 'wOBAval', 'wOBAdom']:
+        for col in ['RunExp', 'xBA', 'xSLG', 'xwOBA']:
             if f'{col}_statcast' in merged.columns:
                 merged[col] = pd.to_numeric(merged[f'{col}_statcast'], errors='coerce').apply(lambda x: f"{x:.3f}" if pd.notna(x) else '')
                 merged = merged.drop(columns=[f'{col}_statcast'])
@@ -1120,7 +1102,7 @@ class BaseballSavantFocusedDownloader:
         # missing or sub-50 (check swings / artifacts), the rest of the swing
         # frame is unreliable too — null the whole cluster together.
         swing_cluster = ['BatSpeed', 'SwingLength', 'AttackAngle', 'AttackDirection',
-                         'SwingPathTilt', 'Int_X', 'Int_Y']
+                         'SwingPathTilt']
         if 'BatSpeed' in merged.columns:
             merged['BatSpeed'] = pd.to_numeric(merged['BatSpeed'], errors='coerce')
             invalid = merged['BatSpeed'].isna() | (merged['BatSpeed'] < 50)
@@ -1136,15 +1118,10 @@ class BaseballSavantFocusedDownloader:
 
         # Format supplement-only columns with trailing zeros
         supplement_round_1 = ['BatSpeed', 'SwingLength', 'AttackAngle',
-                              'AttackDirection', 'SwingPathTilt', 'EffectiveVelo']
+                              'AttackDirection', 'SwingPathTilt']
         for col in supplement_round_1:
             if col in merged.columns:
                 merged[col] = pd.to_numeric(merged[col], errors='coerce').apply(lambda x: f"{x:.1f}" if pd.notna(x) else '')
-
-        # Int_X / Int_Y: bat-ball intercept distances in inches, 2 decimals
-        for col in ['Int_X', 'Int_Y']:
-            if col in merged.columns:
-                merged[col] = pd.to_numeric(merged[col], errors='coerce').apply(lambda x: f"{x:.2f}" if pd.notna(x) else '')
 
         # Drop merge keys so they don't appear in the final CSV
         merged = merged.drop(columns=merge_keys)
@@ -1279,7 +1256,7 @@ class BaseballSavantFocusedDownloader:
             'HC_X', 'HC_Y', 'xBA', 'xSLG', 'xwOBA', 'RunExp',
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
-            'PitchID',
+            'PitchID', 'Barrel',
         ]
 
         # Only include columns that exist
@@ -1369,7 +1346,7 @@ class BaseballSavantFocusedDownloader:
             'HC_X', 'HC_Y', 'xBA', 'xSLG', 'xwOBA', 'RunExp',
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
-            'PitchID',
+            'PitchID', 'Barrel',
         ]
         final_columns = [c for c in final_columns if c in combined_df.columns]
         combined_df = combined_df[final_columns]
@@ -1584,7 +1561,7 @@ class BaseballSavantFocusedDownloader:
             'HC_X', 'HC_Y', 'xBA', 'xSLG', 'xwOBA', 'RunExp',
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
-            'PitchID',
+            'PitchID', 'Barrel',
         ]
         final_columns = [c for c in final_columns if c in combined_df.columns]
         combined_df = combined_df[final_columns]

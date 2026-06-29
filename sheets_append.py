@@ -185,8 +185,19 @@ TEXT_FORCE_COLUMNS = {'Count'}
 # clock times (2:22). Enforcing these by name makes the push robust to any
 # tab's row 2 state.
 EXPLICIT_NUMBER_FORMATS = {
-    'RTilt': {'type': 'TIME',   'pattern': 'h:mm'},
-    'OTilt': {'type': 'TIME',   'pattern': 'h:mm'},
+    'RTilt':           {'type': 'TIME',   'pattern': 'h:mm'},
+    'OTilt':           {'type': 'TIME',   'pattern': 'h:mm'},
+    # Supplemental columns whose row-2 cells are AUTOMATIC-formatted. Under
+    # USER_ENTERED, a whole-number write like "41.0" is parsed to the number 41
+    # and the trailing zero is dropped; a later backfill then reads "41", sees a
+    # mismatch against its freshly-formatted "41.0", and phantom-overwrites the
+    # cell. Pinning one decimal makes the stored value display (and read back) as
+    # "41.0" regardless of any tab's row-2 state.
+    'ArmAngle':        {'type': 'NUMBER', 'pattern': '0.0'},
+    'SwingLength':     {'type': 'NUMBER', 'pattern': '0.0'},
+    'AttackAngle':     {'type': 'NUMBER', 'pattern': '0.0'},
+    'AttackDirection': {'type': 'NUMBER', 'pattern': '0.0'},
+    'SwingPathTilt':   {'type': 'NUMBER', 'pattern': '0.0'},
 }
 
 
@@ -279,6 +290,14 @@ def push_team_data(df, team, gc=None, verbose=True):
     # to resize every single time.
     if end_row > ws.row_count:
         ws.add_rows(end_row - ws.row_count + 1000)
+
+    # Grow the tab's grid width too. Tabs are provisioned at the exact schema
+    # width, so a push whose block is wider than the current grid (e.g. after a
+    # new column like Barrel is added to the schema) would otherwise fail with
+    # "exceeds grid limits" just like the row ceiling above.
+    n_cols = len(df.columns)
+    if n_cols > ws.col_count:
+        ws.add_cols(n_cols - ws.col_count)
 
     ws.update(range_name, rows, value_input_option='USER_ENTERED')
 
