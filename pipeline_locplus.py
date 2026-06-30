@@ -1,366 +1,373 @@
-"""Loc+ (Location+) — per-pitch location-quality metric for pitchers.
+"""Loc+ (Location+) — decomposition-based per-pitch location-quality metric.
 
-The pitcher analog of SD+. For each pitch a pitcher throws, look up the
-league-average expected hitter-perspective xRV for that pitch's
-(zone × count × pitch_type × batter_hand × pitcher_hand) bucket, average
-across all of a pitcher's pitches, and normalize.
+The pitcher analog of a command grade: "is this pitcher putting pitches in
+valuable spots, given the count, pitch type, and matchup, independent of his
+stuff or what the hitter happened to do?"
 
-Conceptually: "Is this pitcher putting pitches in valuable spots, given
-the count, pitch type, and matchup — independent of his stuff or what
-the hitter happened to do with the pitch?"
+MODEL (rebuilt 2026-06). For each pitch we look up the league-average
+EXPECTED hitter-perspective run value of a pitch of that type/handedness at
+that exact plate location, in that count, then average across the pitcher's
+pitches and normalize. Lower expected RV = better location for the pitcher.
 
-Design highlights:
-- Zone classification: same 5 Baseball Savant attack zones as SD+
-  (heart / shadow_in / shadow_out / chase / waste). Reused via import
-  from pipeline_sdplus.
-- Counts: all 12 as-is. Count is the single biggest contextual modifier
-  for location value; collapsing to 3 buckets loses real signal
-  (3-0 vs 1-0, 0-2 vs 0-1).
-- Pitch type: 6 groups (FF, SI, FC, SL, CB, CH) plus OTHER. Including
-  pitch type makes Loc+ measure "command given the pitch identity"
-  rather than penalizing fastball-heavy guys for living in the zone.
-- Handedness: batter × pitcher hand in the key.
-- RV for cell weights: luck-neutral hitter-perspective (xwOBA-based on
-  BIP, -RunExp otherwise). Same rv_fn as SD+.
-- Cell smoothing: continuous Bayesian shrinkage toward the
-  (zone × count × pitch_type) handedness-marginal mean, k=50 pseudo-obs.
-- Per-pitcher regression: Bayesian shrinkage toward league mean with
-  n_prior=400, mirroring SD+.
-- Normalization: z-score with sign flip. Loc+ = 100 + 10 × (mu - raw_adj) / sigma
-  where mu, sigma come from qualified MLB pitchers. Higher = better.
+The expected value is a DECOMPOSITION over smooth league surfaces:
 
-Why z-score instead of SD+'s ratio-to-league: SD+'s league mean dv is
-non-zero (~0.015) because hitters' decisions correlate with the data.
-For Loc+, raw mean xRV across pitchers is ~0 by construction (run values
-balance league-wide), so a ratio normalization is unstable. Z-score is
-the standard "+" stat convention (Stuff+, Pitching+) and works with any
-sign of league mean.
+  ExpRV(x, z | grp, hands, count) =
+      Pswing · [ Pwhiff·rvWhiff(count) + Pfoul·rvFoul(count) + Pbip·xwOBAcon(x,z) ]
+    + (1-Pswing) · [ Pcs·rvCS(count) + (1-Pcs)·rvBall(count) ]
 
-ROC handling: ROC pitchers are scored against the MLB-only lookup table
-but excluded from the baseline pool, so their data doesn't influence
-either the cell weights or the (mu, sigma) standardization parameters.
+  - Pwhiff, Pfoul, xwOBAcon, Pcs (called-strike prob) and Pswing are league
+    SURFACES over a (PlateX, zone-normalized PlateZ) grid, built per pitch-type
+    GROUP × batter-hand × pitcher-hand. Physical surfaces (whiff/foul/contact/
+    called-strike) are count-independent for sample size; swing propensity is
+    count-specific. The run-value WEIGHTS (rvWhiff/rvFoul/rvCS/rvBall) are
+    count-specific. Surfaces are smoothed with an anisotropic separable
+    Gaussian (4.5" horizontal, 0.22 zone vertical).
+  - Scoring at TRUE count level (no count-demeaning): empirically this is more
+    predictive and no less stuff-independent than demeaning.
+  - Contact (xwOBAcon) surface is heavily shrunk toward the group mean because
+    location-driven contact suppression is mostly luck (THT command study).
+
+Design choices were validated empirically (see scripts/locplus_*.py):
+reliability (split-half), stuff-independence (low corr with whiff%/velo), and
+predictive validity (first-half score vs second-half xRV allowed). This model
+roughly doubles the run-prevention signal of the old 5-zone metric while
+becoming markedly more stuff-independent.
+
+Pitch-type groups (validated by clustering value surfaces):
+  FF | SI | FC | SL(+ST,SW,SV) | CU(+KC,CS) | CH(+FS) | OTHER
+
+Normalization: locPlus = 100 + 10·(mu - raw_adj)/sigma  (sign-flipped so
+higher = better). mu, sigma from qualified MLB pitchers; n_prior=107 overall,
+150 per pitch type. ROC pitchers are scored against the MLB surfaces but
+excluded from the (mu, sigma) pool.
 """
 import math
 from collections import defaultdict
 
 from pipeline_utils import safe_float, AAA_TEAMS
-from pipeline_sdplus import (
-    classify_zone, get_count, make_rv_xrv,
-    ZONES, COUNTS,
-)
+from pipeline_sdplus import classify_zone, ZONES
 
-# ── Pitch type grouping ──────────────────────────────────────────────────
-# Map raw pitch-type codes to coarse families. Anything not in the main
-# six (KN, EP, SC, etc.) gets bucketed into OTHER.
-PITCH_TYPE_GROUPS = {
+# ── Pitch-type grouping ─────────────────────────────────────────────────
+GROUP = {
     'FF': 'FF', 'FA': 'FF',
     'SI': 'SI',
     'FC': 'FC', 'CF': 'FC',
-    'SL': 'SL', 'ST': 'SL', 'SV': 'SL', 'SW': 'SL',
-    'CU': 'CB', 'KC': 'CB', 'CS': 'CB',
+    'SL': 'SL', 'ST': 'SL', 'SW': 'SL', 'SV': 'SL',
+    'CU': 'CU', 'KC': 'CU', 'CS': 'CU',
     'CH': 'CH', 'FS': 'CH',
 }
-PT_GROUPS = ['FF', 'SI', 'FC', 'SL', 'CB', 'CH', 'OTHER']
+GROUPS = ['FF', 'SI', 'FC', 'SL', 'CU', 'CH', 'OTHER']
 
-
-def pitch_type_group(p):
+def group_of(p):
     pt = p.get('Pitch Type')
     if not pt:
         return None
-    return PITCH_TYPE_GROUPS.get(pt, 'OTHER')
+    return GROUP.get(pt, 'OTHER')
 
+def group_of_code(pt):
+    if not pt:
+        return None
+    return GROUP.get(pt, 'OTHER')
 
-# ── Hyperparameters ─────────────────────────────────────────────────────
-CELL_SHRINK_K   = 50       # cell → marginal-prior shrinkage pseudo-obs
-PITCHER_PRIOR_N = 400      # pitcher → league regression pseudo-obs
-LOC_SCALE_K     = 10       # locPlus = 100 + LOC_SCALE_K × z
-MIN_PITCHER_PITCHES = 100  # floor for computing overall locPlus
-MIN_PITCH_TYPE_PITCHES = 25  # floor for per-pitch-type locPlus
-PITCH_TYPE_PRIOR_N = 150   # per-pitch-type Bayesian shrinkage pseudo-obs
+# ── Grid + smoothing ────────────────────────────────────────────────────
+X_MIN, X_MAX = -1.5, 1.5            # feet (plate center = 0)
+BIN_X = 2.0 / 12.0                  # 2-inch horizontal bins
+NX = int(round((X_MAX - X_MIN) / BIN_X))           # 18
+Z_MIN, Z_MAX = -0.6, 1.6           # zone-normalized (0 = bottom, 1 = top)
+BIN_Z = 0.10
+NZ = int(round((Z_MAX - Z_MIN) / BIN_Z))           # 22
+PHYS_X_IN = 4.5                    # physical smoothing bandwidths
+PHYS_Z_FRAC = 0.22
 
+# Per-surface shrinkage pseudo-counts toward the group mean
+K_WHIFF, K_FOUL, K_XWCON = 8, 8, 200
+K_SWING_COLL, K_SWING_COUNT, K_CS = 6, 20, 10
+
+# Per-pitcher regression + normalization. n_prior values are the measured
+# split-half r=0.5 crossings (regression constant), averaged over 25 random
+# splits for stability: 117 pitches overall. Per-pitch-type rows use 100 (the
+# fastball family stabilizes ~75-80, breakers are noisier/unmeasurable this
+# season; 100 is the robust central value, and output is low-sensitivity here).
+N_PRIOR_OVERALL = 117
+N_PRIOR_PT = 100
+LOC_SCALE_K = 10
+MIN_POOL_OVERALL = 250             # min pitches to enter the (mu,sigma) pool
+MIN_POOL_PT = 60                   # min pitches of a type to enter its group pool
+
+COUNTS = [(b, s) for b in range(4) for s in range(3)]
 HANDS = ('L', 'R')
+SWING_DESC = {'Swinging Strike', 'Foul', 'In Play'}
+TAKE_DESC = {'Ball', 'Called Strike'}
+EXCLUDE_DESC = {'Hit By Pitch', 'Foul Bunt', 'Missed Bunt', 'Pitchout', 'Swinging Pitchout'}
+BUNT_BB = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
 
 # ═════════════════════════════════════════════════════════════════════════
-#  ELIGIBILITY
+#  HELPERS
 # ═════════════════════════════════════════════════════════════════════════
+def get_count(p):
+    c = p.get('Count')
+    if not isinstance(c, str) or '-' not in c:
+        return None
+    try:
+        b, s = c.split('-', 1)
+        b, s = int(b), int(s)
+    except (TypeError, ValueError):
+        return None
+    return (b, s) if (0 <= b <= 3 and 0 <= s <= 2) else None
 
-def is_eligible_baseline(p):
-    """Pitches that count toward the MLB lookup table.
+def _znorm(p):
+    pz = safe_float(p.get('PlateZ'))
+    top = safe_float(p.get('SzTop'))
+    bot = safe_float(p.get('SzBot'))
+    if pz is None or top is None or bot is None or top <= bot:
+        return None
+    return (pz - bot) / (top - bot)
 
-    Requires RunExp because the cell weights are means of rv_fn(p), which
-    is xwOBA/RunExp-derived. Excludes non-MLB sources, intent walks, HBP,
-    pitchouts, bunt-attempt pitches, and any pitch missing the lookup key.
-    """
-    if p.get('_source') != 'MLB':
-        return False
-    if safe_float(p.get('RunExp')) is None:
-        return False
-    return _is_scorable(p)
-
-
-def is_eligible_score(p):
-    """Pitches that get a Loc+ contribution (used for ANY pitcher,
-    including ROC).
-
-    Scoring is a pure lookup: a pitch's Loc+ contribution is the league
-    cell value for its (zone × count × pitch_type × bhand × phand) bucket.
-    The pitch's OWN RunExp/xwOBA is never used to score it, so RunExp is
-    NOT required here. This is what lets ROC pitchers be scored — the ROC
-    sheet has location/count/pitch-type/handedness but no RunExp column.
-    """
-    return _is_scorable(p)
-
+def _xbin(px):
+    return min(max(int((px - X_MIN) / BIN_X), 0), NX - 1)
+def _zbin(zn):
+    return min(max(int((zn - Z_MIN) / BIN_Z), 0), NZ - 1)
 
 def _is_scorable(p):
-    """Lookup-key validity + event exclusions. No RunExp requirement —
-    that lives in is_eligible_baseline only."""
+    """Valid lookup key + event exclusions. No RunExp/xwOBA requirement here
+    (those are checked at surface-build time), which lets ROC pitches score."""
     if p.get('Event') == 'Intent Walk':
         return False
-    desc = p.get('Description') or ''
-    if 'bunt' in desc.lower() or 'pitchout' in desc.lower():
+    if p.get('Description') in EXCLUDE_DESC:
         return False
-    if desc == 'Hit By Pitch':
+    if p.get('BBType') in BUNT_BB:
         return False
-    if p.get('BBType') in ('bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'):
+    if group_of(p) is None:
         return False
-    if classify_zone(p) is None:
+    if safe_float(p.get('PlateX')) is None or _znorm(p) is None:
+        return False
+    if p.get('Bats') not in HANDS or p.get('Throws') not in HANDS:
         return False
     if get_count(p) is None:
         return False
-    if pitch_type_group(p) is None:
-        return False
-    if p.get('Bats') not in HANDS:
-        return False
-    if p.get('Throws') not in HANDS:
-        return False
     return True
 
+def is_eligible_baseline(p):
+    return p.get('_source') == 'MLB' and _is_scorable(p)
+
 
 # ═════════════════════════════════════════════════════════════════════════
-#  WEIGHT TABLE
+#  SEPARABLE ANISOTROPIC GAUSSIAN SMOOTHER
 # ═════════════════════════════════════════════════════════════════════════
+def _k1d(bw):
+    win = max(1, int(math.ceil(3 * bw)))
+    return [(d, math.exp(-0.5 * (d / bw) ** 2)) for d in range(-win, win + 1)]
 
-def build_weight_table(pitches, rv_fn):
-    """dict[(zone, count, pt_group, bhand, phand)] -> (mean_rv, n).
+_KX = _k1d(PHYS_X_IN / 2.0)        # bandwidth in cells (bins are 2", 0.10z)
+_KZ = _k1d(PHYS_Z_FRAC / BIN_Z)
 
-    Cell value is mean hitter-perspective xRV. Lower = better for the
-    pitcher who threw a pitch into this cell.
-    """
-    cells = defaultdict(lambda: {'sum': 0.0, 'n': 0})
-    for p in pitches:
-        rv = rv_fn(p)
-        if rv is None:
+def _zeros():
+    return [[0.0] * NZ for _ in range(NX)]
+
+def _smooth(num, den, prior, kprior):
+    """Nadaraya-Watson kernel regression (num/den are NX×NZ arrays) with a
+    prior pseudo-count. `prior` is a scalar or an NX×NZ array."""
+    tn, td = _zeros(), _zeros()
+    for i in range(NX):
+        ni, di_, tni, tdi = num[i], den[i], tn[i], td[i]
+        for j in range(NZ):
+            sn = sd = 0.0
+            for dj, w in _KZ:
+                jj = j + dj
+                if 0 <= jj < NZ:
+                    sn += w * ni[jj]; sd += w * di_[jj]
+            tni[j] = sn; tdi[j] = sd
+    out = _zeros()
+    pdict = not isinstance(prior, (int, float))
+    for i in range(NX):
+        oi = out[i]
+        for j in range(NZ):
+            sn = sd = 0.0
+            for di2, w in _KX:
+                ii = i + di2
+                if 0 <= ii < NX:
+                    sn += w * tn[ii][j]; sd += w * td[ii][j]
+            pr = prior[i][j] if pdict else prior
+            s = sd + kprior
+            oi[j] = (sn + kprior * pr) / s if s > 0 else pr
+    return out
+
+def _gsum(a):
+    return sum(sum(r) for r in a)
+
+
+# ═════════════════════════════════════════════════════════════════════════
+#  BUILD LEAGUE SURFACES
+# ═════════════════════════════════════════════════════════════════════════
+def build_surfaces(baseline, lg_woba, woba_scale):
+    """Build all league surfaces + count value scalars from MLB baseline pitches.
+    Returns a dict bundle consumed by score_pitch()."""
+    has_guts = (lg_woba is not None and woba_scale not in (None, 0))
+
+    # count value scalars (hitter perspective = -RunExp)
+    cv = {k: defaultdict(lambda: [0.0, 0]) for k in ('whiff', 'foul', 'cs', 'ball')}
+    for p in baseline:
+        re = safe_float(p.get('RunExp'))
+        if re is None:
             continue
-        key = (
-            classify_zone(p),
-            get_count(p),
-            pitch_type_group(p),
-            p['Bats'],
-            p['Throws'],
-        )
-        cells[key]['sum'] += rv
-        cells[key]['n'] += 1
-    return {k: (v['sum'] / v['n'], v['n']) for k, v in cells.items()}
+        d = p.get('Description')
+        slot = {'Swinging Strike': 'whiff', 'Foul': 'foul',
+                'Called Strike': 'cs', 'Ball': 'ball'}.get(d)
+        if slot:
+            c = get_count(p)
+            cv[slot][c][0] += -re; cv[slot][c][1] += 1
+    RV = {k: {c: (s / n if n else 0.0) for c, (s, n) in dd.items()} for k, dd in cv.items()}
 
+    def acc0():
+        return {k: _zeros() for k in ('swn', 'swd', 'whn', 'fln', 'bipn', 'bipd')}
+    A = defaultdict(acc0)                                   # [(grp,bh,ph)]
+    AC = defaultdict(lambda: {'swn': _zeros(), 'swd': _zeros()})   # [(grp,bh,ph,count)]
+    csn, csd = _zeros(), _zeros()
 
-def marginal_means(pitches, rv_fn):
-    """(zone, count, pt_group) handedness-marginal means.
-    Used as shrinkage priors so sparse hand-split cells fall back to the
-    overall mean for that zone × count × pitch type."""
-    msum = defaultdict(float)
-    mn = defaultdict(int)
-    for p in pitches:
-        rv = rv_fn(p)
-        if rv is None:
-            continue
-        key = (classify_zone(p), get_count(p), pitch_type_group(p))
-        msum[key] += rv
-        mn[key] += 1
-    return {k: (msum[k] / mn[k], mn[k]) for k in msum}
+    for p in baseline:
+        key = (group_of(p), p['Bats'], p['Throws'])
+        c = get_count(p)
+        i = _xbin(safe_float(p.get('PlateX'))); j = _zbin(_znorm(p))
+        d = p.get('Description')
+        a = A[key]; ac = AC[(key, c)]
+        a['swd'][i][j] += 1; ac['swd'][i][j] += 1
+        if d in SWING_DESC:
+            a['swn'][i][j] += 1; ac['swn'][i][j] += 1
+            if d == 'Swinging Strike':
+                a['whn'][i][j] += 1
+            elif d == 'Foul':
+                a['fln'][i][j] += 1
+            elif d == 'In Play':
+                xw = safe_float(p.get('xwOBA'))
+                if has_guts and xw is not None:
+                    a['bipn'][i][j] += (xw - lg_woba) / woba_scale
+                    a['bipd'][i][j] += 1
+        if d in TAKE_DESC:
+            csd[i][j] += 1
+            if d == 'Called Strike':
+                csn[i][j] += 1
 
+    PCS = _smooth(csn, csd, _gsum(csn) / max(_gsum(csd), 1), K_CS)
+    WH, FL, XW, SW = {}, {}, {}, {}
+    for key, a in A.items():
+        swn = _gsum(a['swn']); swd = _gsum(a['swd']); bipd = _gsum(a['bipd'])
+        WH[key] = _smooth(a['whn'], a['swn'], _gsum(a['whn']) / max(swn, 1), K_WHIFF)
+        FL[key] = _smooth(a['fln'], a['swn'], _gsum(a['fln']) / max(swn, 1), K_FOUL)
+        XW[key] = _smooth(a['bipn'], a['bipd'], _gsum(a['bipn']) / max(bipd, 1), K_XWCON)
+        coll = _smooth(a['swn'], a['swd'], swn / swd if swd else 0.0, K_SWING_COLL)
+        SW[key] = {c: _smooth(AC[(key, c)]['swn'], AC[(key, c)]['swd'], coll, K_SWING_COUNT)
+                   for c in COUNTS}
 
-def shrink_table(raw_table, marginals, k=CELL_SHRINK_K):
-    """Continuous Bayesian shrinkage: smoothed = (n × cell + k × marginal) / (n + k).
-    Returns a dict populated for every (zone × count × pt_group × bhand × phand)
-    combination — empty raw cells fall back fully to the marginal mean.
-    """
-    smoothed = {}
-    for zone in ZONES:
-        for count in COUNTS:
-            for pt in PT_GROUPS:
-                marg_mean, _ = marginals.get((zone, count, pt), (0.0, 0))
-                for bhand in HANDS:
-                    for phand in HANDS:
-                        key = (zone, count, pt, bhand, phand)
-                        if key in raw_table:
-                            cell_mean, n = raw_table[key]
-                        else:
-                            cell_mean, n = 0.0, 0
-                        rv = (n * cell_mean + k * marg_mean) / (n + k)
-                        smoothed[key] = (rv, n)
-    return smoothed
+    return {'RV': RV, 'PCS': PCS, 'WH': WH, 'FL': FL, 'XW': XW, 'SW': SW}
 
 
 # ═════════════════════════════════════════════════════════════════════════
-#  PER-PITCHER SCORING
+#  SCORE
 # ═════════════════════════════════════════════════════════════════════════
+def score_pitch(p, S):
+    """Expected hitter-perspective RV for one pitch (lower = better for the
+    pitcher). None if context missing or the (group,hand) surface is absent."""
+    key = (group_of(p), p.get('Bats'), p.get('Throws'))
+    if key not in S['WH']:
+        return None
+    c = get_count(p)
+    px = safe_float(p.get('PlateX')); zn = _znorm(p)
+    if c is None or px is None or zn is None:
+        return None
+    i = _xbin(px); j = _zbin(zn)
+    psw = S['SW'][key][c][i][j]
+    pwh = S['WH'][key][i][j]
+    pfl = S['FL'][key][i][j]
+    pbip = max(0.0, 1.0 - pwh - pfl)
+    vbip = S['XW'][key][i][j]
+    pcs = S['PCS'][i][j]
+    RV = S['RV']
+    swing_val = pwh * RV['whiff'].get(c, 0.0) + pfl * RV['foul'].get(c, 0.0) + pbip * vbip
+    take_val = pcs * RV['cs'].get(c, 0.0) + (1 - pcs) * RV['ball'].get(c, 0.0)
+    return psw * swing_val + (1 - psw) * take_val
 
-def lookup_pitch(p, table):
-    """Return the smoothed cell value (hitter-perspective xRV) for one
-    pitch. None if any context field is missing."""
-    key = (
-        classify_zone(p),
-        get_count(p),
-        pitch_type_group(p),
-        p.get('Bats'),
-        p.get('Throws'),
-    )
-    cell = table.get(key)
-    return cell[0] if cell is not None else None
 
-
-def compute_pitcher_raw(pitches_by_pitcher, table):
-    """dict[(pitcher, team, throws)] -> {'raw_loc', 'n_pitches', 'zone_loc'}.
-
-    raw_loc is the mean lookup-xRV across all of the pitcher's eligible
-    pitches (hitter perspective — lower is better for the pitcher).
-    zone_loc breaks that out by zone for the player-page display.
-    """
-    results = {}
-    for key, pitches in pitches_by_pitcher.items():
-        elig = [p for p in pitches if is_eligible_score(p)]
-        if not elig:
-            continue
-        rvs = []
-        zone_rvs = defaultdict(list)
-        for p in elig:
-            v = lookup_pitch(p, table)
+def _aggregate(pitches_by_key, S, want_zone=False, want_heatmap=False):
+    """Mean ExpRV per key, plus optional zone rollups / heatmap grid."""
+    out = {}
+    for key, pitches in pitches_by_key.items():
+        vals = []
+        zone_acc = defaultdict(list) if want_zone else None
+        cell_acc = defaultdict(lambda: [0.0, 0]) if want_heatmap else None
+        for p in pitches:
+            if not _is_scorable(p):
+                continue
+            v = score_pitch(p, S)
             if v is None:
                 continue
-            rvs.append(v)
-            zone_rvs[classify_zone(p)].append(v)
-        if not rvs:
+            vals.append(v)
+            if want_zone:
+                z = classify_zone(p)
+                if z is not None:
+                    zone_acc[z].append(v)
+            if want_heatmap:
+                i = _xbin(safe_float(p.get('PlateX'))); j = _zbin(_znorm(p))
+                cell_acc[(i, j)][0] += v; cell_acc[(i, j)][1] += 1
+        if not vals:
             continue
-        results[key] = {
-            'raw_loc': sum(rvs) / len(rvs),
-            'n_pitches': len(rvs),
-            'zone_loc': {z: (sum(vs) / len(vs) if vs else None)
-                         for z, vs in zone_rvs.items()},
-        }
-    return results
-
-
-def regress_and_normalize(pitcher_raw,
-                          n_prior=PITCHER_PRIOR_N,
-                          min_n_score=1,
-                          min_n_pool=MIN_PITCHER_PITCHES,
-                          scale_k=LOC_SCALE_K):
-    """Bayesian regression + z-score normalization.
-
-    Two separate thresholds:
-    - min_n_score: minimum scorable pitches to GET a Loc+ value. Set to 1
-      so every pitcher with any usable location data is scored. Tiny
-      samples are pulled hard toward 100 by the n_prior shrinkage, which
-      is the statistically correct "we don't know yet" behavior.
-    - min_n_pool: minimum to be IN the (mu, sigma) standardization pool.
-      Kept high so noisy small-sample pitchers don't distort the league
-      distribution everyone is graded against.
-
-    Standardization pool also excludes ROC (Wally's rule: ROC scored
-    against the MLB baseline but not part of it). Multi-team aggregates
-    (2TM/3TM) stay in the pool, matching SD+/CT+ convention.
-
-    Loc+ = 100 + scale_k × (mu - raw_adj) / sigma   (sign-flipped so higher = better)
-    """
-    scored = {k: v for k, v in pitcher_raw.items() if v['n_pitches'] >= min_n_score}
-    if not scored:
-        return {}
-
-    pool = {k: v for k, v in scored.items()
-            if k[1] not in AAA_TEAMS and v['n_pitches'] >= min_n_pool}
-    if not pool:
-        return {}
-
-    lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
-    for v in scored.values():
-        n = v['n_pitches']
-        v['raw_loc_adj'] = (n * v['raw_loc'] + n_prior * lg_raw) / (n + n_prior)
-
-    pool_adj = [scored[k]['raw_loc_adj'] for k in pool]
-    mu = sum(pool_adj) / len(pool_adj)
-    sigma = math.sqrt(sum((v - mu) ** 2 for v in pool_adj) / len(pool_adj))
-
-    for v in scored.values():
-        if sigma > 1e-9:
-            z = (v['raw_loc_adj'] - mu) / sigma
-            # Sign flip: lower raw (better location) → higher locPlus
-            v['locPlus'] = round(100.0 - scale_k * z, 1)
-        else:
-            v['locPlus'] = 100.0
-    return scored
-
-
-# ═════════════════════════════════════════════════════════════════════════
-#  PACKAGING
-# ═════════════════════════════════════════════════════════════════════════
-
-def serialize_weight_table(smoothed):
-    """JSON-friendly dict keyed by
-    `{zone}|{balls}-{strikes}|{pt_group}|{bhand}|{phand}` → {'rv': float, 'n': int}.
-    """
-    out = {}
-    for (zone, count, pt, bhand, phand), (rv, n) in smoothed.items():
-        key = f"{zone}|{count[0]}-{count[1]}|{pt}|{bhand}|{phand}"
-        out[key] = {'rv': round(rv, 5), 'n': n}
+        rec = {'raw_loc': sum(vals) / len(vals), 'n_pitches': len(vals)}
+        if want_zone:
+            rec['zone_loc'] = {z: (sum(vs) / len(vs) if vs else None)
+                               for z, vs in zone_acc.items()}
+        if want_heatmap:
+            rec['heatmap'] = [[i, j, round(s / n, 4), n]
+                              for (i, j), (s, n) in sorted(cell_acc.items())]
+        out[key] = rec
     return out
 
 
-def regress_and_normalize_by_pt(pitch_raw,
-                                pt_group_fn,
-                                pool_filter_fn,
-                                n_prior=PITCH_TYPE_PRIOR_N,
-                                min_n_score=1,
-                                min_n_pool=MIN_PITCH_TYPE_PITCHES,
-                                scale_k=LOC_SCALE_K):
-    """Per-pitch-type-GROUP Bayesian regression + z-score normalization.
+# ═════════════════════════════════════════════════════════════════════════
+#  REGRESS + NORMALIZE
+# ═════════════════════════════════════════════════════════════════════════
+def _normalize(raw, n_prior, min_pool, pool_filter, lg_woba):
+    """Bayesian-regress each raw_loc toward the pool league mean, then z-score
+    to locPlus = 100 - K·z. Adds 'raw_loc_adj', 'locPlus', 'locRuns100'.
+    Mutates and returns the same dict."""
+    if not raw:
+        return raw
+    pool = {k: v for k, v in raw.items()
+            if pool_filter(k) and v['n_pitches'] >= min_pool}
+    if not pool:
+        for v in raw.values():
+            v['raw_loc_adj'] = v['raw_loc']; v['locPlus'] = 100.0; v['locRuns100'] = 0.0
+        return raw
+    lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
+    for v in raw.values():
+        n = v['n_pitches']
+        v['raw_loc_adj'] = (n * v['raw_loc'] + n_prior * lg_raw) / (n + n_prior)
+    pool_adj = [raw[k]['raw_loc_adj'] for k in pool]
+    mu = sum(pool_adj) / len(pool_adj)
+    sigma = math.sqrt(sum((x - mu) ** 2 for x in pool_adj) / len(pool_adj))
+    for v in raw.values():
+        if sigma > 1e-12:
+            z = (v['raw_loc_adj'] - mu) / sigma
+            v['locPlus'] = round(100.0 - LOC_SCALE_K * z, 1)
+        else:
+            v['locPlus'] = 100.0
+        # interpretable tooltip: location runs saved per 100 pitches (pitcher persp)
+        v['locRuns100'] = round(-(v['raw_loc_adj'] - lg_raw) * 100.0, 3)
+    return raw
 
-    Each row in `pitch_raw` is keyed by some tuple that includes a raw
-    pitch type (e.g., 'FF', 'ST'). `pt_group_fn(key)` returns the family
-    name ('FF', 'SI', 'FC', 'SL', 'CB', 'CH', 'OTHER') used for the
-    standardization bucket. Raw sweepers (ST) and traditional sliders (SL)
-    therefore standardize against the same SL-group pool even though they
-    appear as separate leaderboard rows.
 
-    Two thresholds (same philosophy as the overall metric):
-    - min_n_score: minimum scorable pitches of that type to GET a value.
-      Set to 1 so EVERY pitch type a pitcher throws gets a Loc+. A pitcher
-      who threw 4 curveballs gets a curveball Loc+ ≈ 100 (n_prior pulls it
-      to the group mean) rather than a blank cell.
-    - min_n_pool: minimum to be IN the group's (mu, sigma) distribution.
-      Keeps the per-group baseline from being warped by 3-pitch samples.
-
-    `pool_filter_fn(key)` further restricts the pool (used to drop ROC
-    rows from the baseline while still scoring them). Multi-team
-    aggregates stay in the pool, matching the overall-Loc+ convention.
-    """
-    scored = {k: v for k, v in pitch_raw.items() if v['n_pitches'] >= min_n_score}
-    if not scored:
-        return {}
-
-    # Bucket every scorable row by pitch-type group
+def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
+    """Per-pitch-type rows standardized within their pitch-type GROUP."""
+    if not raw:
+        return raw
     by_group = defaultdict(dict)
-    for k, v in scored.items():
-        by_group[pt_group_fn(k)][k] = v
-
-    for group, rows in by_group.items():
+    for k, v in raw.items():
+        by_group[group_fn(k)][k] = v
+    for grp, rows in by_group.items():
         pool = {k: v for k, v in rows.items()
-                if pool_filter_fn(k) and v['n_pitches'] >= min_n_pool}
+                if pool_filter(k) and v['n_pitches'] >= min_pool}
         if not pool:
-            # No stable baseline for this group — everyone is league-average
-            for k in rows:
-                rows[k]['raw_loc_adj'] = rows[k]['raw_loc']
-                rows[k]['locPlus'] = 100.0
+            for v in rows.values():
+                v['raw_loc_adj'] = v['raw_loc']; v['locPlus'] = 100.0; v['locRuns100'] = 0.0
             continue
         lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
         for v in rows.values():
@@ -368,57 +375,104 @@ def regress_and_normalize_by_pt(pitch_raw,
             v['raw_loc_adj'] = (n * v['raw_loc'] + n_prior * lg_raw) / (n + n_prior)
         pool_adj = [rows[k]['raw_loc_adj'] for k in pool]
         mu = sum(pool_adj) / len(pool_adj)
-        sigma = math.sqrt(sum((v - mu) ** 2 for v in pool_adj) / len(pool_adj))
+        sigma = math.sqrt(sum((x - mu) ** 2 for x in pool_adj) / len(pool_adj))
         for v in rows.values():
-            if sigma > 1e-9:
+            if sigma > 1e-12:
                 z = (v['raw_loc_adj'] - mu) / sigma
-                v['locPlus'] = round(100.0 - scale_k * z, 1)
+                v['locPlus'] = round(100.0 - LOC_SCALE_K * z, 1)
             else:
                 v['locPlus'] = 100.0
-
-    # Flatten back into one dict
+            v['locRuns100'] = round(-(v['raw_loc_adj'] - lg_raw) * 100.0, 3)
     out = {}
     for rows in by_group.values():
         out.update(rows)
     return out
 
 
-def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
-                    lg_woba, woba_scale):
-    """Main entry point.
+# ═════════════════════════════════════════════════════════════════════════
+#  SERIALIZE (metadata / audit)
+# ═════════════════════════════════════════════════════════════════════════
+def serialize_surfaces(S):
+    """Compact, JSON-friendly snapshot for metadata: config + count scalars +
+    the league value surface per group×hand (the count-collapsed ExpRV proxy
+    is reconstructable client-side from these if needed for a league heatmap)."""
+    return {
+        'config': {'binX_in': 2.0, 'binZ_frac': BIN_Z, 'nx': NX, 'nz': NZ,
+                   'xMin': X_MIN, 'xMax': X_MAX, 'zMin': Z_MIN, 'zMax': Z_MAX,
+                   'physX_in': PHYS_X_IN, 'physZ_frac': PHYS_Z_FRAC,
+                   'scaleK': LOC_SCALE_K, 'nPriorOverall': N_PRIOR_OVERALL,
+                   'nPriorPt': N_PRIOR_PT, 'groups': GROUPS},
+        'countValues': {slot: {f"{c[0]}-{c[1]}": round(v, 5) for c, v in d.items()}
+                        for slot, d in S['RV'].items()},
+    }
 
-    Args:
-        all_pitches: flat list of pitch dicts (MLB + AAA). MLB-only is
-            filtered inside via is_eligible_baseline.
-        pitches_by_pitcher: dict[(pitcher, team, throws)] -> list of pitch dicts
-        pitches_by_pitch_type: dict[(pitcher, team, pitch_type, throws)] ->
-            list of pitch dicts (matches pitch_groups key order in
-            process_data.py)
-        lg_woba, woba_scale: FanGraphs Guts constants for xRV
+
+# ═════════════════════════════════════════════════════════════════════════
+#  MAIN ENTRY
+# ═════════════════════════════════════════════════════════════════════════
+def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
+                     lg_woba, woba_scale):
+    """Main entry point. Signature preserved for process_data.py.
 
     Returns:
-        pitcher_results: dict[(pitcher, team, throws)] -> {locPlus, ...}
-            (one row per pitcher, all pitch types combined)
-        pitch_results: dict[(pitcher, team, pitch_type, throws)] -> {locPlus, ...}
-            (one row per pitcher × pitch type, standardized within pitch-type
-            GROUP — so sweepers and traditional sliders share a baseline)
-        weight_table_json: dict for metadata output
+        pitcher_results: dict[(pitcher, team, throws)] ->
+            {locPlus, raw_loc_adj, n_pitches, zone_loc, heatmap, locRuns100}
+        pitch_results:   dict[(pitcher, team, pitch_type, throws)] ->
+            {locPlus, raw_loc_adj, n_pitches, locRuns100}  (std within group)
+        weight_table_json: metadata dict
     """
-    rv_fn = make_rv_xrv(lg_woba, woba_scale)
     baseline = [p for p in all_pitches if is_eligible_baseline(p)]
+    S = build_surfaces(baseline, lg_woba, woba_scale)
 
-    raw_table = build_weight_table(baseline, rv_fn)
-    marginals = marginal_means(baseline, rv_fn)
-    smoothed = shrink_table(raw_table, marginals)
+    pitcher_raw = _aggregate(pitches_by_pitcher, S, want_zone=True, want_heatmap=True)
+    pitcher_results = _normalize(
+        pitcher_raw, N_PRIOR_OVERALL, MIN_POOL_OVERALL,
+        pool_filter=lambda k: k[1] not in AAA_TEAMS, lg_woba=lg_woba)
 
-    pitcher_raw = compute_pitcher_raw(pitches_by_pitcher, smoothed)
-    pitcher_results = regress_and_normalize(pitcher_raw)
+    pitch_raw = _aggregate(pitches_by_pitch_type, S)
+    pitch_results = _normalize_by_group(
+        pitch_raw, group_fn=lambda k: group_of_code(k[2]),
+        n_prior=N_PRIOR_PT, min_pool=MIN_POOL_PT,
+        pool_filter=lambda k: k[1] not in AAA_TEAMS)
 
-    pitch_raw = compute_pitcher_raw(pitches_by_pitch_type, smoothed)
-    pitch_results = regress_and_normalize_by_pt(
-        pitch_raw,
-        pt_group_fn=lambda k: PITCH_TYPE_GROUPS.get(k[2], 'OTHER'),
-        pool_filter_fn=lambda k: k[1] not in AAA_TEAMS,
-    )
+    return pitcher_results, pitch_results, serialize_surfaces(S)
 
-    return pitcher_results, pitch_results, serialize_weight_table(smoothed)
+
+# ═════════════════════════════════════════════════════════════════════════
+#  STANDALONE VALIDATION  (reproduces the V3 lab leaderboard)
+# ═════════════════════════════════════════════════════════════════════════
+if __name__ == '__main__':
+    import pickle, os
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, 'data', 'all_pitches_rs_cache.pkl'), 'rb') as f:
+        ALL = pickle.load(f)
+    by_pitcher = defaultdict(list)
+    by_pt = defaultdict(list)
+    for p in ALL:
+        k = (p.get('Pitcher'), p.get('PTeam'), p.get('Throws'))
+        by_pitcher[k].append(p)
+        by_pt[(p.get('Pitcher'), p.get('PTeam'), p.get('Pitch Type'), p.get('Throws'))].append(p)
+    pr, ptr, meta = compute_loc_plus(ALL, by_pitcher, by_pt,
+                                     lg_woba=0.3169, woba_scale=1.2393)
+    qual = {k: v for k, v in pr.items() if v['n_pitches'] >= 400
+            and k[1] not in AAA_TEAMS}
+    order = sorted(qual, key=lambda k: -qual[k]['locPlus'])
+    vals = [qual[k]['locPlus'] for k in order]
+    print(f"qualified pitchers (>=400 pitches): {len(qual)}")
+    print(f"locPlus range: {min(vals):.0f} .. {max(vals):.0f}   "
+          f"mean={sum(vals)/len(vals):.1f}")
+    print("\nTOP 10:")
+    for k in order[:10]:
+        v = qual[k]
+        print(f"  {k[0]:24s} {k[1]:4s}  locPlus={v['locPlus']:5.1f}  "
+              f"runs/100={v['locRuns100']:+.2f}  n={v['n_pitches']}")
+    print("BOTTOM 6:")
+    for k in order[-6:]:
+        v = qual[k]
+        print(f"  {k[0]:24s} {k[1]:4s}  locPlus={v['locPlus']:5.1f}  "
+              f"runs/100={v['locRuns100']:+.2f}  n={v['n_pitches']}")
+    # sanity: a multi-pitch starter's per-type rows
+    print("\nexample per-pitch-type rows (Skubal if present):")
+    for key, v in sorted(ptr.items(), key=lambda kv: -kv[1]['n_pitches']):
+        if 'Skubal' in (key[0] or ''):
+            print(f"  {key[0]} {key[2]:3s} ({key[1]}): locPlus={v['locPlus']:.1f}  n={v['n_pitches']}")
