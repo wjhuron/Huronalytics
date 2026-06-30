@@ -1826,6 +1826,7 @@ var PlayerPage = {
     if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
 
     section.style.display = '';
+    this._renderLocCommandMap(data);
     var hand = this._heatMapHand || 'R';
 
     // Compute average strike zone across ALL pitches (not per-type)
@@ -1887,6 +1888,100 @@ var PlayerPage = {
     }
 
     // Legend removed — blue-to-red heat scale is intuitive
+  },
+
+  // Loc+ command map: the pitcher's own pitch locations colored by the league
+  // EXPECTED hitter-perspective run value of each spot (blue = good location
+  // for the pitcher, red = costly), opacity by how often he throws there.
+  // Season-level (not refiltered); reads the per-pitcher heatmap grid shipped
+  // by pipeline_locplus.py.
+  _renderLocCommandMap: function(data) {
+    var wrap = document.getElementById('player-command-map');
+    if (!wrap) return;
+    var hm = data && data.locPlusHeatmap;
+    if (!hm || !hm.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+    wrap.style.display = '';
+    wrap.innerHTML = '';
+
+    var label = document.createElement('div');
+    label.className = 'heatmap-label';
+    var title = document.createElement('span');
+    title.textContent = 'Loc+ Command Map';
+    label.appendChild(title);
+    if (data.locPlus != null) {
+      var meta = document.createElement('span');
+      meta.className = 'heatmap-label-meta';
+      // No leading + on positive runs/100 (house number-format rule).
+      var rr = (data.locRuns100 != null) ? (' · ' + data.locRuns100.toFixed(2) + ' runs/100') : '';
+      meta.textContent = '· ' + Math.round(data.locPlus) + rr;
+      label.appendChild(meta);
+    }
+    wrap.appendChild(label);
+
+    var canvas = document.createElement('canvas');
+    canvas.width = 250;
+    canvas.height = 300;
+    wrap.appendChild(canvas);
+
+    var note = document.createElement('div');
+    note.className = 'command-map-note';
+    note.textContent = 'blue = good location · red = costly · opacity = usage';
+    wrap.appendChild(note);
+
+    this._renderLocValueCanvas(canvas, hm);
+  },
+
+  _renderLocValueCanvas: function(canvas, hm) {
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+    var isDark = document.body.classList.contains('dark');
+
+    // Grid mirrors pipeline_locplus.py: x in feet, z is zone-normalized.
+    var X_MIN = -1.5, BIN_X = 2 / 12, Z_MIN = -0.6, BIN_Z = 0.10;
+    // Display bounds (a little padding beyond the zone).
+    var xMin = -1.7, xMax = 1.7, znMin = -0.5, znMax = 1.6;
+    function cx(px) { return ((px - xMin) / (xMax - xMin)) * W; }
+    function cy(zn) { return ((znMax - zn) / (znMax - znMin)) * H; } // flip: top = high z
+
+    ctx.fillStyle = isDark ? '#1e1e3a' : '#f8f8f8';
+    ctx.fillRect(0, 0, W, H);
+
+    var nMax = 1;
+    for (var k = 0; k < hm.length; k++) { if (hm[k][3] > nMax) nMax = hm[k][3]; }
+    // Diverging domain on hitter-perspective xRV: low = good (blue), high = bad (red).
+    var LO = -0.06, HI = 0.06;
+    for (var k = 0; k < hm.length; k++) {
+      var i = hm[k][0], j = hm[k][1], val = hm[k][2], n = hm[k][3];
+      var pxc = X_MIN + (i + 0.5) * BIN_X;
+      var znc = Z_MIN + (j + 0.5) * BIN_Z;
+      var x0 = cx(pxc - BIN_X / 2), x1 = cx(pxc + BIN_X / 2);
+      var y0 = cy(znc + BIN_Z / 2), y1 = cy(znc - BIN_Z / 2);
+      var t = (val - LO) / (HI - LO);
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      ctx.globalAlpha = 0.2 + 0.8 * Math.sqrt(n / nMax);
+      ctx.fillStyle = this._heatColor(t);
+      ctx.fillRect(x0, y0, (x1 - x0) + 0.5, (y1 - y0) + 0.5);
+    }
+    ctx.globalAlpha = 1;
+
+    // Strike zone (zone-normalized 0..1; plate half-width ~0.83 ft)
+    var zl = cx(-0.83), zr = cx(0.83), zt = cy(1), zb = cy(0);
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(zl, zt, zr - zl, zb - zt);
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    var tw = (zr - zl) / 3, th = (zb - zt) / 3;
+    for (var ti = 1; ti < 3; ti++) {
+      ctx.beginPath(); ctx.moveTo(zl + ti * tw, zt); ctx.lineTo(zl + ti * tw, zb); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(zl, zt + ti * th); ctx.lineTo(zr, zt + ti * th); ctx.stroke();
+    }
+
+    var py = cy(-0.4), pcx = cx(0);
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(pcx - 8, py); ctx.lineTo(pcx + 8, py); ctx.lineTo(pcx + 5, py + 5);
+    ctx.lineTo(pcx, py + 8); ctx.lineTo(pcx - 5, py + 5); ctx.closePath(); ctx.fill();
   },
 
   _renderSingleHeatMap: function(canvas, pitches, szTop, szBot, hand) {

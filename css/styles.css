@@ -1606,6 +1606,22 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   letter-spacing: 0.02em;
 }
 
+/* Loc+ command map — value-colored location grid above the density maps. */
+.command-map {
+  text-align: center;
+  margin: 0 0 18px;
+}
+.command-map canvas {
+  max-width: 250px;
+  border-radius: 4px;
+}
+.command-map-note {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #8a8a8a);
+  margin-top: 6px;
+}
+
 /* Swing heat maps (hitter player page) — three modes (Swings/Whiffs/Damage)
    in a single row. Same canvas-based heat treatment as pitcher heat maps,
    different categorical axis (modes vs pitch types). */

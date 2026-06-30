@@ -2056,10 +2056,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['locPlus'] = r['locPlus']
             row['locPlusRaw'] = round(r['raw_loc_adj'], 5)
             row['locPlusN'] = r['n_pitches']
+            row['locRuns100'] = r.get('locRuns100')
         else:
             row['locPlus'] = None
             row['locPlusRaw'] = None
             row['locPlusN'] = 0
+            row['locRuns100'] = None
     print(f"  Loc+ per-pitch-type computed for {len(pitch_loc_results)} rows.")
 
     for row in pitcher_leaderboard:
@@ -2069,6 +2071,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['locPlus'] = r['locPlus']
             row['locPlusRaw'] = round(r['raw_loc_adj'], 5)
             row['locPlusN'] = r['n_pitches']
+            row['locRuns100'] = r.get('locRuns100')
+            row['locPlusHeatmap'] = r.get('heatmap')
             zloc = r.get('zone_loc') or {}
             row['locPlusHeart']      = (round(zloc['heart'], 5)      if zloc.get('heart')      is not None else None)
             row['locPlusShadowIn']   = (round(zloc['shadow_in'], 5)  if zloc.get('shadow_in')  is not None else None)
@@ -2079,6 +2083,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['locPlus'] = None
             row['locPlusRaw'] = None
             row['locPlusN'] = 0
+            row['locRuns100'] = None
+            row['locPlusHeatmap'] = None
             row['locPlusHeart'] = None
             row['locPlusShadowIn'] = None
             row['locPlusShadowOut'] = None
