@@ -2163,16 +2163,19 @@ def main():
             display_name = pitcher_name.upper()
             last_name = pitcher_name
 
-        # Percentile row for the bubble panel — match by mlbId first, then
-        # (name, team). Season cards only (single-game cards have no season
-        # percentile context); pass None otherwise so the panel renders empty.
+        # Percentile row for the bubble panel — match the exact (name, team)
+        # FIRST, then fall back to mlbId. (name, team) must win: a pitcher with
+        # rows on multiple teams (e.g. a ROC arm with an MLB call-up) shares ONE
+        # mlbId, so a by-id lookup returns whichever row hashed last — often the
+        # wrong team's tiny sample. Season cards only (single-game cards have no
+        # season percentile context); pass None otherwise so the panel is empty.
         pctl_row = None
         if is_multi_game:
             if len(teams) > 1:
                 pctl_row = pctl_by_name.get((pitcher_name, team))   # 2TM/3TM combined row
             else:
-                pctl_row = (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None) \
-                           or pctl_by_name.get((pitcher_name, team))
+                pctl_row = pctl_by_name.get((pitcher_name, team)) \
+                           or (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None)
 
         # Build config
         config = {
