@@ -69,6 +69,25 @@ def build_df(pitches):
         b = max(bt.values(), key=lambda d: d['n']); n = b['n']
         primary[k] = {'v': b['v']/n, 'iv': b['iv']/n, 'hb': b['hb']/n, 'vaa': b['vaa']/n}
 
+    # Per-pitcher arm-angle averages, used as a real-time placeholder when arm
+    # angle hasn't backfilled yet (it lags games ~1-2 days). Arm angle is nearly
+    # constant per pitcher, so his own per-pitch-type average (or overall average
+    # for a brand-new pitch) is essentially the real value; the actual number
+    # replaces it on the next run after backfill. ROC has no arm history so this
+    # fills nothing there (ROC uses the no-arm companion model instead).
+    arm_pt = defaultdict(lambda: [0.0, 0]); arm_all = defaultdict(lambda: [0.0, 0])
+    for p in pitches:
+        aa = sf(p.get('ArmAngle'))
+        if aa is None: continue
+        pit = p.get('Pitcher'); pt0 = p.get('Pitch Type')
+        arm_pt[(pit, pt0)][0] += aa; arm_pt[(pit, pt0)][1] += 1
+        arm_all[pit][0] += aa; arm_all[pit][1] += 1
+    def _arm_placeholder(pit, pt0):
+        a = arm_pt.get((pit, pt0))
+        if a and a[1]: return a[0] / a[1]
+        a = arm_all.get(pit)
+        return a[0] / a[1] if (a and a[1]) else None
+
     rows = []
     for p in pitches:
         pt, thr, bats = p.get('Pitch Type'), p.get('Throws'), p.get('Bats')
@@ -77,6 +96,8 @@ def build_df(pitches):
         iv, hb_raw = sf(p.get('IndVertBrk')), sf(p.get('HorzBrk'))
         vaa, ext = sf(p.get('VAA')), sf(p.get('Extension'))
         arm, rel_z = sf(p.get('ArmAngle')), sf(p.get('RelPosZ'))
+        if arm is None:                       # real-time placeholder until backfill
+            arm = _arm_placeholder(p.get('Pitcher'), pt)
         if None in (v, iv, hb_raw, vaa, ext, rel_z): continue
         s = 1.0 if thr == 'R' else -1.0
         hb = hb_raw * s
