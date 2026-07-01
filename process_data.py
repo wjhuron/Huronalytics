@@ -376,8 +376,9 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
 
         ev = safe_float(p.get('ExitVelo'))
         la = safe_float(p.get('LaunchAngle'))
-        if ev is None and la is None:
-            continue
+        # Keep BIP with null EV/LA (untracked balls that still carry a bb_type) so
+        # the client LD/FB/PU%/nBip denominators count every non-bunt BIP like the
+        # server. EV-based stats (avgEV/maxEV/hardHit/barrel) filter nulls separately.
 
         bb_code = BB_TYPE_CODE.get(bb_type, -1)
         if bb_code < 0:
@@ -2397,7 +2398,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # Flag hitters with sufficient BIP for batted ball percentile qualification
     for row in hitter_leaderboard:
-        row['bipQual'] = (row.get('nBip') or 0) >= 20
+        row['bipQual'] = (row.get('nBip') or 0) >= 25  # match QUAL.MIN_BIP_PCTL (client)
 
     # Per-100-PA run value for the hitter percentile panel's "Overall" row.
     # Stored at full precision (no intermediate rounding) per the RV memory;
@@ -2441,7 +2442,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     #              3 = BIP (In Play)
     #   xwOBA: only stored for BIPs; null otherwise
     #   pitcherHand: 'R' / 'L' single char
-    SWING_DESC_FULL = {'Swinging Strike', 'Foul', 'Foul Tip', 'In Play', 'Foul Bunt'}
+    # Bunts are not swings (matches SWING_DESCRIPTIONS / the leaderboard + cards).
+    # 'Foul Tip' is already normalized to 'Swinging Strike' upstream, so it's dead here.
+    SWING_DESC_FULL = {'Swinging Strike', 'Foul', 'In Play'}
     hitter_swing_locations = {}
     for (hitter, team), pitches in hitter_groups.items():
         sz_tops, sz_bots = [], []

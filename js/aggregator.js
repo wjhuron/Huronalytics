@@ -2051,7 +2051,7 @@ const Aggregator = {
       'hr', 'sb',
     ];
     const HITTER_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true, firstPitchSwingPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true
     };
 
     let rows = [];
@@ -2206,7 +2206,7 @@ const Aggregator = {
         izSwChase: izSwChase,
         contactPct: contactPct,
         izContactPct: izContactPct,
-        whiffPct: swings > 0 ? whiffs / swings : null,
+        whiffPct: swingsNonBunt > 0 ? whiffs / swingsNonBunt : null,
         twoStrikeWhiffPct: twoStrikeSwings > 0 ? twoStrikeWhiffs / twoStrikeSwings : null,
         firstPitchSwingPct: firstPitchAppearances > 0 ? firstPitchSwings / firstPitchAppearances : null,
         xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
@@ -2761,7 +2761,7 @@ const Aggregator = {
         chasePct: chasePct_val,
         contactPct: contactPct,
         izContactPct: izContactPct,
-        whiffPct: swings > 0 ? whiffs / swings : null,
+        whiffPct: swingsNonBunt > 0 ? whiffs / swingsNonBunt : null,
         xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
         xSLG: ab > 0 && xSLG_count > 0 ? xSLG_sum / ab : null,
         xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
