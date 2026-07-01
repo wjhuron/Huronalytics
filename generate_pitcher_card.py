@@ -227,8 +227,10 @@ for p in fried:
         except:
             pass
 
-avg_top = np.mean(sz_tops)
-avg_bot = np.mean(sz_bots)
+# Guard the empty case (e.g. a name/date CONFIG typo matches no rows): np.mean([])
+# is NaN and would draw the strike zone at NaN coordinates. Mirror Cards.py.
+avg_top = np.mean(sz_tops) if sz_tops else 3.5
+avg_bot = np.mean(sz_bots) if sz_bots else 1.5
 sorted_types = [pt for pt in PITCH_ORDER if pt in groups]
 
 # Batted ball distribution per pitch type

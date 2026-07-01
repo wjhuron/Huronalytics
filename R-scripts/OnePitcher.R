@@ -129,7 +129,10 @@ calculate_pitcher_stats_table2 <- function(data, pitcher_name) {
         if (has_bb_type) {
           total_bip <- sum(Description %in% in_play_events, na.rm = TRUE)
           if (total_bip > 0) {
-            n_gb <- sum(BBType == "ground_ball", na.rm = TRUE)
+            # Gate on the in-play description too, matching Season.R and the
+            # total_bip denominator — otherwise a ground_ball tagged on a non
+            # "In Play" row (e.g. a foul grounder) inflates GB% and can exceed 100%.
+            n_gb <- sum(Description %in% in_play_events & BBType == "ground_ball", na.rm = TRUE)
             sprintf("%.1f%%", n_gb / total_bip * 100)
           } else {
             "---"
@@ -281,7 +284,10 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   
   # Replace pitch codes with full names
   stats_df$`Pitch Type` <- pitch_names[stats_df$`Pitch Type`]
-  
+  # Drop unmapped pitch types (never occur in practice; an NA name would render
+  # as a blank/NA row and sort unpredictably).
+  stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
+
   # Convert Pitch Type to factor with custom order
   stats_df$`Pitch Type` <- factor(stats_df$`Pitch Type`, levels = pitch_order)
   
@@ -314,6 +320,7 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   # SECOND TABLE - Calculate additional stats
   stats_df_table2 <- calculate_pitcher_stats_table2(pitch_data, selected_pitcher)
   stats_df_table2$`Pitch Type` <- pitch_names[stats_df_table2$`Pitch Type`]
+  stats_df_table2 <- stats_df_table2[!is.na(stats_df_table2$`Pitch Type`), ]
   stats_df_table2$`Pitch Type` <- factor(stats_df_table2$`Pitch Type`, levels = pitch_order)
   stats_df_table2 <- stats_df_table2[order(stats_df_table2$`Pitch Type`), ]
   

@@ -277,6 +277,16 @@ const Aggregator = {
     return typeof team === 'string' && /^\d+TM$/.test(team);
   },
 
+  // Key for grouping a player's per-team + combined (2TM/3TM) rows. Uses mlbId
+  // when present so two distinct players sharing a name (e.g. two "Max Muncy")
+  // don't collide; falls back to name only when no id exists. Behavior-preserving
+  // for normal players since a player's rows all share one mlbId.
+  _combinedKey: function (row) {
+    return (row.mlbId != null && row.mlbId !== '')
+      ? ('id:' + row.mlbId)
+      : ('nm:' + (row.pitcher || row.hitter || ''));
+  },
+
   _bisectLeft: function (arr, val) {
     let lo = 0, hi = arr.length;
     while (lo < hi) {
@@ -762,7 +772,7 @@ const Aggregator = {
     const combinedByPitcher = {};
     for (let ci2 = 0; ci2 < rows.length; ci2++) {
       if (Aggregator._isCombinedTeam(rows[ci2].team)) {
-        combinedByPitcher[rows[ci2].pitcher] = rows[ci2];
+        combinedByPitcher[Aggregator._combinedKey(rows[ci2])] = rows[ci2];
       }
     }
     // Multi-team qualifier denominator: max(team games) across the player's MLB
@@ -770,17 +780,19 @@ const Aggregator = {
     const cumTeamGames = {};
     for (let cg = 0; cg < rows.length; cg++) {
       const cr = rows[cg];
-      if (combinedByPitcher[cr.pitcher] && !Aggregator._isCombinedTeam(cr.team)) {
+      const crKey = Aggregator._combinedKey(cr);
+      if (combinedByPitcher[crKey] && !Aggregator._isCombinedTeam(cr.team)) {
         const tgv = teamGames[cr.team] || 0;
-        if (tgv > (cumTeamGames[cr.pitcher] || 0)) cumTeamGames[cr.pitcher] = tgv;
+        if (tgv > (cumTeamGames[crKey] || 0)) cumTeamGames[crKey] = tgv;
       }
     }
 
     // Mark each row as qualified or not
     for (let qi = 0; qi < rows.length; qi++) {
       const r = rows[qi];
-      const mtRow = combinedByPitcher[r.pitcher];
-      const tg = mtRow ? (cumTeamGames[r.pitcher] || 0) : (teamGames[r.team] || 0);
+      const rKey = Aggregator._combinedKey(r);
+      const mtRow = combinedByPitcher[rKey];
+      const tg = mtRow ? (cumTeamGames[rKey] || 0) : (teamGames[r.team] || 0);
       const ipFloat = Utils.parseIP(mtRow ? mtRow.ip : r.ip);
       const isStarter = Utils.isStarter(mtRow ? mtRow.g : r.g, mtRow ? mtRow.gs : r.gs);
       const _isROC = Aggregator._isROCTeam(r.team);
@@ -838,7 +850,7 @@ const Aggregator = {
     } else {
       rows = rows.filter(function (r) {
         if (self._isROCTeam(r.team)) return false;
-        if (combinedByPitcher[r.pitcher] && !self._isCombinedTeam(r.team)) return false;
+        if (combinedByPitcher[Aggregator._combinedKey(r)] && !self._isCombinedTeam(r.team)) return false;
         return true;
       });
     }
@@ -1625,12 +1637,12 @@ const Aggregator = {
     const combinedByPitchRowEarly = {};
     for (let cpi = 0; cpi < rows.length; cpi++) {
       if (Aggregator._isCombinedTeam(rows[cpi].team)) {
-        combinedByPitchRowEarly[rows[cpi].pitcher] = true;
+        combinedByPitchRowEarly[Aggregator._combinedKey(rows[cpi])] = true;
       }
     }
     for (let pi2 = 0; pi2 < rows.length; pi2++) {
       const rp = rows[pi2];
-      rp._inPool = !(combinedByPitchRowEarly[rp.pitcher] && !Aggregator._isCombinedTeam(rp.team));
+      rp._inPool = !(combinedByPitchRowEarly[Aggregator._combinedKey(rp)] && !Aggregator._isCombinedTeam(rp.team));
     }
     } // end player-mode merge
 
@@ -1645,10 +1657,18 @@ const Aggregator = {
     const ABS_PCTL_KEYS = { horzBrk: true, haa: true, nHAA: true, hbOE: true };  // use |value| for RHP/LHP fairness
     // Shape metrics: physical measurements, no minimum needed
     const SHAPE_METRICS = { velocity: true, spinRate: true, indVertBrk: true, horzBrk: true, vaa: true, haa: true, nVAA: true, nHAA: true, ivbOE: true, hbOE: true, stuffScore: true };
+    // Batted-ball rate stats qualify on BIP count (>=25 BIP of that pitch type),
+    // NOT pitch count — matching the server's PITCH_BB_QUAL_KEYS. Using pitch
+    // count would let a type with many pitches but few BIP (e.g. 40 CU / 5 BIP)
+    // join the pool on 5 noisy batted balls and diverge from the leaderboard.
+    // maxEVAgainst is intentionally excluded (server keeps it on pitch count).
+    const PITCH_BB_QUAL_KEYS = { avgEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true, ldPct: true, fbPct: true, puPct: true, gbPct: true };
     PITCH_PCTL_KEYS.forEach(function (key) {
-      const minPctl = SHAPE_METRICS[key] ? 0 : MIN_PITCH_TYPE_PCTL;
+      const isBBQual = !!PITCH_BB_QUAL_KEYS[key];
+      const minPctl = SHAPE_METRICS[key] ? 0 : (isBBQual ? QUAL.MIN_BIP_PCTL : MIN_PITCH_TYPE_PCTL);
+      const countKey = isBBQual ? 'nBip' : 'count';
       for (let pt in ptGroups) {
-        self._computePercentiles(ptGroups[pt], key, minPctl, 'count', ABS_PCTL_KEYS[key] || false);
+        self._computePercentiles(ptGroups[pt], key, minPctl, countKey, ABS_PCTL_KEYS[key] || false);
       }
     });
 
@@ -1759,7 +1779,7 @@ const Aggregator = {
     const combinedByPitchRow = {};
     for (let cti = 0; cti < rows.length; cti++) {
       if (Aggregator._isCombinedTeam(rows[cti].team)) {
-        combinedByPitchRow[rows[cti].pitcher] = true;
+        combinedByPitchRow[Aggregator._combinedKey(rows[cti])] = true;
       }
     }
 
@@ -1777,21 +1797,23 @@ const Aggregator = {
       const cumTeamGamesPitch = {};
       for (var ckey in ipLookup) {
         const ent = ipLookup[ckey];
-        if (combinedByPitchRow[ent.pitcher] && !Aggregator._isCombinedTeam(ent.team)) {
+        const entKey = Aggregator._combinedKey(ent);
+        if (combinedByPitchRow[entKey] && !Aggregator._isCombinedTeam(ent.team)) {
           const tgv = teamGames[ent.team] || 0;
-          if (tgv > (cumTeamGamesPitch[ent.pitcher] || 0)) cumTeamGamesPitch[ent.pitcher] = tgv;
+          if (tgv > (cumTeamGamesPitch[entKey] || 0)) cumTeamGamesPitch[entKey] = tgv;
         }
       }
       rows = rows.filter(function (r) {
+        const rKey = Aggregator._combinedKey(r);
         // For multi-team players use their combined row's IP + cumulative team games
-        if (combinedByPitchRow[r.pitcher]) {
+        if (combinedByPitchRow[rKey]) {
           const numTeams = Object.keys(ipLookup).filter(function (k) {
-            return ipLookup[k].pitcher === r.pitcher && Aggregator._isCombinedTeam(ipLookup[k].team);
+            return Aggregator._combinedKey(ipLookup[k]) === rKey && Aggregator._isCombinedTeam(ipLookup[k].team);
           });
           const combinedKey = numTeams[0];
           const cp = combinedKey ? ipLookup[combinedKey] : null;
           if (!cp) return false;
-          const tg = cumTeamGamesPitch[r.pitcher] || 0;
+          const tg = cumTeamGamesPitch[rKey] || 0;
           const ipFloat = Utils.parseIP(cp.ip);
           const isStarter = Utils.isStarter(cp.g, cp.gs);
           const isROC = Aggregator._isROCTeam(r.team);
@@ -1815,7 +1837,7 @@ const Aggregator = {
     } else {
       rows = rows.filter(function (r) {
         if (self._isROCTeam(r.team)) return false;
-        if (combinedByPitchRow[r.pitcher] && !Aggregator._isCombinedTeam(r.team)) return false;
+        if (combinedByPitchRow[Aggregator._combinedKey(r)] && !Aggregator._isCombinedTeam(r.team)) return false;
         return true;
       });
     }
@@ -2306,12 +2328,12 @@ const Aggregator = {
     const combinedByHitter = {};
     for (let hci = 0; hci < rows.length; hci++) {
       if (Aggregator._isCombinedTeam(rows[hci].team)) {
-        combinedByHitter[rows[hci].hitter] = rows[hci];
+        combinedByHitter[Aggregator._combinedKey(rows[hci])] = rows[hci];
       }
     }
     for (let hpi = 0; hpi < rows.length; hpi++) {
       const hr = rows[hpi];
-      hr._inPool = !(combinedByHitter[hr.hitter] && !Aggregator._isCombinedTeam(hr.team));
+      hr._inPool = !(combinedByHitter[Aggregator._combinedKey(hr)] && !Aggregator._isCombinedTeam(hr.team));
     }
 
     // Mark each hitter row qualified for percentile-pool inclusion.
@@ -2323,23 +2345,25 @@ const Aggregator = {
     const _combinedRowByHitter = {};
     for (let cbi = 0; cbi < rows.length; cbi++) {
       if (Aggregator._isCombinedTeam(rows[cbi].team)) {
-        _combinedRowByHitter[rows[cbi].hitter] = rows[cbi];
+        _combinedRowByHitter[Aggregator._combinedKey(rows[cbi])] = rows[cbi];
       }
     }
     const _cumTg = {};
     for (let cti = 0; cti < rows.length; cti++) {
       const cr = rows[cti];
-      if (_combinedRowByHitter[cr.hitter] && !Aggregator._isCombinedTeam(cr.team)) {
+      const crKey = Aggregator._combinedKey(cr);
+      if (_combinedRowByHitter[crKey] && !Aggregator._isCombinedTeam(cr.team)) {
         const tgv = hitterTg[cr.team] || 0;
-        if (tgv > (_cumTg[cr.hitter] || 0)) _cumTg[cr.hitter] = tgv;
+        if (tgv > (_cumTg[crKey] || 0)) _cumTg[crKey] = tgv;
       }
     }
     for (let qi = 0; qi < rows.length; qi++) {
       const r = rows[qi];
-      const mt = _combinedRowByHitter[r.hitter];
+      const rKey = Aggregator._combinedKey(r);
+      const mt = _combinedRowByHitter[rKey];
       let _tg, _pa;
       if (mt) {
-        _tg = _cumTg[r.hitter] || 0;
+        _tg = _cumTg[rKey] || 0;
         _pa = (mt.paAll != null ? mt.paAll : mt.pa) || 0;
       } else {
         _tg = hitterTg[r.team] || 0;
@@ -2383,16 +2407,18 @@ const Aggregator = {
       const cumTgH = {};
       for (let ht = 0; ht < rows.length; ht++) {
         const hrr = rows[ht];
-        if (combinedByHitter[hrr.hitter] && !Aggregator._isCombinedTeam(hrr.team)) {
+        const hrrKey = Aggregator._combinedKey(hrr);
+        if (combinedByHitter[hrrKey] && !Aggregator._isCombinedTeam(hrr.team)) {
           const tgv = tgHitter[hrr.team] || 0;
-          if (tgv > (cumTgH[hrr.hitter] || 0)) cumTgH[hrr.hitter] = tgv;
+          if (tgv > (cumTgH[hrrKey] || 0)) cumTgH[hrrKey] = tgv;
         }
       }
       rows = rows.filter(function (r) {
-        const mt = combinedByHitter[r.hitter];
+        const rKey = Aggregator._combinedKey(r);
+        const mt = combinedByHitter[rKey];
         const isROC = Aggregator._isROCTeam(r.team);
         if (mt) {
-          const tg = cumTgH[r.hitter] || 0;
+          const tg = cumTgH[rKey] || 0;
           const pa = (mt.paAll != null ? mt.paAll : mt.pa) || 0;
           return pa >= tg * Utils.hitterPaPerGame(isROC);
         }
@@ -2409,7 +2435,7 @@ const Aggregator = {
     } else {
       rows = rows.filter(function (r) {
         if (self3._isROCTeam(r.team)) return false;
-        if (combinedByHitter[r.hitter] && !Aggregator._isCombinedTeam(r.team)) return false;
+        if (combinedByHitter[Aggregator._combinedKey(r)] && !Aggregator._isCombinedTeam(r.team)) return false;
         return true;
       });
     }
@@ -2796,12 +2822,12 @@ const Aggregator = {
     if (!teamMode) {
     for (let hci = 0; hci < rows.length; hci++) {
       if (Aggregator._isCombinedTeam(rows[hci].team)) {
-        combinedByHitterPT[rows[hci].hitter] = true;
+        combinedByHitterPT[Aggregator._combinedKey(rows[hci])] = true;
       }
     }
     for (let hpi2 = 0; hpi2 < rows.length; hpi2++) {
       const rp = rows[hpi2];
-      rp._inPool = !(combinedByHitterPT[rp.hitter] && !Aggregator._isCombinedTeam(rp.team));
+      rp._inPool = !(combinedByHitterPT[Aggregator._combinedKey(rp)] && !Aggregator._isCombinedTeam(rp.team));
     }
     }
 
@@ -2846,7 +2872,7 @@ const Aggregator = {
     } else {
       rows = rows.filter(function (r) {
         if (self4._isROCTeam(r.team)) return false;
-        if (combinedByHitterPT[r.hitter] && !Aggregator._isCombinedTeam(r.team)) return false;
+        if (combinedByHitterPT[Aggregator._combinedKey(r)] && !Aggregator._isCombinedTeam(r.team)) return false;
         return true;
       });
     }

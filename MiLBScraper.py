@@ -333,7 +333,9 @@ def scrape_milb_transactions(start_date, end_date):
 
         # Pattern 3: Just "released" without position (common in DSL/ACL)
         if 'released' in transaction_text.lower():
-            pattern3 = rf'released\s+{POS}?\s*([\w\u00C0-\u017F][\w\u00C0-\u017F.\']+(?:\s+[\w\u00C0-\u017F][\w\u00C0-\u017F.\']+)*)\s*\.'
+            # Require whitespace after the optional position so a name whose
+            # first letter is a position token (e.g. 'C'arlos) isn't truncated.
+            pattern3 = rf'released\s+(?:{POS}\s+)?([\w\u00C0-\u017F][\w\u00C0-\u017F.\']+(?:\s+[\w\u00C0-\u017F][\w\u00C0-\u017F.\']+)*)\s*\.'
             match = re.search(pattern3, transaction_text)
             if match:
                 return {
@@ -345,7 +347,9 @@ def scrape_milb_transactions(start_date, end_date):
 
         # Pattern 4: Signing - "Team signed free agent [POSITION] Player to a minor league contract"
         # Position is optional to handle both cases
-        pattern4 = rf'signed free agent\s+{POS}?\s*(.+?)\s+to\b'
+        # Require whitespace after the optional position so a name whose first
+        # letter is a position token (e.g. 'C'arlos) isn't truncated.
+        pattern4 = rf'signed free agent\s+(?:{POS}\s+)?(.+?)\s+to\b'
         match = re.search(pattern4, transaction_text, re.IGNORECASE)
         if match:
             return {

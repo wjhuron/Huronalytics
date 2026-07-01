@@ -458,7 +458,10 @@ create_pitch_plot <- function(pitch_data_filtered,
   
   # Determine if pitcher is RHP or LHP based on average arm side release
   avg_arm_side <- mean(pitch_data_filtered$RelPosX, na.rm = TRUE)
-  is_rhp <- avg_arm_side < 0  # RHP have negative RelPosX
+  # isTRUE guards the all-NA case: mean(NA, na.rm=TRUE) is NaN and `NaN < 0` is
+  # NA, which would crash `if (is_rhp)` below (arm angle can be populated while
+  # RelPosX awaits backfill). Default to non-RHP when release side is unknown.
+  is_rhp <- isTRUE(avg_arm_side < 0)  # RHP have negative RelPosX
   
   # Create arm angle line data
   arm_angle_segments <- data.frame()
@@ -617,7 +620,13 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   
   # Replace pitch codes with full names (preserve "Total" as-is)
   stats_df$`Pitch Type` <- ifelse(stats_df$`Pitch Type` == "Total", "Total", pitch_names[stats_df$`Pitch Type`])
-  
+
+  # Drop rows whose code has no mapped name (unmapped pitch types). These never
+  # occur in practice; if one slipped through, an NA Pitch Type would crash the
+  # Total-row check in format_table and inject a phantom all-NA row via NA
+  # logical subsetting in the sort below.
+  stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
+
   # Sort by usage (descending), Total always last
   total_mask <- stats_df$`Pitch Type` == "Total"
   non_total <- stats_df[!total_mask, ]

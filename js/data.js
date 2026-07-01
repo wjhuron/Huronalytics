@@ -145,11 +145,17 @@ const DataStore = {
     // row stands in. Qualification for multi-team players uses combined IP/PA and summed team games.
     var combinedByPlayer = {};
     var isCombinedRe = /^\d+TM$/;
+    // Key on mlbId when present so two distinct players sharing a name (e.g. two
+    // "Max Muncy") don't collide; fall back to name only when no id exists.
+    var playerKey = function (r) {
+      return (r.mlbId != null && r.mlbId !== '')
+        ? ('id:' + r.mlbId)
+        : ('nm:' + (r.pitcher || r.hitter || ''));
+    };
     for (var di2 = 0; di2 < source.length; di2++) {
       var drow = source[di2];
       if (isCombinedRe.test(drow.team)) {
-        var pname = drow.pitcher || drow.hitter;
-        if (pname) combinedByPlayer[pname] = drow;
+        if (drow.pitcher || drow.hitter) combinedByPlayer[playerKey(drow)] = drow;
       }
     }
     // For multi-team players, the qualifier denominator is max(team games) across
@@ -159,10 +165,10 @@ const DataStore = {
     if (filters.minIp === 'Q' || filters.minCount === 'Q') {
       for (var di3 = 0; di3 < source.length; di3++) {
         var drow2 = source[di3];
-        var pn = drow2.pitcher || drow2.hitter;
-        if (pn && combinedByPlayer[pn] && !isCombinedRe.test(drow2.team)) {
+        var pk2 = playerKey(drow2);
+        if ((drow2.pitcher || drow2.hitter) && combinedByPlayer[pk2] && !isCombinedRe.test(drow2.team)) {
           var tgv = _teamGames[drow2.team] || 0;
-          if (tgv > (cumTeamGames[pn] || 0)) cumTeamGames[pn] = tgv;
+          if (tgv > (cumTeamGames[pk2] || 0)) cumTeamGames[pk2] = tgv;
         }
       }
     }
@@ -171,7 +177,7 @@ const DataStore = {
       if (rocTeamSet[row.team] && filters.team !== row.team) return false;
       // Multi-team: "All Teams" view shows only the combined row for multi-team players.
       // Specific-team view shows only per-team rows (combined row hidden).
-      var pkey = row.pitcher || row.hitter;
+      var pkey = playerKey(row);
       var isCombinedRow = isCombinedRe.test(row.team);
       if (filters.team === 'all') {
         if (combinedByPlayer[pkey] && !isCombinedRow) return false;

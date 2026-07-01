@@ -417,7 +417,9 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   
   # Replace pitch codes with full names
   stats_df$`Pitch Type` <- pitch_names[stats_df$`Pitch Type`]
-  
+  # Drop unmapped pitch types (never occur in practice; NA name renders blank).
+  stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
+
   # Convert pitch_type to factor with custom order
   stats_df$`Pitch Type` <- factor(stats_df$`Pitch Type`, levels = pitch_order)
   
@@ -450,7 +452,8 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   if (nrow(platoon_df) > 0) {
     # Replace pitch codes with full names
     platoon_df$`Pitch Type` <- pitch_names[platoon_df$`Pitch Type`]
-    
+    platoon_df <- platoon_df[!is.na(platoon_df$`Pitch Type`), ]
+
     # Convert pitch_type to factor with custom order
     platoon_df$`Pitch Type` <- factor(platoon_df$`Pitch Type`, levels = pitch_order)
     

@@ -570,7 +570,13 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
     BB_TYPE_ENCODE = {'ground_ball': 0, 'line_drive': 1, 'fly_ball': 2, 'popup': 3}
     EVENT_ENCODE = {
         'Single': 1, 'Double': 2, 'Triple': 3, 'Home Run': 4,
-        'Field Error': 5, "Fielder's Choice": 5, "Fielder's Choice Out": 5,
+        'Field Error': 5,
+        # Fielder's choice is intentionally coded as an OUT (0), not error/fc (5):
+        # on the LA×Spray tables a batter who reached on a fielder's choice is
+        # shown as an out. Keys use the canonical apostrophe-free Event strings
+        # (the data has no apostrophe); the wOBA-on-contact value is a separate
+        # concern handled by _bip_woba_value (which keeps FC at 0.9).
+        'Fielders Choice': 0, 'Fielders Choice Out': 0,
     }
     hitter_bip_rows = []
     for p in all_pitches:
@@ -889,10 +895,20 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
                     continue
                 _sum_counts(by_key[(pti, di, bh)], c, 51)
             for (pti, di, bh), c in by_key.items():
+                # Emit in the SAME reordered layout as the per-team pitch builder
+                # (22 counts, then METRIC_OFFSETS sum/count pairs, then tilt). The
+                # accumulator is in storage order (PlateX at 47/48, tilt at 44/45/46),
+                # so a raw range(51) dump would misalign sumPlateX/tilt against
+                # pitchCols and corrupt Break Tilt / nHAA for every multi-team pitcher.
                 row = [pi, combined_ti, throws, pti, di, bh]
-                for i in range(51):
-                    v = c[i]
-                    row.append(round(v, 4) if isinstance(v, float) and v != int(v) else int(v))
+                for i in range(22):
+                    row.append(int(c[i]))
+                for col_name, offset in METRIC_OFFSETS:
+                    row.append(round(c[offset], 4))       # metric sum
+                    row.append(int(c[offset + 1]))         # metric count
+                row.append(round(c[44], 6))  # sumTiltSin
+                row.append(round(c[45], 6))  # sumTiltCos
+                row.append(int(c[46]))       # nTilt
                 pitch_rows.append(row)
 
     # --- Hitter micro: sum across teams for same (bats, di, ph) ---
@@ -3225,7 +3241,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for bkey, box in pitcher_box.items():
         # bkey format: "<id-or-name>|TEAM" — team is the last segment.
         box_team = bkey.split('|')[-1] if '|' in bkey else ''
-        if box_team in AAA_TEAMS:
+        # Skip AAA and synthesized 2TM/3TM combined entries. Combined boxes are
+        # the element-wise sum of the per-team boxes, so counting them alongside
+        # the per-team entries would double-count traded pitchers' outs/ER.
+        if box_team in AAA_TEAMS or _is_combined_team(box_team):
             continue
         total_outs += box.get('outs', 0)
         total_er += box.get('er', 0)
@@ -3237,7 +3256,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # FB includes popups (fly_ball + popup from Statcast BBType)
     # HR from ALL MLB pitchers' boxscore data (including EP pitchers excluded from leaderboard)
     total_hr_lg = sum(box['hr'] for k, box in pitcher_box.items()
-                      if k.split('|')[-1] not in AAA_TEAMS)
+                      if k.split('|')[-1] not in AAA_TEAMS
+                      and not _is_combined_team(k.split('|')[-1]))
     total_fb_lg = 0
     for row in pitcher_leaderboard:
         if row.get('_isROC') or row.get('_isCombined'):
@@ -3767,16 +3787,19 @@ def write_embedded_js(rs_result):
 
 def bump_asset_version(index_path=None):
     """Rewrite every `?v=...` query in index.html to the current build
-    timestamp (YYYYMMDDHHMM). Forces browsers to bypass cached CSS/JS/data
-    whenever the pipeline regenerates output. Idempotent within the same
-    minute."""
+    timestamp (YYYYMMDDHHMMSS). Forces browsers to bypass cached CSS/JS/data
+    whenever the pipeline regenerates output. Second-resolution so two runs
+    that land in the same minute still produce distinct ?v= tags — required
+    because data_embedded.json.gz is served immutable with a static filename,
+    so an identical ?v= on differing content would serve stale data for up to
+    a year."""
     if index_path is None:
         index_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                   'index.html')
     if not os.path.exists(index_path):
         print(f"  WARN: {index_path} not found; skipping version bump")
         return
-    build_tag = datetime.now().strftime('%Y%m%d%H%M')
+    build_tag = datetime.now().strftime('%Y%m%d%H%M%S')
     with open(index_path, 'r') as f:
         html = f.read()
     new_html, n = re.subn(r'\?v=[\w-]+', f'?v={build_tag}', html)

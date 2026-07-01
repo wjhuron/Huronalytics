@@ -1098,6 +1098,17 @@ class BaseballSavantFocusedDownloader:
         if 'Barrel' in merged.columns:
             merged['Barrel'] = pd.to_numeric(merged['Barrel'], errors='coerce').astype('Int64')
 
+        # BatSpeed coalesce: the near-real-time game feed can miss bat speed for
+        # swings the official Statcast export does include. Fold the official
+        # value in (game-feed first, official fallback) BEFORE the validity check
+        # below, mirroring the other supplement columns — otherwise a swing that
+        # merely lacked a fast-feed reading is seen as NaN and the whole swing
+        # frame gets nulled even though a valid official bat speed existed.
+        if 'BatSpeed_statcast' in merged.columns:
+            merged['BatSpeed'] = pd.to_numeric(merged['BatSpeed'], errors='coerce').combine_first(
+                pd.to_numeric(merged['BatSpeed_statcast'], errors='coerce'))
+            merged = merged.drop(columns=['BatSpeed_statcast'])
+
         # Swing-cluster integrity: BatSpeed is the validity anchor. If it's
         # missing or sub-50 (check swings / artifacts), the rest of the swing
         # frame is unreliable too — null the whole cluster together.

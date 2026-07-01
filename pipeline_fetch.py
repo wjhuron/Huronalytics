@@ -788,6 +788,7 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
     hitter_agg = {}
     pitcher_id_map = {}
     hitter_id_map = {}
+    seen_game_pks = set()
 
     accepted_names = set()
     for full_name, abbrev in MILB_TEAM_NAME_TO_ABBREV.items():
@@ -799,6 +800,13 @@ def fetch_and_aggregate_milb_boxscores(game_dates, team_abbrev):
         if ck not in cache:
             continue
         for box in cache[ck]:
+            # Dedup by gamePk: a suspended/resumed game can be cached under two
+            # dates, which would otherwise double-count every player's stats.
+            gpk = box.get('gamePk')
+            if gpk and gpk in seen_game_pks:
+                continue
+            if gpk:
+                seen_game_pks.add(gpk)
             for p in box.get('pitchers', []):
                 p_team = MILB_TEAM_NAME_TO_ABBREV.get(p['team'], p['team'])
                 if p_team != team_abbrev:

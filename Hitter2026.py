@@ -311,7 +311,10 @@ class BaseballSavantHitterDownloader:
 
                 first_name = out_df['Batter'].iloc[0] if not out_df.empty else ''
                 batter_name = first_name or self.get_player_name(mlb_id)
-                stem = self.safe_filename(batter_name) if batter_name else str(mlb_id)
+                name_stem = self.safe_filename(batter_name) if batter_name else ''
+                # Include mlb_id so two batters whose display names normalize to
+                # the same stem don't silently overwrite each other's CSV.
+                stem = f"{name_stem}_{mlb_id}" if name_stem else str(mlb_id)
 
                 output_path = os.path.join(self.download_dir, f"{stem}.csv")
                 out_df.to_csv(output_path, index=False)

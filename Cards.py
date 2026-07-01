@@ -85,7 +85,10 @@ PITCH_NAMES = {
     'EP':'Eephus'
 }
 PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN']
-SWING_DESC = ['Swinging Strike','Foul','Foul Bunt','In Play','Missed Bunt']
+# Bunts are not swings (matches pipeline_utils.SWING_DESCRIPTIONS) so card
+# Whiff%/Chase%/Swing% use the same swing set as the leaderboard they're colored
+# against. STRIKE_DESC still counts Foul Bunt — a foul bunt is a strike.
+SWING_DESC = ['Swinging Strike','Foul','In Play']
 
 def _normalize_name(name):
     """Case-fold for name matching (handles 'de Oca' vs 'De Oca')."""
