@@ -28,12 +28,23 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install 'gspread>=6.0,<7.0' 'google-auth>=2.0,<3.0'
+        run: pip install 'gspread>=6.0,<7.0' 'google-auth>=2.0,<3.0' numpy pandas scikit-learn xgboost
 
       - name: Fetch data and build leaderboard
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         run: python3 process_data.py
+
+      # Stuff+ is an offline-trained model (needs xgboost), so it runs here
+      # rather than inside process_data.py. It trains on the fresh pickle that
+      # process_data.py just built, injects scores into the leaderboard JSONs,
+      # then rebuild_embed.py swaps those into data_embedded.json.gz (which
+      # process_data.py built with the previous run's preserved scores).
+      - name: Compute Stuff+ (train on fresh pickle, inject into leaderboards)
+        run: python3 stuff_plus_v11/train_stuff_v11.py --inject
+
+      - name: Rebuild embedded payload with injected Stuff+
+        run: python3 scripts/rebuild_embed.py
 
       - name: Validate output integrity
         run: |
