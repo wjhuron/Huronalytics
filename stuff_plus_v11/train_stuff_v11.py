@@ -33,6 +33,11 @@ DATA = os.path.join(ROOT, 'data')
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKL = os.path.join(DATA, 'all_pitches_rs_cache.pkl')
 LG_WOBA, WOBA_SCALE = 0.3169, 1.2393
+sys.path.insert(0, ROOT)
+try:
+    from pipeline_utils import AAA_TEAMS
+except Exception:
+    AAA_TEAMS = {'ROC'}
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC'}
 FB_TYPES = {'FF', 'SI', 'FC'}
@@ -100,10 +105,15 @@ def build_df(pitches):
         })
     return pd.DataFrame(rows)
 
-def design(df):
+def design(df, feats=BASE_FEATS):
     dum = pd.get_dummies(df['pitch_type'], prefix='pt')
-    return pd.concat([df[BASE_FEATS].reset_index(drop=True), dum.reset_index(drop=True),
+    return pd.concat([df[feats].reset_index(drop=True), dum.reset_index(drop=True),
                       df[['platoon_same']].reset_index(drop=True)], axis=1)
+
+# ROC/AAA has no arm angle (0% populated), so ROC pitchers are scored with a
+# companion model trained on the same MLB data minus arm_angle, then anchored to
+# the MLB (no-arm) distribution. This applies ONLY to ROC; MLB keeps the full model.
+NOARM_FEATS = [f for f in BASE_FEATS if f != 'arm_angle']
 
 def main():
     ap = argparse.ArgumentParser()
@@ -113,6 +123,7 @@ def main():
     print('loading pitches ...', flush=True)
     D = pickle.load(open(PKL, 'rb'))
     pitches = [p for p in D if p.get('_source') == 'MLB']
+    roc_pitches = [p for p in D if p.get('_source') in ('ROC', 'AAA')]
     df = build_df(pitches)
     df = df[df['target_xrv'].notna()].reset_index(drop=True)
     print(f'  {len(df)} training pitches, {df.pitcher.nunique()} pitchers')
@@ -156,10 +167,54 @@ def main():
     overall, overall_scale = _standardize(['pitcher', 'team', 'throws'], 2 * QUAL_N)
     league['_overall'] = overall_scale['ALL']
 
+    # ── ROC/AAA: no-arm companion model, scored against the MLB baseline. This
+    #    ONLY affects ROC; MLB above is untouched (keeps real arm angle). ──
+    Xna = design(df, NOARM_FEATS)
+    model_na = xgb.XGBRegressor(**TUNED); model_na.fit(Xna, y)
+    df['raw_na'] = -model_na.predict(Xna)
+
+    def _na_scale(keys, qual_min):
+        a = df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
+        out = {}
+        groups = a.groupby('pitch_type') if 'pitch_type' in keys else [('ALL', a)]
+        for key, sub in groups:
+            q = sub[sub['n'] >= qual_min]; base = q if len(q) >= 5 else sub
+            out[key] = {'mu': float(base['rawmean'].mean()), 'sd': float(base['rawmean'].std())}
+        return out
+    na_pt = _na_scale(['pitcher', 'team', 'pitch_type'], QUAL_N)
+    na_ov = _na_scale(['pitcher', 'team', 'throws'], 2 * QUAL_N)['ALL']
+
+    roc_df = build_df(roc_pitches)   # target_xrv is None at ROC — we only score
+    if len(roc_df):
+        Xroc = design(roc_df, NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)
+        roc_df['raw_na'] = -model_na.predict(Xroc)
+
+        def _score_roc(keys, scale, per_type):
+            a = roc_df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
+            a['stuff_mean'] = 100.0
+            groups = a.groupby('pitch_type') if per_type else [('ALL', a)]
+            for key, sub in groups:
+                sc = scale.get(key) if per_type else scale
+                if not sc or not np.isfinite(sc.get('sd', np.nan)) or sc['sd'] <= 0:
+                    continue
+                mu, sd = sc['mu'], sc['sd']
+                adj = (sub['n'] * sub['rawmean'] + K_SHRINK * mu) / (sub['n'] + K_SHRINK)
+                a.loc[sub.index, 'stuff_mean'] = (100 + K_SCALE * (adj - mu) / sd).clip(40, 180)
+            a['stuff_mean'] = a['stuff_mean'].round(1)
+            return a
+        roc_agg = _score_roc(['pitcher', 'team', 'pitch_type'], na_pt, True)
+        roc_overall = _score_roc(['pitcher', 'team', 'throws'], na_ov, False)
+        agg = pd.concat([agg, roc_agg], ignore_index=True)
+        overall = pd.concat([overall, roc_overall], ignore_index=True)
+        print(f'  ROC (no-arm, vs MLB baseline): {len(roc_agg)} pitch-type rows, '
+              f'{len(roc_overall)} pitchers')
+
     # save bundle
     with open(os.path.join(HERE, 'stuff_models_v11.pkl'), 'wb') as f:
         pickle.dump({'model': model, 'features': list(X.columns), 'base_feats': BASE_FEATS,
-                     'league': league, 'params': TUNED, 'version': 'v11'}, f)
+                     'league': league, 'params': TUNED, 'version': 'v11',
+                     'model_na': model_na, 'noarm_feats': NOARM_FEATS,
+                     'na_pt_scale': na_pt, 'na_ov_scale': na_ov}, f)
 
     # report
     from numpy import corrcoef
@@ -196,9 +251,12 @@ def inject(agg, overall):
     look = {(r.pitcher, r.team, r.pitch_type): r.stuff_mean for r in agg.itertuples()}
     for row in pl:
         row['stuffScore'] = look.get((row['pitcher'], row['team'], row['pitchType']))
+    # Percentile pool is MLB-qualified only (ROC scored against the MLB baseline
+    # and ranked into it, so ROC never shifts MLB colors — "only applies to ROC").
     qual_by_pt = defaultdict(list)
     for row in pl:
-        if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None:
+        if (row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None
+                and row.get('team') not in AAA_TEAMS):
             qual_by_pt[row['pitchType']].append(row['stuffScore'])
     n_pl = 0
     for row in pl:
@@ -217,7 +275,8 @@ def inject(agg, overall):
     for row in pp:
         row['stuffScore'] = olook.get((row['pitcher'], row['team'], row.get('throws')))
     qpool = [row['stuffScore'] for row in pp
-             if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None]
+             if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None
+             and row.get('team') not in AAA_TEAMS]
     n_pp = 0
     for row in pp:
         sc = row.get('stuffScore')
