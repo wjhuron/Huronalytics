@@ -40,6 +40,9 @@ BASE_FEATS = ['velocity', 'ivb', 'hb', 'velo_diff', 'ivb_diff', 'hb_diff',
               'spin_rate', 'extension', 'arm_angle', 'rel_z', 'vaa', 'vaa_diff']
 TUNED = dict(max_depth=4, n_estimators=800, learning_rate=0.025, min_child_weight=10,
              reg_lambda=1.5, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, tree_method='hist')
+# Pitcher-level standardization: 10 points per between-pitcher SD, mean shrunk
+# toward the qualified-pool mean by K_SHRINK pseudo-pitches, qualify at QUAL_N.
+K_SCALE, K_SHRINK, QUAL_N = 10, 100, 50
 
 def sf(x):
     try: return float(x)
@@ -126,25 +129,32 @@ def main():
     model = xgb.XGBRegressor(**TUNED); model.fit(X, y)
     df['stuff_raw'] = -model.predict(X)
 
-    # standardize PER PITCH TYPE -> 100 +/- 10
-    league = {}
-    df['stuff_plus'] = 100.0
-    for pt, idx in df.groupby('pitch_type').groups.items():
-        v = df.loc[idx, 'stuff_raw']; mu, sd = v.mean(), v.std()
-        league[pt] = {'mu': float(mu), 'sd': float(sd), 'n': int(len(idx))}
-        if sd > 0:
-            df.loc[idx, 'stuff_plus'] = (100 + 10 * (v - mu) / sd).clip(40, 160)
+    # Standardize at the PITCHER level (proper "+"-stat spread: SD=10 between
+    # pitchers, not between pitches — averaging pitch-level z-scores collapses
+    # the spread). The scale (mu, sd) is fixed from the qualified pool (>=QUAL_N
+    # of that pitch type); each pitcher's mean is then shrunk toward the pool
+    # mean by K_SHRINK pseudo-pitches so small samples fall toward 100 instead
+    # of showing noise flukes. High-sample arms are essentially unaffected.
+    def _standardize(grp_keys, qual_min):
+        a = df.groupby(grp_keys)['stuff_raw'].agg(rawmean='mean', n='size').reset_index()
+        a['stuff_mean'] = 100.0
+        scale = {}
+        groups = a.groupby('pitch_type') if 'pitch_type' in grp_keys else [('ALL', a)]
+        for key, sub in groups:
+            q = sub[sub['n'] >= qual_min]
+            base = q if len(q) >= 5 else sub
+            mu, sd = float(base['rawmean'].mean()), float(base['rawmean'].std())
+            scale[key] = {'mu': mu, 'sd': sd, 'nqual': int(len(q))}
+            if sd > 0:
+                adj = (sub['n'] * sub['rawmean'] + K_SHRINK * mu) / (sub['n'] + K_SHRINK)
+                a.loc[sub.index, 'stuff_mean'] = (100 + K_SCALE * (adj - mu) / sd).clip(40, 180)
+        a['stuff_mean'] = a['stuff_mean'].round(1)
+        return a, scale
 
-    # aggregate to (pitcher, team, pitch_type) for per-type, and (pitcher, team,
-    # throws) for the OVERALL pitcher Stuff+ (usage-weighted mean of per-pitch
-    # stuff, each already standardized within its type -> 100 +/- 10).
-    agg = df.groupby(['pitcher', 'team', 'pitch_type']).agg(
-        stuff_mean=('stuff_plus', 'mean'), n=('stuff_plus', 'size')).reset_index()
-    agg['stuff_mean'] = agg['stuff_mean'].round(1)
+    agg, league = _standardize(['pitcher', 'team', 'pitch_type'], QUAL_N)
     agg.to_csv(os.path.join(HERE, 'pitcher_stuff_v11.csv'), index=False)
-    overall = df.groupby(['pitcher', 'team', 'throws']).agg(
-        stuff_mean=('stuff_plus', 'mean'), n=('stuff_plus', 'size')).reset_index()
-    overall['stuff_mean'] = overall['stuff_mean'].round(1)
+    overall, overall_scale = _standardize(['pitcher', 'team', 'throws'], 2 * QUAL_N)
+    league['_overall'] = overall_scale['ALL']
 
     # save bundle
     with open(os.path.join(HERE, 'stuff_models_v11.pkl'), 'wb') as f:

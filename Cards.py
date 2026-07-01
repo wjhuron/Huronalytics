@@ -1134,7 +1134,7 @@ def _render_single_game_panel(fig, pitches):
             ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58, rh * 0.56, facecolor=TRACK, edgecolor='none'))
             if pct > 0:
                 ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58 * pct, rh * 0.56, facecolor=color, edgecolor='none'))
-            ax.text(0.78, y, f'{pct*100:.1f}%', fontsize=10, va='center', ha='left',
+            ax.text(0.78, y, ("< 1%" if 0 < pct*100 < 1 else f'{pct*100:.1f}%'), fontsize=10, va='center', ha='left',
                     color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
 
     _usage([0.55, 0.32, 0.22, 0.17], usage['R'], tot['R'], 'VS RHH')
@@ -1563,7 +1563,7 @@ def render_card(config, pitches, output_file):
         xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else None
         pt_name='Fastball' if pt=='FF' else PITCH_NAMES.get(pt,pt)
         _nvaa = nvaa_by_pt.get(pt)
-        row=[pt_name,str(n),f"{n/tc*100:.1f}%",
+        row=[pt_name,str(n),("< 1%" if 0 < n/tc*100 < 1 else f"{n/tc*100:.1f}%"),
             f"{sum(velos)/len(velos):.1f}" if velos else '—',f"{max(velos):.1f}" if velos else '—',
             f"{int(sum(spins)/len(spins))}" if spins else '—',
             f'{sum(ivbs)/len(ivbs):.1f}"' if ivbs else '—',f'{sum(hbs)/len(hbs):.1f}"' if hbs else '—',

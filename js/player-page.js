@@ -787,7 +787,8 @@ var PlayerPage = {
 
       var pct = document.createElement('span');
       pct.className = 'usage-pct';
-      pct.textContent = Math.round(e.pct * 100) + '%';
+      // Sub-1% usage reads as "< 1%" rather than rounding down to "0%".
+      pct.textContent = (e.pct > 0 && e.pct * 100 < 1) ? '< 1%' : Math.round(e.pct * 100) + '%';
 
       row.appendChild(label);
       row.appendChild(barWrap);
