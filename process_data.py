@@ -3652,6 +3652,31 @@ def write_json_outputs(result, suffix):
         except (json.JSONDecodeError, KeyError):
             print("  Warning: could not read existing Stuff+ scores")
 
+    # Preserve OVERALL (per-pitcher) Stuff+ from existing pitcher leaderboard
+    pitcher_json_path = os.path.join(DATA_DIR, f'pitcher_leaderboard{suffix}.json')
+    if os.path.exists(pitcher_json_path):
+        try:
+            with open(pitcher_json_path) as f:
+                existing = json.load(f)
+            stuff_map = {}
+            for row in existing:
+                if row.get('stuffScore') is not None:
+                    key = (row.get('pitcher'), row.get('team'), row.get('throws'))
+                    stuff_map[key] = {'stuffScore': row['stuffScore'],
+                                      'stuffScore_pctl': row.get('stuffScore_pctl')}
+            if stuff_map:
+                n_merged = 0
+                for row in result['pitcher_leaderboard']:
+                    key = (row.get('pitcher'), row.get('team'), row.get('throws'))
+                    if key in stuff_map:
+                        row['stuffScore'] = stuff_map[key]['stuffScore']
+                        if stuff_map[key]['stuffScore_pctl'] is not None:
+                            row['stuffScore_pctl'] = stuff_map[key]['stuffScore_pctl']
+                        n_merged += 1
+                print(f"  Preserved overall Stuff+ scores: {n_merged}/{len(stuff_map)} rows merged")
+        except (json.JSONDecodeError, KeyError):
+            print("  Warning: could not read existing overall Stuff+ scores")
+
     # Round floats in every committed artifact (these also land in git via
     # `git add data/`, so shrinking them speeds the push too). Mutating
     # result['micro_data'] in place is fine: write_embedded_js runs next and

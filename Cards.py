@@ -707,6 +707,7 @@ BUBBLE_COLUMNS = [
         ('GB%',        'gbPct',            'gbPct_pctl',            'pct1'),
     ]),
     ('COMMAND & SHAPE', [
+        ('Stuff+',     'stuffScore', 'stuffScore_pctl', 'int'),
         ('Loc+',       'locPlus',   'locPlus_pctl',   'int'),
         ('Zone%',      'izPct',     'izPct_pctl',     'pct1'),
         ('FPS%',       'fpsPct',    'fpsPct_pctl',    'pct1'),
@@ -1493,6 +1494,7 @@ def render_card(config, pitches, output_file):
     xrv_by_pt = {pt: d.get('xRunValue') for pt, d in pitch_lb.items()}
     xrv100_by_pt = {pt: d.get('xRv100') for pt, d in pitch_lb.items()}
     rv100_by_pt = {pt: d.get('rv100') for pt, d in pitch_lb.items()}
+    stuff_by_pt = {pt: d.get('stuffScore') for pt, d in pitch_lb.items()}
     # RV columns: season cards show the actual + expected per-100 pair (PitchRV/100
     # + xPitchRV/100). PitchRV/100 is the real RunExp-based rate for MLB and the
     # contact-wOBA proxy for ROC. Single-game keeps the cumulative xPitchRV.
@@ -1570,6 +1572,7 @@ def render_card(config, pitches, output_file):
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
             f"{iz_n/n*100:.1f}%" if n else '—',
+            (f"{int(round(stuff_by_pt[pt]))}" if stuff_by_pt.get(pt) is not None else '—'),
             (f"{int(round(locplus_by_pt[pt]))}" if locplus_by_pt.get(pt) is not None else '—'),
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
             f"{chase_pct*100:.1f}%" if chase_pct is not None else '—',
@@ -1598,6 +1601,7 @@ def render_card(config, pitches, output_file):
     t_xwobacon = sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw else None
     # Pitcher-level Loc+ for the Total row (from the bubble's leaderboard row).
     _total_locplus = (config.get('pctl_row') or {}).get('locPlus')
+    _total_stuff = (config.get('pctl_row') or {}).get('stuffScore')
     # RV totals. xPitchRV/100 from the leaderboard (expected) for all. PitchRV/100:
     # the real rv100 (MLB) or contact-wOBA proxy (ROC). Single-game keeps cumulative.
     _pr = config.get('pctl_row') or {}
@@ -1618,6 +1622,7 @@ def render_card(config, pitches, output_file):
         fmt_fi(sum(t_exts)/len(t_exts)) if t_exts else '—',
         f"{sum(t_armangles)/len(t_armangles):.1f}°" if t_armangles else '—',
         f"{t_iz/tc*100:.1f}%" if tc else '—',
+        (f"{int(round(_total_stuff))}" if _total_stuff is not None else '—'),
         (f"{int(round(_total_locplus))}" if _total_locplus is not None else '—'),
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
         f"{t_chase*100:.1f}%" if t_chase is not None else '—',
@@ -1629,7 +1634,7 @@ def render_card(config, pitches, output_file):
     # Source-data presence check — RV needs RunExp on at least one pitch.
     has_pitchrv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
 
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','RelZ','RelX','Ext','Arm Angle','Zone%','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_cols
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','RelZ','RelX','Ext','Arm Angle','Zone%','Stuff+','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_cols
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
     # Columns to force-exclude based on data availability and card type.
@@ -1800,6 +1805,17 @@ def render_card(config, pitches, output_file):
             tinted = _pitcher_stat_cell_color(val_str, 100.0, 10.0, True, row_bg, False)
             if tinted:
                 table.get_celld()[(r, lp_col_idx)].set_facecolor(tinted)
+
+    # Stuff+ coloring — index centered at 100 (group avg), higher is better,
+    # scale 10 (≈1 SD). Matches the Stuff+ bubble's blue→red direction.
+    if 'Stuff+' in col_headers:
+        sp_col_idx = col_headers.index('Stuff+')
+        for r in range(1, len(cell_data) + 1):
+            row_bg = DARKER if r == len(cell_data) else (DARK_CELL if r % 2 == 1 else ALT_ROW_BG)
+            val_str = cell_data[r - 1][sp_col_idx]
+            tinted = _pitcher_stat_cell_color(val_str, 100.0, 10.0, True, row_bg, False)
+            if tinted:
+                table.get_celld()[(r, sp_col_idx)].set_facecolor(tinted)
 
     # nVAA coloring — FF and SI only (per spec). nVAA_pctl is already directional
     # (FF: flatter/closer-to-zero better; SI: steeper better), computed vs MLB.

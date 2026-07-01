@@ -135,11 +135,16 @@ def main():
         if sd > 0:
             df.loc[idx, 'stuff_plus'] = (100 + 10 * (v - mu) / sd).clip(40, 160)
 
-    # aggregate to (pitcher, team, pitch_type)
+    # aggregate to (pitcher, team, pitch_type) for per-type, and (pitcher, team,
+    # throws) for the OVERALL pitcher Stuff+ (usage-weighted mean of per-pitch
+    # stuff, each already standardized within its type -> 100 +/- 10).
     agg = df.groupby(['pitcher', 'team', 'pitch_type']).agg(
         stuff_mean=('stuff_plus', 'mean'), n=('stuff_plus', 'size')).reset_index()
     agg['stuff_mean'] = agg['stuff_mean'].round(1)
     agg.to_csv(os.path.join(HERE, 'pitcher_stuff_v11.csv'), index=False)
+    overall = df.groupby(['pitcher', 'team', 'throws']).agg(
+        stuff_mean=('stuff_plus', 'mean'), n=('stuff_plus', 'size')).reset_index()
+    overall['stuff_mean'] = overall['stuff_mean'].round(1)
 
     # save bundle
     with open(os.path.join(HERE, 'stuff_models_v11.pkl'), 'wb') as f:
@@ -162,33 +167,58 @@ def main():
     print(f'\n  saved bundle + pitcher_stuff_v11.csv to {HERE}')
 
     if args.inject:
-        inject(agg)
+        inject(agg, overall)
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
-def inject(agg):
+def _pctl(sc, pool):
+    below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
+    return round((below + 0.5 * equal) / len(pool) * 100)
+
+def inject(agg, overall):
+    """Write stuffScore into BOTH leaderboards. Percentiles use the same
+    qualified pool as Loc+ (rows where locPlus_pctl is not None): per-pitch-type
+    Stuff+ ranks within its pitch type, overall Stuff+ ranks across pitchers.
+    Values are shown for all rows; color/pctl only for qualified rows."""
+    # ── per-pitch-type -> pitch_leaderboard ──
     pl_path = os.path.join(DATA, 'pitch_leaderboard_rs.json')
     pl = json.load(open(pl_path))
     look = {(r.pitcher, r.team, r.pitch_type): r.stuff_mean for r in agg.itertuples()}
-    n = 0
     for row in pl:
-        key = (row['pitcher'], row['team'], row['pitchType'])
-        row['stuffScore'] = look.get(key)
-        if row['stuffScore'] is not None: n += 1
-    pt_groups = defaultdict(list)
+        row['stuffScore'] = look.get((row['pitcher'], row['team'], row['pitchType']))
+    qual_by_pt = defaultdict(list)
     for row in pl:
-        if row.get('stuffScore') is not None:
-            pt_groups[row['pitchType']].append(row['stuffScore'])
+        if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None:
+            qual_by_pt[row['pitchType']].append(row['stuffScore'])
+    n_pl = 0
     for row in pl:
-        pt = row['pitchType']; sc = row.get('stuffScore')
-        if sc is not None and pt in pt_groups:
-            vals = pt_groups[pt]
-            below = sum(1 for x in vals if x < sc); equal = sum(1 for x in vals if x == sc)
-            row['stuffScore_pctl'] = round((below + 0.5 * equal) / len(vals) * 100)
+        sc = row.get('stuffScore'); pt = row['pitchType']
+        if sc is not None: n_pl += 1
+        if sc is not None and row.get('locPlus_pctl') is not None and qual_by_pt.get(pt):
+            row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt])
         else:
             row['stuffScore_pctl'] = None
     json.dump(pl, open(pl_path, 'w'))
-    print(f'  injected stuffScore into {n}/{len(pl)} leaderboard rows')
+
+    # ── overall -> pitcher_leaderboard ──
+    pp_path = os.path.join(DATA, 'pitcher_leaderboard_rs.json')
+    pp = json.load(open(pp_path))
+    olook = {(r.pitcher, r.team, r.throws): r.stuff_mean for r in overall.itertuples()}
+    for row in pp:
+        row['stuffScore'] = olook.get((row['pitcher'], row['team'], row.get('throws')))
+    qpool = [row['stuffScore'] for row in pp
+             if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None]
+    n_pp = 0
+    for row in pp:
+        sc = row.get('stuffScore')
+        if sc is not None: n_pp += 1
+        if sc is not None and row.get('locPlus_pctl') is not None and qpool:
+            row['stuffScore_pctl'] = _pctl(sc, qpool)
+        else:
+            row['stuffScore_pctl'] = None
+    json.dump(pp, open(pp_path, 'w'))
+    print(f'  injected stuffScore: pitch-level {n_pl}/{len(pl)} rows, '
+          f'pitcher-level {n_pp}/{len(pp)} rows (qualified pool = {len(qpool)})')
 
 if __name__ == '__main__':
     main()

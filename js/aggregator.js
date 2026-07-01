@@ -703,9 +703,11 @@ const Aggregator = {
                      'xwOBAcon', 'xwOBAcon_pctl',
                      'xwOBAsp', 'xwOBAsp_pctl',
                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
-                     // Loc+ is precomputed (needs the weight-table lookup unavailable client-side),
-                     // so always surface the season value even under filters.
+                     // Loc+ and Stuff+ are precomputed (need the weight-table / trained
+                     // model unavailable client-side), so always surface the season
+                     // value even under filters.
                      'locPlus', 'locPlus_pctl', 'locPlusN', 'locPlusRaw',
+                     'stuffScore', 'stuffScore_pctl',
                      'armAngle'];
     const preAgg = window.PITCHER_DATA || [];
     const preAggMap = {};

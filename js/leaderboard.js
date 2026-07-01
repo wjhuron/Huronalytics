@@ -23,12 +23,12 @@ const COLUMNS = {
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
     { key: 'vaa',         label: 'VAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Vertical approach angle at the plate (degrees)', group: 'metrics' },
     { key: 'haa',         label: 'HAA',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Horizontal approach angle at the plate (degrees)', group: 'metrics' },
-    { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', desc: 'Stuff+ quality score from physical characteristics only (100 = avg, higher = better for pitcher)', group: 'metrics' },
     // Outcomes
     { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (positive = better for pitcher)', group: 'outcomes' },
     { key: 'xRunValue',   label: 'xRV',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'outcomes' },
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
     { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', desc: 'Stuff+ for this pitch type — pitch quality from physical characteristics only (velocity, movement, release, arm angle), independent of location or outcome. Standardized within the pitch-type group. 100 = group avg, +10 = 1 SD better.', group: 'outcomes' },
     { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+ for this pitch type — xRV-weighted location quality standardized within the pitch-type group (FF, SI, FC, SL, CB, CH). 100 = group avg, +10 = 1 SD better. ROC pitchers scored against the MLB baseline.', group: 'outcomes' },
     { key: 'swStrPct',    label: 'Whiff%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Whiff rate on swings (whiffs / swings) for this pitch type', group: 'outcomes' },
     { key: 'chasePct',    label: 'Chase%',   format: Utils.formatPct, sortType: 'numeric', desc: 'Out-of-zone swing rate for this pitch type', group: 'outcomes' },
@@ -63,7 +63,9 @@ const COLUMNS = {
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / TBF)', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', desc: 'K% minus BB%', group: 'stats' },
     // Pitch Quality
-    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Run value — runs saved vs league average (positive = better for pitcher)', group: 'run_value' },
+    { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', sectionStart: true, desc: 'Stuff+ — overall pitch quality from physical characteristics only (velocity, movement, release, arm angle), usage-weighted across the arsenal and independent of location or outcome. 100 = league avg, +10 = 1 SD better.', group: 'run_value' },
+    { key: 'locPlus',     label: 'Loc+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Location+ — per-pitch location quality scored against an xRV-weighted (zone × count × pitch-type × handedness) model. Command independent of stuff or contact luck. 100 = league avg, +10 = 1 SD better.', group: 'run_value' },
+    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value — runs saved vs league average (positive = better for pitcher)', group: 'run_value' },
     { key: 'xRunValue',   label: 'xRV',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'run_value' },
     { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'run_value' },
     { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches', group: 'run_value' },
@@ -302,7 +304,6 @@ const Leaderboard = {
     // Always hide these regardless of tab
     this.hiddenColumns['vaa'] = true;
     this.hiddenColumns['haa'] = true;
-    this.hiddenColumns['stuffScore'] = true;
 
     // Per-tab defaults
     var defaults = this._TAB_HIDDEN_DEFAULTS[tab];
