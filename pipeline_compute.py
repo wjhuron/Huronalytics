@@ -131,16 +131,20 @@ def compute_expected_stats(pitches, woba_weights=None):
         elif event == 'Home Run':
             hr += 1
 
+        # Exclude bunt at-bats from the expected-contact numerators so the Sheets
+        # match the client micro path and the cards (bunts remain in the AB
+        # denominator, contributing an implicit 0 like a strikeout).
+        _is_bunt = p.get('BBType') in BUNT_BB_TYPES
         xba_val = safe_float(p.get('xBA'))
         xslg_val = safe_float(p.get('xSLG'))
-        if xba_val is not None:
+        if not _is_bunt and xba_val is not None:
             xba_sum += xba_val
             xba_denom += 1
-        if xslg_val is not None:
+        if not _is_bunt and xslg_val is not None:
             xslg_sum += xslg_val
             xslg_denom += 1
 
-        if event not in K_EVENTS:
+        if event not in K_EVENTS and not _is_bunt:
             xwobacon_val = safe_float(p.get('xwOBA'))
             if xwobacon_val is not None:
                 xwobacon_sum += xwobacon_val

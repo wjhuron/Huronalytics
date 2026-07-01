@@ -595,13 +595,14 @@ const Aggregator = {
     const pa = c[9], h = c[10], hr = c[11], k = c[12], bb = c[13];
     const hbp = c[14], sf = c[15], sh = c[16], ci_val = c[17];
     const izSw = c[18], izWh = c[19];
-    const firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24], pu_cnt = c[25], nStrikes = c[26];
+    const firstPitches = c[20], firstPitchStrikes = c[21], fb_cnt = c[22], nHrBip = c[23], ldHr = c[24], pu_cnt = c[25], nStrikes = c[26], ibb = c[27];
     const oneOneTotal = c[28], oneOneWins = c[29], earlyActionPAs = c[30];
     const ab = pa - bb - hbp - sf - sh - ci_val;
 
     const strikePct = n > 0 ? nStrikes / n : null;
     const kPct = pa > 0 ? k / pa : null;
-    const bbPct = pa > 0 ? bb / pa : null;
+    // uBB/PA: exclude intentional walks (c[27]) to match the server (n_bb_all - n_ibb).
+    const bbPct = pa > 0 ? (bb - ibb) / pa : null;
     const kbbPct = (kPct !== null && bbPct !== null) ? Math.round((kPct - bbPct) * 10000) / 10000 : null;
     const babip_denom = ab - k - hr + sf;
     const babip = babip_denom > 0 ? Math.round((h - hr) / babip_denom * 1000) / 1000 : null;
