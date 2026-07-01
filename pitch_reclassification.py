@@ -18,6 +18,7 @@ Conflict rule: A pitcher cannot have two of the same pitch type.
 """
 
 import json
+import os
 from collections import defaultdict
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side

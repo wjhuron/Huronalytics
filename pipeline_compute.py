@@ -649,7 +649,14 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
     pctl_key = metric_key + '_pctl'
 
     def _player_key(r):
-        return r.get('pitcher') or r.get('hitter')
+        # Prefer mlbId so two distinct players sharing a name (e.g. two "Max
+        # Muncy") aren't grouped as stints of one multi-team player. Mirrors the
+        # JS Aggregator._combinedKey so the server percentile pool and the client
+        # re-aggregation route the same rows to interpolation.
+        mid = r.get('mlbId')
+        if mid is not None and mid != '':
+            return 'id:' + str(mid)
+        return 'nm:' + (r.get('pitcher') or r.get('hitter') or '')
 
     combined_players = {_player_key(r) for r in rows if r.get('_isCombined')}
 

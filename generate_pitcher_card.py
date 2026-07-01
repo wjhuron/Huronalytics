@@ -54,7 +54,9 @@ PITCH_NAMES = {
     'CH': 'Changeup', 'FS': 'Splitter', 'KN': 'Knuckleball'
 }
 PITCH_ORDER = ['FF', 'SI', 'FC', 'SL', 'ST', 'CU', 'SV', 'CH', 'FS', 'KN']
-SWING_DESC = ['Swinging Strike', 'Foul', 'Foul Bunt', 'In Play', 'Missed Bunt']
+# Bunts are not swings (matches Cards.SWING_DESC / pipeline_utils.SWING_DESCRIPTIONS)
+# so Whiff%/Chase%/Swing% match the leaderboard. STRIKE_DESC still counts foul bunt.
+SWING_DESC = ['Swinging Strike', 'Foul', 'In Play']
 STRIKE_DESC = ['Called Strike', 'Swinging Strike', 'Foul', 'Foul Bunt', 'In Play']
 
 # Batted ball type colors (for distribution chart)

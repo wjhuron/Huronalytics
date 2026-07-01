@@ -2138,8 +2138,12 @@ const Aggregator = {
           const shcX = bipRecords[sri][bci.hcX];
           const shcY = bipRecords[sri][bci.hcY];
           if (sla == null || shcX == null || shcY == null) continue;
-          // Team rows mix hitters of both hands — use the per-BIP bat side
-          const sBats = teamMode ? bipRecords[sri][bci.batSide] : stands;
+          // Use the per-BIP bat side (not the aggregated stands) so a switch
+          // hitter's righty-side and lefty-side BIP each use the correct spray
+          // orientation + hand-specific zone, matching Python compute_xwobasp.
+          // Team rows already required this; non-team switch hitters ('S') were
+          // collapsing to the L-branch + pooled zones.
+          const sBats = bipRecords[sri][bci.batSide] || stands;
           const sAngle = Aggregator.computeSprayAngle(shcX, shcY);
           const sDir = Aggregator.sprayDirection(sAngle, sBats);
           if (!sDir) continue;

@@ -3192,6 +3192,7 @@ var PlayerPage = {
         ev: row[evIdx],
         bbType: row[bbTypeIdx],
         event: row[eventIdx],
+        bs: (batSideIdx >= 0 ? row[batSideIdx] : null),  // per-BIP bat side for xwOBAsp
         clamped: la !== clampedLA,
       });
     }
@@ -3372,14 +3373,18 @@ var PlayerPage = {
     }
 
     // --- Compute xwOBAsp for annotation (hand-specific with pooled fallback) ---
+    // Use each BIP's actual bat side (not the R-normalized `bats`, which drives
+    // only the visual axis/zone orientation) so a switch hitter's per-side BIP
+    // hit the correct spray direction + hand zone, matching Python compute_xwobasp.
     var _sacqMaps = Aggregator.buildSacqZoneMaps();
     var xwOBAsp_sum = 0, xwOBAsp_count = 0;
     for (var xsi = 0; xsi < points.length; xsi++) {
-      var xsDir = Aggregator.sprayDirection(points[xsi].x, bats);
+      var xsBats = points[xsi].bs || bats;
+      var xsDir = Aggregator.sprayDirection(points[xsi].x, xsBats);
       if (!xsDir) continue;
       var xsLaBin = Aggregator.getLABinIdx(points[xsi].realLA != null ? points[xsi].realLA : points[xsi].y);
       if (xsLaBin == null) continue;
-      var xsWoba = Aggregator.sacqLookup(_sacqMaps, xsDir, xsLaBin, bats);
+      var xsWoba = Aggregator.sacqLookup(_sacqMaps, xsDir, xsLaBin, xsBats);
       if (xsWoba != null) {
         xwOBAsp_sum += xsWoba;
         xwOBAsp_count++;

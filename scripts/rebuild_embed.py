@@ -19,7 +19,9 @@ def main(gz=GZ):
     obj['pitcherData'] = json.load(open(os.path.join(DATA, 'pitcher_leaderboard_rs.json')))
     payload = json.dumps(obj, separators=(',', ':')).encode()
     with open(gz, 'wb') as f:
-        f.write(gzip.compress(payload, 9))
+        # mtime=0 for byte-identical output on unchanged data (matches
+        # write_embedded_js), so a re-run with no new data yields no spurious commit.
+        f.write(gzip.compress(payload, compresslevel=9, mtime=0))
     n_stuff = sum(1 for r in obj['pitcherData'] if r.get('stuffScore') is not None)
     print(f"Rebuilt {os.path.basename(gz)}: {len(obj['pitcherData'])} pitchers "
           f"({n_stuff} with Stuff+), {len(obj['pitchData'])} pitch rows, "

@@ -483,13 +483,21 @@ def build_sacq_lookup(metadata, bats):
 # ─────────────────────────────────────────────────────────────────────
 # Per-pitch stat computation helpers
 # ─────────────────────────────────────────────────────────────────────
-def compute_group_stats(group_pitches, sacq_lookup, bats):
+def compute_group_stats(group_pitches, sacq_lookups, bats):
     """Compute the per-pitch-group row for the bottom table.
     Returns dict with: count, usagePct (caller fills in), swingPct, chasePct,
-    whiffPct, hardHitPct, barrelPct, xwOBAcon, xwOBAsp, rv100, xRv100."""
+    whiffPct, hardHitPct, barrelPct, xwOBAcon, xwOBAsp, rv100, xRv100.
+
+    sacq_lookups is a dict of per-hand lookup fns ({'L':..., 'R':...}); each BIP
+    is scored by its own Bats so switch hitters are not mirror-flipped."""
     n = len(group_pitches)
     if n == 0:
         return None
+
+    def _sacq_for(p):
+        pb = p.get('Bats') or bats
+        return pb, (sacq_lookups.get(pb) or sacq_lookups.get(bats)
+                    or next(iter(sacq_lookups.values())))
     swings = [p for p in group_pitches if p.get('Description') in SWING_DESC]
     whiffs = [p for p in group_pitches if p.get('Description') == 'Swinging Strike']
     # Bunt-excluded swing count — matches the canonical leaderboard whiffPct
@@ -533,7 +541,8 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
     for p in bip:
         bb_type = p.get('BBType')
         ang = spray_angle(sf(p.get('HC_X')), sf(p.get('HC_Y')))
-        sd = spray_direction(ang, bats)
+        pb, _lk = _sacq_for(p)
+        sd = spray_direction(ang, pb)
         if sd is None:
             continue
         if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball'):
@@ -550,9 +559,10 @@ def compute_group_stats(group_pitches, sacq_lookup, bats):
     for p in bip:
         la = sf(p.get('LaunchAngle'))
         ang = spray_angle(sf(p.get('HC_X')), sf(p.get('HC_Y')))
-        sd = spray_direction(ang, bats)
+        pb, lk = _sacq_for(p)
+        sd = spray_direction(ang, pb)
         lb = la_bin_idx(la) if la is not None else None
-        v = sacq_lookup(sd, lb)
+        v = lk(sd, lb)
         if v is not None:
             xw_sp_vals.append(v)
     xwobasp = sum(xw_sp_vals) / len(xw_sp_vals) if xw_sp_vals else None
@@ -1363,6 +1373,11 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # Mirrors the hitter page panel: title centered above, annotations in
     # top-left, big tall chart, legend below.
     sacq_lookup, hand_zones, pool_zones = build_sacq_lookup(metadata, bats)
+    # Per-hand lookups so a switch hitter's BIP are each scored by their actual
+    # side (matching process_data.compute_xwobasp). The overlay zones above stay
+    # in the single `bats` orientation — that's a visual-axis choice only.
+    sacq_lookups = {'L': build_sacq_lookup(metadata, 'L')[0],
+                    'R': build_sacq_lookup(metadata, 'R')[0]}
     # Shift the entire LA × Spray block so the title's TOP edge (not its
     # center) sits at the top of the headline stats strip cells. The title
     # text is drawn with va='center' so the center sits ~0.0070 figrel
@@ -2151,13 +2166,13 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     n_total_seen = len(hitter_pitches)
     for g in GROUP_ORDER:
         gp = [p for p in hitter_pitches if p.get('Pitch Type') in PITCH_GROUPS[g]]
-        stats = compute_group_stats(gp, sacq_lookup, bats)
+        stats = compute_group_stats(gp, sacq_lookups, bats)
         if stats:
             stats['group'] = g
             stats['usagePct'] = stats['count'] / n_total_seen if n_total_seen else None
             group_rows.append(stats)
     # Total row
-    total_stats = compute_group_stats(hitter_pitches, sacq_lookup, bats) or {}
+    total_stats = compute_group_stats(hitter_pitches, sacq_lookups, bats) or {}
     total_stats['group'] = 'Total'
     total_stats['usagePct'] = 1.0
 
