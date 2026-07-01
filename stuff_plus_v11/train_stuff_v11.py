@@ -257,6 +257,22 @@ def main():
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
+def _is_combined_team(t):
+    return isinstance(t, str) and t.endswith('TM') and t[:-2].isdigit()
+
+
+def _combo_score(pool, key):
+    """n-weighted mean of a pitcher's MLB per-team stuff_mean scores, used to
+    synthesize a combined 2TM/3TM row's score (which has no team key in agg).
+    Approximate (slightly over-shrunk vs scoring the true combined arsenal), but
+    fills the otherwise-blank combined row while leaving the model baseline intact."""
+    parts = pool.get(key)
+    if not parts:
+        return None
+    tot = sum(n for _s, n in parts)
+    return round(sum(s * n for s, n in parts) / tot, 1) if tot > 0 else None
+
+
 def _pctl(sc, pool):
     below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
     return round((below + 0.5 * equal) / len(pool) * 100)
@@ -270,14 +286,27 @@ def inject(agg, overall):
     pl_path = os.path.join(DATA, 'pitch_leaderboard_rs.json')
     pl = json.load(open(pl_path))
     look = {(r.pitcher, r.team, r.pitch_type): r.stuff_mean for r in agg.itertuples()}
+    # Pool a pitcher's MLB per-team scores to synthesize the combined 2TM/3TM row.
+    pool_pt = defaultdict(list)
+    for r in agg.itertuples():
+        if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
+            pool_pt[(r.pitcher, r.pitch_type)].append((r.stuff_mean, r.n))
     for row in pl:
-        row['stuffScore'] = look.get((row['pitcher'], row['team'], row['pitchType']))
+        key = (row['pitcher'], row['team'], row['pitchType'])
+        if key in look:
+            row['stuffScore'] = look[key]
+        elif _is_combined_team(row['team']):
+            row['stuffScore'] = _combo_score(pool_pt, (row['pitcher'], row['pitchType']))
+        else:
+            row['stuffScore'] = None
     # Percentile pool is MLB-qualified only (ROC scored against the MLB baseline
     # and ranked into it, so ROC never shifts MLB colors — "only applies to ROC").
+    # Combined 2TM/3TM rows are excluded from the POOL (their stints already
+    # represent them) but still get a ranked percentile below.
     qual_by_pt = defaultdict(list)
     for row in pl:
         if (row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None
-                and row.get('team') not in AAA_TEAMS):
+                and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])):
             qual_by_pt[row['pitchType']].append(row['stuffScore'])
     n_pl = 0
     for row in pl:
@@ -293,11 +322,21 @@ def inject(agg, overall):
     pp_path = os.path.join(DATA, 'pitcher_leaderboard_rs.json')
     pp = json.load(open(pp_path))
     olook = {(r.pitcher, r.team, r.throws): r.stuff_mean for r in overall.itertuples()}
+    pool_ov = defaultdict(list)
+    for r in overall.itertuples():
+        if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
+            pool_ov[(r.pitcher, r.throws)].append((r.stuff_mean, r.n))
     for row in pp:
-        row['stuffScore'] = olook.get((row['pitcher'], row['team'], row.get('throws')))
+        key = (row['pitcher'], row['team'], row.get('throws'))
+        if key in olook:
+            row['stuffScore'] = olook[key]
+        elif _is_combined_team(row['team']):
+            row['stuffScore'] = _combo_score(pool_ov, (row['pitcher'], row.get('throws')))
+        else:
+            row['stuffScore'] = None
     qpool = [row['stuffScore'] for row in pp
              if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None
-             and row.get('team') not in AAA_TEAMS]
+             and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])]
     n_pp = 0
     for row in pp:
         sc = row.get('stuffScore')

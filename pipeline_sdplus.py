@@ -298,12 +298,22 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
     if not eligible:
         return {}
 
-    lg_raw = sum(v['raw_sd'] for v in eligible.values()) / len(eligible)
+    # League anchors (lg_raw, lg_mean) use a de-duplicated POOL: for a multi-team
+    # hitter, only the combined 2TM/3TM row represents them — their per-team stint
+    # rows are excluded so a traded hitter isn't counted 2-3x. sdPlus is still
+    # computed for every eligible row (combined AND stints).
+    def _is_combined(t):
+        return isinstance(t, str) and t.endswith('TM') and t[:-2].isdigit()
+    combined_ids = {k[:1] for k in eligible if _is_combined(k[1])}
+    pool = {k: v for k, v in eligible.items()
+            if _is_combined(k[1]) or k[:1] not in combined_ids}
+
+    lg_raw = sum(v['raw_sd'] for v in pool.values()) / len(pool)
     for v in eligible.values():
         n = v['n_decisions']
         v['raw_sd_adj'] = (n * v['raw_sd'] + n_prior * lg_raw) / (n + n_prior)
 
-    adj_vals = [v['raw_sd_adj'] for v in eligible.values()]
+    adj_vals = [pool[k]['raw_sd_adj'] for k in pool]
     lg_mean = sum(adj_vals) / len(adj_vals)
 
     for v in eligible.values():

@@ -535,6 +535,10 @@ const Aggregator = {
       return la >= 8 && la <= 50 && ev >= 98 && ev * 1.5 - la >= 117 && ev + la >= 124;
     }
 
+    // Prefer the official barrel flag (launch_speed_angle==6) shipped in the micro,
+    // matching the server/Sheets; fall back to the EV/LA heuristic only for older
+    // data lacking the column.
+    const hasBarrelCol = pbci.barrel != null;
     const evs = []; let n_hard = 0, n_barrel = 0;
     let n_ld = 0, n_fb_bb = 0, n_pu_bb = 0; const n_bip_total = bipRecs.length;
     for (let bri = 0; bri < bipRecs.length; bri++) {
@@ -542,7 +546,7 @@ const Aggregator = {
       const bla = bipRecs[bri][pbci.launchAngle];
       const bbt = bipRecs[bri][pbci.bbType]; // 0=gb, 1=ld, 2=fb, 3=pu
       if (bev !== null) { evs.push(bev); if (bev >= QUAL.HARD_HIT_MPH) n_hard++; }
-      if (isBarrel(bev, bla)) n_barrel++;
+      if (hasBarrelCol ? bipRecs[bri][pbci.barrel] === 1 : isBarrel(bev, bla)) n_barrel++;
       if (bbt === 1) n_ld++;
       if (bbt === 2) n_fb_bb++;
       if (bbt === 3) n_pu_bb++;

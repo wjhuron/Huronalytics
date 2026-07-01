@@ -397,6 +397,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             round(hc_x, 2) if hc_x is not None else None,
             round(hc_y, 2) if hc_y is not None else None,
             batter_hand,
+            1 if str(p.get('Barrel', '')).strip() == '6' else 0,  # official barrel (launch_speed_angle==6)
         ])
     print(f"  Pitcher BIP records: {len(pitcher_bip_rows)}")
 
@@ -1060,7 +1061,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             'oneOneTotal', 'oneOneWins', 'earlyActionPAs',
         ],
         'pitcherMicro': pitcher_rows,
-        'pitcherBipCols': ['pitcherIdx', 'teamIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats'],
+        'pitcherBipCols': ['pitcherIdx', 'teamIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats', 'barrel'],
         'pitcherBip': pitcher_bip_rows,
         'pitchCols': [
             'pitcherIdx', 'teamIdx', 'throws', 'pitchTypeIdx', 'dateIdx', 'batterHand',

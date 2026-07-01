@@ -325,14 +325,35 @@ def _aggregate(pitches_by_key, S, want_zone=False, want_heatmap=False):
 # ═════════════════════════════════════════════════════════════════════════
 #  REGRESS + NORMALIZE
 # ═════════════════════════════════════════════════════════════════════════
+def _is_combined_team(t):
+    return isinstance(t, str) and t.endswith('TM') and t[:-2].isdigit()
+
+
+def _pool_identity(k):
+    # Player identity independent of team (team is k[1]); groups a combined
+    # 2TM/3TM row with its per-team stint rows so we can keep only the combined
+    # row in the normalization pool (matching the percentile-pool convention).
+    return k[:1] + k[2:]
+
+
+def _in_norm_pool(k, pool_filter, combined_ids):
+    if not pool_filter(k):
+        return False
+    # Exclude per-team stint rows of a pitcher who also has a combined row.
+    if not _is_combined_team(k[1]) and _pool_identity(k) in combined_ids:
+        return False
+    return True
+
+
 def _normalize(raw, n_prior, min_pool, pool_filter, lg_woba):
     """Bayesian-regress each raw_loc toward the pool league mean, then z-score
     to locPlus = 100 - K·z. Adds 'raw_loc_adj', 'locPlus', 'locRuns100'.
     Mutates and returns the same dict."""
     if not raw:
         return raw
+    combined_ids = {_pool_identity(k) for k in raw if _is_combined_team(k[1])}
     pool = {k: v for k, v in raw.items()
-            if pool_filter(k) and v['n_pitches'] >= min_pool}
+            if _in_norm_pool(k, pool_filter, combined_ids) and v['n_pitches'] >= min_pool}
     if not pool:
         for v in raw.values():
             v['raw_loc_adj'] = v['raw_loc']; v['locPlus'] = 100.0; v['locRuns100'] = 0.0
@@ -359,12 +380,13 @@ def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
     """Per-pitch-type rows standardized within their pitch-type GROUP."""
     if not raw:
         return raw
+    combined_ids = {_pool_identity(k) for k in raw if _is_combined_team(k[1])}
     by_group = defaultdict(dict)
     for k, v in raw.items():
         by_group[group_fn(k)][k] = v
     for grp, rows in by_group.items():
         pool = {k: v for k, v in rows.items()
-                if pool_filter(k) and v['n_pitches'] >= min_pool}
+                if _in_norm_pool(k, pool_filter, combined_ids) and v['n_pitches'] >= min_pool}
         if not pool:
             for v in rows.values():
                 v['raw_loc_adj'] = v['raw_loc']; v['locPlus'] = 100.0; v['locRuns100'] = 0.0
