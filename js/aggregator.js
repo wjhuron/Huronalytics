@@ -2012,15 +2012,15 @@ const Aggregator = {
           hitterIdx: teamMode ? null : row[ci.hitterIdx],
           teamIdx: row[ci.teamIdx],
           batsSet: {},
-          counts: new Array(49)
+          counts: new Array(50)  // 50 hitter-micro data cols (incl. buntAB at 49)
         };
-        for (let z = 0; z < 49; z++) groups[gk].counts[z] = 0;
+        for (let z = 0; z < 50; z++) groups[gk].counts[z] = 0;
       }
 
       const g = groups[gk];
       g.batsSet[row[ci.bats]] = true;
 
-      for (let f = 0; f < 49; f++) {
+      for (let f = 0; f < 50; f++) {
         g.counts[f] += row[5 + f];
       }
     }

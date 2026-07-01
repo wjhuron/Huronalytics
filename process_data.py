@@ -1111,6 +1111,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             'firstPitchAppearances', 'firstPitchSwings',
             'xBA_sum', 'xBA_count', 'xSLG_sum', 'xSLG_count',
             'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
+            'swingsNonBunt', 'contactNonBunt',
         ],
         'hitterPitchMicro': hitter_pitch_rows,
         'hitterPitchBipCols': ['hitterIdx', 'teamIdx', 'pitchTypeIdx', 'dateIdx', 'pitcherHand', 'exitVelo', 'launchAngle'],
