@@ -534,8 +534,10 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             if xwobacon_val is not None:
                 c[45] += xwobacon_val; c[46] += 1
 
-        # xwOBA: assigned to ALL PA events (K, BB, HBP, BIP), not just BIPs
-        if event and event not in NON_PA_EVENTS and event != 'Intent Walk':
+        # xwOBA: assigned to all PA events (K, BB, HBP, BIP) EXCEPT SH (sac bunt)
+        # and CI, matching the standard AB+BB+HBP+SF denominator and pipeline_compute.
+        if (event and event not in NON_PA_EVENTS and event != 'Intent Walk'
+                and event not in SH_EVENTS and event not in CI_EVENTS):
             xwoba_val = safe_float(p.get('xwOBA'))
             if xwoba_val is not None:
                 c[43] += xwoba_val; c[44] += 1
@@ -545,8 +547,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
         if count_str:
             strikes = count_str.split('-')[1] if '-' in count_str else ''
             if strikes == '2':
-                if desc in SWING_DESCRIPTIONS:
-                    c[35] += 1  # twoStrikeSwings
+                if desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES:
+                    c[35] += 1  # twoStrikeSwings (bunt-excluded, matches whiff convention)
                 if desc == 'Swinging Strike':
                     c[36] += 1  # twoStrikeWhiffs
             if count_str == '0-0':
@@ -740,8 +742,10 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             if xwobacon_val is not None:
                 c[45] += xwobacon_val; c[46] += 1
 
-        # xwOBA: assigned to ALL PA events (K, BB, HBP, BIP), not just BIPs
-        if event and event not in NON_PA_EVENTS and event != 'Intent Walk':
+        # xwOBA: assigned to all PA events (K, BB, HBP, BIP) EXCEPT SH (sac bunt)
+        # and CI, matching the standard AB+BB+HBP+SF denominator and pipeline_compute.
+        if (event and event not in NON_PA_EVENTS and event != 'Intent Walk'
+                and event not in SH_EVENTS and event not in CI_EVENTS):
             xwoba_val = safe_float(p.get('xwOBA'))
             if xwoba_val is not None:
                 c[43] += xwoba_val; c[44] += 1
@@ -751,8 +755,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
         if count_str:
             strikes = count_str.split('-')[1] if '-' in count_str else ''
             if strikes == '2':
-                if desc in SWING_DESCRIPTIONS:
-                    c[35] += 1  # twoStrikeSwings
+                if desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES:
+                    c[35] += 1  # twoStrikeSwings (bunt-excluded, matches whiff convention)
                 if desc == 'Swinging Strike':
                     c[36] += 1  # twoStrikeWhiffs
             if count_str == '0-0':
@@ -3255,16 +3259,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # --- Compute FIP, xFIP, SIERA ---
     # FIP_CONSTANT and WOBA_WEIGHTS are set globally from FanGraphs Guts page
 
-    # Compute league HR/FB% for xFIP
-    # FB includes popups (fly_ball + popup from Statcast BBType)
-    # HR from ALL MLB pitchers' boxscore data (including EP pitchers excluded from leaderboard)
-    total_hr_lg = sum(box['hr'] for k, box in pitcher_box.items()
-                      if k.split('|')[-1] not in AAA_TEAMS
-                      and not _is_combined_team(k.split('|')[-1]))
+    # Compute league HR/FB% for xFIP. FB includes popups (fly_ball + popup).
+    # Numerator (HR) and denominator (FB) must come from the SAME population — the
+    # non-ROC, non-combined leaderboard pitchers — so EP (position-player) pitchers,
+    # who contribute HR-allowed via their boxscore but no tracked fly balls, don't
+    # inflate the ratio.
+    total_hr_lg = 0
     total_fb_lg = 0
     for row in pitcher_leaderboard:
         if row.get('_isROC') or row.get('_isCombined'):
             continue
+        box = row.get('_box')
+        if box:
+            total_hr_lg += box.get('hr', 0)
         n_bip = row.get('nBip', 0) or 0
         if n_bip > 0:
             fb_pct = row.get('fbPct') or 0

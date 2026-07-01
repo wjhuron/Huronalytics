@@ -1545,6 +1545,11 @@ const Aggregator = {
 
       if (teamMode) {
         obj._isTeamRow = true;
+        // Team rows mix LHP and RHP of a pitch type; their signed tilt sin/cos
+        // sum toward cancellation, so the circular mean is a meaningless clock
+        // value. Suppress it (unlike category rows, which are one pitcher/one hand).
+        obj.breakTilt = null;
+        obj.breakTiltMinutes = null;
         if (filters.pitchTypes && filters.pitchTypes.indexOf('all') === -1 && filters.pitchTypes.indexOf(obj.pitchType) === -1) continue;
         // Same default floor as player mode ('Qualified' = 25 pitches of the
         // type): a team row built on a handful of pitches is noise.

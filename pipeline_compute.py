@@ -100,10 +100,12 @@ def compute_expected_stats(pitches, woba_weights=None):
         if event == 'Intent Walk':
             continue
 
-        xwoba_val = safe_float(p.get('xwOBA'))
-        if xwoba_val is not None:
-            xwoba_sum += xwoba_val
-            xwoba_denom += 1
+        # xwOBA denominator is AB+BB+HBP+SF (standard); exclude SH (sac bunt) and CI.
+        if event not in SH_EVENTS and event not in CI_EVENTS:
+            xwoba_val = safe_float(p.get('xwOBA'))
+            if xwoba_val is not None:
+                xwoba_sum += xwoba_val
+                xwoba_denom += 1
 
         if event in BB_EVENTS:
             ubb += 1
