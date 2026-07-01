@@ -707,11 +707,11 @@ BUBBLE_COLUMNS = [
         ('GB%',        'gbPct',            'gbPct_pctl',            'pct1'),
     ]),
     ('COMMAND & SHAPE', [
+        ('Velocity',   'fbVelo',    'fbVelo_pctl',    'mph'),
         ('Stuff+',     'stuffScore', 'stuffScore_pctl', 'int'),
         ('Loc+',       'locPlus',   'locPlus_pctl',   'int'),
         ('Zone%',      'izPct',     'izPct_pctl',     'pct1'),
         ('FPS%',       'fpsPct',    'fpsPct_pctl',    'pct1'),
-        ('Velocity',   'fbVelo',    'fbVelo_pctl',    'mph'),
     ]),
 ]
 
@@ -1999,6 +1999,7 @@ def main():
                         'velocity': _r.get('velocity'), 'velocity_pctl': _r.get('velocity_pctl'),
                         'xRunValue': _r.get('xRunValue'), 'xRv100': _r.get('xRv100'),
                         'rv100': _r.get('rv100'),
+                        'stuffScore': _r.get('stuffScore'), 'stuffScore_pctl': _r.get('stuffScore_pctl'),
                     }
         except Exception as _e:
             print(f"  WARNING: could not load pitch leaderboard for Loc+: {_e}")
