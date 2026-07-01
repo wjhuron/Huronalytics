@@ -253,7 +253,7 @@ def main():
     print(f'\n  saved bundle + pitcher_stuff_v11.csv to {HERE}')
 
     if args.inject:
-        inject(agg, overall)
+        inject(agg, overall, league)
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
@@ -261,23 +261,27 @@ def _is_combined_team(t):
     return isinstance(t, str) and t.endswith('TM') and t[:-2].isdigit()
 
 
-def _combo_score(pool, key):
-    """n-weighted mean of a pitcher's MLB per-team stuff_mean scores, used to
-    synthesize a combined 2TM/3TM row's score (which has no team key in agg).
-    Approximate (slightly over-shrunk vs scoring the true combined arsenal), but
-    fills the otherwise-blank combined row while leaving the model baseline intact."""
-    parts = pool.get(key)
-    if not parts:
+def _combo_score(parts, mu, sd):
+    """Exact combined-arsenal Stuff+ for a 2TM/3TM row: pool the pitcher's MLB
+    stint RAW predictions (n-weighted mean), then re-standardize at the COMBINED n
+    against the league mu/sd — re-shrinking with the full-season sample rather than
+    averaging the already-shrunk stint scores (which over-shrinks). Replicates
+    _standardize's math exactly. `parts` is a list of (rawmean, n) per stint."""
+    if not parts or mu is None or sd is None or sd <= 0:
         return None
-    tot = sum(n for _s, n in parts)
-    return round(sum(s * n for s, n in parts) / tot, 1) if tot > 0 else None
+    tot_n = sum(n for _rm, n in parts)
+    if tot_n <= 0:
+        return None
+    combined_rawmean = sum(rm * n for rm, n in parts) / tot_n
+    adj = (tot_n * combined_rawmean + K_SHRINK * mu) / (tot_n + K_SHRINK)
+    return round(min(180.0, max(40.0, 100 + K_SCALE * (adj - mu) / sd)), 1)
 
 
 def _pctl(sc, pool):
     below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
     return round((below + 0.5 * equal) / len(pool) * 100)
 
-def inject(agg, overall):
+def inject(agg, overall, league):
     """Write stuffScore into BOTH leaderboards. Percentiles use the same
     qualified pool as Loc+ (rows where locPlus_pctl is not None): per-pitch-type
     Stuff+ ranks within its pitch type, overall Stuff+ ranks across pitchers.
@@ -286,17 +290,20 @@ def inject(agg, overall):
     pl_path = os.path.join(DATA, 'pitch_leaderboard_rs.json')
     pl = json.load(open(pl_path))
     look = {(r.pitcher, r.team, r.pitch_type): r.stuff_mean for r in agg.itertuples()}
-    # Pool a pitcher's MLB per-team scores to synthesize the combined 2TM/3TM row.
+    # Pool a pitcher's MLB per-team RAW predictions to score the combined 2TM/3TM row.
     pool_pt = defaultdict(list)
     for r in agg.itertuples():
         if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
-            pool_pt[(r.pitcher, r.pitch_type)].append((r.stuff_mean, r.n))
+            pool_pt[(r.pitcher, r.pitch_type)].append((r.rawmean, r.n))
     for row in pl:
         key = (row['pitcher'], row['team'], row['pitchType'])
         if key in look:
             row['stuffScore'] = look[key]
         elif _is_combined_team(row['team']):
-            row['stuffScore'] = _combo_score(pool_pt, (row['pitcher'], row['pitchType']))
+            sc = league.get(row['pitchType'])
+            row['stuffScore'] = _combo_score(
+                pool_pt.get((row['pitcher'], row['pitchType'])),
+                sc['mu'] if sc else None, sc['sd'] if sc else None)
         else:
             row['stuffScore'] = None
     # Percentile pool is MLB-qualified only (ROC scored against the MLB baseline
@@ -325,13 +332,16 @@ def inject(agg, overall):
     pool_ov = defaultdict(list)
     for r in overall.itertuples():
         if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
-            pool_ov[(r.pitcher, r.throws)].append((r.stuff_mean, r.n))
+            pool_ov[(r.pitcher, r.throws)].append((r.rawmean, r.n))
+    ov_scale = league.get('_overall')
     for row in pp:
         key = (row['pitcher'], row['team'], row.get('throws'))
         if key in olook:
             row['stuffScore'] = olook[key]
         elif _is_combined_team(row['team']):
-            row['stuffScore'] = _combo_score(pool_ov, (row['pitcher'], row.get('throws')))
+            row['stuffScore'] = _combo_score(
+                pool_ov.get((row['pitcher'], row.get('throws'))),
+                ov_scale['mu'] if ov_scale else None, ov_scale['sd'] if ov_scale else None)
         else:
             row['stuffScore'] = None
     qpool = [row['stuffScore'] for row in pp
