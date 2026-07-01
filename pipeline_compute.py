@@ -60,7 +60,7 @@ HITTER_STAT_KEYS = [
     'runValue', 'xRunValue', 'rv100', 'xRv100',
     'hr', 'sb',
 ]
-HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct'}
+HITTER_INVERT_PCTL = {'swingPct', 'chasePct', 'whiffPct', 'gbPct', 'kPct', 'puPct', 'twoStrikeWhiffPct', 'firstPitchSwingPct'}
 
 PITCHER_BB_KEYS = ['avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'ldPct', 'fbPct', 'puPct', 'hrFbPct', 'xwOBAsp']
 PITCHER_BB_INVERT = {'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'xwOBAsp'}
@@ -91,6 +91,7 @@ def compute_expected_stats(pitches, woba_weights=None):
     xwoba_denom = 0
     xwobacon_sum = 0.0
     xwobacon_denom = 0
+    nonbunt_ab = 0  # AB denominator for xBA/xSLG, excluding bunt ABs (Savant convention)
 
     for p in pitches:
         event = p.get('Event')
@@ -124,6 +125,11 @@ def compute_expected_stats(pitches, woba_weights=None):
             continue
 
         ab += 1
+        # Savant excludes bunts from expected stats entirely, so bunt at-bats are
+        # dropped from BOTH the xBA/xSLG numerators AND the denominator (nonbunt_ab).
+        _is_bunt = p.get('BBType') in BUNT_BB_TYPES
+        if not _is_bunt:
+            nonbunt_ab += 1
         if event == 'Single':
             singles += 1
         elif event == 'Double':
@@ -133,10 +139,6 @@ def compute_expected_stats(pitches, woba_weights=None):
         elif event == 'Home Run':
             hr += 1
 
-        # Exclude bunt at-bats from the expected-contact numerators so the Sheets
-        # match the client micro path and the cards (bunts remain in the AB
-        # denominator, contributing an implicit 0 like a strikeout).
-        _is_bunt = p.get('BBType') in BUNT_BB_TYPES
         xba_val = safe_float(p.get('xBA'))
         xslg_val = safe_float(p.get('xSLG'))
         if not _is_bunt and xba_val is not None:
@@ -163,12 +165,12 @@ def compute_expected_stats(pitches, woba_weights=None):
     else:
         result['wOBA'] = None
 
-    # xBA/xSLG are Statcast-only — denominator is AB to match the standard
-    # Statcast convention (Ks contribute implicit 0). Return None when no
-    # AB had any Statcast data, otherwise the result is 0.0 for AAA-only
-    # players (which then gets a 0th percentile, swamping the leaderboard).
-    result['xBA'] = round(xba_sum / ab, 3) if (ab > 0 and xba_denom > 0) else None
-    result['xSLG'] = round(xslg_sum / ab, 3) if (ab > 0 and xslg_denom > 0) else None
+    # xBA/xSLG are Statcast-only — denominator is non-bunt AB (Savant drops bunts;
+    # Ks contribute an implicit 0). Return None when no AB had any Statcast data,
+    # otherwise the result is 0.0 for AAA-only players (which then gets a 0th
+    # percentile, swamping the leaderboard).
+    result['xBA'] = round(xba_sum / nonbunt_ab, 3) if (nonbunt_ab > 0 and xba_denom > 0) else None
+    result['xSLG'] = round(xslg_sum / nonbunt_ab, 3) if (nonbunt_ab > 0 and xslg_denom > 0) else None
     result['xwOBA'] = round(xwoba_sum / xwoba_denom, 3) if xwoba_denom > 0 else None
     result['xwOBAcon'] = round(xwobacon_sum / xwobacon_denom, 3) if xwobacon_denom > 0 else None
     return result

@@ -2060,7 +2060,7 @@ const Aggregator = {
       'hr', 'sb',
     ];
     const HITTER_INVERT = {
-      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true
+      swingPct: true, chasePct: true, whiffPct: true, gbPct: true, kPct: true, puPct: true, twoStrikeWhiffPct: true, firstPitchSwingPct: true
     };
 
     let rows = [];
@@ -2084,9 +2084,10 @@ const Aggregator = {
       const firstPitchAppearances = c[37], firstPitchSwings = c[38];
       const xBA_sum = c[39], xBA_count = c[40], xSLG_sum = c[41], xSLG_count = c[42];
       const xwOBA_sum = c[43], xwOBA_count = c[44], xwOBAcon_sum = c[45], xwOBAcon_count = c[46];
-      const swingsNonBunt = c[47], contactNonBunt = c[48];
+      const swingsNonBunt = c[47], contactNonBunt = c[48], buntAB = c[49] || 0;
 
       const ab = pa - bb - hbp - sf - sh - ci_v;
+      const nonbuntAB = ab - buntAB;  // xBA/xSLG denominator (Savant excludes bunts)
       const singles = h - db - tp - hr;
       const tb_val = singles + 2 * db + 3 * tp + 4 * hr;
       const xbh = db + tp + hr;
@@ -2218,8 +2219,8 @@ const Aggregator = {
         whiffPct: swingsNonBunt > 0 ? whiffs / swingsNonBunt : null,
         twoStrikeWhiffPct: twoStrikeSwings > 0 ? twoStrikeWhiffs / twoStrikeSwings : null,
         firstPitchSwingPct: firstPitchAppearances > 0 ? firstPitchSwings / firstPitchAppearances : null,
-        xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
-        xSLG: ab > 0 && xSLG_count > 0 ? xSLG_sum / ab : null,
+        xBA: nonbuntAB > 0 && xBA_count > 0 ? xBA_sum / nonbuntAB : null,
+        xSLG: nonbuntAB > 0 && xSLG_count > 0 ? xSLG_sum / nonbuntAB : null,
         xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
         xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
       };
@@ -2686,9 +2687,10 @@ const Aggregator = {
       const firstPitchAppearances = c[37], firstPitchSwings = c[38];
       const xBA_sum = c[39], xBA_count = c[40], xSLG_sum = c[41], xSLG_count = c[42];
       const xwOBA_sum = c[43], xwOBA_count = c[44], xwOBAcon_sum = c[45], xwOBAcon_count = c[46];
-      const swingsNonBunt = c[47], contactNonBunt = c[48];
+      const swingsNonBunt = c[47], contactNonBunt = c[48], buntAB = c[49] || 0;
 
       const ab = pa - bb - hbp - sf - sh - ci_v;
+      const nonbuntAB = ab - buntAB;  // xBA/xSLG denominator (Savant excludes bunts)
       const singles = h - db - tp - hr;
       const tb_val = singles + 2 * db + 3 * tp + 4 * hr;
 
@@ -2771,8 +2773,8 @@ const Aggregator = {
         contactPct: contactPct,
         izContactPct: izContactPct,
         whiffPct: swingsNonBunt > 0 ? whiffs / swingsNonBunt : null,
-        xBA: ab > 0 && xBA_count > 0 ? xBA_sum / ab : null,
-        xSLG: ab > 0 && xSLG_count > 0 ? xSLG_sum / ab : null,
+        xBA: nonbuntAB > 0 && xBA_count > 0 ? xBA_sum / nonbuntAB : null,
+        xSLG: nonbuntAB > 0 && xSLG_count > 0 ? xSLG_sum / nonbuntAB : null,
         xwOBA: xwOBA_count > 0 ? xwOBA_sum / xwOBA_count : null,
         xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
         twoStrikeWhiffPct: twoStrikeSwings > 0 ? twoStrikeWhiffs / twoStrikeSwings : null,

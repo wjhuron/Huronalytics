@@ -417,7 +417,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
     #  37:firstPitchAppearances  38:firstPitchSwings
     #  39:xBA_sum  40:xBA_count  41:xSLG_sum  42:xSLG_count
     #  43:xwOBA_sum  44:xwOBA_count  45:xwOBAcon_sum  46:xwOBAcon_count
-    #  47:swingsNonBunt  48:contactNonBunt  49:ibb
+    #  47:swingsNonBunt  48:contactNonBunt  49:buntAB
     # ==========================================================
     hitter_micro = defaultdict(lambda: [0.0] * 50)
 
@@ -457,6 +457,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             if event in SH_EVENTS:       c[9] += 1   # sh
             if event in CI_EVENTS:       c[10] += 1  # ci
             if event in K_EVENTS:        c[11] += 1  # k
+            # bunt at-bats (a bunt put in play that counts as an AB — not a sac
+            # bunt): excluded from the xBA/xSLG denominator client-side to match
+            # Savant and the server (nonbunt_ab).
+            if bb_type in BUNT_BB_TYPES and event not in SH_EVENTS:
+                c[49] += 1  # buntAB
 
         # Swing counts
         if desc in SWING_DESCRIPTIONS:
@@ -560,7 +565,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
     hitter_rows = []
     for (hi, ti, bats, di, ph), c in hitter_micro.items():
         row = [hi, ti, bats, di, ph]
-        for i in range(49):
+        for i in range(50):  # 0-49 (incl. buntAB at 49); matches hitterCols
             val = c[i]
             row.append(round(val, 4) if isinstance(val, float) and val != int(val) else int(val))
         hitter_rows.append(row)
@@ -929,10 +934,10 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             for (ti, bats, di, ph, c) in hmicro_by_hitter[hi]:
                 if ti not in teamset:
                     continue
-                _sum_counts(by_key[(bats, di, ph)], c, 49)
+                _sum_counts(by_key[(bats, di, ph)], c, 50)
             for (bats, di, ph), c in by_key.items():
                 row = [hi, combined_ti, bats, di, ph]
-                for i in range(49):
+                for i in range(50):  # incl. buntAB at 49
                     v = c[i]
                     row.append(round(v, 4) if isinstance(v, float) and v != int(v) else int(v))
                 hitter_rows.append(row)
@@ -1089,7 +1094,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
             'firstPitchAppearances', 'firstPitchSwings',
             'xBA_sum', 'xBA_count', 'xSLG_sum', 'xSLG_count',
             'xwOBA_sum', 'xwOBA_count', 'xwOBAcon_sum', 'xwOBAcon_count',
-            'swingsNonBunt', 'contactNonBunt', 'ibb',
+            'swingsNonBunt', 'contactNonBunt', 'buntAB',
         ],
         'hitterMicro': hitter_rows,
         'hitterBipCols': ['hitterIdx', 'teamIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
@@ -3113,13 +3118,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['hr'] = box_hr
                 row['xbh'] = box_2b + box_3b + box_hr
 
-                # K% and BB% (BB% excludes IBB, matching FanGraphs)
+                # K% and BB%. Hitter BB% uses TOTAL walks (incl. IBB), matching
+                # the client re-aggregation. (wOBA below still uses uBB, since IBB
+                # carries no wOBA weight.) Pitchers, by contrast, use uBB.
                 box_ubb = box_bb - box_ibb
                 row['kPct'] = round(box_so / box_pa, 4) if box_pa > 0 else None
-                row['bbPct'] = round(box_ubb / box_pa, 4) if box_pa > 0 else None
-                # BB/K (uses uBB to match bbPct denominator). Stored at full
+                row['bbPct'] = round(box_bb / box_pa, 4) if box_pa > 0 else None
+                # BB/K uses the same total-walk numerator as bbPct. Stored at full
                 # precision; display layer rounds to 2 decimals at render time.
-                row['bbToK'] = (box_ubb / box_so) if box_so > 0 else None
+                row['bbToK'] = (box_bb / box_so) if box_so > 0 else None
 
                 # BABIP = (H - HR) / (AB - K - HR + SF)
                 babip_denom = box_ab - box_so - box_hr + box_sf
