@@ -1281,8 +1281,11 @@ class BaseballSavantFocusedDownloader:
             'PitchID', 'Barrel',
         ]
 
-        # Only include columns that exist
-        final_columns = [c for c in final_columns if c in combined_df.columns]
+        # Keep the full column schema regardless of data availability so every
+        # CSV matches the MLB/ROC/AAA layout; missing columns come out empty
+        for col in final_columns:
+            if col not in combined_df.columns:
+                combined_df[col] = ''
         combined_df = combined_df[final_columns]
 
         # ROC/AAA normalization (no-op for MLB downloads)
@@ -1370,7 +1373,11 @@ class BaseballSavantFocusedDownloader:
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
         ]
-        final_columns = [c for c in final_columns if c in combined_df.columns]
+        # Keep the full column schema regardless of data availability so every
+        # CSV matches the MLB/ROC/AAA layout; missing columns come out empty
+        for col in final_columns:
+            if col not in combined_df.columns:
+                combined_df[col] = ''
         combined_df = combined_df[final_columns]
 
         # ROC/AAA normalization (no-op for MLB downloads)
@@ -1624,7 +1631,11 @@ class BaseballSavantFocusedDownloader:
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
         ]
-        final_columns = [c for c in final_columns if c in combined_df.columns]
+        # Keep the full column schema regardless of data availability so every
+        # CSV matches the MLB/ROC/AAA layout; missing columns come out empty
+        for col in final_columns:
+            if col not in combined_df.columns:
+                combined_df[col] = ''
         combined_df = combined_df[final_columns]
 
         # ROC/AAA normalization (no-op for MLB downloads)
