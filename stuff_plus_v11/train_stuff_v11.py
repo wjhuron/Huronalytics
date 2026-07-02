@@ -41,10 +41,29 @@ except Exception:
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC'}
 FB_TYPES = {'FF', 'SI', 'FC'}
+# 2026-07-02 config (validated: scripts/phase2b_stuff_experiments.py):
+# - rel_x (hand-normalized release side) added ALONE — earlier labs only
+#   tested it bundled with HAA; solo it wins (rel +0.004, pred +0.007) and
+#   every public reference model carries it
+# - movement features are the DENSITY-ADJUSTED xIndVrtBrk/xHorzBrk (flat on
+#   the harness, adopted for coherence: the model's ivb is now the same
+#   quantity the site displays, and altitude pitchers stop eating a
+#   systematic stuff penalty for their home air)
+# - monotone velocity constraint (rel +0.008, pred flat): more velo, same
+#   everything else, never grades worse — kills sparse-region artifacts
 BASE_FEATS = ['velocity', 'ivb', 'hb', 'velo_diff', 'ivb_diff', 'hb_diff',
-              'spin_rate', 'extension', 'arm_angle', 'rel_z', 'vaa', 'vaa_diff']
+              'spin_rate', 'extension', 'arm_angle', 'rel_z', 'vaa', 'vaa_diff',
+              'rel_x']
 TUNED = dict(max_depth=4, n_estimators=800, learning_rate=0.025, min_child_weight=10,
              reg_lambda=1.5, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, tree_method='hist')
+MONO_FEAT = 'velocity'
+
+
+def _params_for(X):
+    """TUNED + the monotone velocity constraint mapped to X's columns."""
+    p = dict(TUNED)
+    p['monotone_constraints'] = tuple(-1 if c == MONO_FEAT else 0 for c in X.columns)
+    return p
 # Pitcher-level standardization: 10 points per between-pitcher SD, mean shrunk
 # toward the qualified-pool mean by K_SHRINK pseudo-pitches, qualify at QUAL_N.
 K_SCALE, K_SHRINK, QUAL_N = 10, 100, 50
@@ -98,14 +117,18 @@ def build_df(pitches):
         pt, thr, bats = p.get('Pitch Type'), p.get('Throws'), p.get('Bats')
         if pt not in SUPPORTED or thr not in ('L', 'R') or bats not in ('L', 'R'): continue
         v, spin = sf(p.get('Velocity')), sf(p.get('Spin Rate'))
-        iv, hb_raw = sf(p.get('IndVertBrk')), sf(p.get('HorzBrk'))
+        # density-adjusted movement (pipeline_fetch backfills these from raw
+        # when the adjustment hasn't landed, so coverage matches raw)
+        iv, hb_raw = sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk'))
         vaa, ext = sf(p.get('VAA')), sf(p.get('Extension'))
         arm, rel_z = sf(p.get('ArmAngle')), sf(p.get('RelPosZ'))
+        rel_x_raw = sf(p.get('RelPosX'))
         if arm is None:                       # real-time placeholder until backfill
             arm = _arm_placeholder(p.get('Pitcher'), pt)
-        if None in (v, iv, hb_raw, vaa, ext, rel_z): continue
+        if None in (v, iv, hb_raw, vaa, ext, rel_z, rel_x_raw): continue
         s = 1.0 if thr == 'R' else -1.0
         hb = hb_raw * s
+        rel_x = rel_x_raw * s
         fbref = primary.get((p.get('Pitcher'), thr))
         if fbref:
             velo_diff = v - fbref['v']; ivb_diff = iv - fbref['iv']
@@ -124,11 +147,12 @@ def build_df(pitches):
             target = None
         rows.append({
             'pitcher': p.get('Pitcher'), 'team': p.get('PTeam'), 'throws': thr,
+            'date': p.get('Game Date'),
             'pitch_type': pt, 'platoon_same': 1 if bats == thr else 0,
             'velocity': v, 'ivb': iv, 'hb': hb, 'velo_diff': velo_diff,
             'ivb_diff': ivb_diff, 'hb_diff': hb_diff, 'spin_rate': spin,
-            'extension': ext, 'arm_angle': arm, 'rel_z': rel_z, 'vaa': vaa,
-            'vaa_diff': vaa_diff, 'target_xrv': target,
+            'extension': ext, 'arm_angle': arm, 'rel_z': rel_z, 'rel_x': rel_x,
+            'vaa': vaa, 'vaa_diff': vaa_diff, 'target_xrv': target,
         })
     return pd.DataFrame(rows)
 
@@ -165,15 +189,16 @@ def main():
     groups = df['pitcher'].values
     def _oof_predict(Xd, n_splits=8):
         oof = np.full(len(y), np.nan)
+        pp = _params_for(Xd)
         for tr, te in GroupKFold(n_splits=n_splits).split(Xd, y, groups):
-            mm = xgb.XGBRegressor(**TUNED); mm.fit(Xd.iloc[tr], y[tr]); oof[te] = mm.predict(Xd.iloc[te])
+            mm = xgb.XGBRegressor(**pp); mm.fit(Xd.iloc[tr], y[tr]); oof[te] = mm.predict(Xd.iloc[te])
         return -oof
     df['stuff_raw'] = _oof_predict(X)
 
     # full-data model: kept in the bundle for scoring pitches outside the
     # training set (ROC uses the no-arm companion; any future out-of-sample
     # scoring uses this). It no longer scores MLB leaderboard rows.
-    model = xgb.XGBRegressor(**TUNED); model.fit(X, y)
+    model = xgb.XGBRegressor(**_params_for(X)); model.fit(X, y)
 
     # Standardize at the PITCHER level (proper "+"-stat spread: SD=10 between
     # pitchers, not between pitches — averaging pitch-level z-scores collapses
@@ -205,7 +230,7 @@ def main():
     # ── ROC/AAA: no-arm companion model, scored against the MLB baseline. This
     #    ONLY affects ROC; MLB above is untouched (keeps real arm angle). ──
     Xna = design(df, NOARM_FEATS)
-    model_na = xgb.XGBRegressor(**TUNED); model_na.fit(Xna, y)
+    model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna, y)
     # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
     # are ranked against carry no in-sample luck inflation. ROC pitches are not
     # in the training set, so model_na's predictions on ROC are truly OOS.
@@ -254,7 +279,10 @@ def main():
                      'model_na': model_na, 'noarm_feats': NOARM_FEATS,
                      'na_pt_scale': na_pt, 'na_ov_scale': na_ov}, f)
 
-    # report
+    # report + metric history (drift visibility: every retrain appends its
+    # OOF descriptive r and split-half reliability to data/, which CI
+    # commits — see "They Don't Make Pitch Models Like They Used To" for
+    # why watching these decay matters)
     from numpy import corrcoef
     g = df.groupby(['pitcher', 'pitch_type'])
     recs = []
@@ -262,7 +290,28 @@ def main():
         if len(grp) >= 50:
             recs.append((grp['stuff_raw'].mean(), grp['target_xrv'].mean()))
     xs = np.array([r[0] for r in recs]); ys = np.array([r[1] for r in recs])
-    print(f'  OOF stuff vs same-period xRV (descriptive): r = {corrcoef(xs, ys)[0,1]:+.3f}')
+    oof_desc_r = float(corrcoef(xs, ys)[0, 1])
+    print(f'  OOF stuff vs same-period xRV (descriptive): r = {oof_desc_r:+.3f}')
+
+    # split-half reliability of OOF stuff (odd/even calendar dates)
+    date_order = {d: i for i, d in enumerate(sorted(df['date'].dropna().unique()))}
+    df['_half'] = df['date'].map(date_order).fillna(0).astype(int) % 2
+    a0, a1 = [], []
+    for key, grp in df.groupby(['pitcher', 'throws', 'pitch_type']):
+        h0, h1 = grp[grp._half == 0], grp[grp._half == 1]
+        if len(h0) >= 40 and len(h1) >= 40:
+            a0.append(h0['stuff_raw'].mean()); a1.append(h1['stuff_raw'].mean())
+    rel = float(corrcoef(np.array(a0), np.array(a1))[0, 1]) if len(a0) >= 5 else float('nan')
+    print(f'  OOF split-half reliability (>=40/half): r = {rel:+.3f} (n={len(a0)})')
+
+    hist = os.path.join(DATA, 'stuff_metrics_history.csv')
+    latest_date = max((d for d in df['date'].dropna()), default='')
+    new_file = not os.path.exists(hist)
+    with open(hist, 'a') as f:
+        if new_file:
+            f.write('through_date,n_pitches,n_pitchers,oof_descriptive_r,oof_splithalf_r,n_rel_units\n')
+        f.write(f'{latest_date},{len(df)},{df.pitcher.nunique()},'
+                f'{oof_desc_r:.4f},{rel:.4f},{len(a0)}\n')
     print('\n  top arsenals by mean Stuff+ (n>=200):')
     top = agg[agg.n >= 200].sort_values('stuff_mean', ascending=False).head(10)
     for _, r in top.iterrows():
@@ -299,10 +348,16 @@ def _pctl(sc, pool):
     return round((below + 0.5 * equal) / len(pool) * 100)
 
 def inject(agg, overall, league):
-    """Write stuffScore into BOTH leaderboards. Percentiles use the same
-    qualified pool as Loc+ (rows where locPlus_pctl is not None): per-pitch-type
-    Stuff+ ranks within its pitch type, overall Stuff+ ranks across pitchers.
-    Values are shown for all rows; color/pctl only for qualified rows."""
+    """Write stuffScore into BOTH leaderboards.
+
+    Percentile convention (site standard, aligned 2026-07-02): the pool that
+    DEFINES the distribution is MLB rows with >=25 pitches (per pitch type at
+    pitch level; overall at pitcher level), excluding combined 2TM/3TM rows
+    (their stints already represent them). EVERY row with a score gets a
+    rank stored — including ROC and low-sample rows — and qualification is a
+    render-only coloring gate applied by leaderboard.js. Previously the rank
+    existed only where locPlus_pctl existed, which silently coupled Stuff+
+    coloring to Loc+ qualification settings."""
     # ── per-pitch-type -> pitch_leaderboard ──
     pl_path = os.path.join(DATA, 'pitch_leaderboard_rs.json')
     pl = json.load(open(pl_path))
@@ -323,20 +378,19 @@ def inject(agg, overall, league):
                 sc['mu'] if sc else None, sc['sd'] if sc else None)
         else:
             row['stuffScore'] = None
-    # Percentile pool is MLB-qualified only (ROC scored against the MLB baseline
-    # and ranked into it, so ROC never shifts MLB colors — "only applies to ROC").
-    # Combined 2TM/3TM rows are excluded from the POOL (their stints already
-    # represent them) but still get a ranked percentile below.
+    # Pool: MLB rows with >=25 pitches of the type; combined 2TM/3TM rows
+    # excluded from the POOL (their stints already represent them). Every
+    # scored row gets a rank; coloring is gated at render time.
     qual_by_pt = defaultdict(list)
     for row in pl:
-        if (row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None
+        if (row.get('stuffScore') is not None and (row.get('count') or 0) >= 25
                 and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])):
             qual_by_pt[row['pitchType']].append(row['stuffScore'])
     n_pl = 0
     for row in pl:
         sc = row.get('stuffScore'); pt = row['pitchType']
         if sc is not None: n_pl += 1
-        if sc is not None and row.get('locPlus_pctl') is not None and qual_by_pt.get(pt):
+        if sc is not None and qual_by_pt.get(pt):
             row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt])
         else:
             row['stuffScore_pctl'] = None
@@ -362,13 +416,13 @@ def inject(agg, overall, league):
         else:
             row['stuffScore'] = None
     qpool = [row['stuffScore'] for row in pp
-             if row.get('stuffScore') is not None and row.get('locPlus_pctl') is not None
+             if row.get('stuffScore') is not None and (row.get('count') or 0) >= 25
              and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])]
     n_pp = 0
     for row in pp:
         sc = row.get('stuffScore')
         if sc is not None: n_pp += 1
-        if sc is not None and row.get('locPlus_pctl') is not None and qpool:
+        if sc is not None and qpool:
             row['stuffScore_pctl'] = _pctl(sc, qpool)
         else:
             row['stuffScore_pctl'] = None
