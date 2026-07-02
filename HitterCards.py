@@ -1661,7 +1661,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         right += 0.006
         right = _place_text2(right, l2_y, '|', 13, TEXT_FAINT, '600')
         right += 0.006
-        _place_text2(right, l2_y, f"{med_la_real:+.1f}° LA",
+        _place_text2(right, l2_y, f"{med_la_real:.1f}° LA",
                        14, pctl_color, '800')
 
     # Spray axes styling

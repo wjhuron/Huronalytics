@@ -3205,7 +3205,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         _fg = _fg_refresh(max_age_hours=24, verbose=True)
         _fg_mlb_h = _fg.get('mlbHitters', {})
         _fg_aaa_h = _fg.get('aaaHitters', {})
-        n_mlb_wrc = n_mlb_xwoba = n_mlb_xba = n_mlb_xslg = n_mlb = 0
+        n_mlb_wrc = n_mlb = 0
         n_aaa_wrc = n_aaa = 0
         for row in hitter_leaderboard:
             mid = row.get('mlbId')
@@ -3225,17 +3225,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     if fg_player.get('wRCplus') is not None:
                         row['wRCplus'] = fg_player['wRCplus']
                         n_mlb_wrc += 1
-                    if fg_player.get('xwOBA') is not None:
-                        row['xwOBA'] = fg_player['xwOBA']
-                        n_mlb_xwoba += 1
-                    if fg_player.get('xBA') is not None:
-                        row['xBA'] = fg_player['xBA']
-                        n_mlb_xba += 1
-                    if fg_player.get('xSLG') is not None:
-                        row['xSLG'] = fg_player['xSLG']
-                        n_mlb_xslg += 1
-        print(f"  FG hitter override: wRC+ {n_mlb_wrc}/{n_mlb} MLB + {n_aaa_wrc}/{n_aaa} AAA; "
-              f"xwOBA {n_mlb_xwoba} | xBA {n_mlb_xba} | xSLG {n_mlb_xslg} (MLB)")
+                    # xBA/xSLG/xwOBA are NOT overridden with FanGraphs — keep the
+                    # pipeline's Statcast-computed values so they stay consistent
+                    # with xwOBAcon and with the website (which re-aggregates from
+                    # the same Statcast micro). wRC+ has no pipeline equivalent, so
+                    # it still comes from FanGraphs.
+        print(f"  FG hitter override: wRC+ {n_mlb_wrc}/{n_mlb} MLB + {n_aaa_wrc}/{n_aaa} AAA")
     except Exception as _e:
         print(f"  WARNING: FG hitter override failed ({type(_e).__name__}: {_e})")
 
