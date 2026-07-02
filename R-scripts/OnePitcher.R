@@ -49,9 +49,9 @@ calculate_pitcher_stats <- function(data, pitcher_name, has_arm_angle = FALSE) {
       avg_tilt = avg_tilt_clock(OTilt),
       avg_ivb = sprintf("%.1f\"", mean(xIndVrtBrk, na.rm = TRUE)),
       avg_hb = sprintf("%.1f\"", mean(xHorzBrk, na.rm = TRUE)),
-      avg_height = sprintf("%.1f'", mean(RelPosZ, na.rm = TRUE)),
-      avg_side = sprintf("%.1f'", mean(RelPosX, na.rm = TRUE)),
-      avg_extension = sprintf("%.1f'", mean(Extension, na.rm = TRUE)),
+      avg_height = sprintf("%.2f'", mean(RelPosZ, na.rm = TRUE)),
+      avg_side = sprintf("%.2f'", mean(RelPosX, na.rm = TRUE)),
+      avg_extension = sprintf("%.2f'", mean(Extension, na.rm = TRUE)),
       avg_arm_angle = if (has_arm_angle) sprintf("%.1f°", mean(ArmAngle, na.rm = TRUE)) else NA_character_,
       avg_vaa = sprintf("%.2f°", mean(VAA, na.rm = TRUE)),
       avg_haa = sprintf("%.2f°", mean(HAA, na.rm = TRUE)),
@@ -303,15 +303,11 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
       "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "OTilt",
       "IVB", "HB", "RelZ", "RelX", "Ext", "Arm Angle", "VAA", "HAA"
     )
-    # Define proportional widths for table 1 (15 columns with Arm Angle)
-    table1_widths <- unit(c(1.4, 0.7, 0.9, 0.6, 0.9, 0.9, 0.6, 0.5, 0.5, 0.6, 0.6, 0.5, 1.0, 0.6, 0.6), "null")
   } else {
     table1_colnames <- c(
       "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "OTilt",
       "IVB", "HB", "RelZ", "RelX", "Ext", "VAA", "HAA"
     )
-    # Define proportional widths for table 1 (14 columns without Arm Angle)
-    table1_widths <- unit(c(1.4, 0.7, 0.9, 0.6, 0.9, 0.9, 0.6, 0.5, 0.5, 0.6, 0.6, 0.5, 0.6, 0.6), "null")
   }
   
   # Set column names for first table
@@ -326,19 +322,20 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   
   # Define headers for second table (removed BBE and Exit Velo)
   table2_colnames <- c(
-    "Pitch Type", "Count", "% Thrown", "IZ%", "Swing%",
+    "Pitch Type", "Count", "% Thrown", "Zone%", "Swing%",
     "CSW%", "Whiff%", "Chase%", "GB%"
   )
   
   # Set column names for second table
   names(stats_df_table2) <- table2_colnames
   
-  # Create base table theme with larger font and more padding
+  # Create base table theme with larger font; tight horizontal padding so each
+  # column is only as wide as its widest content
   tt <- ttheme_minimal(
     core = list(
       fg_params = list(col = "black", fontsize = 16),
       bg_params = list(fill = "white"),
-      padding = unit(c(8, 8), "mm")
+      padding = unit(c(2, 8), "mm")
     ),
     colhead = list(
       fg_params = list(
@@ -348,26 +345,21 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
         fontfamily = NULL
       ),
       bg_params = list(fill = "white"),
-      padding = unit(c(8, 8), "mm")
+      padding = unit(c(2, 8), "mm")
     )
   )
-  
-  # Define proportional widths for table 2 (9 columns) - increased IZ% width
-  table2_widths <- unit(c(1.4, 0.8, 0.9, 0.8, 0.8, 0.8, 0.8, 0.9, 0.8), "null")
-  
-  # Create both tables with proportional widths
+
+  # Create both tables (column widths auto-size to fit content)
   tbl1 <- tableGrob(
     stats_df_table1,
     rows = NULL,
-    theme = tt,
-    widths = table1_widths
+    theme = tt
   )
-  
+
   tbl2 <- tableGrob(
     stats_df_table2,
     rows = NULL,
-    theme = tt,
-    widths = table2_widths
+    theme = tt
   )
   
   # Apply formatting to both tables

@@ -141,15 +141,15 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
       else
         NA_character_,
       avg_height = if (has_col["RelPosZ"])
-        sprintf("%.1f'", mean(RelPosZ, na.rm = TRUE))
+        sprintf("%.2f'", mean(RelPosZ, na.rm = TRUE))
       else
         NA_character_,
       avg_side = if (has_col["RelPosX"])
-        sprintf("%.1f'", mean(RelPosX, na.rm = TRUE))
+        sprintf("%.2f'", mean(RelPosX, na.rm = TRUE))
       else
         NA_character_,
       avg_extension = if (has_col["Extension"])
-        sprintf("%.1f'", mean(Extension, na.rm = TRUE))
+        sprintf("%.2f'", mean(Extension, na.rm = TRUE))
       else
         NA_character_,
       avg_arm_angle = if (has_col["ArmAngle"])
@@ -340,7 +340,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
     "avg_arm_angle" = "Arm Angle",
     "avg_vaa" = "VAA",
     "avg_haa" = "HAA",
-    "iz_percent" = "IZ%",
+    "iz_percent" = "Zone%",
     "csw_percent" = "CSW%",
     "swstr_percent" = "Whiff%",
     "chase_percent" = "Chase%",
@@ -634,22 +634,24 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   non_total <- non_total[order(-as.numeric(non_total$Count)), ]
   stats_df <- bind_rows(non_total, total_rows)
   
-  # Create base table theme
+  # Create base table theme (tight horizontal padding so each column is only
+  # as wide as its widest content; colhead fontsize matches the format_table
+  # header override so fitted widths don't clip the bold headers)
   tt <- ttheme_minimal(
     core = list(
       fg_params = list(col = "black", fontsize = 11),
       bg_params = list(fill = "white"),
-      padding = unit(c(7, 7), "mm")
+      padding = unit(c(2, 7), "mm")
     ),
     colhead = list(
       fg_params = list(
         col = "black",
         fontface = "bold",
-        fontsize = 11,
+        fontsize = 12,
         fontfamily = NULL
       ),
       bg_params = list(fill = "white"),
-      padding = unit(c(7, 7), "mm")
+      padding = unit(c(2, 7), "mm")
     )
   )
   

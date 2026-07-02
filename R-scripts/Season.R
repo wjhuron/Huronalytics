@@ -56,9 +56,9 @@ calculate_combined_pitcher_stats <- function(data, pitcher_name, has_arm_angle =
       avg_tilt = avg_tilt_clock(OTilt),
       avg_ivb = sprintf("%.1f\"", mean(xIndVrtBrk, na.rm = TRUE)),
       avg_hb = sprintf("%.1f\"", mean(xHorzBrk, na.rm = TRUE)),
-      avg_height = sprintf("%.1f'", mean(RelPosZ, na.rm = TRUE)),
-      avg_side = sprintf("%.1f'", mean(RelPosX, na.rm = TRUE)),
-      avg_extension = sprintf("%.1f'", mean(Extension, na.rm = TRUE)),
+      avg_height = sprintf("%.2f'", mean(RelPosZ, na.rm = TRUE)),
+      avg_side = sprintf("%.2f'", mean(RelPosX, na.rm = TRUE)),
+      avg_extension = sprintf("%.2f'", mean(Extension, na.rm = TRUE)),
       avg_arm_angle = if (has_arm_angle) sprintf("%.1f°", mean(ArmAngle, na.rm = TRUE)) else NA_character_,
       avg_vaa = sprintf("%.2f°", mean(VAA, na.rm = TRUE)),
       avg_haa = sprintf("%.2f°", mean(HAA, na.rm = TRUE)),
@@ -432,14 +432,14 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
       "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "OTilt",
       "IVB", "HB", "RelZ", "RelX", "Ext", "Arm Angle",
       "VAA", "HAA",
-      "IZ%", "CSW%", "Whiff%", "Chase%", "GB%"
+      "Zone%", "CSW%", "Whiff%", "Chase%", "GB%"
     )
   } else {
     combined_colnames <- c(
       "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "OTilt",
       "IVB", "HB", "RelZ", "RelX", "Ext",
       "VAA", "HAA",
-      "IZ%", "CSW%", "Whiff%", "Chase%", "GB%"
+      "Zone%", "CSW%", "Whiff%", "Chase%", "GB%"
     )
   }
   
@@ -465,8 +465,8 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
     
     # Define headers for the platoon table with duplicate pitch type column
     platoon_colnames <- c(
-      "Pitch Type", "Count", "% Thrown", "IZ%", "CSW%", "Whiff%", "Chase%", "GB%",
-      "Pitch Type", "Count", "% Thrown", "IZ%", "CSW%", "Whiff%", "Chase%", "GB%"
+      "Pitch Type", "Count", "% Thrown", "Zone%", "CSW%", "Whiff%", "Chase%", "GB%",
+      "Pitch Type", "Count", "% Thrown", "Zone%", "CSW%", "Whiff%", "Chase%", "GB%"
     )
     
     # Reorder columns to include duplicate pitch type
@@ -480,12 +480,13 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
     names(platoon_df) <- platoon_colnames
   }
   
-  # Create base table theme
+  # Create base table theme (tight horizontal padding so each column is only
+  # as wide as its widest content)
   tt <- ttheme_minimal(
     core = list(
       fg_params = list(col = "black", fontsize = 9),
       bg_params = list(fill = "white"),
-      padding = unit(c(7, 7), "mm")
+      padding = unit(c(2, 7), "mm")
     ),
     colhead = list(
       fg_params = list(
@@ -495,16 +496,15 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
         fontfamily = NULL
       ),
       bg_params = list(fill = "white"),
-      padding = unit(c(7, 7), "mm")
+      padding = unit(c(2, 7), "mm")
     )
   )
-  
-  # Create the main stats table
+
+  # Create the main stats table (column widths auto-size to fit content)
   tbl1 <- tableGrob(
     stats_df,
     rows = NULL,
-    theme = tt,
-    widths = unit(rep(1, ncol(stats_df)), "null")
+    theme = tt
   )
   
   # Apply formatting to the main table
@@ -515,8 +515,7 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
     tbl2 <- tableGrob(
       platoon_df,
       rows = NULL,
-      theme = tt,
-      widths = unit(rep(1, ncol(platoon_df)), "null")
+      theme = tt
     )
     
     # Apply formatting to the platoon table
