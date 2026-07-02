@@ -975,6 +975,7 @@ class BaseballSavantFocusedDownloader:
                 'on_1b',
                 'on_2b',
                 'on_3b',
+                'outs_when_up',
                 'launch_speed_angle',
             ]
 
@@ -1022,6 +1023,7 @@ class BaseballSavantFocusedDownloader:
             'estimated_ba_using_speedangle': 'xBA',
             'estimated_slg_using_speedangle': 'xSLG',
             'estimated_woba_using_speedangle': 'xwOBA',
+            'outs_when_up': 'Outs',
             'launch_speed_angle': 'Barrel',
         }
         # on_1b/on_2b/on_3b are not renamed — they're consumed to build the Runners column
@@ -1079,6 +1081,16 @@ class BaseballSavantFocusedDownloader:
             if f'{col}_statcast' in merged.columns:
                 merged[col] = pd.to_numeric(merged[f'{col}_statcast'], errors='coerce').apply(lambda x: f"{x:.3f}" if pd.notna(x) else '')
                 merged = merged.drop(columns=[f'{col}_statcast'])
+
+        # Outs: the live feed has no pre-pitch outs field, so this comes from
+        # the supplement's outs_when_up (matches backfill_supplement.py)
+        if 'Outs_statcast' in merged.columns:
+            statcast_outs = pd.to_numeric(merged['Outs_statcast'], errors='coerce')
+            merged['Outs'] = statcast_outs.combine_first(
+                pd.to_numeric(merged['Outs'], errors='coerce'))
+            merged = merged.drop(columns=['Outs_statcast'])
+        if 'Outs' in merged.columns:
+            merged['Outs'] = pd.to_numeric(merged['Outs'], errors='coerce').astype('Int64')
 
         # Build Runners column from on_1b/on_2b/on_3b
         # on_1b/on_2b/on_3b contain player IDs when occupied, NaN when empty
