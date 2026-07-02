@@ -1537,6 +1537,35 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         print(f"  {label}: slope={slope:.4f}, intercept={intercept:.4f}, R²={r2:.4f} (n={n})")
         return {'slope': slope, 'intercept': intercept, 'r2': r2, 'n': n}
 
+    def fit_within_pitcher_slope(triples, label):
+        """Pitcher-demeaned (fixed-effects) OLS slope of y on x.
+
+        triples: [(pitcher_key, x, y)]. Estimates the slope from within-pitcher
+        location variance only, so between-pitcher clusters (LHP/RHP mirrors,
+        shape-location selection) cannot corrupt it. The location slope is pure
+        flight geometry, ~1.0-1.1 deg/ft for every pitch type — a fit far from
+        that range is a red flag, not a feature."""
+        if len(triples) < 30:
+            return None
+        sums = {}
+        for k, x, y in triples:
+            s = sums.setdefault(k, [0.0, 0.0, 0])
+            s[0] += x; s[1] += y; s[2] += 1
+        sxx = 0.0
+        sxy = 0.0
+        for k, x, y in triples:
+            s = sums[k]
+            dx = x - s[0] / s[2]
+            dy = y - s[1] / s[2]
+            sxx += dx * dx
+            sxy += dx * dy
+        if sxx < 1e-10:
+            return None
+        slope = sxy / sxx
+        print(f"  {label}: slope={slope:.4f} (within-pitcher, n={len(triples)}, "
+              f"pitchers={len(sums)})")
+        return {'slope': slope, 'n': len(triples)}
+
     def mat_inv_general(M):
         """Invert a square matrix via Gauss-Jordan elimination with partial pivoting."""
         n = len(M)
@@ -1685,43 +1714,59 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row['nVAA'] = None
 
     # --- Fit HAA ~ PlateX regressions per pitch type (MLB only) ---
-    # Per-pitch-type slopes are critical: breaking balls (SL slope ~3.6, ST ~4.9) vs fastballs (SI ~0.17)
-    haa_reg_by_pt = defaultdict(list)  # pitch_type -> [(plateX, haa)]
+    # LHP is mirrored into the RHP frame (negate PlateX AND HAA; the slope is
+    # frame-invariant because both axes flip), and the slope is fit
+    # within-pitcher. Fitting hand-pooled natural-frame data blended the
+    # geometric slope with the LHP/RHP cluster axis (SL fit 1.93 vs true ~1.05,
+    # making nHAA ANTI-correlated with location), so both guards matter.
+    # League avg PlateX is hand-specific: the pooled mean injected a
+    # hand-dependent constant (RHP SL -0.35 deg, LHP +0.89) that broke the
+    # |nHAA| percentile-ranking fairness between hands.
+    HAA_HAND_MIN_N = 10  # min pitches for a hand-specific league PlateX mean
+    haa_reg_by_pt = defaultdict(list)     # pitch_type -> [(pitcher_key, mirrored plateX, mirrored haa)]
+    haa_px_by_pt_hand = defaultdict(list)  # (pitch_type, throws) -> [plateX] (natural frame)
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue
         pt = p.get('Pitch Type') or p.get('TaggedPitchType')
         haa_val = safe_float(p.get('HAA'))
         px_val = safe_float(p.get('PlateX'))
-        if pt and haa_val is not None and px_val is not None:
-            haa_reg_by_pt[pt].append((px_val, haa_val))
+        throws = p.get('Throws')
+        if pt and haa_val is not None and px_val is not None and throws in ('L', 'R'):
+            s = 1.0 if throws == 'R' else -1.0
+            haa_reg_by_pt[pt].append(((p.get('Pitcher'), throws), px_val * s, haa_val * s))
+            haa_px_by_pt_hand[(pt, throws)].append(px_val)
 
-    print("\nHAA ~ PlateX regressions (per pitch type):")
-    haa_regressions = {}  # pitch_type -> {slope, intercept, leagueAvgPlateX}
+    print("\nHAA ~ PlateX regressions (per pitch type, mirrored + within-pitcher):")
+    haa_regressions = {}  # pitch_type -> {slope, leagueAvgPlateX: {'R':…, 'L':…}}
     for pt in sorted(haa_reg_by_pt.keys()):
-        pairs = haa_reg_by_pt[pt]
-        result = fit_linear_regression(pairs, f"HAA~PlateX {pt}")
+        result = fit_within_pitcher_slope(haa_reg_by_pt[pt], f"HAA~PlateX {pt}")
         if result:
-            mean_px = sum(p[0] for p in pairs) / len(pairs)
+            means = {}
+            for hand in ('R', 'L'):
+                vals = haa_px_by_pt_hand.get((pt, hand))
+                if vals and len(vals) >= HAA_HAND_MIN_N:
+                    means[hand] = sum(vals) / len(vals)
             haa_regressions[pt] = {
                 'slope': result['slope'],
-                'intercept': result['intercept'],
-                'leagueAvgPlateX': mean_px,
+                'leagueAvgPlateX': means,
             }
 
     # Compute nHAA for each pitch leaderboard row using per-pitch-type slope
+    # and the hand-specific league PlateX mean.
     for row in pitch_leaderboard:
         if row.get('haa') is not None:
             pt = row['pitchType']
             reg = haa_regressions.get(pt)
-            if reg:
+            lg_px = reg['leagueAvgPlateX'].get(row.get('throws')) if reg else None
+            if reg and lg_px is not None:
                 key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
                 pitches_for_row = pitch_groups[key]
                 px_vals = [safe_float(p.get('PlateX')) for p in pitches_for_row]
                 px_vals = [v for v in px_vals if v is not None]
                 if px_vals:
                     avg_px = sum(px_vals) / len(px_vals)
-                    row['nHAA'] = round(row['haa'] - reg['slope'] * (avg_px - reg['leagueAvgPlateX']), 2)
+                    row['nHAA'] = round(row['haa'] - reg['slope'] * (avg_px - lg_px), 2)
                 else:
                     row['nHAA'] = None
             else:
@@ -2920,8 +2965,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'vaaRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6),
                                   'leagueAvgPlateZ': round(r['leagueAvgPlateZ'], 6)}
                            for pt, r in vaa_regressions.items()},
-        'haaRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6),
-                                  'leagueAvgPlateX': round(r['leagueAvgPlateX'], 6)}
+        'haaRegressions': {pt: {'slope': round(r['slope'], 6),
+                                  'leagueAvgPlateX': {h: round(v, 6)
+                                                      for h, v in r['leagueAvgPlateX'].items()}}
                            for pt, r in haa_regressions.items()},
         'sacqZones': sacq_zones_output,
         'mvnModels': {
@@ -2941,6 +2987,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'locPlusWeights': loc_weights,
         'hitterPlusStandardization': hitter_plus_standardization,
         'plusReanchor': plus_reanchor,
+        # BB+ component weights — single source of truth, read by
+        # js/aggregator.js so the client recompute can never drift from the
+        # server again (the 0.6/0.4 → 0.585/0.415 desync shipped for months).
+        'bbPlusWeights': {'con': BB_PLUS_W_CON, 'sp': BB_PLUS_W_SP},
         # Tier 2: 3D xwOBA table used to fill ROC BIP xwOBA (no Savant
         # per-pitch xwOBA available for AAA). For transparency / audit.
         'xwOBA3DTable': (__import__('pipeline_xwoba3d').serialize_table(_xw3d_smoothed_table)

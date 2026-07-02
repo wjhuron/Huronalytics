@@ -44,7 +44,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-02 14:26",
+  "generatedAt": "2026-07-02 13:38",
   "totalPitches": 379565,
   "totalPitchers": 712,
   "totalHitters": 606,
@@ -383,9 +383,9 @@
     "locPlus": 100.0,
     "era": 4.2,
     "hr9": 1.16,
-    "fip": 4.19,
-    "xFIP": 4.19,
-    "siera": 4.08
+    "fip": 4.18,
+    "xFIP": 4.18,
+    "siera": 4.07
   },
   "hitterLeagueAverages": {
     "babip": 0.2892,
@@ -446,7 +446,7 @@
     "kPct": 0.2212,
     "bbPct": 0.0901,
     "bbToK": 0.4497,
-    "wRCplus": 99.7967,
+    "wRCplus": 99.8112,
     "xWRCplus": 100.5709
   },
   "vaaRegressions": {
@@ -503,54 +503,73 @@
   },
   "haaRegressions": {
     "CH": {
-      "slope": 0.697535,
-      "intercept": 0.091118,
-      "leagueAvgPlateX": -0.080839
+      "slope": 1.068322,
+      "leagueAvgPlateX": {
+        "R": -0.324988,
+        "L": 0.37984
+      }
     },
     "CU": {
-      "slope": 1.240833,
-      "intercept": 1.215951,
-      "leagueAvgPlateX": 0.033486
+      "slope": 1.033526,
+      "leagueAvgPlateX": {
+        "R": 0.076134,
+        "L": -0.073234
+      }
     },
     "FC": {
-      "slope": 1.776959,
-      "intercept": 0.987449,
-      "leagueAvgPlateX": 0.13951
+      "slope": 1.048084,
+      "leagueAvgPlateX": {
+        "R": 0.270181,
+        "L": -0.274206
+      }
     },
     "FF": {
-      "slope": 1.076507,
-      "intercept": 0.48758,
-      "leagueAvgPlateX": -0.016543
+      "slope": 1.087455,
+      "leagueAvgPlateX": {
+        "R": -0.011958,
+        "L": -0.028388
+      }
     },
     "FS": {
-      "slope": 0.808314,
-      "intercept": 0.494948,
-      "leagueAvgPlateX": -0.116806
+      "slope": 1.081206,
+      "leagueAvgPlateX": {
+        "R": -0.230429,
+        "L": 0.345036
+      }
     },
     "KN": {
       "slope": 1.292482,
-      "intercept": 0.764081,
-      "leagueAvgPlateX": 0.118455
+      "leagueAvgPlateX": {
+        "R": 0.118455
+      }
     },
     "SI": {
-      "slope": 0.844863,
-      "intercept": 0.135343,
-      "leagueAvgPlateX": -0.075575
+      "slope": 1.062844,
+      "leagueAvgPlateX": {
+        "R": -0.178851,
+        "L": 0.154527
+      }
     },
     "SL": {
-      "slope": 1.930893,
-      "intercept": 0.764233,
-      "leagueAvgPlateX": 0.133622
+      "slope": 1.041184,
+      "leagueAvgPlateX": {
+        "R": 0.316488,
+        "L": -0.332358
+      }
     },
     "ST": {
-      "slope": 2.278015,
-      "intercept": 0.997824,
-      "leagueAvgPlateX": 0.172499
+      "slope": 1.056349,
+      "leagueAvgPlateX": {
+        "R": 0.40366,
+        "L": -0.316905
+      }
     },
     "SV": {
-      "slope": 1.479739,
-      "intercept": 2.561888,
-      "leagueAvgPlateX": 0.162611
+      "slope": 1.055575,
+      "leagueAvgPlateX": {
+        "R": 0.233136,
+        "L": -0.297399
+      }
     }
   },
   "sacqZones": [
@@ -6225,6 +6244,10 @@
     "sdPlus": 0.994678,
     "ctPlus": 0.991999,
     "hitterPlusShift": 5.3578
+  },
+  "bbPlusWeights": {
+    "con": 0.585,
+    "sp": 0.415
   },
   "xwOBA3DTable": {
     "ev0|la0|pull|R": {

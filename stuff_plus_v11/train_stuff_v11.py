@@ -11,10 +11,10 @@ persistence ceiling (~0.195) and far above v10's architecture (~0.02-0.06 in the
 same harness). Reliability ~0.87.
 
 Offline trainer (xgboost is fine here): trains on the cleaned pitch pickle,
-scores every pitch, standardizes to 100 +/- 10 PER PITCH TYPE, aggregates to
-(pitcher, team, pitch_type), and (optionally, with --inject) writes stuffScore +
-stuffScore_pctl into the pitch leaderboard, exactly like v10. Stuff+ remains
-force-hidden on the site until explicitly surfaced.
+scores every MLB pitch OUT-OF-FOLD (pitcher-grouped, so no pitcher's own
+outcomes train the model that scores him), standardizes to 100 +/- 10 PER
+PITCH TYPE, aggregates to (pitcher, team, pitch_type), and (optionally, with
+--inject) writes stuffScore + stuffScore_pctl into the pitch leaderboard.
 
 Usage:
     python3 stuff_plus_v11/train_stuff_v11.py            # train + save bundle/CSV
@@ -151,15 +151,23 @@ def main():
 
     X = design(df); y = df['target_xrv'].values
 
-    # OOF sanity check (pitcher-grouped) — confirms it reproduces the harness
-    oof = np.full(len(df), np.nan); groups = df['pitcher'].values
-    for tr, te in GroupKFold(n_splits=4).split(X, y, groups):
-        mm = xgb.XGBRegressor(**TUNED); mm.fit(X.iloc[tr], y[tr]); oof[te] = mm.predict(X.iloc[te])
-    df['_oof_stuff'] = -oof
+    # Production MLB scores are OUT-OF-FOLD (pitcher-grouped): a pitcher's own
+    # 2026 outcomes never train the model that scores his pitches. In-sample
+    # scoring inflated descriptive r from 0.22 to 0.42 by absorbing pitcher
+    # luck through his unique feature cluster (median 2.7, p90 8 Stuff+ pts on
+    # qualified units) — the shipped number must come from the validated path.
+    groups = df['pitcher'].values
+    def _oof_predict(Xd, n_splits=8):
+        oof = np.full(len(y), np.nan)
+        for tr, te in GroupKFold(n_splits=n_splits).split(Xd, y, groups):
+            mm = xgb.XGBRegressor(**TUNED); mm.fit(Xd.iloc[tr], y[tr]); oof[te] = mm.predict(Xd.iloc[te])
+        return -oof
+    df['stuff_raw'] = _oof_predict(X)
 
-    # production model: train on all data, score all pitches
+    # full-data model: kept in the bundle for scoring pitches outside the
+    # training set (ROC uses the no-arm companion; any future out-of-sample
+    # scoring uses this). It no longer scores MLB leaderboard rows.
     model = xgb.XGBRegressor(**TUNED); model.fit(X, y)
-    df['stuff_raw'] = -model.predict(X)
 
     # Standardize at the PITCHER level (proper "+"-stat spread: SD=10 between
     # pitchers, not between pitches — averaging pitch-level z-scores collapses
@@ -192,7 +200,10 @@ def main():
     #    ONLY affects ROC; MLB above is untouched (keeps real arm angle). ──
     Xna = design(df, NOARM_FEATS)
     model_na = xgb.XGBRegressor(**TUNED); model_na.fit(Xna, y)
-    df['raw_na'] = -model_na.predict(Xna)
+    # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
+    # are ranked against carry no in-sample luck inflation. ROC pitches are not
+    # in the training set, so model_na's predictions on ROC are truly OOS.
+    df['raw_na'] = _oof_predict(Xna)
 
     def _na_scale(keys, qual_min):
         a = df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
@@ -243,7 +254,7 @@ def main():
     recs = []
     for key, grp in g:
         if len(grp) >= 50:
-            recs.append((grp['_oof_stuff'].mean(), grp['target_xrv'].mean()))
+            recs.append((grp['stuff_raw'].mean(), grp['target_xrv'].mean()))
     xs = np.array([r[0] for r in recs]); ys = np.array([r[1] for r in recs])
     print(f'  OOF stuff vs same-period xRV (descriptive): r = {corrcoef(xs, ys)[0,1]:+.3f}')
     print('\n  top arsenals by mean Stuff+ (n>=200):')

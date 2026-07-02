@@ -1045,8 +1045,12 @@ const Aggregator = {
     const haaReg = haaRegs && haaRegs[ptName];
     const haaMean = mean('sumHAA', 'nHAA');
     const plateXMean = mean('sumPlateX', 'nPlateX');
-    if (haaMean != null && plateXMean != null && haaReg && haaReg.leagueAvgPlateX != null) {
-      out.nHAA = haaMean - haaReg.slope * (plateXMean - haaReg.leagueAvgPlateX);
+    // leagueAvgPlateX is hand-specific ({R:…, L:…}); slope is fit mirrored +
+    // within-pitcher server-side. Hand-mixed groups (team mode, throws=null)
+    // get null, same as the hand-specific MVN model below.
+    const haaLgPX = (haaReg && haaReg.leagueAvgPlateX) ? haaReg.leagueAvgPlateX[g.throws] : null;
+    if (haaMean != null && plateXMean != null && haaReg && haaLgPX != null) {
+      out.nHAA = haaMean - haaReg.slope * (plateXMean - haaLgPX);
     }
 
     const mvnModels = DataStore.metadata && DataStore.metadata.mvnModels;
@@ -1475,12 +1479,14 @@ const Aggregator = {
         obj.nVAA = null;
       }
       // Normalized HAA (location-independent, per pitch type):
-      // nHAA = HAA - slope * (pitcher_avgPlateX - league_avgPlateX)
-      // Per-pitch-type slopes are critical: breaking balls (SL ~3.6) vs fastballs (SI ~0.17)
+      // nHAA = HAA - slope * (pitcher_avgPlateX - league_avgPlateX[throws])
+      // Slope is fit mirrored + within-pitcher server-side (geometric ~1.05
+      // deg/ft for every pitch type); league PlateX mean is hand-specific.
       const haaRegs = DataStore.metadata && DataStore.metadata.haaRegressions;
       const haaReg = haaRegs && haaRegs[obj.pitchType];
-      if (obj.haa !== null && obj._plateX !== null && haaReg && haaReg.leagueAvgPlateX != null) {
-        obj.nHAA = Number((obj.haa - haaReg.slope * (obj._plateX - haaReg.leagueAvgPlateX)).toFixed(2));
+      const haaLgPX = (haaReg && haaReg.leagueAvgPlateX) ? haaReg.leagueAvgPlateX[obj.throws] : null;
+      if (obj.haa !== null && obj._plateX !== null && haaReg && haaLgPX != null) {
+        obj.nHAA = Number((obj.haa - haaReg.slope * (obj._plateX - haaLgPX)).toFixed(2));
       } else {
         obj.nHAA = null;
       }
@@ -2227,7 +2233,10 @@ const Aggregator = {
         xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
       };
 
-      // BB+ composite: 60% xwOBAcon+ + 40% xwOBAsp+, indexed so 100 = league avg
+      // BB+ composite: weighted xwOBAcon+ / xwOBAsp+, indexed so 100 = league
+      // avg. Weights come from metadata.bbPlusWeights (single source of
+      // truth, set in process_data.py) so this recompute can never drift
+      // from the server definition again.
       const hLgAvgs = (DataStore && DataStore.metadata && DataStore.metadata.hitterLeagueAverages) || {};
       const lgXC = hLgAvgs.xwOBAcon;
       const lgXS = hLgAvgs.xwOBAsp;
@@ -2237,17 +2246,18 @@ const Aggregator = {
       // shrink the sample. (Hitter+ is pass-through season value, not
       // recomputed client-side, so it's gated server-side instead.)
       var BB_PLUS_MIN_BIP = 80;
-      if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS &&
+      const bbW = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusWeights) || null;
+      if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS && bbW &&
           (obj.nBip || 0) >= BB_PLUS_MIN_BIP) {
         const conPlus = 100 * obj.xwOBAcon / lgXC;
         const spPlus = 100 * obj.xwOBAsp / lgXS;
-        // Mirror the server's qualified-pool re-anchor (100 = qualified
-        // median). sd/ct/hitterPlus are pass-through; bbPlus is the only
-        // "+" recomputed client-side, so it must apply the same factor.
+        // Mirror the server's re-anchor (all-MLB PA-weighted mean = 100).
+        // sd/ct/hitterPlus are pass-through; bbPlus is the only "+"
+        // recomputed client-side, so it must apply the same factor.
         const bbReAnchor = (DataStore && DataStore.metadata &&
                             DataStore.metadata.plusReanchor &&
                             DataStore.metadata.plusReanchor.bbPlus) || 1;
-        obj.bbPlus = Math.round((0.6 * conPlus + 0.4 * spPlus) * bbReAnchor * 10) / 10;
+        obj.bbPlus = Math.round((bbW.con * conPlus + bbW.sp * spPlus) * bbReAnchor * 10) / 10;
       } else {
         obj.bbPlus = null;
       }
