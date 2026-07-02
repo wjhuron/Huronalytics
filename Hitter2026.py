@@ -188,7 +188,7 @@ class BaseballSavantHitterDownloader:
         bteam  = pd.Series(np.where(topbot == 'Bot', home, away), index=raw_df.index)
         out['BTeam'] = bteam.map(self.normalize_team)
 
-        out['Batter'] = self._safe_col(raw_df, 'player_name').fillna('')
+        out['Batter'] = self._safe_col(raw_df, 'player_name').fillna('').str.strip()
         out['Bats']   = self._safe_col(raw_df, 'stand').fillna('')
         out['Throws'] = self._safe_col(raw_df, 'p_throws').fillna('')
 

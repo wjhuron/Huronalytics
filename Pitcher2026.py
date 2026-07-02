@@ -171,7 +171,7 @@ class BaseballSavantFocusedDownloader:
         # Best option: the API provides lastFirstName already formatted
         last_first = player_info.get('lastFirstName', '')
         if last_first:
-            return last_first
+            return last_first.strip()  # API's lastFirstName can carry a trailing space
 
         # Second option: build it from separate firstName and lastName fields
         first_name = player_info.get('firstName', '')

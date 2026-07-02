@@ -3866,6 +3866,18 @@ def main():
     rs_pitches = read_all_pitches_from_sheets()
     print(f"  Read {len(rs_pitches)} RS pitches from the 6 division workbooks")
 
+    # Normalize player names: strip surrounding whitespace so a stray trailing/
+    # leading space (e.g. "Lee, Hao-Yu ") doesn't fork one player into duplicate
+    # rows. (Accents are already handled consistently upstream.)
+    _name_fixed = 0
+    for _p in rs_pitches:
+        for _fld in ('Batter', 'Pitcher'):
+            _v = _p.get(_fld)
+            if isinstance(_v, str) and _v != _v.strip():
+                _p[_fld] = _v.strip(); _name_fixed += 1
+    if _name_fixed:
+        print(f"  Normalized {_name_fixed} whitespace-padded player names")
+
     # Shared MLB ID cache
     mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')
     mlb_id_cache = load_mlb_id_cache(mlb_id_cache_path)
