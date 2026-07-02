@@ -1155,7 +1155,10 @@ def render_card(config, pitches, output_file):
 
     for p in pitches:
         pt = p.get('Pitch Type', '')
-        hb, ivb = p.get('xHorzBrk') or p.get('HorzBrk'), p.get('xIndVrtBrk') or p.get('IndVertBrk')
+        # `is None` (not `or`): a numeric 0.0 adjusted value must not fall
+        # through to raw. Safe today only because cache values are strings.
+        hb = p.get('xHorzBrk') if p.get('xHorzBrk') is not None else p.get('HorzBrk')
+        ivb = p.get('xIndVrtBrk') if p.get('xIndVrtBrk') is not None else p.get('IndVertBrk')
         if pt and hb is not None and hb != '' and ivb is not None and ivb != '':
             try: groups[pt].append((float(hb), float(ivb)))
             except Exception: pass
@@ -1523,8 +1526,8 @@ def render_card(config, pitches, output_file):
         n = len(pp)
         velos=[v for v in (sf(p.get('Velocity')) for p in pp) if v]
         spins=[v for v in (sf(p.get('Spin Rate')) for p in pp) if v]
-        ivbs=[v for v in (sf(p.get('xIndVrtBrk') or p.get('IndVertBrk')) for p in pp) if v is not None]
-        hbs=[v for v in (sf(p.get('xHorzBrk') or p.get('HorzBrk')) for p in pp) if v is not None]
+        ivbs=[v for v in (sf(p.get('xIndVrtBrk') if p.get('xIndVrtBrk') is not None else p.get('IndVertBrk')) for p in pp) if v is not None]
+        hbs=[v for v in (sf(p.get('xHorzBrk') if p.get('xHorzBrk') is not None else p.get('HorzBrk')) for p in pp) if v is not None]
         relzs=[v for v in (sf(p.get('RelPosZ')) for p in pp) if v is not None]
         relxs=[v for v in (sf(p.get('RelPosX')) for p in pp) if v is not None]
         exts=[v for v in (sf(p.get('Extension')) for p in pp) if v is not None]

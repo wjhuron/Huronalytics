@@ -51,7 +51,6 @@ HITTER_PRIOR_N = 85       # hitter → league regression pseudo-swings.
                           #   own-data/league. Rank-preserving (ρ≈.999 vs
                           #   K=400); the qualified-pool re-anchor still
                           #   re-centers the median to 100 downstream.
-CT_SCALE_K     = 30       # ctPlus = 100 + CT_SCALE_K × z
 MIN_HITTER_SWINGS = 85    # computation floor = split-half r=.50 point
                           #   (signal=noise). Measured directly via the
                           #   reliability study (n0~84 swings; model
@@ -248,19 +247,30 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
                           min_n=MIN_HITTER_SWINGS):
     """Ratio-to-league scaling, matching BB+ convention:
         ctPlus = 100 × hitter_raw_adj / league_mean_raw_adj
-    Same note on spread as SD+: signed, near-zero league mean produces
-    a wider spread than BB+.
+    (raw_ct is a leverage-weighted contact rate in [0, 1], league mean ~0.74,
+    so the ratio spread is naturally narrow.)
     """
     eligible = {k: v for k, v in hitter_raw.items() if v['n_swings'] >= min_n}
     if not eligible:
         return {}
 
-    lg_raw = sum(v['raw_ct'] for v in eligible.values()) / len(eligible)
+    # League anchors (lg_raw, lg_mean) use a de-duplicated POOL, mirroring
+    # pipeline_sdplus.regress_and_normalize: for a multi-team hitter, only the
+    # combined 2TM/3TM row represents them — their per-team stint rows are
+    # excluded so a traded hitter isn't counted 2-3x in the shrinkage target
+    # and ratio denominator. ctPlus is still computed for every eligible row.
+    def _is_combined(t):
+        return isinstance(t, str) and t.endswith('TM') and t[:-2].isdigit()
+    combined_ids = {k[:1] for k in eligible if _is_combined(k[1])}
+    pool = {k: v for k, v in eligible.items()
+            if _is_combined(k[1]) or k[:1] not in combined_ids}
+
+    lg_raw = sum(v['raw_ct'] for v in pool.values()) / len(pool)
     for v in eligible.values():
         n = v['n_swings']
         v['raw_ct_adj'] = (n * v['raw_ct'] + n_prior * lg_raw) / (n + n_prior)
 
-    adj_vals = [v['raw_ct_adj'] for v in eligible.values()]
+    adj_vals = [pool[k]['raw_ct_adj'] for k in pool]
     lg_mean = sum(adj_vals) / len(adj_vals)
 
     for v in eligible.values():

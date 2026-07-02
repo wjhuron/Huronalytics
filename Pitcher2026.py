@@ -11,7 +11,16 @@ from io import StringIO
 
 # ── Weather-adjustment constants and helpers ──────────────────────────────────
 
-STANDARD_RHO = 1.195  # kg/m³ at sea level, ~70°F (matches process_data.py)
+STANDARD_RHO = 1.195  # kg/m³ reference: sea level at ~72.4°F (101325 Pa / 287.05 / 295.6 K)
+
+# Fallback temperature when the feed omits weather.temp, and the clamp used
+# when the roof is closed / dome (feeds occasionally report the OUTDOOR temp
+# for closed-roof games, which would inject a spurious density error).
+# Elevation is ~90% of the density signal at altitude parks, so an assumed
+# indoor-ish temperature beats silently skipping the adjustment entirely.
+DEFAULT_TEMP_F = 70.0
+ROOF_CLOSED_TEMP_F = 72.0
+ROOF_CLOSED_CONDITIONS = {'dome', 'roof closed'}
 
 # MLB's live feed omits venue.location.elevation for most international
 # parks, so without an override Mexico City games look like sea level and
@@ -40,8 +49,13 @@ def compute_weather_adj_factor(rho_game):
 
     xIndVrtBrk = rawIVB × factor,  xHorzBrk = rawHB × factor.
 
-    Uses ρ^(2/3) scaling: thinner air reduces Magnus force but also reduces
-    drag → longer flight time → partial compensation.  Net deflection ∝ ρ^(2/3).
+    Uses ρ^(2/3) scaling. NOTE: trajectory theory (Nathan) says deflection
+    scales ~ρ^1.0-1.1 (Magnus ∝ ρ, and less drag means the ball arrives
+    SOONER, compounding rather than compensating), while empirical cross-park
+    studies land around ρ^0.5-0.7 (measurement fit, humidity offsets, pitcher
+    adaptation). 2/3 sits in the empirical band; it is pending calibration
+    against our own within-pitcher cross-park data before any change, since
+    historical x-columns in Sheets carry this constant.
 
     Returns 1.0 when inputs are missing or invalid.
     """
@@ -72,6 +86,23 @@ class BaseballSavantFocusedDownloader:
 
         # Initialize team mappings
         self._initialize_team_mappings()
+
+    def _record_game_weather(self, game_pk, info):
+        """Append/refresh one game's density inputs in data/game_weather_rs.json.
+
+        Keyed by game_pk (str, JSON keys are strings). Small file (~2.5k games
+        a season), so read-modify-write per game is fine."""
+        sidecar = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'data', 'game_weather_rs.json')
+        try:
+            with open(sidecar) as f:
+                store = json.load(f)
+        except (FileNotFoundError, ValueError):
+            store = {}
+        store[str(game_pk)] = info
+        os.makedirs(os.path.dirname(sidecar), exist_ok=True)
+        with open(sidecar, 'w') as f:
+            json.dump(store, f, indent=0, sort_keys=True)
 
     def _initialize_team_mappings(self):
         """Initialize dictionaries for team name/abbreviation/ID mappings"""
@@ -610,11 +641,40 @@ class BaseballSavantFocusedDownloader:
                 if elev_val is not None:
                     game_elevation = float(elev_val)
 
-                # Air density
-                if game_temp is not None and game_elevation is not None:
-                    game_rho = compute_air_density(game_elevation, game_temp)
+                # Roof closed / dome: clamp to indoor temp. Feeds sometimes
+                # report the outdoor reading (e.g. 104°F Phoenix with the
+                # roof shut), which would inject a ~4% spurious density error.
+                condition = (weather.get('condition') or '').strip().lower()
+                if condition in ROOF_CLOSED_CONDITIONS:
+                    game_temp = ROOF_CLOSED_TEMP_F
+
+                # Air density. Missing temp falls back to DEFAULT_TEMP_F
+                # rather than skipping the adjustment: elevation is ~90% of
+                # the signal at altitude parks, and a silent factor of 1.0 at
+                # Coors is a far bigger error than an assumed 70°F (this
+                # failure mode bit the Las Vegas homestand).
+                if game_elevation is not None:
+                    game_rho = compute_air_density(
+                        game_elevation,
+                        game_temp if game_temp is not None else DEFAULT_TEMP_F)
             except (ValueError, TypeError):
                 pass  # any parse failure → defaults (no adjustment)
+
+            # Persist per-game density inputs to a sidecar so adjustments are
+            # auditable and re-derivable if the exponent ever changes (the
+            # sheet x-columns bake the factor in; without this the LV-style
+            # forensic rebuild from feeds is the only recovery path).
+            try:
+                self._record_game_weather(game_pk, {
+                    'venueId': venue.get('id'),
+                    'condition': weather.get('condition'),
+                    'tempF': game_temp,
+                    'elevationFt': game_elevation,
+                    'rho': round(game_rho, 5) if game_rho else None,
+                    'factor': round(compute_weather_adj_factor(game_rho), 5),
+                })
+            except Exception as e:
+                print(f"  WARNING: could not record game weather sidecar: {e}")
 
             # Extract all plays
             all_plays = data['liveData']['plays'].get('allPlays', [])

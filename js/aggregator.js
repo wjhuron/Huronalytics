@@ -716,7 +716,10 @@ const Aggregator = {
                      'era_pctl', 'hr9_pctl', 'runValue_pctl', 'rv100_pctl', 'xRunValue_pctl', 'xRv100_pctl', 'fip', 'fip_pctl', 'xFIP', 'xFIP_pctl', 'siera', 'siera_pctl',
                      'wOBA', 'wOBA_pctl', 'xBA', 'xBA_pctl', 'xSLG', 'xSLG_pctl', 'xwOBA', 'xwOBA_pctl',
                      'xwOBAcon', 'xwOBAcon_pctl',
-                     'xwOBAsp', 'xwOBAsp_pctl',
+                     // xwOBAsp deliberately NOT merged: _computePitcherBipStats
+                     // recomputes it from filtered BIP records (like avgEVAgainst),
+                     // and merging the season value here clobbered that recompute,
+                     // making the stat silently ignore date/hand filters.
                      'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl',
                      // Loc+ and Stuff+ are precomputed (need the weight-table / trained
                      // model unavailable client-side), so always surface the season

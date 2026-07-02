@@ -1615,14 +1615,32 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             mu_bar.append(mu[a] + adj)
         return mu_bar
 
+    # Minimum pitches per (pitchType, throws) group. A 5-6 variable
+    # covariance conditioned on 3-4 regressors needs real sample: at the old
+    # floor of 30, Sigma22 inversion produced wildly unstable conditional
+    # slopes for rare groups (early-season ST_L, FS_L, SV). Blank xIVB/xHB
+    # for a rare group is honest; a number from 28 dof is not.
+    MVN_MIN_N = 150
+
     def fit_mvn_models(all_pitches):
         """Fit MVN models per (pitchType, throws) for expected movement.
         MLB model: [IVB, HB, ArmAngle, Extension, Velocity]
         ROC model: [IVB, HB, RelPosZ, RelPosX, Extension, Velocity]
-        Returns dict keyed by 'pitchType_throws' with 'mlb' and/or 'roc' sub-models."""
+        Returns dict keyed by 'pitchType_throws' with 'mlb' and/or 'roc' sub-models.
+
+        Both models are fit on MLB pitches ONLY: the 'roc' variant is the
+        MLB baseline expressed in release-point features (arm angle is absent
+        at ROC), and ROC pitchers are scored against it — so ROC pitches must
+        not contribute to the baseline they're measured against.
+
+        Interpretation note: velocity is a conditioning variable, so the OE
+        residuals are "movement vs a typical arm from this slot/extension at
+        this velo" — a uniqueness residual, not a velo-inclusive skill delta."""
         groups_mlb = defaultdict(list)
         groups_roc = defaultdict(list)
         for p in all_pitches:
+            if p.get('_source', 'MLB') != 'MLB':
+                continue
             pt = p.get('Pitch Type') or p.get('TaggedPitchType')
             throws = p.get('Throws')
             ivb = safe_float(p.get('xIndVrtBrk'))
@@ -1639,6 +1657,26 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 groups_mlb[key].append([ivb, hb, aa, ext, velo])
             if rel_z is not None and rel_x is not None and ext is not None and velo is not None:
                 groups_roc[key].append([ivb, hb, rel_z, rel_x, ext, velo])
+
+        def mad_screen(data, thresh=6.0):
+            """Drop rows more than thresh MADs from the median on any dim.
+            Sample moments are non-robust; a handful of mistracked pitches
+            (extension glitches, velocity spikes) can swing the conditional
+            slopes of smaller groups."""
+            n = len(data)
+            k = len(data[0])
+            meds, mads = [], []
+            for i in range(k):
+                vals = sorted(row[i] for row in data)
+                med = vals[n // 2] if n % 2 else (vals[n // 2 - 1] + vals[n // 2]) / 2
+                devs = sorted(abs(v - med) for v in vals)
+                mad = devs[n // 2] if n % 2 else (devs[n // 2 - 1] + devs[n // 2]) / 2
+                meds.append(med)
+                mads.append(mad)
+            kept = [row for row in data
+                    if all(mads[i] <= 1e-9 or abs(row[i] - meds[i]) <= thresh * mads[i]
+                           for i in range(k))]
+            return kept if len(kept) >= MVN_MIN_N else data
 
         def compute_mu_cov(data):
             n = len(data)
@@ -1658,19 +1696,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         all_keys = set(list(groups_mlb.keys()) + list(groups_roc.keys()))
         for key in sorted(all_keys):
             model = {}
-            if key in groups_mlb and len(groups_mlb[key]) >= 30:
-                mu, cov = compute_mu_cov(groups_mlb[key])
-                model['mlb'] = {'mu': mu, 'cov': cov, 'n': len(groups_mlb[key])}
-            if key in groups_roc and len(groups_roc[key]) >= 30:
-                mu, cov = compute_mu_cov(groups_roc[key])
-                model['roc'] = {'mu': mu, 'cov': cov, 'n': len(groups_roc[key])}
+            if key in groups_mlb and len(groups_mlb[key]) >= MVN_MIN_N:
+                data = mad_screen(groups_mlb[key])
+                mu, cov = compute_mu_cov(data)
+                model['mlb'] = {'mu': mu, 'cov': cov, 'n': len(data)}
+            if key in groups_roc and len(groups_roc[key]) >= MVN_MIN_N:
+                data = mad_screen(groups_roc[key])
+                mu, cov = compute_mu_cov(data)
+                model['roc'] = {'mu': mu, 'cov': cov, 'n': len(data)}
             if model:
                 models[key] = model
         return models
 
     # --- Fit VAA ~ PlateZ regressions per pitch type (MLB only) ---
-    # Per-pitch-type slopes capture that different pitches have different VAA~PlateZ relationships
-    vaa_reg_by_pt = defaultdict(list)  # pitch_type -> [(plateZ, vaa)]
+    # Within-pitcher (fixed-effects) fit, same estimator as HAA below: the
+    # location slope is flight geometry (~1.0 deg/ft), and demeaning per
+    # pitcher keeps between-pitcher shape/location selection out of it. No
+    # mirroring needed (PlateZ/VAA don't flip by hand), and the league PlateZ
+    # mean stays pooled (plate height doesn't differ meaningfully by hand).
+    vaa_reg_by_pt = defaultdict(list)  # pitch_type -> [(pitcher_key, plateZ, vaa)]
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue
@@ -1678,18 +1722,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         vaa_val = safe_float(p.get('VAA'))
         pz_val = safe_float(p.get('PlateZ'))
         if pt and vaa_val is not None and pz_val is not None:
-            vaa_reg_by_pt[pt].append((pz_val, vaa_val))
+            vaa_reg_by_pt[pt].append(((p.get('Pitcher'), p.get('Throws')), pz_val, vaa_val))
 
-    print("\nVAA ~ PlateZ regressions (per pitch type):")
-    vaa_regressions = {}  # pitch_type -> {slope, intercept, leagueAvgPlateZ}
+    print("\nVAA ~ PlateZ regressions (per pitch type, within-pitcher):")
+    vaa_regressions = {}  # pitch_type -> {slope, leagueAvgPlateZ}
     for pt in sorted(vaa_reg_by_pt.keys()):
-        pairs = vaa_reg_by_pt[pt]
-        result = fit_linear_regression(pairs, f"VAA~PlateZ {pt}")
+        triples = vaa_reg_by_pt[pt]
+        result = fit_within_pitcher_slope(triples, f"VAA~PlateZ {pt}")
         if result:
-            mean_pz = sum(p[0] for p in pairs) / len(pairs)
+            mean_pz = sum(t[1] for t in triples) / len(triples)
             vaa_regressions[pt] = {
                 'slope': result['slope'],
-                'intercept': result['intercept'],
                 'leagueAvgPlateZ': mean_pz,
             }
 
@@ -2111,9 +2154,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             pitcher_league_avgs[stat] = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
     pitcher_league_avgs['count'] = len(pitcher_lb_mlb)
 
-    # Loc+ — pitcher location-quality index. xRV-weighted (zone × count ×
-    # pitch_type × batter_hand × pitcher_hand) cell table, Bayesian-regressed
-    # per pitcher, z-score normalized to 100 ± 10. See pipeline_locplus.py.
+    # Loc+ — pitcher location-quality index (v2 decomposition model): per
+    # pitch, ExpRV = P(swing)·[whiff/foul/BIP value surfaces] + P(take)·
+    # [CS/ball count values], surfaces per (pitch group × hands) on a smoothed
+    # 2-inch × zone-normalized grid, count-specific RV weights; per-pitcher
+    # mean Bayesian-regressed and z-scored to 100 ± 10. See pipeline_locplus.py.
     # Also computes per-pitch-type Loc+ for the Arsenal tab (each row in
     # pitch_leaderboard gets a Loc+ standardized within its pitch-type group).
     from pipeline_locplus import compute_loc_plus
@@ -2222,7 +2267,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     LA_BINS = [(-999, -10), (-10, 0), (0, 5), (5, 10), (10, 15), (15, 20),
                (20, 25), (25, 30), (30, 35), (35, 40), (40, 50), (50, 999)]
     SACQ_MIN_BIP = 20
-    SACQ_QUALITY_THRESHOLD = 0.500
+    # (SACQ% the player stat is retired — xwOBAsp keeps the full value
+    # gradient a binary quality threshold threw away. The zone table below
+    # survives as the xwOBAsp lookup + player-page heatmap.)
 
     # Collect all BIPs with spray + wOBA data (MLB only — exclude ROC/AAA pitches)
     # Build both hand-specific (spray_dir, la_bin, bats) and pooled (spray_dir, la_bin) tables.
@@ -2275,11 +2322,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         for key, data in bins.items():
             woba = data['woba_sum'] / data['woba_denom'] if data['woba_denom'] > 0 else None
             xwobacon = data['xwoba_sum'] / data['xwoba_count'] if data['xwoba_count'] > 0 else None
-            quality = (data['count'] >= SACQ_MIN_BIP and woba is not None and woba >= SACQ_QUALITY_THRESHOLD)
             table[key] = {
                 'woba': round(woba, 3) if woba is not None else None,
                 'xwobacon': round(xwobacon, 3) if xwobacon is not None else None,
-                'quality': quality,
                 'count': data['count'],
             }
         return table
@@ -2298,10 +2343,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         return None
 
     # Build serializable zone data for frontend (hand-specific + pooled).
-    # The "woba" field is mathematically wOBAcon (sum of wOBA event values / sum of
-    # wOBA denominator weights, restricted to BIPs in the zone). Emit it as "wobacon"
-    # going forward; keep "woba" as a transitional alias so older deployed JS still
-    # works between the pipeline rename and the JS rename rolling out.
+    # The "wobacon" field is wOBAcon (sum of wOBA event values / sum of wOBA
+    # denominator weights, restricted to BIPs in the zone).
     sacq_zones_output = []
     for (direction, la_bin_idx, bats_key), info in sorted(sacq_zone_hand.items(), key=lambda x: (x[0][2], x[0][0], x[0][1])):
         lo, hi = LA_BINS[la_bin_idx]
@@ -2312,9 +2355,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'laBin': la_bin_idx,
             'bats': bats_key,
             'wobacon': info['woba'],
-            'woba': info['woba'],  # alias, remove after deploy stabilizes
             'xwobacon': info['xwobacon'],
-            'quality': info['quality'],
             'count': info['count'],
         })
     # Also include pooled bins (bats=null) as fallback for frontend
@@ -2327,15 +2368,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'laBin': la_bin_idx,
             'bats': None,
             'wobacon': info['woba'],
-            'woba': info['woba'],  # alias, remove after deploy stabilizes
             'xwobacon': info['xwobacon'],
-            'quality': info['quality'],
             'count': info['count'],
         })
-    n_hand_quality = sum(1 for v in sacq_zone_hand.values() if v['quality'])
-    n_pooled_quality = sum(1 for v in sacq_zone_pooled.values() if v['quality'])
-    print(f"  SACQ zones: {len(sacq_zone_hand)} hand-specific ({n_hand_quality} quality), "
-          f"{len(sacq_zone_pooled)} pooled ({n_pooled_quality} quality)")
+    print(f"  SACQ zones: {len(sacq_zone_hand)} hand-specific, "
+          f"{len(sacq_zone_pooled)} pooled")
 
     # --- Helper: compute xwOBAsp for a list of pitches using sacq_lookup ---
     def compute_xwobasp(pitches):
@@ -2385,6 +2422,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in pitch_leaderboard:
         pitches = pitch_type_lookup.get((row['pitcher'], row['team'], row['pitchType']), [])
         row['xwOBAsp'] = compute_xwobasp(pitches)
+        # Per-hand splits for the pitch tab's hand filter (js/aggregator.js
+        # xKeys merge). Without these the client silently fell back to the
+        # both-hands value while its siblings (xwOBA etc.) switched hands.
+        for _hand in ('L', 'R'):
+            row['xwOBAsp_vs' + _hand] = compute_xwobasp(
+                [p for p in pitches if p.get('Bats') == _hand])
 
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
@@ -2786,9 +2829,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs['sdPlus'] = 100.0
     print(f"  SD+ computed for {len(sd_results)} qualified hitters.")
 
-    # CT+ — contact-execution index: per-swing contact rate above expected,
-    # RV-weighted via the same (zone × count) cell table structure as SD+.
-    # See pipeline_contact.py.
+    # CT+ — contact-frequency index: leverage-weighted contact rate over
+    # eligible swings, where leverage = rv_contact − rv_whiff for the
+    # (zone × count) cell (same table structure as SD+). NOTE: currently a
+    # weighted RAW contact rate — no expected-contact baseline is subtracted
+    # (lift-over-expected conversion planned). See pipeline_contact.py.
     from pipeline_contact import compute_ct_plus
     ct_results, ct_weights = compute_ct_plus(
         all_pitches, sd_pitches_by_hitter,
@@ -2827,8 +2872,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Hitter+ — composite of BB+ (contact quality), SD+ (decision quality),
     # CT+ (contact frequency). Weights derived from OLS regression of wRC+ on
     # z-standardized metrics against the 3.1 × TGP qualified sample: normalized
-    # coefficients come out at ~65/7/28. Hitter+ is standardized to have SD≈40
-    # so it's visually comparable to wRC+ on the leaderboard.
+    # coefficients come out at ~65/7/28. The ×40 SCALE targets a wRC+-like
+    # spread, but realized SD is meaningfully BELOW 40 because the component
+    # z's are imperfectly correlated (Var(w·z) = w'Σw < 1). Weights are
+    # same-season in-sample OLS — treat as provisional pending out-of-sample
+    # re-derivation (planned alongside the xwOBAsp residualization).
     HITTER_PLUS_W_BB = 0.65
     HITTER_PLUS_W_SD = 0.07
     HITTER_PLUS_W_CT = 0.28
@@ -2962,7 +3010,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'leagueAverages': league_avgs,
         'pitcherLeagueAverages': pitcher_league_avgs,
         'hitterLeagueAverages': hitter_league_avgs,
-        'vaaRegressions': {pt: {'slope': round(r['slope'], 6), 'intercept': round(r['intercept'], 6),
+        'vaaRegressions': {pt: {'slope': round(r['slope'], 6),
                                   'leagueAvgPlateZ': round(r['leagueAvgPlateZ'], 6)}
                            for pt, r in vaa_regressions.items()},
         'haaRegressions': {pt: {'slope': round(r['slope'], 6),
@@ -3221,11 +3269,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     row['wRCplus'] = round(numerator / lg_rpa * 100)
                 else:
                     row['wRCplus'] = None
-                # xWRC+ (same formula but using xwOBA instead of wOBA)
+                # xWRC+ (same formula but using xwOBA instead of wOBA).
+                # NO park factor here: xwOBA is an EV/LA model output mapped
+                # to league-average-park outcomes, so it doesn't contain the
+                # park effect wRC+'s PF term divides out — applying PF to it
+                # over-corrected (e.g. docked Rockies hitters twice).
                 xwoba = row.get('xwOBA')
                 if xwoba is not None:
                     xwraa_per_pa = (xwoba - lg_woba) / woba_scale
-                    xnumerator = xwraa_per_pa + lg_rpa + (lg_rpa - pf * lg_rpa)
+                    xnumerator = xwraa_per_pa + lg_rpa
                     row['xWRCplus'] = round(xnumerator / lg_rpa * 100) if lg_rpa > 0 else None
                 else:
                     row['xWRCplus'] = None
@@ -3234,19 +3286,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row['wRCplus'] = None
                 row['xWRCplus'] = None
 
-    # FanGraphs override: replace our pipeline-computed wRC+, xwOBA, xBA,
-    # and xSLG with canonical FG values for every hitter. FG has slightly
-    # different park-factor / wOBA-weight tuning and intermediate
-    # precision that produces small but visible deltas (e.g. Wood reads
-    # wRC+ 151 here vs 152 on FG; xwOBA .425 vs .426). Pulling FG's
-    # numbers keeps the card aligned with fangraphs.com.
+    # FanGraphs override: replace our pipeline-computed wRC+ with canonical
+    # FG values. FG has slightly different park-factor / wOBA-weight tuning
+    # and intermediate precision that produces small but visible deltas
+    # (e.g. Wood reads wRC+ 151 here vs 152 on FG). Pulling FG's number
+    # keeps the card aligned with fangraphs.com.
     #
     # - wRC+: overridden for both MLB and AAA hitters. AAA gap is large
     #   (~13-19 pts) because our pipeline applies MLB constants to AAA
     #   data; FG uses AAA-baseline weights + IL/PCL park factors.
-    # - xwOBA / xBA / xSLG: overridden for MLB hitters only. FG doesn't
-    #   publish these for AAA (they require Statcast EV/LA data which is
-    #   MLB-only).
+    # - xwOBA / xBA / xSLG: NOT overridden (dropped in commit eab9655) —
+    #   the pipeline's Statcast per-pitch values are the source of truth.
     # - wOBA / AVG / OBP / SLG / BABIP / OPS / ISO: NOT overridden —
     #   pipeline matches FG to within ±0.0005 (rounding noise), so the
     #   override would be cosmetically identical to the pipeline value.
@@ -3554,8 +3604,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Batted-ball stats use a BIP-count qualifier (>=25 BIPs of that pitch
     # type) instead of pitch count, since their denominator is BIPs. Includes
     # gbPct (which lives in PITCH_STAT_KEYS for historical reasons but is a
-    # BIP-rate stat).
-    PITCH_BB_QUAL_KEYS = set(PITCH_BB_PCTL_KEYS) | {'gbPct'}
+    # BIP-rate stat) and xwOBAsp (which was gated on pitch count before,
+    # leaving 52% of colored pitch-type cells with <20 BIP behind them).
+    PITCH_BB_QUAL_KEYS = set(PITCH_BB_PCTL_KEYS) | {'gbPct', 'xwOBAsp'}
 
     # 1. Pitch-type percentiles (grouped by pitch type)
     pt_groups = defaultdict(list)
@@ -3722,7 +3773,8 @@ def write_json_outputs(result, suffix):
     def strip_internal_keys(rows):
         return [{k: v for k, v in row.items() if not k.startswith('_')} for row in rows]
 
-    # Preserve Stuff+ scores from existing pitch leaderboard (injected by train_stuff_v10.py)
+    # Preserve Stuff+ scores from existing pitch leaderboard (injected by
+    # stuff_plus_v11/train_stuff_v11.py --inject; keyed by pitcher/team/pitchType)
     pitch_json_path = os.path.join(DATA_DIR, f'pitch_leaderboard{suffix}.json')
     if os.path.exists(pitch_json_path):
         try:

@@ -41,7 +41,10 @@ MLB_TEAMS = {
     'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
     'WBC',
 }
-AAA_TEAMS = {'ROC'}
+# 'AAA' included defensively: the dormant Supabase reader can tag rows
+# PTeam='AAA', which would otherwise slip past `team not in AAA_TEAMS`
+# checks and leak into MLB normalization pools if that path is ever revived.
+AAA_TEAMS = {'ROC', 'AAA'}
 ALL_TEAMS = MLB_TEAMS | AAA_TEAMS
 
 # ── Leaderboard qualification thresholds ─────────────────────────────────

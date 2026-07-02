@@ -884,8 +884,18 @@ const Leaderboard = {
             // interpolated rank for the tooltip but renders uncolored.
             showColor = !(Aggregator.loaded && Aggregator._isROCTeam(row.team));
           } else if (isPitcherPitchType) {
-            // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches
-            showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
+            // Pitcher pitch-type data: shape metrics always qualify; outcome metrics need minimum pitches.
+            // BIP-denominated stats gate on BIP count instead — at the pitch-type
+            // level a 25-pitch row often has <10 BIP behind xwOBAsp/EV stats
+            // (52% of colored xwOBAsp cells had <20 BIP before this gate).
+            const PITCH_BIP_GATED = { xwOBAsp: true, avgEVAgainst: true, hardHitPct: true,
+                                      barrelPctAgainst: true, hrFbPct: true, ldPct: true,
+                                      fbPct: true, puPct: true, gbPct: true, babip: true };
+            if (PITCH_BIP_GATED[col.key]) {
+              showColor = (row.nBip || 0) >= QUAL.MIN_BIP_PCTL;
+            } else {
+              showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
+            }
           } else if (isPitcherRow) {
             // Pitcher overall: IP-based qualification (ROC-aware:
             // MLB SP 1.0 / RP 0.5, ROC SP 0.8 / RP 0.4 × team games).

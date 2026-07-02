@@ -1,10 +1,9 @@
 """SD+ (Swing Decisions+) — per-pitch decision-quality metric.
 
-Builds a 60-cell (zone × count × decision) run-value weight table from
-league-wide MLB pitch data, then scores each hitter on the mean
+Builds a 120-cell (5 zones × 12 counts × 2 decisions) run-value weight table
+from league-wide MLB pitch data, then scores each hitter on the mean
 decision-value of their own decisions (swing/take) using the league cell
-weights. 100 = league-average decision-maker; +30 points per standard
-deviation above.
+weights. 100 = league-average decision-maker.
 
 Design highlights:
 - Zone classification: Baseball Savant attack zones, applied to the hitter-
@@ -19,9 +18,10 @@ Design highlights:
   zone means with k=50 pseudo-obs.
 - Per-hitter regression: Bayesian regression toward the league mean with
   n_prior=400 pseudo-obs. Mitigates early-season noise.
-- Normalization: sdPlus = 100 + 30 × z across hitters meeting a 100-decision
-  floor (the MLB 3.1 PA × team_games_played qualification is applied
-  separately by the leaderboard consumer).
+- Normalization: ratio-to-league ×100 (see regress_and_normalize), NOT a
+  z-score scale. Floor: 225 decisions (measured split-half r=.50 point);
+  the MLB 3.1 PA × team_games_played qualification is applied separately
+  by the leaderboard consumer.
 
 The decision-value formula is `dv = RV(chosen) - RV(opposite)` — absolute
 opportunity cost, not league-relative.
@@ -53,7 +53,6 @@ COUNTS = [(b, s) for b in range(4) for s in range(3)]
 # ── Hyperparameters ─────────────────────────────────────────────────────
 CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-obs
 HITTER_PRIOR_N = 400      # hitter → league regression pseudo-obs
-SD_SCALE_K     = 30       # sdPlus = 100 + SD_SCALE_K × z
 MIN_HITTER_DECISIONS = 225  # floor = split-half r=.50 point (signal=
                             # noise). Measured directly via the
                             # reliability study (r=.50 crossing ~225-229

@@ -54,8 +54,10 @@ def sf(x):
     except (TypeError, ValueError): return None
 
 def build_df(pitches):
-    # pass 1: per-pitcher primary fastball reference (handedness-normalized)
-    fb = defaultdict(lambda: defaultdict(lambda: {'v': 0.0, 'iv': 0.0, 'hb': 0.0, 'vaa': 0.0, 'n': 0}))
+    # pass 1: per-pitcher primary fastball reference (handedness-normalized).
+    # VAA gets its own count: a pitch missing VAA must not dilute the mean
+    # toward 0 by incrementing the shared n while contributing 0.0.
+    fb = defaultdict(lambda: defaultdict(lambda: {'v': 0.0, 'iv': 0.0, 'hb': 0.0, 'vaa': 0.0, 'n': 0, 'n_vaa': 0}))
     for p in pitches:
         pt, thr = p.get('Pitch Type'), p.get('Throws')
         if pt not in FB_TYPES or thr not in ('L', 'R'): continue
@@ -63,11 +65,14 @@ def build_df(pitches):
         if None in (v, iv, hb): continue
         s = 1.0 if thr == 'R' else -1.0
         a = fb[(p.get('Pitcher'), thr)][pt]
-        a['v'] += v; a['iv'] += iv; a['hb'] += hb * s; a['vaa'] += (vaa or 0.0); a['n'] += 1
+        a['v'] += v; a['iv'] += iv; a['hb'] += hb * s; a['n'] += 1
+        if vaa is not None:
+            a['vaa'] += vaa; a['n_vaa'] += 1
     primary = {}
     for k, bt in fb.items():
         b = max(bt.values(), key=lambda d: d['n']); n = b['n']
-        primary[k] = {'v': b['v']/n, 'iv': b['iv']/n, 'hb': b['hb']/n, 'vaa': b['vaa']/n}
+        primary[k] = {'v': b['v']/n, 'iv': b['iv']/n, 'hb': b['hb']/n,
+                      'vaa': (b['vaa']/b['n_vaa']) if b['n_vaa'] else None}
 
     # Per-pitcher arm-angle averages, used as a real-time placeholder when arm
     # angle hasn't backfilled yet (it lags games ~1-2 days). Arm angle is nearly
@@ -104,7 +109,8 @@ def build_df(pitches):
         fbref = primary.get((p.get('Pitcher'), thr))
         if fbref:
             velo_diff = v - fbref['v']; ivb_diff = iv - fbref['iv']
-            hb_diff = hb - fbref['hb']; vaa_diff = vaa - fbref['vaa']
+            hb_diff = hb - fbref['hb']
+            vaa_diff = (vaa - fbref['vaa']) if fbref['vaa'] is not None else None
         else:
             velo_diff = ivb_diff = hb_diff = vaa_diff = None
         desc = p.get('Description', '')

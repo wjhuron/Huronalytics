@@ -1,9 +1,10 @@
 """stuff_data.py — engineer the Stuff+ training dataset from the pitch pickle.
 
 Builds one row per MLB pitch with: physical stuff features (velo, movement,
-spin, release, arm angle), SSW residuals (observed minus expected movement),
-fastball-relative diffs, several candidate TARGETS, outcome flags, and
-split/half tags for the validation harness. Caches to scratch for fast
+spin, release, arm angle), weather-adjustment deltas (raw minus density-
+adjusted movement — NOT expected-movement residuals; axis_dev is the SSW
+proxy), fastball-relative diffs, several candidate TARGETS, outcome flags,
+and split/half tags for the validation harness. Caches to scratch for fast
 experiment iteration.
 
 All movement/release/HAA features are handedness-normalized so "arm side" is a
@@ -85,15 +86,20 @@ for p in mlb:
     hb = hb_raw * sgn
     rel_x = rel_x_raw * sgn
     haa = (haa_raw * sgn) if haa_raw is not None else None
-    ivb_oe = (iv - xiv) if (xiv is not None) else None
-    hb_oe = ((hb_raw - xhb) * sgn) if (xhb is not None) else None
+    # NOT SSW residuals: xIndVrtBrk/xHorzBrk in the pickle are the WEATHER-
+    # ADJUSTED movement (raw × density factor), not MVN-expected movement.
+    # These deltas are therefore just the density correction itself (≈0
+    # outside altitude parks). Kept under honest names for density-related
+    # experiments; any past experiment that used them as "SSW" tested noise.
+    ivb_wx_delta = (iv - xiv) if (xiv is not None) else None
+    hb_wx_delta = ((hb_raw - xhb) * sgn) if (xhb is not None) else None
     # plate location (for location-neutralization tests); handedness-normalized x
     px = sf(p.get('PlateX')); pz = sf(p.get('PlateZ'))
     szt = sf(p.get('SzTop')); szb = sf(p.get('SzBot'))
     plate_x = (px * sgn) if px is not None else None
     plate_z_norm = ((pz - szb) / (szt - szb)) if (pz is not None and szt and szb and szt > szb) else None
-    # spin-axis deviation: observed movement tilt vs spin-based tilt (SSW proxy,
-    # distinct from the movement-magnitude residuals ivb_oe/hb_oe)
+    # spin-axis deviation: observed movement tilt vs spin-based tilt (the
+    # actual SSW proxy in this dataset)
     ot = tilt_deg(p.get('OTilt')); rt = tilt_deg(p.get('RTilt'))
     if ot is not None and rt is not None:
         d = ((ot - rt + 180) % 360) - 180   # wrap to [-180, 180]
@@ -137,7 +143,7 @@ for p in mlb:
         'balls': b, 'strikes': s,
         # features
         'velocity': v, 'perceived_velo': perceived, 'spin_rate': spin,
-        'ivb': iv, 'hb': hb, 'ivb_oe': ivb_oe, 'hb_oe': hb_oe,
+        'ivb': iv, 'hb': hb, 'ivb_wx_delta': ivb_wx_delta, 'hb_wx_delta': hb_wx_delta,
         'vaa': vaa, 'haa': haa, 'extension': ext, 'arm_angle': arm,
         'rel_z': rel_z, 'rel_x': rel_x,
         'plate_x': plate_x, 'plate_z_norm': plate_z_norm, 'axis_dev': axis_dev,
@@ -161,7 +167,7 @@ print("by pitch type:\n", df['pitch_type'].value_counts().to_string())
 print("\ntarget_xrv: mean %.4f std %.4f  (non-null %d)" % (
     df['target_xrv'].mean(), df['target_xrv'].std(), df['target_xrv'].notna().sum()))
 print("feature null rates (key):")
-for c in ['ivb_oe', 'hb_oe', 'arm_angle', 'velo_diff', 'spin_per_mph', 'haa']:
+for c in ['ivb_wx_delta', 'hb_wx_delta', 'arm_angle', 'velo_diff', 'spin_per_mph', 'haa']:
     print(f"  {c:12s} {df[c].isna().mean():.1%}")
 print("whiff/swing rate: %.1f%%   bip rate: %.1f%%   gb/bip: %.1f%%" % (
     100*df['is_whiff'].sum()/df['is_swing'].sum(),

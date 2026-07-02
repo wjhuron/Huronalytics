@@ -1,20 +1,21 @@
-"""xwOBA3D — joint EV × LA × spray × bats empirical wOBA lookup.
+"""xwOBA3D — EV × LA × spray × bats lookup table of SAVANT MODEL xwOBA.
 
-Current BB+ combines two independent 2D lookups:
-  xwOBAcon  ← Savant's EV × LA per-pitch model
-  xwOBAsp   ← Our SACQ table: spray × LA × bats
+Shipped role (the only role): imputing per-pitch xwOBA for ROC/AAA balls in
+play, where Savant's estimated_woba_using_speedangle is absent. Validated
+held-out at r=0.915 per BIP for that purpose (see process_data.py wiring).
 
-Those two components assume additive independence. In reality, contact
-outcome varies jointly with all three dimensions — e.g., a 95 mph pulled
-line drive at 20° has very different league wOBA than a 95 mph opposite-
-field line drive at 20°, and the current additive composite can't
-express that interaction.
+IMPORTANT SCOPE LIMIT: the cell value is the mean of Savant's
+estimated_woba_using_speedangle — a model output that is a function of
+EV × LA only — NOT actual outcome wOBA. Savant xwOBA is constant in spray
+given EV/LA, so the spray dimension here only captures within-bin EV/LA
+composition differences; the table CANNOT express real spray interactions
+(a pulled vs oppo 95 mph / 20° liner having different league value). Do
+NOT promote this into BB+ or use it as an xwOBAsp replacement without
+first rebuilding the cell values on outcome wOBA (_bip_woba_value, the way
+the SACQ table in process_data.py does).
 
-This module builds the 3D (EV × LA × spray × bats) empirical wOBA table
-from league BIP data, applies hierarchical Bayesian shrinkage toward 2D
-marginals for thin cells, and computes a per-hitter xwOBA3D — the mean
-3D-lookup wOBA across their BIP. Intended as a drop-in replacement or
-supplement for xwOBAsp in BB+.
+Builds the table from league BIP data with hierarchical Bayesian shrinkage
+toward 2D marginals for thin cells.
 """
 import math
 from collections import defaultdict
@@ -29,7 +30,10 @@ from pipeline_utils import (
 EV_BINS = [(0, 70), (70, 80), (80, 88), (88, 95), (95, 102), (102, 200)]
 LA_BINS = [(-90, -10), (-10, 0), (0, 10), (10, 20), (20, 30), (30, 40), (40, 90)]
 SPRAY_DIRS = ['pull', 'pull_side', 'center_pull', 'center_oppo', 'oppo_side', 'oppo']
-HANDS = ['R', 'L', 'S']  # 'S' = switch hitter — rare per-pitch attribute
+# Per-pitch Bats is always the side batted from ('L'/'R'; the scraper writes
+# per-PA batSide). 'S' is deliberately NOT accepted: spray_direction() would
+# treat it as LHB and mirror pull/oppo wrongly for a switch hitter batting R.
+HANDS = ['R', 'L']
 
 # Hierarchical shrinkage pseudo-count toward 2D marginals.
 CELL_SHRINK_K = 20
@@ -160,42 +164,10 @@ def shrink_xwoba3d(raw_table, bip_pitches, k=CELL_SHRINK_K):
     return smoothed
 
 
-# ── Per-hitter aggregation ──────────────────────────────────────────────
-
-def compute_hitter_xwoba3d(hitter_pitches, table):
-    """Return hitter's mean expected wOBA via 3D lookup. None if no BIP."""
-    vals = []
-    for p in hitter_pitches:
-        key = classify_bip(p)
-        if key is None:
-            continue
-        if key in table:
-            vals.append(table[key][0])
-    return sum(vals) / len(vals) if vals else None
-
-
-def compute_all_hitters_xwoba3d(all_pitches, pitches_by_hitter):
-    """Returns (hitter_dict, league_mean, smoothed_table)."""
-    bip = [p for p in all_pitches if p.get('_source') == 'MLB']
-    raw = build_xwoba3d_table(bip)
-    smoothed = shrink_xwoba3d(raw, bip)
-
-    hitter_results = {}
-    for key, pitches in pitches_by_hitter.items():
-        r = compute_hitter_xwoba3d(pitches, smoothed)
-        if r is not None:
-            hitter_results[key] = r
-
-    # League average = BIP-weighted overall mean from the cell table
-    total_sum = 0.0
-    total_n = 0
-    for (rv, n) in smoothed.values():
-        total_sum += rv * n
-        total_n   += n
-    lg_avg = total_sum / total_n if total_n else None
-
-    return hitter_results, lg_avg, smoothed
-
+# ── Packaging ───────────────────────────────────────────────────────────
+# (Per-hitter aggregation helpers were removed 2026-07-02: never wired into
+# the pipeline, and a hitter-level xwOBA3D built on model-xwOBA cells would
+# be nearly degenerate with xwOBAcon — see the module docstring.)
 
 def serialize_table(smoothed):
     """For metadata output."""

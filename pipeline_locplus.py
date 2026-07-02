@@ -37,8 +37,9 @@ Pitch-type groups (validated by clustering value surfaces):
   FF | SI | FC | SL(+ST,SW,SV) | CU(+KC,CS) | CH(+FS) | OTHER
 
 Normalization: locPlus = 100 + 10·(mu - raw_adj)/sigma  (sign-flipped so
-higher = better). mu, sigma from qualified MLB pitchers; n_prior=107 overall,
-150 per pitch type. ROC pitchers are scored against the MLB surfaces but
+higher = better). mu, sigma from qualified MLB pitchers; n_prior=117 overall,
+100 per pitch type (N_PRIOR_OVERALL / N_PRIOR_PT below — measured split-half
+r=0.5 crossings). ROC pitchers are scored against the MLB surfaces but
 excluded from the (mu, sigma) pool.
 """
 import math
@@ -98,7 +99,8 @@ COUNTS = [(b, s) for b in range(4) for s in range(3)]
 HANDS = ('L', 'R')
 SWING_DESC = {'Swinging Strike', 'Foul', 'In Play'}
 TAKE_DESC = {'Ball', 'Called Strike'}
-EXCLUDE_DESC = {'Hit By Pitch', 'Foul Bunt', 'Missed Bunt', 'Pitchout', 'Swinging Pitchout'}
+EXCLUDE_DESC = {'Hit By Pitch', 'Foul Bunt', 'Missed Bunt', 'Bunt Foul Tip',
+                'Pitchout', 'Swinging Pitchout', 'Foul Pitchout'}
 BUNT_BB = {'bunt', 'bunt_grounder', 'bunt_popup', 'bunt_line_drive'}
 
 
@@ -218,6 +220,18 @@ def build_surfaces(baseline, lg_woba, woba_scale):
             c = get_count(p)
             cv[slot][c][0] += -re; cv[slot][c][1] += 1
     RV = {k: {c: (s / n if n else 0.0) for c, (s, n) in dd.items()} for k, dd in cv.items()}
+    # Fill counts with zero baseline events (possible on partial/backfill
+    # runs — e.g. no 3-0 whiffs yet) with the slot's event-weighted overall
+    # mean. Without this, score_pitch's .get(c, ...) silently valued the
+    # outcome at 0.0 — e.g. a 3-0 whiff at 0.0 instead of ~-0.10 —
+    # distorting every pitch scored in that count.
+    for k, dd in cv.items():
+        tot_s = sum(s for s, n in dd.values())
+        tot_n = sum(n for _s, n in dd.values())
+        overall = tot_s / tot_n if tot_n else 0.0
+        for c in COUNTS:
+            if c not in RV[k]:
+                RV[k][c] = overall
 
     def acc0():
         return {k: _zeros() for k in ('swn', 'swd', 'whn', 'fln', 'bipn', 'bipd')}
@@ -345,7 +359,7 @@ def _in_norm_pool(k, pool_filter, combined_ids):
     return True
 
 
-def _normalize(raw, n_prior, min_pool, pool_filter, lg_woba):
+def _normalize(raw, n_prior, min_pool, pool_filter):
     """Bayesian-regress each raw_loc toward the pool league mean, then z-score
     to locPlus = 100 - K·z. Adds 'raw_loc_adj', 'locPlus', 'locRuns100'.
     Mutates and returns the same dict."""
@@ -449,7 +463,7 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
     pitcher_raw = _aggregate(pitches_by_pitcher, S, want_zone=True, want_heatmap=True)
     pitcher_results = _normalize(
         pitcher_raw, N_PRIOR_OVERALL, MIN_POOL_OVERALL,
-        pool_filter=lambda k: k[1] not in AAA_TEAMS, lg_woba=lg_woba)
+        pool_filter=lambda k: k[1] not in AAA_TEAMS)
 
     pitch_raw = _aggregate(pitches_by_pitch_type, S)
     pitch_results = _normalize_by_group(

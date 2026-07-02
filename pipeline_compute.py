@@ -529,7 +529,12 @@ def compute_hitter_stats(pitches):
         velo = safe_float(p.get('Velocity'))
         if ev is not None and velo is not None:
             n_blast_eligible += 1
-            max_ev = 0.2 * velo + 1.2 * bs
+            # Statcast max EV = 1.23 * bat speed + 0.23 * pitch speed AT THE
+            # PLATE. We have release velo; plate velo ≈ 0.92 * release, so
+            # 0.23 * 0.92 ≈ 0.212 is the release-velo coefficient. The bat
+            # coefficient is Statcast's 1.23 exactly (1.2 previously ran our
+            # squaredUpPct slightly hot vs Savant).
+            max_ev = 0.212 * velo + 1.23 * bs
             # Squared-up = >= 80% of max possible EV given bat speed + pitch velo.
             # Blast = Squared-up AND bat speed >= 75 (i.e. Statcast's "elite contact"
             # gate adds the swing-speed requirement on top of the energy-transfer one).
