@@ -627,11 +627,13 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   # logical subsetting in the sort below.
   stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
 
-  # Sort by usage (descending), Total always last
+  # Sort by usage (descending), Total always last; exact usage ties fall
+  # back to pitch_order
   total_mask <- stats_df$`Pitch Type` == "Total"
   non_total <- stats_df[!total_mask, ]
   total_rows <- stats_df[total_mask, ]
-  non_total <- non_total[order(-as.numeric(non_total$Count)), ]
+  non_total <- non_total[order(-as.numeric(non_total$Count),
+                               factor(non_total$`Pitch Type`, levels = pitch_order)), ]
   stats_df <- bind_rows(non_total, total_rows)
   
   # Create base table theme (tight horizontal padding so each column is only

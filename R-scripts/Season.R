@@ -420,11 +420,11 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   # Drop unmapped pitch types (never occur in practice; NA name renders blank).
   stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
 
-  # Convert pitch_type to factor with custom order
+  # Convert pitch_type to factor (levels act as the usage tie-break order)
   stats_df$`Pitch Type` <- factor(stats_df$`Pitch Type`, levels = pitch_order)
-  
-  # Sort the dataframe by the factor levels
-  stats_df <- stats_df[order(stats_df$`Pitch Type`), ]
+
+  # Sort by usage (descending); exact ties fall back to pitch_order
+  stats_df <- stats_df[order(-as.numeric(stats_df$num_thrown), stats_df$`Pitch Type`), ]
   
   # Define headers for the combined table based on whether arm angle exists
   if (has_arm_angle) {
@@ -454,11 +454,14 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
     platoon_df$`Pitch Type` <- pitch_names[platoon_df$`Pitch Type`]
     platoon_df <- platoon_df[!is.na(platoon_df$`Pitch Type`), ]
 
-    # Convert pitch_type to factor with custom order
+    # Convert pitch_type to factor (levels act as the usage tie-break order)
     platoon_df$`Pitch Type` <- factor(platoon_df$`Pitch Type`, levels = pitch_order)
-    
-    # Sort the dataframe by the factor levels  
-    platoon_df <- platoon_df[order(platoon_df$`Pitch Type`), ]
+
+    # Sort by overall usage (RHH + LHH counts, descending) so the platoon
+    # table matches the main table's order; exact ties fall back to pitch_order
+    platoon_df <- platoon_df[order(
+      -(as.numeric(platoon_df$num_thrown_fmt_rhh) + as.numeric(platoon_df$num_thrown_fmt_lhh)),
+      platoon_df$`Pitch Type`), ]
     
     # Add duplicate pitch type column for LHH section
     platoon_df$pitch_type_lhh <- platoon_df$`Pitch Type`

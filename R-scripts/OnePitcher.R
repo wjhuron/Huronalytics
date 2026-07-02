@@ -288,11 +288,11 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   # as a blank/NA row and sort unpredictably).
   stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
 
-  # Convert Pitch Type to factor with custom order
+  # Convert Pitch Type to factor (levels act as the usage tie-break order)
   stats_df$`Pitch Type` <- factor(stats_df$`Pitch Type`, levels = pitch_order)
-  
-  # Sort the dataframe by the factor levels
-  stats_df <- stats_df[order(stats_df$`Pitch Type`), ]
+
+  # Sort by usage (descending); exact ties fall back to pitch_order
+  stats_df <- stats_df[order(-as.numeric(stats_df$num_thrown), stats_df$`Pitch Type`), ]
   
   # FIRST TABLE - Use stats_df directly
   stats_df_table1 <- stats_df
@@ -318,7 +318,8 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   stats_df_table2$`Pitch Type` <- pitch_names[stats_df_table2$`Pitch Type`]
   stats_df_table2 <- stats_df_table2[!is.na(stats_df_table2$`Pitch Type`), ]
   stats_df_table2$`Pitch Type` <- factor(stats_df_table2$`Pitch Type`, levels = pitch_order)
-  stats_df_table2 <- stats_df_table2[order(stats_df_table2$`Pitch Type`), ]
+  stats_df_table2 <- stats_df_table2[order(-as.numeric(stats_df_table2$num_thrown),
+                                           stats_df_table2$`Pitch Type`), ]
   
   # Define headers for second table (removed BBE and Exit Velo)
   table2_colnames <- c(
