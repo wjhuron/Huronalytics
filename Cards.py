@@ -1562,7 +1562,7 @@ def render_card(config, pitches, output_file):
         oop_pitches_n = sum(1 for p in pp if compute_iz(p) == False)
         chase_pct = oop_swings_n / oop_pitches_n if oop_pitches_n else None
         # xwOBAcon — average xwOBA on BIPs only.
-        bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pp if p.get('Description') == 'In Play') if v is not None]
+        bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pp if p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt')) if v is not None]
         xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else None
         pt_name='Fastball' if pt=='FF' else PITCH_NAMES.get(pt,pt)
         _nvaa = nvaa_by_pt.get(pt)
@@ -1600,7 +1600,7 @@ def render_card(config, pitches, output_file):
     t_oop_n = sum(1 for p in pitches if compute_iz(p) == False)
     t_chase = t_oop_sw / t_oop_n if t_oop_n else None
     # xwOBAcon total — average xwOBA on BIPs.
-    t_bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pitches if p.get('Description') == 'In Play') if v is not None]
+    t_bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pitches if p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt')) if v is not None]
     t_xwobacon = sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw else None
     # Pitcher-level Loc+ for the Total row (from the bubble's leaderboard row).
     _total_locplus = (config.get('pctl_row') or {}).get('locPlus')
@@ -1647,7 +1647,7 @@ def render_card(config, pitches, output_file):
         for _h in ('PitchRV', 'xPitchRV', 'PitchRV/100', 'xPitchRV/100'):
             force_exclude.add(_h)
     # If no xwOBA on any BIP, xwOBAcon column drops too.
-    has_xwoba_bip = any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' for p in pitches)
+    has_xwoba_bip = any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt') for p in pitches)
     if not has_xwoba_bip: force_exclude.add('xwOBAcon')
     # Conditional RelZ/RelX: always exclude on season cards. On single-game cards,
     # exclude only when Arm Angle data exists (Arm Angle conveys the same release

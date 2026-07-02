@@ -1916,7 +1916,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                 swing_pts.append((px, pz))
                 if desc == 'Swinging Strike':
                     whiff_pts.append((px, pz))
-            if desc == 'In Play':
+            if desc == 'In Play' and not str(p.get('BBType', '')).startswith('bunt'):
                 if is_roc:
                     # ROC: weight by ExitVelo (xwOBA isn't tagged for AAA)
                     ev = sf(p.get('ExitVelo'))
