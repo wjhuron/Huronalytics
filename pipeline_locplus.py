@@ -46,7 +46,33 @@ import math
 from collections import defaultdict
 
 from pipeline_utils import safe_float, AAA_TEAMS
-from pipeline_sdplus import classify_zone, ZONES
+from pipeline_sdplus import classify_zone, ZONES, build_bip_count_offsets
+
+# ── Model options (each A/B-validated on the 3-objective harness:
+#    scripts/phase2_locplus_eval.py — reliability / stuff-independence /
+#    predictive validity). Validated 2026-07-02: ──
+PCS_BY_HAND = True             # called-strike surface per batter hand (the
+                               # LHH called zone sits ~2" farther outside;
+                               # takes are ~half of pitches and shadow takes
+                               # are where location value concentrates).
+                               # WON: rel 0.568->0.575, pred 0.079->0.082.
+BIP_COUNT_ANCHOR = False       # add offset(c) to the BIP value branch
+                               # (pipeline_sdplus.build_bip_count_offsets).
+                               # LOST decisively for Loc+ and stays OFF:
+                               # velo leak 0.29->0.38, whiff leak
+                               # 0.031->0.072, predictive 0.079->-0.029.
+                               # Anchoring makes ExpRV strongly count-mix
+                               # dependent, and count mix is a stuff/
+                               # sequencing effect — exactly the contamination
+                               # Loc+ exists to exclude. (The anchor is
+                               # correct and ON in SD+/CT+, which score
+                               # hitter decisions against the count state.)
+SWING_PRIOR_COUNT_LEVEL = True # count-specific swing surfaces shrink toward
+                               # collapsed-surface × league count multiplier
+                               # (a sparse 3-0 surface otherwise shrinks
+                               # toward a ~46% swing rate instead of ~10%).
+                               # WON objective 2: whiff leak 0.031->0.019,
+                               # rel +0.005, pred -0.006 (noise-level).
 
 # ── Pitch-type grouping ─────────────────────────────────────────────────
 GROUP = {
@@ -237,17 +263,22 @@ def build_surfaces(baseline, lg_woba, woba_scale):
         return {k: _zeros() for k in ('swn', 'swd', 'whn', 'fln', 'bipn', 'bipd')}
     A = defaultdict(acc0)                                   # [(grp,bh,ph)]
     AC = defaultdict(lambda: {'swn': _zeros(), 'swd': _zeros()})   # [(grp,bh,ph,count)]
-    csn, csd = _zeros(), _zeros()
+    csn = {h: _zeros() for h in HANDS}
+    csd = {h: _zeros() for h in HANDS}
+    cnt_sw = defaultdict(lambda: [0, 0])   # count -> [swings, pitches] (league)
 
     for p in baseline:
-        key = (group_of(p), p['Bats'], p['Throws'])
+        bh = p['Bats']
+        key = (group_of(p), bh, p['Throws'])
         c = get_count(p)
         i = _xbin(safe_float(p.get('PlateX'))); j = _zbin(_znorm(p))
         d = p.get('Description')
         a = A[key]; ac = AC[(key, c)]
         a['swd'][i][j] += 1; ac['swd'][i][j] += 1
+        cnt_sw[c][1] += 1
         if d in SWING_DESC:
             a['swn'][i][j] += 1; ac['swn'][i][j] += 1
+            cnt_sw[c][0] += 1
             if d == 'Swinging Strike':
                 a['whn'][i][j] += 1
             elif d == 'Foul':
@@ -258,11 +289,32 @@ def build_surfaces(baseline, lg_woba, woba_scale):
                     a['bipn'][i][j] += (xw - lg_woba) / woba_scale
                     a['bipd'][i][j] += 1
         if d in TAKE_DESC:
-            csd[i][j] += 1
+            csd[bh][i][j] += 1
             if d == 'Called Strike':
-                csn[i][j] += 1
+                csn[bh][i][j] += 1
 
-    PCS = _smooth(csn, csd, _gsum(csn) / max(_gsum(csd), 1), K_CS)
+    # Called-strike surface: per batter hand (PCS_BY_HAND) or pooled. Stored
+    # as {hand: grid} either way so score_pitch has one lookup shape.
+    if PCS_BY_HAND:
+        PCS = {h: _smooth(csn[h], csd[h],
+                          _gsum(csn[h]) / max(_gsum(csd[h]), 1), K_CS)
+               for h in HANDS}
+    else:
+        pn = _zeros(); pd_ = _zeros()
+        for h in HANDS:
+            for i in range(NX):
+                for j in range(NZ):
+                    pn[i][j] += csn[h][i][j]; pd_[i][j] += csd[h][i][j]
+        pooled = _smooth(pn, pd_, _gsum(pn) / max(_gsum(pd_), 1), K_CS)
+        PCS = {h: pooled for h in HANDS}
+
+    # League per-count swing-rate multipliers for the count-level prior.
+    tot_sw = sum(v[0] for v in cnt_sw.values())
+    tot_n = sum(v[1] for v in cnt_sw.values())
+    overall_rate = tot_sw / tot_n if tot_n else 0.0
+    cnt_mult = {c: ((v[0] / v[1]) / overall_rate if v[1] and overall_rate else 1.0)
+                for c, v in cnt_sw.items()}
+
     WH, FL, XW, SW = {}, {}, {}, {}
     for key, a in A.items():
         swn = _gsum(a['swn']); swd = _gsum(a['swd']); bipd = _gsum(a['bipd'])
@@ -270,10 +322,24 @@ def build_surfaces(baseline, lg_woba, woba_scale):
         FL[key] = _smooth(a['fln'], a['swn'], _gsum(a['fln']) / max(swn, 1), K_FOUL)
         XW[key] = _smooth(a['bipn'], a['bipd'], _gsum(a['bipn']) / max(bipd, 1), K_XWCON)
         coll = _smooth(a['swn'], a['swd'], swn / swd if swd else 0.0, K_SWING_COLL)
-        SW[key] = {c: _smooth(AC[(key, c)]['swn'], AC[(key, c)]['swd'], coll, K_SWING_COUNT)
-                   for c in COUNTS}
+        if SWING_PRIOR_COUNT_LEVEL:
+            SW[key] = {}
+            for c in COUNTS:
+                m = cnt_mult.get(c, 1.0)
+                prior_c = [[min(1.0, coll[i][j] * m) for j in range(NZ)]
+                           for i in range(NX)]
+                SW[key][c] = _smooth(AC[(key, c)]['swn'], AC[(key, c)]['swd'],
+                                     prior_c, K_SWING_COUNT)
+        else:
+            SW[key] = {c: _smooth(AC[(key, c)]['swn'], AC[(key, c)]['swd'], coll, K_SWING_COUNT)
+                       for c in COUNTS}
 
-    return {'RV': RV, 'PCS': PCS, 'WH': WH, 'FL': FL, 'XW': XW, 'SW': SW}
+    # Count-anchoring offsets for the BIP value branch (empty dict = off).
+    BIPOFF = (build_bip_count_offsets(baseline, lg_woba, woba_scale)
+              if (BIP_COUNT_ANCHOR and has_guts) else {})
+
+    return {'RV': RV, 'PCS': PCS, 'WH': WH, 'FL': FL, 'XW': XW, 'SW': SW,
+            'BIPOFF': BIPOFF}
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -294,8 +360,10 @@ def score_pitch(p, S):
     pwh = S['WH'][key][i][j]
     pfl = S['FL'][key][i][j]
     pbip = max(0.0, 1.0 - pwh - pfl)
-    vbip = S['XW'][key][i][j]
-    pcs = S['PCS'][i][j]
+    # BIP value count-anchored into the same delta-RE currency as the other
+    # four outcome values (offset dict is empty when the option is off).
+    vbip = S['XW'][key][i][j] + S['BIPOFF'].get(c, 0.0)
+    pcs = S['PCS'][p['Bats']][i][j]
     RV = S['RV']
     swing_val = pwh * RV['whiff'].get(c, 0.0) + pfl * RV['foul'].get(c, 0.0) + pbip * vbip
     take_val = pcs * RV['cs'].get(c, 0.0) + (1 - pcs) * RV['ball'].get(c, 0.0)
@@ -437,7 +505,10 @@ def serialize_surfaces(S):
                    'xMin': X_MIN, 'xMax': X_MAX, 'zMin': Z_MIN, 'zMax': Z_MAX,
                    'physX_in': PHYS_X_IN, 'physZ_frac': PHYS_Z_FRAC,
                    'scaleK': LOC_SCALE_K, 'nPriorOverall': N_PRIOR_OVERALL,
-                   'nPriorPt': N_PRIOR_PT, 'groups': GROUPS},
+                   'nPriorPt': N_PRIOR_PT, 'groups': GROUPS,
+                   'pcsByHand': PCS_BY_HAND,
+                   'bipCountAnchor': BIP_COUNT_ANCHOR,
+                   'swingPriorCountLevel': SWING_PRIOR_COUNT_LEVEL},
         'countValues': {slot: {f"{c[0]}-{c[1]}": round(v, 5) for c, v in d.items()}
                         for slot, d in S['RV'].items()},
     }

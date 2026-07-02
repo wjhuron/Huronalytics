@@ -1,12 +1,12 @@
 # ---- Configuration ----
-input_file_path <- "TBR"  # Team code (e.g., "PIT", "WSH") or full path
+input_file_path <- "FCL"  # Team code (e.g., "PIT", "WSH") or full path
 output_directory <- "/Users/wallyhuron/Downloads/"
 
 # ---- Optional Filtering Parameters ----
 # Set these to NULL to disable filtering
 selected_pitcher_filter <- NULL  # Example format: "Bieber, Shane" 
-start_date_filter <- NULL        # Example format: "2025-04-01"
-end_date_filter <- NULL          # Example format: "2025-04-20"
+start_date_filter <- "2026-02-07"        # Example format: "2025-04-01"
+end_date_filter <- "2026-11-28"         # Example format: "2025-04-20"
 
 # ---- Required Libraries ----
 library(tidyverse)

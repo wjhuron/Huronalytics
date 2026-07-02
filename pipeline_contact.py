@@ -1,20 +1,27 @@
-"""CT+ (Contact+) — per-swing contact-frequency index.
+"""CT+ (Contact+) — per-swing contact-execution index.
 
 Complements SD+ (decision quality) and BB+ (contact quality) to form an
 orthogonal three-axis view of plate performance:
     SD+  — did you swing at the right pitch?
-    CT+  — did you make contact when you swung?          (this file)
+    CT+  — did you make contact when you swung, vs expectation?  (this file)
     BB+  — how good was the contact when you made it?
 
-Raw metric: hitter's LEVERAGE-WEIGHTED CONTACT RATE across their
-eligible swings:
-    raw_ct = Σ (I[contact] × leverage[cell]) / Σ leverage[cell]
+Raw metric: hitter's leverage-weighted ACTUAL contact over leverage-
+weighted EXPECTED contact across the same swings:
+    raw_ct = Σ (I[contact] × leverage[cell]) / Σ ((1 − p_whiff[cell]) × leverage[cell])
     leverage[cell] = rv_contact[cell] - rv_whiff[cell]
+    p_whiff[cell]  = league whiff rate for that (zone × count) cell
 
-That is, contact = 1 / whiff = 0, weighted by the RV gap between making
-and missing contact in each (zone × count) cell. Always in [0, 1]. League
-mean is ~0.74. Matches BB+'s ratio-to-league convention:
-    ctPlus = 100 × hitter_raw_ct / league_raw_ct
+League mean ≈ 1.0 by construction. ctPlus = 100 × raw_adj / league_adj
+(BB+'s ratio-to-league convention still applies cleanly).
+
+Why expected-contact in the denominator (2026-07-02 change): the previous
+raw contact-rate form let swing selection leak in — chase-prone hitters
+scored low CT+ partly through WHERE they swung, double-counting what SD+
+already measures. Dividing by the league contact expectation for the same
+swings removes the mix and leaves pure contact execution. Validated:
+split-half r 0.60→0.67, stabilization n0 127→95 swings
+(scripts/phase2_sdct_harness.py).
 
 Why leverage weighting: 2-strike whiffs matter far more than 0-0 whiffs
 because rv_whiff ≈ K (very negative) at 2K while a 0-0 whiff is just a
@@ -22,10 +29,10 @@ strike added. Heart-zone whiffs cost more than chase-zone whiffs because
 rv_contact ≈ high xwOBA on heart contact. The (rv_contact - rv_whiff)
 weighting makes high-stakes contact count more toward the hitter's score.
 
-Empirical validation confirmed the (zone × count) cell structure is
-approximately optimal at current sample sizes — pitch-type expansion
-adds <1% of residual variance; pitcher-identity adjustment is dominated
-by sampling noise.
+Cell RVs are count-anchored (build_bip_count_offsets) so BIP and whiff
+values share the count-conditional delta-RE currency. The (zone × count)
+cell structure was validated as approximately optimal at current samples —
+pitch-type expansion added <1% residual variance.
 """
 import math
 from collections import defaultdict
@@ -33,7 +40,7 @@ from collections import defaultdict
 from pipeline_utils import safe_float
 from pipeline_sdplus import (
     classify_zone, classify_decision, get_count, is_eligible,
-    make_rv_xrv, ZONES, COUNTS,
+    make_rv_xrv, build_bip_count_offsets, ZONES, COUNTS,
 )
 
 # ── Hyperparameters ─────────────────────────────────────────────────────
@@ -210,35 +217,47 @@ def compute_ct_swing(p, table):
 # ── Per-hitter aggregation ──────────────────────────────────────────────
 
 def compute_hitter_ct(pitches_by_hitter, table):
-    """Compute hitter's leverage-weighted contact rate.
-    raw_ct = Σ(I[contact] × leverage) / Σ(leverage)   ∈ [0, 1]
+    """Compute hitter's mix-adjusted contact ratio.
+    raw_ct = Σ(I[contact] × lev) / Σ((1 − p_whiff_cell) × lev)   (~1.0 = league)
     Returns {(hitter, team) -> {raw_ct, n_swings, zone_dv}} where
-    zone_dv[z] is the per-zone leverage-weighted contact rate (also [0, 1]).
+    zone_dv[z] is the per-zone actual/expected contact ratio.
     """
     results = {}
     for key, pitches in pitches_by_hitter.items():
         swings = [p for p in pitches if is_ct_eligible(p)]
         if not swings:
             continue
-        num = 0.0
-        denom = 0.0
-        zone_accum = defaultdict(lambda: [0.0, 0.0])  # [num, denom] per zone
+        actual = 0.0     # Σ lev·I[contact]
+        expected = 0.0   # Σ lev·(1 − p_whiff_cell): league contact given the SAME swings
+        zone_accum = defaultdict(lambda: [0.0, 0.0])  # [actual, expected] per zone
         for p in swings:
             lev, con = compute_ct_swing(p, table)
             if lev <= 0:
-                # Should not happen if cells are sane — skip defensively
+                # Two waste-zone hitter's-count cells carry (slightly) negative
+                # leverage in practice (contact there is worth less than the
+                # ball a whiff would concede); zero-stakes swings drop out.
                 continue
-            num += lev * con
-            denom += lev
-            zone_accum[classify_zone(p)][0] += lev * con
-            zone_accum[classify_zone(p)][1] += lev
-        if denom <= 0:
+            cell = table[(classify_zone(p), get_count(p))]
+            exp_con = lev * (1.0 - cell['p_whiff'])
+            actual += lev * con
+            expected += exp_con
+            z = classify_zone(p)
+            zone_accum[z][0] += lev * con
+            zone_accum[z][1] += exp_con
+        if expected <= 0:
             continue
         results[key] = {
-            'raw_ct':   num / denom,
+            # Mix-adjusted contact ratio: leverage-weighted ACTUAL contact
+            # over leverage-weighted EXPECTED contact for the same swings
+            # (league p_whiff per cell). ~1.0 = league-average contact GIVEN
+            # where/when this hitter swings — swing-selection differences no
+            # longer leak in (they belong to SD+). Validated 2026-07-02:
+            # split-half r 0.60→0.67, n0 127→95 swings vs the raw-rate form
+            # (scripts/phase2_sdct_harness.py).
+            'raw_ct':   actual / expected,
             'n_swings': len(swings),
-            'zone_dv':  {z: (a/d if d > 0 else None)
-                         for z, (a, d) in zone_accum.items()},
+            'zone_dv':  {z: (a / e if e > 0 else None)
+                         for z, (a, e) in zone_accum.items()},
         }
     return results
 
@@ -247,7 +266,7 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
                           min_n=MIN_HITTER_SWINGS):
     """Ratio-to-league scaling, matching BB+ convention:
         ctPlus = 100 × hitter_raw_adj / league_mean_raw_adj
-    (raw_ct is a leverage-weighted contact rate in [0, 1], league mean ~0.74,
+    (raw_ct is the actual/expected contact ratio, league mean ≈ 1.0,
     so the ratio spread is naturally narrow.)
     """
     eligible = {k: v for k, v in hitter_raw.items() if v['n_swings'] >= min_n}
@@ -302,10 +321,13 @@ def compute_ct_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
     Matches compute_sd_plus signature for symmetric integration in
     process_data.py.
     """
-    rv_fn = make_rv_xrv(lg_woba, woba_scale)
     # Cell weight tables stay MLB-baselined (translation framing); ROC
     # hitters are looked up against this MLB table by compute_hitter_ct.
     swings = [p for p in all_pitches if p.get('_source','MLB')=='MLB' and is_ct_eligible(p)]
+    # Count-anchor the BIP branch (same currency fix as SD+/Loc+; see
+    # pipeline_sdplus.build_bip_count_offsets).
+    offsets = build_bip_count_offsets(swings, lg_woba, woba_scale)
+    rv_fn = make_rv_xrv(lg_woba, woba_scale, offsets)
     raw = build_contact_cell_weights(swings, rv_fn)
     zone_means = zone_level_contact_means(swings, rv_fn)
     smoothed = shrink_contact_cells(raw, zone_means)

@@ -16,7 +16,9 @@ import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PKL = os.path.join(ROOT, 'data', 'all_pitches_rs_cache.pkl')
-OUT = '/private/tmp/claude-501/-Users-wallyhuron-Huronalytics/2c999aee-7a23-428c-9672-8140b8b4d58d/scratchpad/stuff_df.pkl'
+# Override with STUFF_DF_OUT; default keeps the artifact out of the repo.
+OUT = os.environ.get('STUFF_DF_OUT',
+                     os.path.join(ROOT, 'data', '_stuff_df_scratch.pkl'))
 LG_WOBA, WOBA_SCALE = 0.3169, 1.2393
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC'}

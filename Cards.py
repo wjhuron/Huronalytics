@@ -1883,10 +1883,10 @@ def render_card(config, pitches, output_file):
 # ═══════════════════════════════════════════════════════════════
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team            = "WSH"
+    team            = "ROC"
     start_date      = None    # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
-    filter_pitchers = "Cavalli, Cade"                 # Semicolon-separated "Last, First" names, or "" for all
+    filter_pitchers = ""                 # Semicolon-separated "Last, First" names, or "" for all
     game_pk         = ""                 # Optional game PK for live/in-progress games
     output_dir      = OUTPUT_DIR
 

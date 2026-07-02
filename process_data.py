@@ -2829,11 +2829,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs['sdPlus'] = 100.0
     print(f"  SD+ computed for {len(sd_results)} qualified hitters.")
 
-    # CT+ — contact-frequency index: leverage-weighted contact rate over
-    # eligible swings, where leverage = rv_contact − rv_whiff for the
-    # (zone × count) cell (same table structure as SD+). NOTE: currently a
-    # weighted RAW contact rate — no expected-contact baseline is subtracted
-    # (lift-over-expected conversion planned). See pipeline_contact.py.
+    # CT+ — contact-execution index: leverage-weighted actual contact over
+    # leverage-weighted EXPECTED contact for the same swings (league p_whiff
+    # per zone × count cell), so swing-mix effects stay in SD+ where they
+    # belong. See pipeline_contact.py.
     from pipeline_contact import compute_ct_plus
     ct_results, ct_weights = compute_ct_plus(
         all_pitches, sd_pitches_by_hitter,

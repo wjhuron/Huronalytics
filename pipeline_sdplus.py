@@ -1,25 +1,31 @@
 """SD+ (Swing Decisions+) — per-pitch decision-quality metric.
 
-Builds a 120-cell (5 zones × 12 counts × 2 decisions) run-value weight table
-from league-wide MLB pitch data, then scores each hitter on the mean
-decision-value of their own decisions (swing/take) using the league cell
-weights. 100 = league-average decision-maker.
+Builds a 360-cell (5 zones × 12 counts × 3 pitch categories × 2 decisions)
+run-value weight table from league-wide MLB pitch data, then scores each
+hitter on the decision-value of their own decisions (swing/take) using the
+league cell weights, reweighted to the league zone mix. 100 = league-average
+decision-maker.
 
-Design highlights:
+Design highlights (config validated 2026-07-02, scripts/phase2_sdct_harness.py
++ scripts/phase2_sdplus_extensions.py):
 - Zone classification: Baseball Savant attack zones, applied to the hitter-
   specific SzTop/SzBot (which already incorporate the ABS adjustment in
   this pipeline). Five buckets: heart / shadow_in / shadow_out / chase /
   waste. Shadow is split on whether the pitch is a strike (via compute_in_zone).
-- Counts: all 12 as-is.
+- Counts: all 12 as-is. Pitch categories: FB / BRK / OFF (a 2-2 shadow
+  slider and 2-2 shadow fastball have very different swing values).
 - RV for cell weights: luck-neutral (xwOBA-based for BIP, -RunExp for
-  non-BIP). Makes the cell weights "expected run value given league-
-  average execution" rather than "average realized outcome."
-- Cell smoothing: continuous Bayesian shrinkage toward decision-specific
-  zone means with k=50 pseudo-obs.
+  non-BIP), with the BIP branch COUNT-ANCHORED into the same
+  count-conditional delta-RE currency (build_bip_count_offsets).
+- Cell smoothing: cascade Bayesian shrinkage cell → (zone × cat) → zone,
+  k=50 pseudo-obs per level.
+- Aggregation: MIX-NEUTRAL — per-zone mean dv reweighted to the league
+  zone distribution, so opportunity (the pitch diet faced) doesn't leak
+  into the decision score.
 - Per-hitter regression: Bayesian regression toward the league mean with
-  n_prior=400 pseudo-obs. Mitigates early-season noise.
+  n_prior=250 pseudo-obs (= measured n0, MMSE-optimal).
 - Normalization: ratio-to-league ×100 (see regress_and_normalize), NOT a
-  z-score scale. Floor: 225 decisions (measured split-half r=.50 point);
+  z-score scale. Floor: 250 decisions (measured split-half r=.50 point);
   the MLB 3.1 PA × team_games_played qualification is applied separately
   by the leaderboard consumer.
 
@@ -41,7 +47,12 @@ from pipeline_utils import (
 HEART_X   = 6.7 / 12      # ±6.7" from plate center = inner 67% of plate
 SHADOW_X  = 13.3 / 12     # ±13.3" = outer 133% of plate
 CHASE_X   = 20.0 / 12     # ±20"  = outer 200% of plate
-HEART_VERT_FRAC  = 1.0 / 3.0    # Heart covers middle 33% of zone height
+HEART_VERT_FRAC  = 1.0 / 6.0    # trim 1/6 per side → heart = middle 67% of
+                                # zone height, the true Savant heart. (Was
+                                # 1/3 = middle 33% through 2026-07-02, which
+                                # made shadow_in a mega-zone mixing meatballs
+                                # with edge pitches; heart held 12% of
+                                # decisions vs Savant's ~26%.)
 SHADOW_VERT_FRAC = 1.0 / 6.0    # Shadow extends 17% of zone_ht above/below
 CHASE_VERT_FRAC  = 0.5          # Chase extends 50% of zone_ht above/below
 
@@ -50,15 +61,41 @@ TAKE_DESCRIPTIONS = {'Called Strike', 'Ball'}
 ZONES = ['heart', 'shadow_in', 'shadow_out', 'chase', 'waste']
 COUNTS = [(b, s) for b in range(4) for s in range(3)]
 
+# Pitch-category split of the cell table (2026-07-02): a 2-2 shadow slider
+# and a 2-2 shadow fastball carry very different swing values. 360 cells
+# (5 zones × 12 counts × 3 cats × 2 decisions) with a shrinkage cascade
+# cell → (zone × cat) → zone. Validated: split-half r +0.016/+0.006 vs the
+# zone×count table (scripts/phase2_sdplus_extensions.py).
+CATS = ('FB', 'BRK', 'OFF')
+FB_CAT_TYPES = {'FF', 'SI', 'FC', 'FA'}
+OFF_CAT_TYPES = {'CH', 'FS', 'SC', 'KN'}
+
+
+def cat_of(p):
+    pt = p.get('Pitch Type')
+    if pt in FB_CAT_TYPES:
+        return 'FB'
+    if pt in OFF_CAT_TYPES:
+        return 'OFF'
+    return 'BRK'
+
 # ── Hyperparameters ─────────────────────────────────────────────────────
 CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-obs
-HITTER_PRIOR_N = 400      # hitter → league regression pseudo-obs
-MIN_HITTER_DECISIONS = 225  # floor = split-half r=.50 point (signal=
-                            # noise). Measured directly via the
-                            # reliability study (r=.50 crossing ~225-229
-                            # decisions). The old 100 was r~.34, i.e.
-                            # mostly noise. Leaderboard qualification
-                            # (3.1 × TGP) is a separate stricter gate.
+HITTER_PRIOR_N = 250      # hitter → league regression pseudo-obs. Set to
+                          # the measured stabilization constant n0 (~233-283
+                          # decisions under the full 2026-07-02 config:
+                          # count-anchored BIP values, true Savant heart,
+                          # FB/BRK/OFF cells, mix-neutral aggregation), i.e.
+                          # the MMSE-optimal pseudo-count K=n0, matching
+                          # CT+'s convention. (The old 400 was tuned for
+                          # the pre-anchor config and over-shrank ~1.6x.)
+MIN_HITTER_DECISIONS = 250  # floor = split-half r=.50 point (signal=
+                            # noise). Re-measured 2026-07-02 on the full
+                            # config via scripts/phase2_sdplus_extensions.py
+                            # (n0 estimates 233 @high-n / 283 @low-n strata;
+                            # 250 is the midpoint). Leaderboard
+                            # qualification (3.1 × TGP) is a separate
+                            # stricter gate.
 
 # MLB standard qualification: PA ≥ 3.1 × team games played.
 PA_PER_TEAM_GAME = 3.1
@@ -172,11 +209,53 @@ def rv_hitter_runexp(p):
     return -rv if rv is not None else None
 
 
-def make_rv_xrv(lg_woba, woba_scale):
+def build_bip_count_offsets(pitches, lg_woba, woba_scale, min_n=50):
+    """Per-count additive offset that puts the BIP xwOBA-value branch in the
+    same count-conditional delta-RE currency as takes/whiffs/fouls.
+
+        offset(c) = mean(-RunExp | BIP in count c)
+                  - mean((xwOBA - lg_woba)/woba_scale | BIP in count c)
+
+    -RunExp on a BIP is the actual count-conditional value of ending the PA
+    from count c; the xwOBA branch is anchored to a neutral PA state. Their
+    per-count means differ by exactly the count-state correction (outcome
+    luck averages out within a count at league scale). Measured span is
+    ~0.24 runs (0-2 BIPs undervalued ~0.10, 3-0/3-1 overvalued ~0.14) — see
+    scripts/count_anchor_offsets.py. Because the offset is a count-level
+    constant, within-count variation stays 100% xwOBA-driven (luck-neutral).
+
+    Counts with < min_n BIPs on either side fall back to 0.0 (neutral)."""
+    if lg_woba is None or woba_scale in (None, 0):
+        return {}
+    acc = {}
+    for p in pitches:
+        if p.get('Description') != 'In Play':
+            continue
+        c = get_count(p)
+        if c is None:
+            continue
+        a = acc.setdefault(c, [0.0, 0, 0.0, 0])  # re_sum, re_n, xw_sum, xw_n
+        re = safe_float(p.get('RunExp'))
+        xw = safe_float(p.get('xwOBA'))
+        if re is not None:
+            a[0] += -re; a[1] += 1
+        if xw is not None:
+            a[2] += (xw - lg_woba) / woba_scale; a[3] += 1
+    offsets = {}
+    for c, (rs, rn, xs, xn) in acc.items():
+        if rn >= min_n and xn >= min_n:
+            offsets[c] = rs / rn - xs / xn
+    return offsets
+
+
+def make_rv_xrv(lg_woba, woba_scale, count_offsets=None):
     """Return an rv_fn that produces luck-neutral hitter-perspective RV:
     xwOBA-based for BIP pitches with xwOBA, -RunExp for everything else
     (including BIP without xwOBA). Falls back gracefully if Guts constants
-    are missing."""
+    are missing.
+
+    count_offsets (from build_bip_count_offsets) count-anchors the BIP
+    branch so it shares the delta-RE currency of the non-BIP outcomes."""
     has_guts = (lg_woba is not None and woba_scale is not None
                 and woba_scale != 0)
 
@@ -184,7 +263,12 @@ def make_rv_xrv(lg_woba, woba_scale):
         if has_guts and p.get('Description') == 'In Play':
             xw = safe_float(p.get('xwOBA'))
             if xw is not None:
-                return (xw - lg_woba) / woba_scale
+                v = (xw - lg_woba) / woba_scale
+                if count_offsets:
+                    c = get_count(p)
+                    if c is not None:
+                        v += count_offsets.get(c, 0.0)
+                return v
         rv = safe_float(p.get('RunExp'))
         return -rv if rv is not None else None
     return _fn
@@ -195,7 +279,7 @@ def make_rv_xrv(lg_woba, woba_scale):
 # ═════════════════════════════════════════════════════════════════════════
 
 def build_weight_table(pitches, rv_fn):
-    """dict[(zone, count, decision)] -> (mean_rv, n)."""
+    """dict[(zone, count, cat, decision)] -> (mean_rv, n)."""
     cells = defaultdict(lambda: {'sum': 0.0, 'n': 0})
     for p in pitches:
         zone = classify_zone(p)
@@ -204,43 +288,49 @@ def build_weight_table(pitches, rv_fn):
         rv = rv_fn(p)
         if rv is None:
             continue
-        key = (zone, count, decision)
+        key = (zone, count, cat_of(p), decision)
         cells[key]['sum'] += rv
         cells[key]['n'] += 1
     return {k: (v['sum'] / v['n'], v['n']) for k, v in cells.items()}
 
 
 def zone_level_means(pitches, rv_fn):
-    """Decision-specific zone means. Used as shrinkage priors."""
-    zsum = defaultdict(float)
-    zn = defaultdict(int)
+    """(zone × cat × decision) and (zone × decision) means — the two levels
+    of the shrinkage cascade."""
+    zc_sum = defaultdict(float); zc_n = defaultdict(int)
+    z_sum = defaultdict(float); z_n = defaultdict(int)
     for p in pitches:
         zone = classify_zone(p)
         decision = classify_decision(p)
         rv = rv_fn(p)
         if rv is None:
             continue
-        zsum[(zone, decision)] += rv
-        zn[(zone, decision)] += 1
-    return {k: (zsum[k] / zn[k], zn[k]) for k in zsum}
+        zc_sum[(zone, cat_of(p), decision)] += rv
+        zc_n[(zone, cat_of(p), decision)] += 1
+        z_sum[(zone, decision)] += rv
+        z_n[(zone, decision)] += 1
+    return ({k: (zc_sum[k] / zc_n[k], zc_n[k]) for k in zc_sum},
+            {k: (z_sum[k] / z_n[k], z_n[k]) for k in z_sum})
 
 
 def shrink_table(raw_table, zone_means, k=CELL_SHRINK_K):
-    """Continuous Bayesian shrinkage: smoothed = (n × cell + k × zone) / (n + k).
-    Returns dict keyed by (zone, count, decision) with ALL 120 combinations
-    populated (even when raw cell was empty — falls back to zone mean)."""
+    """Cascade Bayesian shrinkage: cell → (zone × cat) → zone, k pseudo-obs
+    per level. Returns dict keyed by (zone, count, cat, decision) with ALL
+    360 combinations populated."""
+    zc_means, z_means = zone_means
     smoothed = {}
     for zone in ZONES:
         for count in COUNTS:
-            for decision in ('swing', 'take'):
-                key = (zone, count, decision)
-                if key in raw_table:
-                    cell_mean, n = raw_table[key]
-                else:
-                    cell_mean, n = 0.0, 0
-                zone_mean, _ = zone_means.get((zone, decision), (0.0, 0))
-                rv = (n * cell_mean + k * zone_mean) / (n + k)
-                smoothed[key] = (rv, n)
+            for cat in CATS:
+                for decision in ('swing', 'take'):
+                    z_mean, _zn = z_means.get((zone, decision), (0.0, 0))
+                    zc_mean, zc_n = zc_means.get((zone, cat, decision), (0.0, 0))
+                    zc_shrunk = ((zc_n * zc_mean + k * z_mean) / (zc_n + k)
+                                 if (zc_n + k) else z_mean)
+                    key = (zone, count, cat, decision)
+                    cell_mean, n = raw_table.get(key, (0.0, 0))
+                    rv = (n * cell_mean + k * zc_shrunk) / (n + k)
+                    smoothed[key] = (rv, n)
     return smoothed
 
 
@@ -253,16 +343,27 @@ def compute_dv(p, table):
     zone = classify_zone(p)
     decision = classify_decision(p)
     count = get_count(p)
-    swing_rv, _ = table[(zone, count, 'swing')]
-    take_rv,  _ = table[(zone, count, 'take')]
+    cat = cat_of(p)
+    swing_rv, _ = table[(zone, count, cat, 'swing')]
+    take_rv,  _ = table[(zone, count, cat, 'take')]
     if decision == 'swing':
         return swing_rv - take_rv
     else:
         return take_rv - swing_rv
 
 
-def compute_hitter_sd(pitches_by_hitter, table):
-    """dict[(hitter, team)] -> {'raw_sd', 'n_decisions', 'zone_dv'}."""
+def compute_hitter_sd(pitches_by_hitter, table, lg_zone_w=None):
+    """dict[(hitter, team)] -> {'raw_sd', 'n_decisions', 'zone_dv'}.
+
+    raw_sd is MIX-NEUTRAL (2026-07-02): the hitter's per-zone mean dv is
+    reweighted to the LEAGUE zone distribution (lg_zone_w), so seeing a more
+    separable pitch diet (more heart+waste, fewer coin-flip shadow pitches)
+    no longer inflates the score — that is opportunity, not decision skill
+    (SEAGER controls the same confound). Weights renormalize over the zones
+    the hitter actually has. Validated: split-half r +0.02-0.03 and the
+    stabilization n0 drops ~10-15% vs the plain per-decision mean
+    (scripts/phase2_sdplus_extensions.py). Falls back to the plain mean when
+    lg_zone_w is None."""
     results = {}
     for key, pitches in pitches_by_hitter.items():
         elig = [p for p in pitches if is_eligible(p)]
@@ -272,11 +373,17 @@ def compute_hitter_sd(pitches_by_hitter, table):
         zone_dvs = defaultdict(list)
         for p, dv in zip(elig, dvs):
             zone_dvs[classify_zone(p)].append(dv)
+        zone_means = {z: sum(vs) / len(vs) for z, vs in zone_dvs.items() if vs}
+        if lg_zone_w:
+            wsum = sum(lg_zone_w.get(z, 0.0) for z in zone_means)
+            raw_sd = (sum(m * lg_zone_w.get(z, 0.0) for z, m in zone_means.items()) / wsum
+                      if wsum > 0 else sum(dvs) / len(dvs))
+        else:
+            raw_sd = sum(dvs) / len(dvs)
         results[key] = {
-            'raw_sd': sum(dvs) / len(dvs),
+            'raw_sd': raw_sd,
             'n_decisions': len(dvs),
-            'zone_dv': {z: (sum(vs) / len(vs) if vs else None)
-                        for z, vs in zone_dvs.items()},
+            'zone_dv': {z: zone_means.get(z) for z in zone_dvs},
         }
     return results
 
@@ -329,10 +436,10 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
 
 def serialize_weight_table(smoothed):
     """Turn the smoothed cell table into a JSON-friendly dict keyed by
-    `{zone}|{balls}-{strikes}|{decision}` → {'rv': float, 'n': int}."""
+    `{zone}|{cat}|{balls}-{strikes}|{decision}` → {'rv': float, 'n': int}."""
     out = {}
-    for (zone, count, decision), (rv, n) in smoothed.items():
-        key = f"{zone}|{count[0]}-{count[1]}|{decision}"
+    for (zone, count, cat, decision), (rv, n) in smoothed.items():
+        key = f"{zone}|{cat}|{count[0]}-{count[1]}|{decision}"
         out[key] = {'rv': round(rv, 5), 'n': n}
     return out
 
@@ -370,16 +477,27 @@ def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
             n_decisions, zone_dv, z}
         weight_table_json: dict for metadata output (audit/frontend)
     """
-    rv_fn = make_rv_xrv(lg_woba, woba_scale)
     # Cell weight tables stay MLB-baselined (translation framing); ROC
     # hitters are looked up against this MLB table by compute_hitter_sd.
     eligible = [p for p in all_pitches if p.get('_source','MLB')=='MLB' and is_eligible(p)]
+
+    # Count-anchor the BIP branch so all outcomes share the count-conditional
+    # delta-RE currency (see build_bip_count_offsets).
+    offsets = build_bip_count_offsets(eligible, lg_woba, woba_scale)
+    rv_fn = make_rv_xrv(lg_woba, woba_scale, offsets)
 
     raw_table = build_weight_table(eligible, rv_fn)
     zone_means = zone_level_means(eligible, rv_fn)
     smoothed = shrink_table(raw_table, zone_means)
 
-    hitter_raw = compute_hitter_sd(pitches_by_hitter, smoothed)
+    # League zone distribution for the mix-neutral aggregation.
+    zone_counts = defaultdict(int)
+    for p in eligible:
+        zone_counts[classify_zone(p)] += 1
+    tot = sum(zone_counts.values())
+    lg_zone_w = {z: n / tot for z, n in zone_counts.items()} if tot else None
+
+    hitter_raw = compute_hitter_sd(pitches_by_hitter, smoothed, lg_zone_w)
     normalized = regress_and_normalize(hitter_raw)
 
     return normalized, serialize_weight_table(smoothed)

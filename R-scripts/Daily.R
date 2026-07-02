@@ -1,11 +1,11 @@
 # ---- Configuration ----
-input_file_path <- "PIT" # Team code (e.g., "PIT", "WSH") or full path
+input_file_path <- "" # Team code (e.g., "PIT", "WSH") or full path
 output_directory <- "/Users/wallyhuron/Downloads/"
 # ---- Optional Filtering Parameters ----
 # Set these to NULL to disable filtering
 selected_pitcher_filter <- NULL          # Example format: "Bieber, Shane" - Set to NULL for all pitchers
-start_date_filter <- "2026-04-27"        # Example format: "2025-05-18" - Set to NULL for no date filter
-end_date_filter <- "2026-04-27"          # Example format: "2025-05-18" - Set to NULL for no date filter
+start_date_filter <- "2026-07-02"        # Example format: "2025-05-18" - Set to NULL for no date filter
+end_date_filter <- "2026-07-02"          # Example format: "2025-05-18" - Set to NULL for no date filter
 # ---- Required Libraries ----
 library(tidyverse)
 library(patchwork)
