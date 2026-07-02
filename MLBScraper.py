@@ -80,6 +80,19 @@ def scrape_mlb_transactions(start_date, end_date):
         'Toronto Blue Jays', 'Washington Nationals'
     ]
 
+    # Articles, prepositions, and transaction verbs that can never be part of a
+    # player name — used to truncate the position-anchored name and to reject
+    # garbage runs in the no-position fallback.
+    _NAME_STOP = frozenset({
+        'a', 'an', 'the', 'and', 'or', 'to', 'from', 'for', 'with', 'on', 'off', 'of', 'as',
+        'was', 'were', 'is', 'are', 'has', 'have', 'had', 'been', 'his', 'their', 'right', 'left',
+        'released', 'signed', 'claimed', 'selected', 'purchased', 'traded', 'acquired',
+        'returned', 'retired', 'elected', 'free', 'agency', 'waivers', 'waiver', 'assignment',
+        'outright', 'outrighted', 'designated', 'activated', 'reinstated', 'optioned',
+        'recalled', 'placed', 'transferred', 'sent', 'contract', 'minor', 'league', 'major',
+        'disabled', 'injured', 'list', 'day',
+    })
+
     def parse_transaction(transaction_text, team_name):
         """Parse transaction text to extract player, position, and transaction type."""
         if not transaction_text or transaction_text == 'Transaction':
@@ -130,22 +143,43 @@ def scrape_mlb_transactions(start_date, end_date):
             if match:
                 position = pos
                 player_name = match.group(1).strip()
-                # Remove transaction-related words
+                # Truncate at the first transaction-related word (the name ends
+                # where the verb/preposition tail begins).
                 player_name = re.sub(
-                    r'\s+(outright|outrighted|off|for|to|from|and|with|on|waivers|assignment|the|a)\s+.*$', '',
+                    r'\s+(' + '|'.join(_NAME_STOP) + r')\b.*$', '',
                     player_name, flags=re.IGNORECASE)
-                player_name = re.sub(r'[.,;:]$', '', player_name.strip())
-                player = player_name
-                break
+                # Strip trailing separators but PRESERVE a "Jr."/"Sr." period so
+                # the name dedupes cleanly against other sources that keep it.
+                player_name = re.sub(r'[,;:]+$', '', player_name.strip())
+                if not re.search(r'\b(?:Jr|Sr)\.$', player_name, flags=re.IGNORECASE):
+                    player_name = re.sub(r'\.+$', '', player_name)
+                player = player_name.strip() or None
+                if player:
+                    break
 
         if not player:
-            name_pattern = r'\b([\w\u00C0-\u017F.\'-]+\s+[\w\u00C0-\u017F.\'-]+(?:\s+[\w\u00C0-\u017F.\'-]+)?(?:\s+[\w\u00C0-\u017F.\'-]+)?)\b'
-            matches = re.findall(name_pattern, transaction_text)
-            if matches:
-                for match in matches:
-                    if match not in mlb_teams and not any(team in match for team in mlb_teams):
-                        player = match
+            # No position token found \u2014 take the first maximal run of 2-4
+            # consecutive name-like tokens: capitalized (accents allowed), not a
+            # transaction/stopword, and not part of a team name. This isolates a
+            # leading name ("Juan Soto elected free agency") that a greedy regex
+            # would swallow together with the following verb.
+            team_tokens = set()
+            for tm in mlb_teams:
+                team_tokens.update(tm.split())
+            run = []
+            for tok in transaction_text.split() + ['\x00']:  # sentinel flushes tail
+                core = tok.strip(".,;:'\"")
+                is_name = bool(re.match(r"[A-Z\u00C0-\u017F]", tok)) and core.lower() not in _NAME_STOP and core not in team_tokens
+                if is_name:
+                    run.append(tok.strip(",;:"))
+                else:
+                    if 2 <= len(run) <= 4:
+                        cand = ' '.join(run)
+                        if not re.search(r'\b(?:Jr|Sr)\.$', cand, flags=re.IGNORECASE):
+                            cand = re.sub(r'\.+$', '', cand)
+                        player = cand
                         break
+                    run = []
 
         if player:
             return {

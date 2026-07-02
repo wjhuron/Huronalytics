@@ -199,7 +199,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
       # GB% (always shown, uses BB Type if available)
       gb_percent = {
         if (has_bb_type) {
-          total_bip <- sum(Description %in% in_play_events, na.rm = TRUE)
+          total_bip <- sum(Description %in% in_play_events & !grepl("^bunt", BBType), na.rm = TRUE)
           if (total_bip > 0) {
             n_gb <- sum(BBType == "ground_ball", na.rm = TRUE)
             sprintf("%.1f%%", n_gb / total_bip * 100)
@@ -215,7 +215,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
   
   # --- Compute and append Total row ---
   total_swings_all <- sum(pitcher_data$Description %in% swing_events, na.rm = TRUE)
-  total_bip_all <- sum(pitcher_data$Description %in% in_play_events, na.rm = TRUE)
+  total_bip_all <- sum(pitcher_data$Description %in% in_play_events & !grepl("^bunt", pitcher_data$BBType), na.rm = TRUE)
   
   total_row <- tibble(
     `Pitch Type` = "Total",

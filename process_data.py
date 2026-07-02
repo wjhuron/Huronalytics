@@ -3497,7 +3497,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # so pitches thrown rarely (e.g., 5 sliders) don't pollute the per-pitch
     # percentile pool. Shape metrics (velo, IVB, HB, etc.) need no minimum.
     MIN_PITCH_TYPE_OUTCOME = 25
-    PITCH_SHAPE_KEYS = set(METRIC_KEYS.values()) | {'nVAA', 'nHAA'}
+    PITCH_SHAPE_KEYS = set(METRIC_KEYS.values()) | {'nVAA', 'nHAA', 'ivbOE', 'hbOE'}
+    # Hand-signed shape metrics stored in an absolute frame — rank on |value| so
+    # LHP/RHP aren't split by sign. Mirrors js/aggregator.js ABS_PCTL_KEYS.
+    ABS_PCTL_KEYS = {'horzBrk', 'haa', 'nHAA', 'hbOE'}
     # Batted-ball stats use a BIP-count qualifier (>=25 BIPs of that pitch
     # type) instead of pitch count, since their denominator is BIPs. Includes
     # gbPct (which lives in PITCH_STAT_KEYS for historical reasons but is a
@@ -3515,8 +3518,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             mc, ck = MIN_PITCH_TYPE_OUTCOME, 'nBip'
         else:
             mc, ck = MIN_PITCH_TYPE_OUTCOME, 'count'
+        av = metric in ABS_PCTL_KEYS
         for pt, pt_rows in pt_groups.items():
-            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc, count_key=ck)
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc, count_key=ck, abs_val=av)
 
     # 2. Pitcher percentiles (all stats including boxscore-derived).
     # Pool: ALL MLB pitchers (no qualifier). This matches the convention used
@@ -3562,6 +3566,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                     row['vaa_pctl'] = 100 - row['vaa_pctl']
                 if row.get('nVAA_pctl') is not None:
                     row['nVAA_pctl'] = 100 - row['nVAA_pctl']
+        else:
+            # HAA/nHAA are abs-ranked (larger magnitude = higher pctl by default).
+            # For fastballs, closer to 0 is better, so invert. Mirrors the JS
+            # Aggregator HAA/nHAA fastball inversion (js/aggregator.js:1751).
+            for row in pt_rows:
+                if row.get('haa_pctl') is not None:
+                    row['haa_pctl'] = 100 - row['haa_pctl']
+                if row.get('nHAA_pctl') is not None:
+                    row['nHAA_pctl'] = 100 - row['nHAA_pctl']
     for row in pitch_leaderboard:
         for stat in ('wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'):
             pctl_key = stat + '_pctl'

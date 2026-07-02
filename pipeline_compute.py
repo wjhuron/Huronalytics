@@ -40,7 +40,7 @@ PITCH_BB_PCTL_KEYS = ['avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct
 # = good for pitcher) and is already in PITCH_STAT_KEYS.
 PITCH_BB_INVERT = {'avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'babip'}
 
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA'] + PITCH_STAT_KEYS + PITCH_BB_PCTL_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'locPlus']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA', 'ivbOE', 'hbOE'] + PITCH_STAT_KEYS + PITCH_BB_PCTL_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'locPlus']
 
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 
@@ -596,7 +596,7 @@ def compute_hitter_stats(pitches):
 
 # ── Percentile computation ───────────────────────────────────────────────
 
-def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None):
+def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False):
     """Compute percentile rank (0-100) for each row's metric value.
 
     Distribution is built from rows that:
@@ -609,10 +609,17 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
     rows therefore still get a stored percentile rank (for tooltip display);
     the rendering layer decides separately whether to apply percentile coloring.
 
+    abs_val=True ranks on |value| instead of the signed value. Required for
+    hand-signed shape metrics (haa, nHAA, horzBrk, hbOE) stored in an absolute
+    catcher/pitcher frame: ranking the signed value would rank handedness rather
+    than quality (LHP negative, RHP positive). Mirrors the JS Aggregator's
+    ABS_PCTL_KEYS so the server-emitted percentiles match the client re-agg.
+
     Uses the 'mean rank' method for ties. O(n log n) via sort + bisect.
     """
     import bisect
     pctl_key = metric_key + '_pctl'
+    _v = (lambda x: abs(x)) if abs_val else (lambda x: x)
 
     def _row_in_pool(row):
         if row.get(metric_key) is None:
@@ -623,7 +630,7 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
             return False
         return True
 
-    sorted_vals = sorted(rows[i][metric_key] for i in range(len(rows)) if _row_in_pool(rows[i]))
+    sorted_vals = sorted(_v(rows[i][metric_key]) for i in range(len(rows)) if _row_in_pool(rows[i]))
     n = len(sorted_vals)
 
     if n < 2:
@@ -632,6 +639,7 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
         return
 
     def _pctl_from_sorted(val):
+        val = _v(val)
         below = bisect.bisect_left(sorted_vals, val)
         above = bisect.bisect_right(sorted_vals, val)
         equal = above - below
@@ -642,7 +650,7 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
         row[pctl_key] = _pctl_from_sorted(val) if val is not None else None
 
 
-def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None):
+def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False):
     """Compute percentiles from an MLB pool of one row per player (combined 2TM/3TM
     rows replace their per-team rows), then interpolate AAA rows and the per-team
     rows of multi-team players against the pool.
@@ -679,7 +687,8 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
             continue
         mlb_rows.append(r)
 
-    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key, qualifier_fn=qualifier_fn)
+    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key, qualifier_fn=qualifier_fn, abs_val=abs_val)
+    _v = (lambda x: abs(x)) if abs_val else (lambda x: x)
 
     def _mlb_in_pool(row):
         if row.get(metric_key) is None:
@@ -690,7 +699,7 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
             return False
         return True
 
-    mlb_values = sorted(r[metric_key] for r in mlb_rows if _mlb_in_pool(r))
+    mlb_values = sorted(_v(r[metric_key]) for r in mlb_rows if _mlb_in_pool(r))
     n = len(mlb_values)
 
     import bisect
@@ -702,6 +711,7 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
         if n < 2:
             row[pctl_key] = 50
             continue
+        val = _v(val)
         below = bisect.bisect_left(mlb_values, val)
         above = bisect.bisect_right(mlb_values, val)
         equal = above - below

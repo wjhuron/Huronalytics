@@ -127,7 +127,7 @@ calculate_pitcher_stats_table2 <- function(data, pitcher_name) {
       },
       gb_percent = {
         if (has_bb_type) {
-          total_bip <- sum(Description %in% in_play_events, na.rm = TRUE)
+          total_bip <- sum(Description %in% in_play_events & !grepl("^bunt", BBType), na.rm = TRUE)
           if (total_bip > 0) {
             # Gate on the in-play description too, matching Season.R and the
             # total_bip denominator — otherwise a ground_ball tagged on a non

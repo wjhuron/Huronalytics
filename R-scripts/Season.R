@@ -82,7 +82,7 @@ calculate_combined_pitcher_stats <- function(data, pitcher_name, has_arm_angle =
         }
       },
       gb_percent = {
-        balls_in_play <- sum(Description %in% in_play_events, na.rm = TRUE)
+        balls_in_play <- sum(Description %in% in_play_events & !grepl("^bunt", BBType), na.rm = TRUE)
         ground_balls <- sum(Description %in% in_play_events & BBType == "ground_ball", na.rm = TRUE)
         if (balls_in_play > 0) {
           sprintf("%.1f%%", ground_balls / balls_in_play * 100)
@@ -143,7 +143,7 @@ calculate_platoon_stats <- function(data, pitcher_name) {
       ooz_count = sum(InZone == "No", na.rm = TRUE),
       chase_count = sum(Description %in% swing_events & (InZone == "No"), na.rm = TRUE),
       # Ground Ball calculations
-      balls_in_play = sum(Description %in% in_play_events, na.rm = TRUE),
+      balls_in_play = sum(Description %in% in_play_events & !grepl("^bunt", BBType), na.rm = TRUE),
       ground_balls = sum(Description %in% in_play_events & BBType == "ground_ball", na.rm = TRUE),
       .groups = "drop"
     ) %>%
