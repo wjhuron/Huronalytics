@@ -885,7 +885,8 @@ class BaseballSavantFocusedDownloader:
             return None
 
     def download_statcast_supplement(self, team_abbrev, start_date, end_date,
-                                     player_id=None, player_type='pitcher'):
+                                     player_id=None, player_type='pitcher',
+                                     minors=False):
         """
         Download supplemental data from Statcast Search CSV endpoint.
         Provides columns not available in the live feed API:
@@ -902,10 +903,17 @@ class BaseballSavantFocusedDownloader:
         team filter is replaced with a single-player lookup: player_type
         'pitcher' → pitches thrown, 'batter' → pitches faced.
 
+        minors=True queries the minor league Statcast Search instead (AAA and
+        below with tracking); those rows lack bat tracking columns but carry
+        arm_angle, run exp, expected stats, runners, and launch_speed_angle.
+
         Returns a DataFrame keyed on game_pk, at_bat_number, pitch_number
         for merging with live feed data, or None if the request fails.
         """
-        url = "https://baseballsavant.mlb.com/statcast_search/csv"
+        if minors:
+            url = "https://baseballsavant.mlb.com/statcast-search-minors/csv"
+        else:
+            url = "https://baseballsavant.mlb.com/statcast_search/csv"
 
         params = {
             'all': 'true',
@@ -918,11 +926,14 @@ class BaseballSavantFocusedDownloader:
             'sort_col': 'pitches',
             'sort_order': 'desc',
         }
+        if minors:
+            params['minors'] = 'true'
 
+        label = 'minor league Statcast Search' if minors else 'Statcast Search'
         if player_id:
             lookup_key = 'batters_lookup[]' if player_type == 'batter' else 'pitchers_lookup[]'
             params[lookup_key] = str(player_id)
-            print(f"Downloading Statcast Search supplement for player {player_id} ({player_type})...")
+            print(f"Downloading {label} supplement for player {player_id} ({player_type})...")
         else:
             statcast_team = self.get_statcast_team_abbrev(team_abbrev)
             params['team'] = statcast_team
@@ -1417,42 +1428,62 @@ class BaseballSavantFocusedDownloader:
             print(f"Error looking up player {player_id}: {str(e)}")
             return None, None
 
+    # Sport IDs for every level with a game log; the gameLog endpoint
+    # defaults to sportId=1 (MLB + spring training), so minor league games
+    # must be requested level by level
+    PLAYER_GAME_SPORT_IDS = {
+        1: 'MLB',
+        11: 'AAA',
+        12: 'AA',
+        13: 'High-A',
+        14: 'Single-A',
+        16: 'Rookie',
+    }
+
     def get_player_games(self, player_id, season, group):
         """
-        Get all games a player appeared in for a season from their MLB game log.
+        Get all games a player appeared in for a season from their game logs,
+        across every level (MLB through Rookie ball).
 
         group: "pitching" or "hitting" — which game log to pull.
         Uses the same game types as team mode (spring training through World Series).
 
-        Returns a list of (date, game_pk) tuples.
+        Returns a list of (date, game_pk, sport_id) tuples.
         """
         url = f"https://statsapi.mlb.com/api/v1/people/{player_id}/stats"
 
-        params = {
-            "stats": "gameLog",
-            "season": season,
-            "group": group,
-            "gameType": "E,S,R,F,D,L,W",
-        }
+        games = []
+        for sport_id, level_name in self.PLAYER_GAME_SPORT_IDS.items():
+            params = {
+                "stats": "gameLog",
+                "season": season,
+                "group": group,
+                "gameType": "E,S,R,F,D,L,W",
+                "sportId": sport_id,
+            }
 
-        try:
-            response = self.session.get(url, params=params, timeout=30)
+            try:
+                response = self.session.get(url, params=params, timeout=30)
 
-            if response.status_code != 200:
-                print(f"Error: {group} game log returned status code {response.status_code}")
-                return []
+                if response.status_code != 200:
+                    print(f"Error: {group} game log ({level_name}) returned status code {response.status_code}")
+                    continue
 
-            games = []
-            for stat in response.json().get('stats', []):
-                for split in stat.get('splits', []):
-                    game_pk = split.get('game', {}).get('gamePk')
-                    if game_pk:
-                        games.append((split.get('date', ''), game_pk))
-            return games
+                level_games = []
+                for stat in response.json().get('stats', []):
+                    for split in stat.get('splits', []):
+                        game_pk = split.get('game', {}).get('gamePk')
+                        if game_pk:
+                            level_games.append((split.get('date', ''), game_pk, sport_id))
 
-        except Exception as e:
-            print(f"Error getting {group} game log: {str(e)}")
-            return []
+                if level_games:
+                    print(f"  {level_name}: {len(level_games)} {group} games")
+                games.extend(level_games)
+
+            except Exception as e:
+                print(f"Error getting {group} game log ({level_name}): {str(e)}")
+
+        return games
 
     def download_player_games(self, player_id, season, output_name=None, save_csv=True):
         """
@@ -1486,8 +1517,8 @@ class BaseballSavantFocusedDownloader:
         role = {'1': 'pitcher', 'Y': 'two-way player'}.get(position_code, 'hitter')
         print(f"Player: {player_name} (ID {player_id}, {role})")
 
-        # Collect game PKs from the applicable game logs (a two-way player
-        # appears in both); dedupe and keep chronological order
+        # Collect game PKs from the applicable game logs across every level
+        # (a two-way player appears in both); dedupe and keep chronological order
         entries = []
         if is_pitcher:
             entries.extend(self.get_player_games(player_id, season, 'pitching'))
@@ -1496,7 +1527,10 @@ class BaseballSavantFocusedDownloader:
 
         game_pks = []
         seen = set()
-        for date, game_pk in sorted(set(entries)):
+        has_minors = False
+        for date, game_pk, sport_id in sorted(set(entries)):
+            if sport_id != 1:
+                has_minors = True
             if game_pk not in seen:
                 seen.add(game_pk)
                 game_pks.append(game_pk)
@@ -1507,21 +1541,30 @@ class BaseballSavantFocusedDownloader:
 
         print(f"Found {len(game_pks)} games for {player_name} in {season}")
 
-        # Download and process each game, keeping only this player's plays
+        # Download and process each game, keeping only this player's plays.
+        # Games without Statcast tracking (untracked minor league parks) are
+        # skipped so the CSV only carries pitches with real tracking data.
         all_dfs = []
+        skipped_untracked = 0
         for game_pk in game_pks:
             df = self.download_game_data(game_pk, filter_player_id=player_id)
 
-            if df is not None:
+            if df is None or len(df) == 0:
+                print(f"Failed to download data for game {game_pk}")
+            elif 'Velocity' in df.columns and not df['Velocity'].astype(str).str.strip().ne('').any():
+                skipped_untracked += 1
+                print(f"No Statcast tracking data for game {game_pk} — skipping")
+            else:
                 # Fetch real-time bat speed from Savant game feed
                 df = self.merge_bat_speed(df, game_pk)
                 all_dfs.append(df)
                 print(f"Successfully downloaded data for game {game_pk}")
-            else:
-                print(f"Failed to download data for game {game_pk}")
 
             # Add a small delay to avoid rate limiting
             time.sleep(1)
+
+        if skipped_untracked:
+            print(f"Skipped {skipped_untracked} game(s) with no Statcast tracking data")
 
         print(f"Downloaded {len(all_dfs)} out of {len(game_pks)} games for {player_name}")
 
@@ -1537,17 +1580,24 @@ class BaseballSavantFocusedDownloader:
         sup_start = combined_df['Game Date'].min()
         sup_end = combined_df['Game Date'].max()
 
+        # MLB search covers MLB + spring training; minor league games need the
+        # separate minors search (fetched only when the game log found any)
+        minors_flags = [False] + ([True] if has_minors else [])
+
         supplement_frames = []
-        if is_pitcher:
-            sup = self.download_statcast_supplement(None, sup_start, sup_end,
-                                                    player_id=player_id, player_type='pitcher')
-            if sup is not None:
-                supplement_frames.append(sup)
-        if is_hitter:
-            sup = self.download_statcast_supplement(None, sup_start, sup_end,
-                                                    player_id=player_id, player_type='batter')
-            if sup is not None:
-                supplement_frames.append(sup)
+        for minors in minors_flags:
+            if is_pitcher:
+                sup = self.download_statcast_supplement(None, sup_start, sup_end,
+                                                        player_id=player_id, player_type='pitcher',
+                                                        minors=minors)
+                if sup is not None:
+                    supplement_frames.append(sup)
+            if is_hitter:
+                sup = self.download_statcast_supplement(None, sup_start, sup_end,
+                                                        player_id=player_id, player_type='batter',
+                                                        minors=minors)
+                if sup is not None:
+                    supplement_frames.append(sup)
 
         if supplement_frames:
             supplement_df = pd.concat(supplement_frames, ignore_index=True)
