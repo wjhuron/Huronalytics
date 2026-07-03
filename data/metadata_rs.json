@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-02 20:33",
+  "generatedAt": "2026-07-03 00:54",
   "totalPitches": 380461,
   "totalPitchers": 713,
   "totalHitters": 606,
@@ -385,9 +385,9 @@
     "locPlus": 100.0,
     "era": 4.2,
     "hr9": 1.16,
-    "fip": 4.18,
-    "xFIP": 4.18,
-    "siera": 4.07
+    "fip": 4.19,
+    "xFIP": 4.19,
+    "siera": 4.08
   },
   "hitterLeagueAverages": {
     "babip": 0.2892,
@@ -449,7 +449,7 @@
     "kPct": 0.2211,
     "bbPct": 0.0901,
     "bbToK": 0.4498,
-    "wRCplus": 99.8179,
+    "wRCplus": 99.8042,
     "xWRCplus": 100.8231
   },
   "vaaRegressions": {
