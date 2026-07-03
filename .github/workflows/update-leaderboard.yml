@@ -134,6 +134,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # cache-file merge driver (see .gitattributes): auto-resolve
+          # generated caches during the rebase-retry loop below
+          git config merge.theirs.driver "cp -f %B %A"
           git add data/ index.html css/ js/
           if git diff --cached --quiet; then
             echo "No changes to deploy."

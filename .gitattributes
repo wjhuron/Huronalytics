@@ -1,0 +1,13 @@
+# Generated caches: auto-resolve merge conflicts by taking the incoming
+# version ("theirs") — these are regenerable derivatives; the next pipeline
+# run re-fetches anything missing. Requires the one-time driver definition:
+#   git config merge.theirs.driver "cp -f %B %A"
+# (set locally per machine; CI sets it in update-leaderboard.yml)
+data/hitter_position_cache.json merge=theirs
+data/mlb_id_cache.json merge=theirs
+data/boxscore_cache.json merge=theirs
+data/milb_boxscore_cache.json merge=theirs
+data/game_weather_rs.json merge=theirs
+data/game_weather_2025.json merge=theirs
+# Append-only log: union merge keeps both sides' rows
+data/stuff_metrics_history.csv merge=union
