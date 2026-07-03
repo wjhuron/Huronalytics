@@ -188,8 +188,9 @@ const Aggregator = {
     return null;
   },
 
-  // Build hand-specific + pooled zone maps from METADATA.sacqZones.
-  // Returns { hand: {key→zone}, pooled: {key→zone} }
+  // Build hand-specific + pooled zone maps from METADATA.sacqZones, plus the
+  // LA-only marginals (METADATA.sacqLaZones) used for the sprayVal residual.
+  // Returns { hand, pooled, laHand, laPooled } (key→zone maps).
   buildSacqZoneMaps: function () {
     var zones = (window.METADATA && window.METADATA.sacqZones) || [];
     var hand = {}, pooled = {};
@@ -201,7 +202,27 @@ const Aggregator = {
         pooled[sz.spray + '|' + sz.laBin] = sz;
       }
     }
-    return { hand: hand, pooled: pooled };
+    var laZones = (window.METADATA && window.METADATA.sacqLaZones) || [];
+    var laHand = {}, laPooled = {};
+    for (var j = 0; j < laZones.length; j++) {
+      var lz = laZones[j];
+      if (lz.bats) {
+        laHand[lz.laBin + '|' + lz.bats] = lz;
+      } else {
+        laPooled[String(lz.laBin)] = lz;
+      }
+    }
+    return { hand: hand, pooled: pooled, laHand: laHand, laPooled: laPooled };
+  },
+
+  // LA-only league wOBAcon: hand-specific first, pooled fallback. Mirrors
+  // Python la_lookup (same MIN_SACQ convention).
+  sacqLaLookup: function (maps, laBin, bats) {
+    var info = maps.laHand[laBin + '|' + bats];
+    if (info && info.count >= QUAL.MIN_SACQ && info.wobacon != null) return info.wobacon;
+    info = maps.laPooled[String(laBin)];
+    if (info && info.count >= QUAL.MIN_SACQ && info.wobacon != null) return info.wobacon;
+    return null;
   },
 
   // Look up zone wOBAcon: try hand-specific first, fall back to pooled.
@@ -2058,7 +2079,7 @@ const Aggregator = {
 
     const HITTER_STAT_KEYS = [
       'avg', 'obp', 'slg', 'ops', 'iso', 'wOBA', 'babip', 'kPct', 'bbPct', 'bbToK',
-      'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'bbPlus',
+      'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'sprayVal', 'bbPlus',
       'avgEVAll', 'ev50', 'maxEV', 'hardHitPct', 'barrelPct',
       'gbPct', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
       'pullPct', 'airPullPct',
@@ -2151,10 +2172,14 @@ const Aggregator = {
       // hardHitPct and barrelPct: use EV-valid count as denominator (not total BIP)
       const hardHitPct = evsAll.length > 0 ? hardHit / evsAll.length : null;
 
-      // xwOBAsp — compute from BIP records using hand-specific zone table with pooled fallback
+      // xwOBAsp + sprayVal — computed from BIP records using the hand-specific
+      // zone tables with pooled fallback. sprayVal is the LA-residualized
+      // placement skill: zone wOBAcon minus LA-only league wOBAcon per BIP.
       let xwOBAsp_val = null;
+      let sprayVal_val = null;
       if (bipRecords.length > 0) {
         let xwOBAsp_sum = 0, xwOBAsp_count = 0;
+        let spray_sum = 0, spray_count = 0;
         for (let sri = 0; sri < bipRecords.length; sri++) {
           const sla = bipRecords[sri][bci.launchAngle];
           const shcX = bipRecords[sri][bci.hcX];
@@ -2175,9 +2200,15 @@ const Aggregator = {
           if (zWoba != null) {
             xwOBAsp_sum += zWoba;
             xwOBAsp_count++;
+            const laWoba = Aggregator.sacqLaLookup(sacqMaps, sLaBin, sBats);
+            if (laWoba != null) {
+              spray_sum += zWoba - laWoba;
+              spray_count++;
+            }
           }
         }
         xwOBAsp_val = xwOBAsp_count > 0 ? xwOBAsp_sum / xwOBAsp_count : null;
+        sprayVal_val = spray_count > 0 ? spray_sum / spray_count : null;
       }
 
       const hitterName = g.hitterIdx != null ? lookups.hitters[g.hitterIdx] : null;
@@ -2212,6 +2243,7 @@ const Aggregator = {
         hardHitPct: hardHitPct,
         barrelPct: evsAll.length > 0 ? barrels / evsAll.length : null,
         xwOBAsp: xwOBAsp_val,
+        sprayVal: sprayVal_val,
         gbPct: bip > 0 ? gb_c / bip : null,
         ldPct: bip > 0 ? ld / bip : null,
         fbPct: bip > 0 ? fb / bip : null,
@@ -2236,13 +2268,14 @@ const Aggregator = {
         xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
       };
 
-      // BB+ composite: weighted xwOBAcon+ / xwOBAsp+, indexed so 100 = league
-      // avg. Weights come from metadata.bbPlusWeights (single source of
+      // BB+ composite: weighted xwOBAcon+ / sprayPlus, indexed so 100 =
+      // league avg. sprayPlus = 100 + 100·sprayVal/lgXWOBAcon (the
+      // LA-residualized placement skill re-expressed on the xwOBAcon
+      // scale). Weights come from metadata.bbPlusWeights (single source of
       // truth, set in process_data.py) so this recompute can never drift
       // from the server definition again.
       const hLgAvgs = (DataStore && DataStore.metadata && DataStore.metadata.hitterLeagueAverages) || {};
       const lgXC = hLgAvgs.xwOBAcon;
-      const lgXS = hLgAvgs.xwOBAsp;
       // Reliability floor: BB+ is majority noise below ~80 batted balls
       // (split-half r=.50 point). Keep in sync with BB_PLUS_MIN_BIP in
       // process_data.py. Matters most here because date/hand filters
@@ -2250,10 +2283,10 @@ const Aggregator = {
       // recomputed client-side, so it's gated server-side instead.)
       var BB_PLUS_MIN_BIP = 80;
       const bbW = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusWeights) || null;
-      if (obj.xwOBAcon != null && obj.xwOBAsp != null && lgXC && lgXS && bbW &&
+      if (obj.xwOBAcon != null && obj.sprayVal != null && lgXC && bbW &&
           (obj.nBip || 0) >= BB_PLUS_MIN_BIP) {
         const conPlus = 100 * obj.xwOBAcon / lgXC;
-        const spPlus = 100 * obj.xwOBAsp / lgXS;
+        const spPlus = 100 * (lgXC + obj.sprayVal) / lgXC;
         // Mirror the server's re-anchor (all-MLB PA-weighted mean = 100).
         // sd/ct/hitterPlus are pass-through; bbPlus is the only "+"
         // recomputed client-side, so it must apply the same factor.

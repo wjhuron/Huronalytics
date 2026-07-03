@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-02 18:45",
+  "generatedAt": "2026-07-02 20:13",
   "totalPitches": 380461,
   "totalPitchers": 713,
   "totalHitters": 606,
@@ -397,6 +397,7 @@
     "xwOBA": 0.3179,
     "xwOBAcon": 0.3669,
     "xwOBAsp": 0.3767,
+    "sprayVal": 0.0001,
     "avgEVAll": 88.8919,
     "ev50": 99.6992,
     "maxEV": 110.071,
@@ -2724,6 +2725,224 @@
       "wobacon": 0.011,
       "xwobacon": 0.018,
       "count": 575
+    }
+  ],
+  "sacqLaZones": [
+    {
+      "laBin": 0,
+      "bats": "L",
+      "wobacon": 0.119,
+      "count": 5420
+    },
+    {
+      "laBin": 1,
+      "bats": "L",
+      "wobacon": 0.243,
+      "count": 3454
+    },
+    {
+      "laBin": 2,
+      "bats": "L",
+      "wobacon": 0.389,
+      "count": 2078
+    },
+    {
+      "laBin": 3,
+      "bats": "L",
+      "wobacon": 0.519,
+      "count": 2252
+    },
+    {
+      "laBin": 4,
+      "bats": "L",
+      "wobacon": 0.759,
+      "count": 2445
+    },
+    {
+      "laBin": 5,
+      "bats": "L",
+      "wobacon": 0.678,
+      "count": 2359
+    },
+    {
+      "laBin": 6,
+      "bats": "L",
+      "wobacon": 0.666,
+      "count": 2307
+    },
+    {
+      "laBin": 7,
+      "bats": "L",
+      "wobacon": 0.73,
+      "count": 2131
+    },
+    {
+      "laBin": 8,
+      "bats": "L",
+      "wobacon": 0.536,
+      "count": 1890
+    },
+    {
+      "laBin": 9,
+      "bats": "L",
+      "wobacon": 0.365,
+      "count": 1503
+    },
+    {
+      "laBin": 10,
+      "bats": "L",
+      "wobacon": 0.089,
+      "count": 2151
+    },
+    {
+      "laBin": 11,
+      "bats": "L",
+      "wobacon": 0.021,
+      "count": 2990
+    },
+    {
+      "laBin": 0,
+      "bats": "R",
+      "wobacon": 0.154,
+      "count": 6175
+    },
+    {
+      "laBin": 1,
+      "bats": "R",
+      "wobacon": 0.251,
+      "count": 3853
+    },
+    {
+      "laBin": 2,
+      "bats": "R",
+      "wobacon": 0.393,
+      "count": 2250
+    },
+    {
+      "laBin": 3,
+      "bats": "R",
+      "wobacon": 0.515,
+      "count": 2402
+    },
+    {
+      "laBin": 4,
+      "bats": "R",
+      "wobacon": 0.747,
+      "count": 2381
+    },
+    {
+      "laBin": 5,
+      "bats": "R",
+      "wobacon": 0.65,
+      "count": 2496
+    },
+    {
+      "laBin": 6,
+      "bats": "R",
+      "wobacon": 0.676,
+      "count": 2462
+    },
+    {
+      "laBin": 7,
+      "bats": "R",
+      "wobacon": 0.7,
+      "count": 2237
+    },
+    {
+      "laBin": 8,
+      "bats": "R",
+      "wobacon": 0.539,
+      "count": 1952
+    },
+    {
+      "laBin": 9,
+      "bats": "R",
+      "wobacon": 0.297,
+      "count": 1512
+    },
+    {
+      "laBin": 10,
+      "bats": "R",
+      "wobacon": 0.085,
+      "count": 2166
+    },
+    {
+      "laBin": 11,
+      "bats": "R",
+      "wobacon": 0.022,
+      "count": 3556
+    },
+    {
+      "laBin": 0,
+      "bats": null,
+      "wobacon": 0.138,
+      "count": 11595
+    },
+    {
+      "laBin": 1,
+      "bats": null,
+      "wobacon": 0.247,
+      "count": 7307
+    },
+    {
+      "laBin": 2,
+      "bats": null,
+      "wobacon": 0.391,
+      "count": 4328
+    },
+    {
+      "laBin": 3,
+      "bats": null,
+      "wobacon": 0.517,
+      "count": 4654
+    },
+    {
+      "laBin": 4,
+      "bats": null,
+      "wobacon": 0.753,
+      "count": 4826
+    },
+    {
+      "laBin": 5,
+      "bats": null,
+      "wobacon": 0.664,
+      "count": 4855
+    },
+    {
+      "laBin": 6,
+      "bats": null,
+      "wobacon": 0.671,
+      "count": 4769
+    },
+    {
+      "laBin": 7,
+      "bats": null,
+      "wobacon": 0.715,
+      "count": 4368
+    },
+    {
+      "laBin": 8,
+      "bats": null,
+      "wobacon": 0.538,
+      "count": 3842
+    },
+    {
+      "laBin": 9,
+      "bats": null,
+      "wobacon": 0.331,
+      "count": 3015
+    },
+    {
+      "laBin": 10,
+      "bats": null,
+      "wobacon": 0.087,
+      "count": 4317
+    },
+    {
+      "laBin": 11,
+      "bats": null,
+      "wobacon": 0.022,
+      "count": 6546
     }
   ],
   "mvnModels": {
@@ -6633,8 +6852,8 @@
   },
   "hitterPlusStandardization": {
     "bbPlus": {
-      "mean": 101.713,
-      "sd": 10.915
+      "mean": 101.822,
+      "sd": 13.919
     },
     "sdPlus": {
       "mean": 100.254,
@@ -6645,22 +6864,22 @@
       "sd": 6.828
     },
     "weights": {
-      "bb": 0.65,
-      "sd": 0.07,
-      "ct": 0.28
+      "bb": 0.7,
+      "sd": 0.15,
+      "ct": 0.15
     },
-    "scale": 40,
+    "scale": 62.316,
     "nQualified": 153
   },
   "plusReanchor": {
-    "bbPlus": 0.986148,
+    "bbPlus": 0.982868,
     "sdPlus": 0.994785,
     "ctPlus": 0.992947,
-    "hitterPlusShift": 5.3522
+    "hitterPlusShift": 6.8293
   },
   "bbPlusWeights": {
-    "con": 0.585,
-    "sp": 0.415
+    "con": 0.85,
+    "sp": 0.15
   },
   "xwOBA3DTable": {
     "ev0|la0|pull|R": {

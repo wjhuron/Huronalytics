@@ -1154,6 +1154,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'vaaRegressions': {},
                 'haaRegressions': {},
                 'sacqZones': [],
+                'sacqLaZones': [],
             },
             'micro_data': {
                 'lookups': {'pitchers': [], 'hitters': [], 'teams': [], 'dates': [], 'pitchTypes': []},
@@ -2278,6 +2279,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     _empty_bin = lambda: {'woba_sum': 0.0, 'woba_denom': 0.0, 'xwoba_sum': 0.0, 'xwoba_count': 0, 'count': 0}
     sacq_bins_hand = {}   # (spray_dir, la_bin_idx, bats) → accumulators
     sacq_bins_pooled = {} # (spray_dir, la_bin_idx) → accumulators
+    # LA-only marginals (no spray dimension): the baseline for the spray
+    # residual. resid = zone wOBAcon − LA-only wOBAcon isolates WHERE the
+    # ball went given how high it was hit — the sticky pull-air skill.
+    la_bins_hand = {}     # (la_bin_idx, bats) → accumulators
+    la_bins_pooled = {}   # (la_bin_idx,) → accumulators
     for p in all_pitches:
         if p.get('_source', 'MLB') != 'MLB':
             continue  # Exclude ROC/AAA pitches from SACQ zone computation
@@ -2304,9 +2310,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 break
         if la_bin_idx is None:
             continue
-        # Accumulate into both hand-specific and pooled bins
+        # Accumulate into hand-specific + pooled bins (spray × LA and LA-only)
         for key, table in [((direction, la_bin_idx, bats), sacq_bins_hand),
-                           ((direction, la_bin_idx), sacq_bins_pooled)]:
+                           ((direction, la_bin_idx), sacq_bins_pooled),
+                           ((la_bin_idx, bats), la_bins_hand),
+                           ((la_bin_idx,), la_bins_pooled)]:
             if key not in table:
                 table[key] = _empty_bin()
             table[key]['count'] += 1
@@ -2331,6 +2339,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     sacq_zone_hand = _finalize_bins(sacq_bins_hand)
     sacq_zone_pooled = _finalize_bins(sacq_bins_pooled)
+    la_zone_hand = _finalize_bins(la_bins_hand)
+    la_zone_pooled = _finalize_bins(la_bins_pooled)
+
+    def la_lookup(la_bin_idx, bats_val):
+        """LA-only league wOBAcon: hand-specific first, pooled fallback
+        (same SACQ_MIN_BIP convention as sacq_lookup)."""
+        info = la_zone_hand.get((la_bin_idx, bats_val))
+        if info and info['count'] >= SACQ_MIN_BIP and info['woba'] is not None:
+            return info['woba']
+        info = la_zone_pooled.get((la_bin_idx,))
+        if info and info['count'] >= SACQ_MIN_BIP and info['woba'] is not None:
+            return info['woba']
+        return None
 
     def sacq_lookup(direction, la_bin_idx, bats_val):
         """Look up zone wOBA: try hand-specific first, fall back to pooled."""
@@ -2371,8 +2392,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'xwobacon': info['xwobacon'],
             'count': info['count'],
         })
+    # LA-only marginals for the client-side sprayVal recompute (hand-specific
+    # rows carry bats; pooled fallback rows carry bats=None).
+    sacq_la_zones_output = []
+    for (la_bin_idx, bats_key), info in sorted(la_zone_hand.items(), key=lambda x: (x[0][1], x[0][0])):
+        sacq_la_zones_output.append({
+            'laBin': la_bin_idx, 'bats': bats_key,
+            'wobacon': info['woba'], 'count': info['count'],
+        })
+    for (la_bin_idx,), info in sorted(la_zone_pooled.items()):
+        sacq_la_zones_output.append({
+            'laBin': la_bin_idx, 'bats': None,
+            'wobacon': info['woba'], 'count': info['count'],
+        })
     print(f"  SACQ zones: {len(sacq_zone_hand)} hand-specific, "
-          f"{len(sacq_zone_pooled)} pooled")
+          f"{len(sacq_zone_pooled)} pooled; LA-only: {len(la_zone_hand)} hand, "
+          f"{len(la_zone_pooled)} pooled")
 
     # --- Helper: compute xwOBAsp for a list of pitches using sacq_lookup ---
     def compute_xwobasp(pitches):
@@ -2404,6 +2439,43 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 xwobasp_sum += zone_woba
                 xwobasp_count += 1
         return round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
+
+    # --- Helper: spray residual ("pull skill") for a list of pitches ---
+    # Per BIP: zone wOBAcon (spray × LA) minus LA-only league wOBAcon —
+    # isolates WHERE the ball went given how high it was hit. This is the
+    # sticky pull-air placement skill (public benchmarks: pulled-air%
+    # stabilizes ~340 BBE; each pp above league ≈ +.005 wOBA over xwOBA),
+    # near-orthogonal to xwOBAcon by construction. Returned in wOBA points.
+    def compute_sprayval(pitches):
+        resid_sum = 0.0
+        resid_count = 0
+        for p in pitches:
+            bb_type = p.get('BBType')
+            if not bb_type or bb_type in BUNT_BB_TYPES:
+                continue
+            hc_x = safe_float(p.get('HC_X'))
+            hc_y = safe_float(p.get('HC_Y'))
+            la_val = safe_float(p.get('LaunchAngle'))
+            bats_val = p.get('Bats')
+            if la_val is None or hc_x is None or hc_y is None or not bats_val:
+                continue
+            angle = spray_angle(hc_x, hc_y)
+            direction = spray_direction(angle, bats_val)
+            if not direction:
+                continue
+            la_bin_idx = None
+            for bi, (lo, hi) in enumerate(LA_BINS):
+                if lo <= la_val < hi:
+                    la_bin_idx = bi
+                    break
+            if la_bin_idx is None:
+                continue
+            zone_woba = sacq_lookup(direction, la_bin_idx, bats_val)
+            la_woba = la_lookup(la_bin_idx, bats_val)
+            if zone_woba is not None and la_woba is not None:
+                resid_sum += zone_woba - la_woba
+                resid_count += 1
+        return round(resid_sum / resid_count, 4) if resid_count > 0 else None
 
     # --- Compute xwOBAsp for each pitcher (second pass, requires sacq_zone_table) ---
     pitcher_pitch_lookup = {}
@@ -2463,6 +2535,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                                 negate=True))
 
         row['xwOBAsp'] = compute_xwobasp(pitches)
+        row['sprayVal'] = compute_sprayval(pitches)
 
         hitter_leaderboard.append(row)
 
@@ -2729,7 +2802,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'ev50', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
-                 'xwOBAcon', 'xwOBAsp',
+                 'xwOBAcon', 'xwOBAsp', 'sprayVal',
                  'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
     # Bat tracking stats weighted by nCompSwings
@@ -2759,10 +2832,23 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
     # BB+ — composite batted-ball index indexed to 100 = league avg.
-    # Weights derived from OLS regression of wRC+ on (xwOBAcon+, xwOBAsp+) —
-    # normalized coefficients come out at 58.5/41.5. Re-validate annually.
-    BB_PLUS_W_CON = 0.585
-    BB_PLUS_W_SP  = 0.415
+    # 2026-07-02 redefinition: the spray component is now the LA-RESIDUALIZED
+    # sprayVal (zone wOBAcon minus LA-only league wOBAcon per BIP), expressed
+    # as sprayPlus = 100 × (lgXWOBAcon + sprayVal) / lgXWOBAcon. The old
+    # xwOBAsp+ shared its LA dimension with xwOBAcon (corr 0.44, double-
+    # counting); the residualized pair is near-orthogonal (corr 0.07).
+    #
+    # Weights derived PREDICTIVELY (scripts/derive_bbplus_weights.py:
+    # 2nd-half wOBA on standardized 1st-half components, 212 hitters).
+    # HONEST CAVEAT: in this half-season sample the spray beta was
+    # noise-level (~0, slightly negative); 0.15 is a prior-informed weight
+    # (public pull-air research: ~+.005 wOBA per pp above league; sprayVal
+    # split-half r=.33 at 40+ BIP/half says the trait is real) at the
+    # magnitude the sample allows. Re-derive with full-season + multi-season
+    # data before trusting it further; the old same-season wRC+ OLS that
+    # produced 58.5/41.5 structurally flattered the spray side and is retired.
+    BB_PLUS_W_CON = 0.85
+    BB_PLUS_W_SP  = 0.15
     # Reliability floor: BB+ is the slowest-stabilizing of the three
     # component "+" stats. Split-half study put the r=.50 (signal=noise)
     # point at ~80 batted balls (modelled; the same n/(n+n0) model
@@ -2772,14 +2858,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # js/aggregator.js (the only place BB+ is recomputed client-side).
     BB_PLUS_MIN_BIP = 80
     lg_xwobacon_bb = hitter_league_avgs.get('xwOBAcon')
-    lg_xwobasp_bb = hitter_league_avgs.get('xwOBAsp')
     for row in hitter_leaderboard:
         xc = row.get('xwOBAcon')
-        xs = row.get('xwOBAsp')
-        if (xc is not None and xs is not None and lg_xwobacon_bb
-                and lg_xwobasp_bb and (row.get('nBip') or 0) >= BB_PLUS_MIN_BIP):
+        sv = row.get('sprayVal')
+        if (xc is not None and sv is not None and lg_xwobacon_bb
+                and (row.get('nBip') or 0) >= BB_PLUS_MIN_BIP):
             con_plus = 100.0 * xc / lg_xwobacon_bb
-            sp_plus = 100.0 * xs / lg_xwobasp_bb
+            # sprayPlus: the residual re-expressed on the xwOBAcon scale so
+            # the ratio-to-100 convention holds (100 + 100·resid/lg).
+            sp_plus = 100.0 * (lg_xwobacon_bb + sv) / lg_xwobacon_bb
             row['bbPlus'] = round(BB_PLUS_W_CON * con_plus + BB_PLUS_W_SP * sp_plus, 1)
         else:
             row['bbPlus'] = None
@@ -2876,10 +2963,24 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # z's are imperfectly correlated (Var(w·z) = w'Σw < 1). Weights are
     # same-season in-sample OLS — treat as provisional pending out-of-sample
     # re-derivation (planned alongside the xwOBAsp residualization).
-    HITTER_PLUS_W_BB = 0.65
-    HITTER_PLUS_W_SD = 0.07
-    HITTER_PLUS_W_CT = 0.28
-    HITTER_PLUS_SCALE = 40  # multiplier on composite z-score
+    # Weights (2026-07-02): prior-informed 70/15/15, replacing the retired
+    # same-season wRC+ OLS's 65/7/28. The out-of-sample derivation
+    # (scripts/derive_hitterplus_weights.py: 1st-half components → 2nd-half
+    # wOBA, 209 hitters) found only BB+ carries detectable prediction
+    # (r=+0.25); the SD+ beta was noise-NEGATIVE and CT+ shrank to ~0 under
+    # ridge — half a season cannot price the two smaller skills, and the old
+    # 7% SD+ was a collinearity artifact of the flawed method. 70/15/15
+    # encodes: contact quality dominates outcomes; decision quality and
+    # contact execution are real, orthogonalized process skills at equal
+    # modest weights. Re-derive with multi-season data.
+    HITTER_PLUS_W_BB = 0.70
+    HITTER_PLUS_W_SD = 0.15
+    HITTER_PLUS_W_CT = 0.15
+    HITTER_PLUS_TARGET_SD = 40  # realized SD of Hitter+ over the qualified
+                                # pool — enforced exactly below (the old
+                                # fixed ×40 multiplier produced SD well
+                                # under 40 because Var(w·z) = w'Σw < 1 for
+                                # imperfectly correlated components)
 
     # Standardization uses the leaderboard-qualified hitter pool (ROC-aware:
     # 3.1 PA×TG for MLB, 2.7 for ROC). In practice ROC hitters have None
@@ -2921,25 +3022,34 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'sdPlus': {'mean': round(_m_sd, 3), 'sd': round(_s_sd, 3)},
         'ctPlus': {'mean': round(_m_ct, 3), 'sd': round(_s_ct, 3)},
         'weights': {'bb': HITTER_PLUS_W_BB, 'sd': HITTER_PLUS_W_SD, 'ct': HITTER_PLUS_W_CT},
-        'scale': HITTER_PLUS_SCALE,
+        'scale': None,  # set below after the realized-SD rescale is computed
         'nQualified': len(_hplus_qual),
     }
 
-    for row in hitter_leaderboard:
+    def _composite_z(row):
         bbp, sdp, ctp = row.get('bbPlus'), row.get('sdPlus'), row.get('ctPlus')
         if bbp is None or sdp is None or ctp is None:
-            row['hitterPlus'] = None
-            continue
+            return None
         if _s_bb <= 0 or _s_sd <= 0 or _s_ct <= 0:
-            row['hitterPlus'] = None
-            continue
-        z_bb = (bbp - _m_bb) / _s_bb
-        z_sd = (sdp - _m_sd) / _s_sd
-        z_ct = (ctp - _m_ct) / _s_ct
-        composite_z = HITTER_PLUS_W_BB * z_bb + HITTER_PLUS_W_SD * z_sd + HITTER_PLUS_W_CT * z_ct
-        row['hitterPlus'] = round(100 + HITTER_PLUS_SCALE * composite_z, 1)
+            return None
+        return (HITTER_PLUS_W_BB * (bbp - _m_bb) / _s_bb
+                + HITTER_PLUS_W_SD * (sdp - _m_sd) / _s_sd
+                + HITTER_PLUS_W_CT * (ctp - _m_ct) / _s_ct)
+
+    # Rescale so the REALIZED SD over the qualified pool is exactly
+    # HITTER_PLUS_TARGET_SD (wRC+-like spread by construction, not by hope).
+    _qual_zs = [z for z in (_composite_z(h) for h in _hplus_qual) if z is not None]
+    _z_sd = _sd(_qual_zs) if len(_qual_zs) >= 10 else 0.0
+    _scale = HITTER_PLUS_TARGET_SD / _z_sd if _z_sd > 1e-9 else HITTER_PLUS_TARGET_SD
+    hitter_plus_standardization['scale'] = round(_scale, 3)
+
+    for row in hitter_leaderboard:
+        z = _composite_z(row)
+        row['hitterPlus'] = round(100 + _scale * z, 1) if z is not None else None
     hitter_league_avgs['hitterPlus'] = 100.0
-    print(f"  Hitter+ computed (BB+/SD+/CT+ composite, weights 65/7/28).")
+    print(f"  Hitter+ computed (BB+/SD+/CT+ composite, weights "
+          f"{HITTER_PLUS_W_BB:.0%}/{HITTER_PLUS_W_SD:.0%}/{HITTER_PLUS_W_CT:.0%}, "
+          f"scale {_scale:.1f} → SD {HITTER_PLUS_TARGET_SD}).")
 
     # ── All-MLB-mean re-anchor for the four "+" indices ──────────────
     # Anchor 100 to the PA-weighted MEAN of ALL MLB hitters (matches the
@@ -3017,6 +3127,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                                                       for h, v in r['leagueAvgPlateX'].items()}}
                            for pt, r in haa_regressions.items()},
         'sacqZones': sacq_zones_output,
+        'sacqLaZones': sacq_la_zones_output,
         'mvnModels': {
             key: {
                 variant: {
