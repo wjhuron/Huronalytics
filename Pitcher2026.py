@@ -13,6 +13,16 @@ from io import StringIO
 
 STANDARD_RHO = 1.195  # kg/m³ reference: sea level at ~72.4°F (101325 Pa / 287.05 / 295.6 K)
 
+# Density→movement exponent. Calibrated 2026-07-02 from our own data
+# (scripts/weather_exponent_calibration.py): within-pitcher fixed-effects
+# fit of log|movement| on log(rho) over 307-364k pitches / 1,298 games gave
+# e = 1.01 (IVB), 1.11 (HB), ~1.15 (total, month-controlled) — matching
+# Nathan trajectory theory (~1.0-1.1) and rejecting the original 2/3.
+# 1.05 is the adopted middle. Historical sheet x-columns were backfilled to
+# this exponent on 2026-07-02 (scripts/backfill_weather_exponent.py);
+# per-game density inputs live in data/game_weather_rs.json.
+WEATHER_EXPONENT = 1.05
+
 # Fallback temperature when the feed omits weather.temp, and the clamp used
 # when the roof is closed / dome (feeds occasionally report the OUTDOOR temp
 # for closed-roof games, which would inject a spurious density error).
@@ -49,20 +59,17 @@ def compute_weather_adj_factor(rho_game):
 
     xIndVrtBrk = rawIVB × factor,  xHorzBrk = rawHB × factor.
 
-    Uses ρ^(2/3) scaling. NOTE: trajectory theory (Nathan) says deflection
-    scales ~ρ^1.0-1.1 (Magnus ∝ ρ, and less drag means the ball arrives
-    SOONER, compounding rather than compensating), while empirical cross-park
-    studies land around ρ^0.5-0.7 (measurement fit, humidity offsets, pitcher
-    adaptation). 2/3 sits in the empirical band; it is pending calibration
-    against our own within-pitcher cross-park data before any change, since
-    historical x-columns in Sheets carry this constant.
+    Uses ρ^WEATHER_EXPONENT scaling (1.05, empirically calibrated — see the
+    constant's comment). Magnus force ∝ ρ, and thinner air also means less
+    drag so the ball arrives SOONER: both effects compound, which is why the
+    exponent is ~1, not the old 2/3's "partial compensation" story.
 
     Returns 1.0 when inputs are missing or invalid.
     """
     if not rho_game or rho_game <= 0:
         return 1.0
 
-    return (STANDARD_RHO / rho_game) ** (2 / 3)
+    return (STANDARD_RHO / rho_game) ** WEATHER_EXPONENT
 
 
 class BaseballSavantFocusedDownloader:
