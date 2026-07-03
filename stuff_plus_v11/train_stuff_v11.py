@@ -41,6 +41,60 @@ except Exception:
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC'}
 FB_TYPES = {'FF', 'SI', 'FC'}
+
+# Prior-season training data (season-blocked scheme; see main()). The pickle
+# is static (2025 is finished); 2025 FG Guts constants for its targets.
+PRIOR_PKL = os.path.join(DATA, '_pitches2025_training.pkl')
+PRIOR_LG_WOBA, PRIOR_WOBA_SCALE = 0.3131, 1.2317
+
+
+def _harmonize_tags(prior, current):
+    """Map prior-season tags to the pitcher's nearest current-season tag when
+    the (velo, ivb, hb) centroids say the label flipped across seasons
+    (SL<->FC, CH<->FS, CU<->SV boundary churn — 85 units / 4.3% of shared
+    pitcher-tags in the 2025 audit). Mutates and returns `prior`."""
+    from collections import defaultdict as _dd
+    import math as _m
+
+    def cents(pitches, mv_keys):
+        acc = _dd(lambda: [0.0, 0.0, 0.0, 0])
+        for p in pitches:
+            v = sf(p.get('Velocity'))
+            iv = sf(p.get(mv_keys[0]))
+            hb = sf(p.get(mv_keys[1]))
+            thr = p.get('Throws')
+            if None in (v, iv, hb) or thr not in ('L', 'R'):
+                continue
+            s = 1.0 if thr == 'R' else -1.0
+            a = acc[(p.get('Pitcher'), p.get('Pitch Type'))]
+            a[0] += v; a[1] += iv; a[2] += hb * s; a[3] += 1
+        return {k: (a[0]/a[3], a[1]/a[3], a[2]/a[3]) for k, a in acc.items() if a[3] >= 30}
+
+    c_p = cents(prior, ('xIndVrtBrk', 'xHorzBrk'))
+    c_c = cents(current, ('xIndVrtBrk', 'xHorzBrk'))
+    by_pitcher = _dd(dict)
+    for (pit, tag), c in c_c.items():
+        by_pitcher[pit][tag] = c
+    flips = {}
+    for (pit, tag_p), c in c_p.items():
+        tags = by_pitcher.get(pit)
+        if not tags:
+            continue
+        best, bd = None, 1e9
+        for tag_c, c2 in tags.items():
+            d = _m.sqrt(((c[0]-c2[0])/1.5)**2 + ((c[1]-c2[1])/2.5)**2 + ((c[2]-c2[2])/2.5)**2)
+            if d < bd:
+                bd, best = d, tag_c
+        if best != tag_p and bd <= 1.5:
+            flips[(pit, tag_p)] = best
+    n = 0
+    for p in prior:
+        k = (p.get('Pitcher'), p.get('Pitch Type'))
+        if k in flips:
+            p['Pitch Type'] = flips[k]
+            n += 1
+    print(f'  tag harmonization: {len(flips)} flipped units, {n} prior pitches relabeled')
+    return prior
 # 2026-07-02 config (validated: scripts/phase2b_stuff_experiments.py):
 # - rel_x (hand-normalized release side) added ALONE — earlier labs only
 #   tested it bundled with HAA; solo it wins (rel +0.004, pred +0.007) and
@@ -186,6 +240,31 @@ def main():
     df = df[df['target_xrv'].notna()].reset_index(drop=True)
     print(f'  {len(df)} training pitches, {df.pitcher.nunique()} pitchers')
 
+    # ── SEASON-BLOCKED prior-season training data (2026-07-03) ──
+    # data/_pitches2025_training.pkl: Wally's retagged 2025 season, joined to
+    # public Statcast (VAA/xwOBA/RunExp recovered, density-adjusted movement;
+    # built by scripts/build_2025_training_set.py; tags harmonized to 2026
+    # labels via the cross-year centroid audit in the same script family).
+    # It joins EVERY fold's training set below, while 2026 pitches are still
+    # scored strictly out-of-fold by pitcher — so the model learns stable
+    # cross-season identity (Tyler Rogers' singleton cluster: 50 -> 127) with
+    # zero same-season luck leakage. Validated (scripts/
+    # train_2526_experiment.py): pred future xRV 0.203 -> 0.244, descriptive
+    # 0.274 -> 0.333, YoY-only model beats the 2026-only config outright.
+    # 2025 targets use 2025 Guts constants (run environment differs).
+    df_prior = None
+    if os.path.exists(PRIOR_PKL):
+        global LG_WOBA, WOBA_SCALE
+        p25 = pickle.load(open(PRIOR_PKL, 'rb'))
+        _lg26, _sc26 = LG_WOBA, WOBA_SCALE
+        LG_WOBA, WOBA_SCALE = PRIOR_LG_WOBA, PRIOR_WOBA_SCALE
+        df_prior = build_df(_harmonize_tags(p25, pitches))
+        LG_WOBA, WOBA_SCALE = _lg26, _sc26
+        df_prior = df_prior[df_prior['target_xrv'].notna()].reset_index(drop=True)
+        print(f'  + {len(df_prior)} prior-season (2025) training pitches')
+    else:
+        print('  (no prior-season pickle found — training on current season only)')
+
     X = design(df); y = df['target_xrv'].values
 
     # Production MLB scores are OUT-OF-FOLD (pitcher-grouped): a pitcher's own
@@ -194,18 +273,33 @@ def main():
     # luck through his unique feature cluster (median 2.7, p90 8 Stuff+ pts on
     # qualified units) — the shipped number must come from the validated path.
     groups = df['pitcher'].values
-    def _oof_predict(Xd, n_splits=8):
+    def _oof_predict(Xd, feats=None, n_splits=8):
         oof = np.full(len(y), np.nan)
         pp = _params_for(Xd)
+        Xp, yp = None, None
+        if df_prior is not None:
+            Xp = design(df_prior, feats or BASE_FEATS).reindex(columns=Xd.columns, fill_value=0)
+            yp = df_prior['target_xrv'].values
         for tr, te in GroupKFold(n_splits=n_splits).split(Xd, y, groups):
-            mm = xgb.XGBRegressor(**pp); mm.fit(Xd.iloc[tr], y[tr]); oof[te] = mm.predict(Xd.iloc[te])
+            if Xp is not None:
+                Xtr = pd.concat([Xd.iloc[tr], Xp], ignore_index=True)
+                ytr = np.concatenate([y[tr], yp])
+            else:
+                Xtr, ytr = Xd.iloc[tr], y[tr]
+            mm = xgb.XGBRegressor(**pp); mm.fit(Xtr, ytr); oof[te] = mm.predict(Xd.iloc[te])
         return -oof
     df['stuff_raw'] = _oof_predict(X)
 
     # full-data model: kept in the bundle for scoring pitches outside the
     # training set (ROC uses the no-arm companion; any future out-of-sample
     # scoring uses this). It no longer scores MLB leaderboard rows.
-    model = xgb.XGBRegressor(**_params_for(X)); model.fit(X, y)
+    if df_prior is not None:
+        X_all = pd.concat([X, design(df_prior).reindex(columns=X.columns, fill_value=0)],
+                          ignore_index=True)
+        y_all = np.concatenate([y, df_prior['target_xrv'].values])
+    else:
+        X_all, y_all = X, y
+    model = xgb.XGBRegressor(**_params_for(X)); model.fit(X_all, y_all)
 
     # Standardize at the PITCHER level (proper "+"-stat spread: SD=10 between
     # pitchers, not between pitches — averaging pitch-level z-scores collapses
@@ -237,11 +331,17 @@ def main():
     # ── ROC/AAA: no-arm companion model, scored against the MLB baseline. This
     #    ONLY affects ROC; MLB above is untouched (keeps real arm angle). ──
     Xna = design(df, NOARM_FEATS)
-    model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna, y)
+    if df_prior is not None:
+        Xna_all = pd.concat([Xna, design(df_prior, NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)],
+                            ignore_index=True)
+        yna_all = np.concatenate([y, df_prior['target_xrv'].values])
+    else:
+        Xna_all, yna_all = Xna, y
+    model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna_all, yna_all)
     # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
     # are ranked against carry no in-sample luck inflation. ROC pitches are not
     # in the training set, so model_na's predictions on ROC are truly OOS.
-    df['raw_na'] = _oof_predict(Xna)
+    df['raw_na'] = _oof_predict(Xna, feats=NOARM_FEATS)
 
     def _na_scale(keys, qual_min):
         a = df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
