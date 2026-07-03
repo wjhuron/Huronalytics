@@ -1097,16 +1097,17 @@ var PlayerPage = {
   _renderHitterRunValue: function (data) {
     // "Overall" row at the top of the hitter percentile panel — mirrors the
     // pitcher panel's xPitch Run Value / 100 row in style. Uses the standard
-    // pctl-row layout (label + bar + circle + value). Value is xRV/100 PAs;
-    // percentile comes from the qualified-hitter pool computed in
-    // process_data.py.
+    // pctl-row layout (label + bar + circle + value). Value is xRV per 100
+    // PITCHES (unified 2026-07-03 with the per-pitch-type rows below it and
+    // the Savant/FG convention; was per 100 PA); percentile comes from the
+    // pool computed in process_data.py.
     var container = document.getElementById('player-percentiles');
     var isDark = document.body.classList.contains('dark');
 
     var sectionLabel = document.createElement('div');
     sectionLabel.className = 'pctl-section-label';
     sectionLabel.style.cssText = 'font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted, #888); margin-bottom: 6px; letter-spacing: 0.5px;';
-    sectionLabel.textContent = 'xRun Value / 100 PA';
+    sectionLabel.textContent = 'xRun Value / 100 Pitches';
     container.appendChild(sectionLabel);
 
     // Qualification (PA × team games, ROC-aware: 3.1 MLB / 2.7 ROC) —

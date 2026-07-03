@@ -2590,15 +2590,17 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     for row in hitter_leaderboard:
         row['bipQual'] = (row.get('nBip') or 0) >= 25  # match QUAL.MIN_BIP_PCTL (client)
 
-    # Per-100-PA run value for the hitter percentile panel's "Overall" row.
-    # Stored at full precision (no intermediate rounding) per the RV memory;
-    # display layer rounds at render time.
+    # Per-100-PITCH run value for the hitter percentile panel's "Overall" row
+    # (2026-07-03; was per 100 PA — a house deviation from the Savant/FG
+    # convention that also mixed denominators with the per-pitch-type rows in
+    # the same panel). Stored at full precision (no intermediate rounding)
+    # per the RV memory; display layer rounds at render time.
     for row in hitter_leaderboard:
-        pa = row.get('pa') or 0
+        n_pitches = row.get('count') or 0
         rv = row.get('runValue')
         xrv = row.get('xRunValue')
-        row['rv100'] = (rv / pa * 100) if (rv is not None and pa > 0) else None
-        row['xRv100'] = (xrv / pa * 100) if (xrv is not None and pa > 0) else None
+        row['rv100'] = (rv / n_pitches * 100) if (rv is not None and n_pitches > 0) else None
+        row['xRv100'] = (xrv / n_pitches * 100) if (xrv is not None and n_pitches > 0) else None
 
     hitter_leaderboard.sort(key=lambda r: r.get('pa', 0), reverse=True)
     print(f"Hitter leaderboard: {len(hitter_leaderboard)} rows")

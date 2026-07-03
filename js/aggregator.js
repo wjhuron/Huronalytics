@@ -2350,10 +2350,10 @@ const Aggregator = {
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
                         'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
                         // SD+, CT+, and Hitter+ are precomputed against the
-                        // full season (need the 60-cell RV weight tables and
-                        // hitter-standardization SDs that aren't available
-                        // client-side), so always surface the season values
-                        // even under filters.
+                        // full season (need the 360-cell / 60-cell RV weight
+                        // tables and hitter-standardization SDs that aren't
+                        // available client-side), so always surface the
+                        // season values even under filters.
                         'sdPlus', 'sdPlusN', 'sdPlusRaw',
                         'ctPlus', 'ctPlusN', 'ctPlusRaw',
                         'hitterPlus'];
