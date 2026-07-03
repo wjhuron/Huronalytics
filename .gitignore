@@ -46,3 +46,6 @@ stuff_plus_v10/model_summary_v10.txt
 
 # Logs
 *.log
+
+# encrypted transport artifacts
+*.pkl.enc

@@ -40,6 +40,19 @@ jobs:
       # process_data.py just built, injects scores into the leaderboard JSONs,
       # then rebuild_embed.py swaps those into data_embedded.json.gz (which
       # process_data.py built with the previous run's preserved scores).
+      - name: Fetch prior-season training data (encrypted release asset)
+        # The 2025 retagged training set travels as AES-256 ciphertext on the
+        # public release; only CI (STUFF_DATA_KEY secret) and Wally's .env can
+        # decrypt. See scripts/build_2025_training_set.py for provenance.
+        env:
+          STUFF_DATA_KEY: ${{ secrets.STUFF_DATA_KEY }}
+        run: |
+          curl -sL -o /tmp/p25.enc \
+            https://github.com/wjhuron/Huronalytics/releases/download/latest-data/_pitches2025_training.pkl.enc \
+            && openssl enc -d -aes-256-cbc -pbkdf2 -pass env:STUFF_DATA_KEY \
+                 -in /tmp/p25.enc -out data/_pitches2025_training.pkl \
+            || echo "prior-season asset unavailable — trainer will fall back"
+
       - name: Compute Stuff+ (train on fresh pickle, inject into leaderboards)
         # Retrain ONLY when the prior-season (2025) training pickle is present:
         # the model is now season-blocked multi-season (see train_stuff_v11.py),
