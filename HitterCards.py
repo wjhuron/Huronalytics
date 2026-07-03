@@ -276,10 +276,24 @@ WOBA_CMAP = LinearSegmentedColormap.from_list(
 # ─────────────────────────────────────────────────────────────────────
 # Data loading
 # ─────────────────────────────────────────────────────────────────────
+# The release asset is AES-256 ciphertext (2026-07-03: the retagged pitch
+# data is no longer published in plaintext). STUFF_DATA_KEY from .env
+# decrypts after download.
 RELEASE_PICKLE_URL = (
     'https://github.com/wjhuron/Huronalytics/releases/download/'
-    'latest-data/all_pitches_rs_cache.pkl'
+    'latest-data/all_pitches_rs_cache.pkl.enc'
 )
+
+
+def _stuff_data_key():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    try:
+        for line in open(env_path):
+            if line.startswith('STUFF_DATA_KEY='):
+                return line.split('=', 1)[1].strip()
+    except OSError:
+        pass
+    return os.environ.get('STUFF_DATA_KEY')
 
 
 def fetch_pickle_from_release(out_path, verbose=True):
@@ -311,7 +325,17 @@ def fetch_pickle_from_release(out_path, verbose=True):
                               f"{total // (1024 * 1024)} MB  ({pct:.0f}%)", end='')
             if verbose and total:
                 print()
-        os.replace(tmp_path, out_path)
+        key = _stuff_data_key()
+        if not key:
+            raise RuntimeError('STUFF_DATA_KEY missing from .env — cannot decrypt pickle')
+        import subprocess
+        dec_path = tmp_path + '.dec'
+        subprocess.run(['openssl', 'enc', '-d', '-aes-256-cbc', '-pbkdf2',
+                        '-pass', 'env:STUFF_DATA_KEY', '-in', tmp_path,
+                        '-out', dec_path],
+                       check=True, env={**os.environ, 'STUFF_DATA_KEY': key})
+        os.remove(tmp_path)
+        os.replace(dec_path, out_path)
         return True
     except Exception as e:
         if os.path.exists(tmp_path):

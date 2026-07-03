@@ -164,6 +164,16 @@ jobs:
       # run process_data.py locally, which means re-fetching everything
       # from Google Sheets. Attaching to a fixed-tag release lets the
       # card auto-download the latest pickle in seconds.
+      - name: Encrypt pickle for publication
+        # The retagged pitch data ships as AES-256 ciphertext only
+        # (STUFF_DATA_KEY decrypts: repo secret in CI, .env locally).
+        if: success()
+        env:
+          STUFF_DATA_KEY: ${{ secrets.STUFF_DATA_KEY }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -pass env:STUFF_DATA_KEY \
+            -in data/all_pitches_rs_cache.pkl -out data/all_pitches_rs_cache.pkl.enc
+
       - name: Publish pickle to "latest-data" release
         if: success()
         uses: softprops/action-gh-release@v2
@@ -176,6 +186,6 @@ jobs:
             automatically when it detects a stale local pickle.
 
             Updated: ${{ github.event.repository.updated_at }}
-          files: data/all_pitches_rs_cache.pkl
+          files: data/all_pitches_rs_cache.pkl.enc
           fail_on_unmatched_files: true
           make_latest: false
