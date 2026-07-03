@@ -284,11 +284,23 @@ def compute_stats(pitches):
     }
 
 
-def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False):
+def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False,
+                count_offsets=None, bip_count_means=None):
     """Compute expected run value (xRV).
 
-    For BIP pitches with xwOBA: uses (xwOBA - lgWOBA) / wOBAScale
-    (hitter perspective: positive = above-average contact).
+    For BIP pitches with xwOBA: uses (xwOBA - lgWOBA) / wOBAScale plus the
+    per-count anchoring offset (count_offsets, from
+    pipeline_sdplus.build_bip_count_offsets). The offset puts the BIP branch
+    in the same count-conditional delta-RE currency as every other pitch, so
+    summed xRV is league-calibrated against summed RV (without it, shipped
+    xRV ran -495 league runs vs RV's +85, systematically flattering
+    two-strike-contact pitchers by up to ~0.3 runs/100 — measured
+    2026-07-03, predictive power identical either way).
+
+    For BIPs MISSING xwOBA (~1.5%): uses the league's expected anchored BIP
+    value for that count (bip_count_means) rather than the pitch's actual
+    -RunExp, which leaked real outcomes into an "expected" stat.
+
     For all other pitches: uses -RunExp to convert from pitcher perspective
     (RunExp in sheets is positive = good for pitcher) to hitter perspective.
 
@@ -297,21 +309,50 @@ def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False):
     (positive = good for pitcher, i.e. runs saved).
     negate=True (for hitters): keeps hitter perspective (positive = good for hitter).
     """
+    from pipeline_sdplus import get_count
     xrv_values = []
     has_guts = lg_woba is not None and woba_scale is not None and woba_scale != 0
     for p in pitches:
         is_bip = p.get('Description') == 'In Play'
-        xwoba_val = safe_float(p.get('xwOBA')) if is_bip else None
-        if is_bip and xwoba_val is not None and has_guts:
-            xrv_values.append((xwoba_val - lg_woba) / woba_scale)
-        else:
-            rv = safe_float(p.get('RunExp'))
-            if rv is not None:
-                xrv_values.append(-rv)
+        if is_bip and has_guts:
+            c = get_count(p)
+            xwoba_val = safe_float(p.get('xwOBA'))
+            if xwoba_val is not None:
+                v = (xwoba_val - lg_woba) / woba_scale
+                if count_offsets:
+                    v += count_offsets.get(c, 0.0)
+                xrv_values.append(v)
+                continue
+            if bip_count_means and c in bip_count_means:
+                xrv_values.append(bip_count_means[c])
+                continue
+        rv = safe_float(p.get('RunExp'))
+        if rv is not None:
+            xrv_values.append(-rv)
     if not xrv_values:
         return {'xRunValue': None}
     total = sum(xrv_values)
     return {'xRunValue': -total if not negate else total}
+
+
+def build_bip_count_means(pitches, lg_woba, woba_scale, count_offsets):
+    """League mean ANCHORED BIP xRV per count — the fallback value for BIPs
+    missing xwOBA (hitter perspective)."""
+    from pipeline_sdplus import get_count
+    acc = {}
+    if lg_woba is None or woba_scale in (None, 0):
+        return {}
+    for p in pitches:
+        if p.get('Description') != 'In Play':
+            continue
+        xw = safe_float(p.get('xwOBA'))
+        c = get_count(p)
+        if xw is None or c is None:
+            continue
+        a = acc.setdefault(c, [0.0, 0])
+        a[0] += (xw - lg_woba) / woba_scale + (count_offsets.get(c, 0.0) if count_offsets else 0.0)
+        a[1] += 1
+    return {c: s / n for c, (s, n) in acc.items() if n >= 50}
 
 
 def compute_pitcher_batted_ball(pitches):

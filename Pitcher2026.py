@@ -1740,11 +1740,11 @@ def main():
 
     # ── Settings (edit these directly or override via command line) ──
     team_abbrev     = ""
-    start_date      = "2026-07-02"
-    end_date        = "2026-07-02"
+    start_date      = "2026-07-03"
+    end_date        = "2026-07-03"
     pitchers_only   = True
 
-    game_id         = "815884"          # Game PK (e.g., "831437") — leave blank for team/date lookup
+    game_id         = "82"          # Game PK (e.g., "831437") — leave blank for team/date lookup
     filter_team     = None        # Optional team filter for game ID mode (e.g., "CAN")
     output_name     = ""          # Optional custom filename (without .csv)
 

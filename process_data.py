@@ -1438,6 +1438,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 pitcher_total[(pitcher, t)] for t in teams
             )
 
+    # Count-anchoring for displayed xRV (same currency fix as SD+/CT+, adopted
+    # for xRV 2026-07-03): offsets align the BIP branch with the delta-RE
+    # currency of every other pitch; bip_count_means is the missing-xwOBA
+    # fallback (league expected anchored BIP value per count, replacing the
+    # actual-outcome fallback that leaked results into an expected stat).
+    # Built from MLB pitches only; ROC rows are scored with MLB constants
+    # (translation framing).
+    from pipeline_sdplus import build_bip_count_offsets
+    from pipeline_compute import build_bip_count_means
+    _xrv_lg = GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None
+    _xrv_scale = GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None
+    _mlb_for_xrv = [p for p in all_pitches if p.get('_source', 'MLB') == 'MLB']
+    XRV_COUNT_OFFSETS = build_bip_count_offsets(_mlb_for_xrv, _xrv_lg, _xrv_scale)
+    XRV_BIP_COUNT_MEANS = build_bip_count_means(_mlb_for_xrv, _xrv_lg, _xrv_scale,
+                                                XRV_COUNT_OFFSETS)
+
     pitch_leaderboard = []
     for (pitcher, team, pitch_type, throws), pitches in pitch_groups.items():
         if not pitch_type:
@@ -1487,8 +1503,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_pitcher_batted_ball(pitches))
         row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
         row.update(compute_xrv(pitches,
-                                lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
-                                woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None))
+                                lg_woba=_xrv_lg, woba_scale=_xrv_scale,
+                                count_offsets=XRV_COUNT_OFFSETS,
+                                bip_count_means=XRV_BIP_COUNT_MEANS))
         # RV/100 and xRV/100 for this pitch type (raw — rounded at final output step)
         if row.get('runValue') is not None and row.get('count', 0) > 0:
             row['rv100'] = row['runValue'] / row['count'] * 100
@@ -2530,8 +2547,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row.update(compute_hitter_stats(pitches))
         row.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
         row.update(compute_xrv(pitches,
-                                lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
-                                woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                lg_woba=_xrv_lg, woba_scale=_xrv_scale,
+                                count_offsets=XRV_COUNT_OFFSETS,
+                                bip_count_means=XRV_BIP_COUNT_MEANS,
                                 negate=True))
 
         row['xwOBAsp'] = compute_xwobasp(pitches)
@@ -2709,8 +2727,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             row.update(compute_hitter_stats(pt_pitches))
             row.update(compute_expected_stats(pt_pitches, woba_weights=WOBA_WEIGHTS))
             row.update(compute_xrv(pt_pitches,
-                                    lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
-                                    woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                    lg_woba=_xrv_lg, woba_scale=_xrv_scale,
+                                    count_offsets=XRV_COUNT_OFFSETS,
+                                    bip_count_means=XRV_BIP_COUNT_MEANS,
                                     negate=True))
             hitter_pitch_leaderboard.append(row)
 
@@ -2727,8 +2746,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         row_all.update(compute_hitter_stats(pitches))
         row_all.update(compute_expected_stats(pitches, woba_weights=WOBA_WEIGHTS))
         row_all.update(compute_xrv(pitches,
-                                    lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
-                                    woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                    lg_woba=_xrv_lg, woba_scale=_xrv_scale,
+                                    count_offsets=XRV_COUNT_OFFSETS,
+                                    bip_count_means=XRV_BIP_COUNT_MEANS,
                                     negate=True))
         hitter_pitch_leaderboard.append(row_all)
 
@@ -2753,8 +2773,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                 row_cat.update(compute_hitter_stats(cat_pitches))
                 row_cat.update(compute_expected_stats(cat_pitches, woba_weights=WOBA_WEIGHTS))
                 row_cat.update(compute_xrv(cat_pitches,
-                                            lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
-                                            woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+                                            lg_woba=_xrv_lg, woba_scale=_xrv_scale,
+                                            count_offsets=XRV_COUNT_OFFSETS,
+                                            bip_count_means=XRV_BIP_COUNT_MEANS,
                                             negate=True))
                 hitter_pitch_leaderboard.append(row_cat)
 

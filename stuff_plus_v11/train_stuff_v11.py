@@ -139,6 +139,13 @@ def build_df(pitches):
         desc = p.get('Description', '')
         is_bip = desc == 'In Play'
         xw, re = sf(p.get('xwOBA')), sf(p.get('RunExp'))
+        # NOTE: the BIP branch is deliberately NOT count-anchored (unlike the
+        # displayed xRV and the SD+/CT+ cell tables). Tested 2026-07-03:
+        # anchoring the target dropped reliability 0.876->0.863 and pred
+        # 0.213->0.175 — same failure mode as Loc+ (the count-state term
+        # correlates with pitch usage/count-mix, which is contamination for
+        # a skill-isolation model). Scope rule: anchor value-accounting and
+        # decision metrics; never skill-isolation models.
         if is_bip and xw is not None:
             target = (xw - LG_WOBA) / WOBA_SCALE
         elif re is not None:
