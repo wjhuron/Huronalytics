@@ -1581,9 +1581,9 @@ def render_card(config, pitches, output_file):
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
-            f"{iz_n/n*100:.1f}%" if n else '—',
             (f"{int(round(stuff_by_pt[pt]))}" if stuff_by_pt.get(pt) is not None else '—'),
             (f"{int(round(locplus_by_pt[pt]))}" if locplus_by_pt.get(pt) is not None else '—'),
+            f"{iz_n/n*100:.1f}%" if n else '—',
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
             f"{chase_pct*100:.1f}%" if chase_pct is not None else '—',
             f"{xwobacon:.3f}".replace('0.', '.') if xwobacon is not None else '—']
@@ -1631,9 +1631,9 @@ def render_card(config, pitches, output_file):
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
         fmt_fi(sum(t_exts)/len(t_exts)) if t_exts else '—',
         f"{sum(t_armangles)/len(t_armangles):.1f}°" if t_armangles else '—',
-        f"{t_iz/tc*100:.1f}%" if tc else '—',
         (f"{int(round(_total_stuff))}" if _total_stuff is not None else '—'),
         (f"{int(round(_total_locplus))}" if _total_locplus is not None else '—'),
+        f"{t_iz/tc*100:.1f}%" if tc else '—',
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
         f"{t_chase*100:.1f}%" if t_chase is not None else '—',
         f"{t_xwobacon:.3f}".replace('0.', '.') if t_xwobacon is not None else '—']
@@ -1644,7 +1644,7 @@ def render_card(config, pitches, output_file):
     # Source-data presence check — RV needs RunExp on at least one pitch.
     has_pitchrv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
 
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','nHAA','RelZ','RelX','Ext','Arm Angle','Zone%','Stuff+','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_cols
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','nHAA','RelZ','RelX','Ext','Arm Angle','Stuff+','Loc+','Zone%','Whiff%','Chase%','xwOBAcon'] + rv_cols
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
     # Columns to force-exclude based on data availability and card type.
@@ -1685,29 +1685,18 @@ def render_card(config, pitches, output_file):
     cell_data = [[row[i] for i in cols_to_keep] for row in all_cell_data]
     pt_codes=[r[0] for r in pitch_stats]+[None]
 
-    # Divider sits at the boundary between metrics (left) and rate stats
-    # (right). Zone% is the first rate-stat column now that Strike% is gone.
-    divider_col = col_headers.index('Zone%') if 'Zone%' in col_headers else None
+    # Divider sits at the boundary between physical traits (left) and outcomes
+    # (right). Stuff+ leads the outcomes block (Stuff+, Loc+, Zone%, ...).
+    divider_col = col_headers.index('Stuff+') if 'Stuff+' in col_headers else (
+        col_headers.index('Zone%') if 'Zone%' in col_headers else None)
 
-    # Proportional column widths: each column gets enough space for its widest
-    # entry (header or any cell) plus a small padding floor. Without this,
-    # matplotlib defaults to equal widths, which wastes space on short columns
-    # (Count, Usage) and lets long ones (PitchRV/100, xPitchRV/100) collide.
-    PAD_CHARS = 2
-    MIN_CHARS = 4
-    col_char_widths = []
-    for _ci in range(len(col_headers)):
-        _max_len = len(str(col_headers[_ci]))
-        for _row in cell_data:
-            _v = str(_row[_ci]) if _ci < len(_row) else ''
-            if len(_v) > _max_len:
-                _max_len = len(_v)
-        col_char_widths.append(max(MIN_CHARS, _max_len + PAD_CHARS))
-    _total = sum(col_char_widths)
-    col_widths = [c / _total for c in col_char_widths]
-
+    # Column autosizing happens after styling (bold text measures wider):
+    # start from equal widths, then shrink each column to its widest rendered
+    # cell (header or value) plus a fixed padding.
+    n_cols = len(col_headers)
     table = ax_table.table(cellText=cell_data, colLabels=col_headers,
-                            loc='upper center', cellLoc='center', colWidths=col_widths)
+                            loc='upper center', cellLoc='center',
+                            colWidths=[1.0 / n_cols] * n_cols)
     table.auto_set_font_size(False); table.set_fontsize(10); table.scale(1, 1.6)
 
     for (r,c), cell in table.get_celld().items():
@@ -1843,6 +1832,29 @@ def render_card(config, pitches, output_file):
             if tinted:
                 table.get_celld()[(r, nvaa_col_idx)].set_facecolor(tinted)
 
+    # Content-fit column widths: measure each column's widest rendered text
+    # (header or any cell, styling already applied) and set the column width to
+    # that plus a fixed padding. The table shrinks to content — loc='upper
+    # center' keeps it centered in the band — instead of stretching short
+    # columns (Count, IVB) to fill the full card width. If the fitted widths
+    # would overflow the band (many pitch types + all 20 columns), scale all
+    # columns down proportionally so the table still fits.
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    _ax_w_px = ax_table.get_window_extent(renderer).width
+    COL_PAD_IN = 0.22   # fixed padding per column (total, inches)
+    _pad_px = COL_PAD_IN * fig.dpi
+    _col_px = [0.0] * n_cols
+    for (_r, _c), _cell in table.get_celld().items():
+        _txt = _cell.get_text()
+        if not _txt.get_text():
+            continue
+        _col_px[_c] = max(_col_px[_c], _txt.get_window_extent(renderer).width)
+    _fit_fracs = [(_w + _pad_px) / _ax_w_px for _w in _col_px]
+    _shrink = min(1.0, 1.0 / sum(_fit_fracs))
+    for (_r, _c), _cell in table.get_celld().items():
+        _cell.set_width(_fit_fracs[_c] * _shrink)
+
     # Divider + borders
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer(); fig_bbox = fig.get_window_extent(renderer)
@@ -1861,8 +1873,18 @@ def render_card(config, pitches, output_file):
     for x1,y1,x2,y2 in [(l,b,r_,b),(l,t,r_,t),(l,b,l,t),(r_,b,r_,t)]:
         fig.add_artist(plt.Line2D([x1,x2],[y1,y2], transform=fig.transFigure, color=ACCENT, linewidth=2, zorder=10))
 
-    # Place watermark just below the metrics table border (measured after draw)
-    fig.text(0.99, b - 0.008, 'Huronalytics', fontsize=9, ha='right', va='top', color=TEXT_FAINT, style='italic', fontfamily='DIN Condensed')
+    # Stuff+ footnote — season cards only, just below the table's bottom border.
+    # Left edge aligned under the Stuff+ column (the outcomes-block divider);
+    # two lines so it never runs past the card's right edge.
+    if is_season and 'Stuff+' in col_headers:
+        _sp_cell = table.get_celld()[(0, col_headers.index('Stuff+'))]
+        _sp_x = _sp_cell.get_window_extent(renderer).x0 / fig_bbox.width
+        fig.text(_sp_x, b - 0.008,
+                 'Per-pitch Stuff+ graded vs same pitch type (100 = average for that type)\nOverall Stuff+ = full-arsenal pitch value, mix included',
+                 fontsize=8, color=TEXT_MUTED, va='top', ha='left', fontfamily='Avenir Next', fontweight='bold', linespacing=1.5)
+
+    # Watermark — bottom-left of the card, just below the table border.
+    fig.text(l, b - 0.008, 'Huronalytics', fontsize=9, ha='left', va='top', color=TEXT_FAINT, style='italic', fontfamily='DIN Condensed')
     plt.savefig(output_file, dpi=SAVE_DPI, bbox_inches='tight', facecolor=BG, pad_inches=0.1)
     plt.close()
 
