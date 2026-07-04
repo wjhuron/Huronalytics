@@ -46,6 +46,7 @@ calculate_pitcher_stats <- function(data, pitcher_name, has_arm_angle = FALSE) {
       avg_velo = sprintf("%.1f mph", mean(Velocity, na.rm = TRUE)),
       max_velo = sprintf("%.1f mph", max(Velocity, na.rm = TRUE)),
       avg_spin = sprintf("%.0f rpm", round(mean(`Spin Rate`, na.rm = TRUE))),
+      avg_rtilt = avg_tilt_clock(RTilt),
       avg_tilt = avg_tilt_clock(OTilt),
       avg_ivb = sprintf("%.1f\"", mean(xIndVrtBrk, na.rm = TRUE)),
       avg_hb = sprintf("%.1f\"", mean(xHorzBrk, na.rm = TRUE)),
@@ -61,13 +62,13 @@ calculate_pitcher_stats <- function(data, pitcher_name, has_arm_angle = FALSE) {
   if (has_arm_angle) {
     result %>%
       select(
-        `Pitch Type`, num_thrown, percent_thrown, avg_velo, max_velo, avg_spin, avg_tilt,
+        `Pitch Type`, num_thrown, percent_thrown, avg_velo, max_velo, avg_spin, avg_rtilt, avg_tilt,
         avg_ivb, avg_hb, avg_height, avg_side, avg_extension, avg_arm_angle, avg_vaa, avg_haa
       )
   } else {
     result %>%
       select(
-        `Pitch Type`, num_thrown, percent_thrown, avg_velo, max_velo, avg_spin, avg_tilt,
+        `Pitch Type`, num_thrown, percent_thrown, avg_velo, max_velo, avg_spin, avg_rtilt, avg_tilt,
         avg_ivb, avg_hb, avg_height, avg_side, avg_extension, avg_vaa, avg_haa
       )
   }
@@ -300,12 +301,12 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   # Define headers for first table based on whether arm angle exists
   if (has_arm_angle) {
     table1_colnames <- c(
-      "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "OTilt",
+      "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "RTilt", "OTilt",
       "IVB", "HB", "RelZ", "RelX", "Ext", "Arm Angle", "VAA", "HAA"
     )
   } else {
     table1_colnames <- c(
-      "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "OTilt",
+      "Pitch Type", "Count", "% Thrown", "Velocity", "Max Velo", "Spin Rate", "RTilt", "OTilt",
       "IVB", "HB", "RelZ", "RelX", "Ext", "VAA", "HAA"
     )
   }
@@ -382,7 +383,7 @@ generate_pitcher_reports <- function(input_file, output_dir,
                                      pitcher_filter = NULL, 
                                      start_date = NULL, 
                                      end_date = NULL) {
-  # Read data (Supabase for known team codes, CSV otherwise). OTilt stays
+  # Read data (Supabase for known team codes, CSV otherwise). RTilt/OTilt stay
   # character to prevent time parsing — handled inside load_pitch_data().
   message("Reading pitch data from: ", input_file)
   pitch_data <- load_pitch_data(input_file)

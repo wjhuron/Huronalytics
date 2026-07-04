@@ -85,6 +85,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
   conditional_cols <- c(
     "Velocity",
     "Spin Rate",
+    "RTilt",
     "OTilt",
     "xIndVrtBrk",
     "xHorzBrk",
@@ -126,6 +127,10 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
         sprintf("%.0f rpm", round(mean(
           `Spin Rate`, na.rm = TRUE
         )))
+      else
+        NA_character_,
+      avg_rtilt = if (has_col["RTilt"])
+        avg_tilt_clock(`RTilt`)
       else
         NA_character_,
       avg_tilt = if (has_col["OTilt"])
@@ -199,7 +204,9 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
       # GB% (always shown, uses BB Type if available)
       gb_percent = {
         if (has_bb_type) {
-          total_bip <- sum(Description %in% in_play_events & !grepl("^bunt", BBType), na.rm = TRUE)
+          total_bip <- sum(Description %in% in_play_events &
+                             !grepl("^bunt", BBType),
+                           na.rm = TRUE)
           if (total_bip > 0) {
             n_gb <- sum(BBType == "ground_ball", na.rm = TRUE)
             sprintf("%.1f%%", n_gb / total_bip * 100)
@@ -215,7 +222,11 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
   
   # --- Compute and append Total row ---
   total_swings_all <- sum(pitcher_data$Description %in% swing_events, na.rm = TRUE)
-  total_bip_all <- sum(pitcher_data$Description %in% in_play_events & !grepl("^bunt", pitcher_data$BBType), na.rm = TRUE)
+  total_bip_all <- sum(
+    pitcher_data$Description %in% in_play_events &
+      !grepl("^bunt", pitcher_data$BBType),
+    na.rm = TRUE
+  )
   
   total_row <- tibble(
     `Pitch Type` = "Total",
@@ -224,6 +235,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
     avg_velo = NA_character_,
     max_velo = NA_character_,
     avg_spin = NA_character_,
+    avg_rtilt = NA_character_,
     avg_tilt = NA_character_,
     avg_ivb = NA_character_,
     avg_hb = NA_character_,
@@ -291,6 +303,8 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
     cols_to_keep <- c(cols_to_keep, "avg_velo", "max_velo")
   if (has_col["Spin Rate"])
     cols_to_keep <- c(cols_to_keep, "avg_spin")
+  if (has_col["RTilt"])
+    cols_to_keep <- c(cols_to_keep, "avg_rtilt")
   if (has_col["OTilt"])
     cols_to_keep <- c(cols_to_keep, "avg_tilt")
   if (has_col["xIndVrtBrk"])
@@ -331,6 +345,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
     "avg_velo" = "Velo",
     "max_velo" = "Max Velo",
     "avg_spin" = "Spin Rate",
+    "avg_rtilt" = "RTilt",
     "avg_tilt" = "OTilt",
     "avg_ivb" = "IVB",
     "avg_hb" = "HB",
@@ -620,20 +635,22 @@ create_pitcher_tables <- function(pitch_data, selected_pitcher, game_date = NULL
   
   # Replace pitch codes with full names (preserve "Total" as-is)
   stats_df$`Pitch Type` <- ifelse(stats_df$`Pitch Type` == "Total", "Total", pitch_names[stats_df$`Pitch Type`])
-
+  
   # Drop rows whose code has no mapped name (unmapped pitch types). These never
   # occur in practice; if one slipped through, an NA Pitch Type would crash the
   # Total-row check in format_table and inject a phantom all-NA row via NA
   # logical subsetting in the sort below.
   stats_df <- stats_df[!is.na(stats_df$`Pitch Type`), ]
-
+  
   # Sort by usage (descending), Total always last; exact usage ties fall
   # back to pitch_order
   total_mask <- stats_df$`Pitch Type` == "Total"
   non_total <- stats_df[!total_mask, ]
   total_rows <- stats_df[total_mask, ]
-  non_total <- non_total[order(-as.numeric(non_total$Count),
-                               factor(non_total$`Pitch Type`, levels = pitch_order)), ]
+  non_total <- non_total[order(
+    -as.numeric(non_total$Count),
+    factor(non_total$`Pitch Type`, levels = pitch_order)
+  ), ]
   stats_df <- bind_rows(non_total, total_rows)
   
   # Create base table theme (tight horizontal padding so each column is only

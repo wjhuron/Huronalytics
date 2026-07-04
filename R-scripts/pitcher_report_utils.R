@@ -149,7 +149,8 @@ read_team_from_supabase <- function(team) {
   tmp <- tempfile(fileext = ".csv")
   on.exit(unlink(tmp), add = TRUE)
   readr::write_csv(df, tmp, na = "")
-  readr::read_csv(tmp, col_types = readr::cols(OTilt = readr::col_character()))
+  readr::read_csv(tmp, col_types = readr::cols(RTilt = readr::col_character(),
+                                               OTilt = readr::col_character()))
 }
 
 # Extract a team code from a bare code ("PIT") or a CSV path
@@ -172,7 +173,8 @@ load_pitch_data <- function(input) {
     stop("load_pitch_data: file not found: ", input,
          "\n  Export the team's tab from its division workbook to ~/Downloads first.")
   }
-  readr::read_csv(input, col_types = readr::cols(OTilt = readr::col_character()))
+  readr::read_csv(input, col_types = readr::cols(RTilt = readr::col_character(),
+                                                 OTilt = readr::col_character()))
 }
 
 # ---- Shared Helper Functions ----
