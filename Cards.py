@@ -1898,6 +1898,11 @@ def main():
     parser.add_argument('--pitchers', default=None, help='Semicolon-separated "Last, First" names')
     parser.add_argument('--game-pk', default=None, help='Game PK for live/in-progress games')
     parser.add_argument('--output-dir', default=None, help=f'Output directory (default: {OUTPUT_DIR})')
+    parser.add_argument('--tab', default=None,
+                        help='Read pitches from this scratch tab in the NLE2026 '
+                             'workbook (e.g. Sheet2) instead of a team tab. '
+                             'Scratch data never touches the leaderboards; cards '
+                             'render MiLB-style (no percentile bubbles).')
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -1915,15 +1920,26 @@ def main():
     # Teams: a comma-separated --team (e.g. TOR,LAD) combines a multi-team
     # pitcher's full season. Pitch data is read from each team's worksheet; the
     # bubbles use the pipeline's synthetic 2TM/3TM combined leaderboard row.
+    scratch_tab = args.tab
+    if scratch_tab:
+        # Scratch-tab mode: pitch data comes from a non-team tab (never read
+        # by the pipeline, so it can't leak to the site). MiLB-style render.
+        teams = [scratch_tab]
+        team = scratch_tab
+        league = 'MiLB'
     teams = [t.strip() for t in str(team).split(',') if t.strip()]
     if not teams:
         print("Error: no team specified")
         sys.exit(1)
     for t in teams:
+        if scratch_tab:
+            continue
         if t not in AL_TEAMS and t not in NL_TEAMS and t not in MILB_TEAMS:
             print(f"Error: Unknown team '{t}'")
             sys.exit(1)
-    if len(teams) > 1:
+    if scratch_tab:
+        pass  # league/team already set for scratch-tab mode
+    elif len(teams) > 1:
         league = 'MLB'
         team = f"{len(teams)}TM"   # combined label = leaderboard 2TM/3TM key
     else:
@@ -2018,7 +2034,8 @@ def main():
     gc = gspread.service_account()
     all_rows = []
     for t in teams:
-        ws = gc.open_by_key(_workbook_id_for_team(t)).worksheet(t)
+        _NLE2026 = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
+        ws = gc.open_by_key(_NLE2026 if scratch_tab else _workbook_id_for_team(t)).worksheet(t)
         for attempt in range(3):
             try:
                 t_rows = ws.get_all_records()
@@ -2074,7 +2091,27 @@ def main():
     print("\nStep 2: Fetching boxscore stats from MLB API...")
     box_stats = {}
     _single_date = len(game_dates_seen) == 1
-    for t in teams:
+    if scratch_tab:
+        # Scratch-tab mode: the rows' PitchIDs embed the game_pks the data
+        # came from (Pitcher2026 player_id pulls), so fetch exactly those
+        # boxscores — works for MLB and MiLB feeds alike.
+        _pks = sorted({str(r.get('PitchID', '')).split('_')[0]
+                       for r in all_rows if r.get('PitchID')} - {''})
+        print(f"  Fetching {len(_pks)} boxscores from scratch-tab game IDs...")
+        for _pk in _pks:
+            _bx = fetch_boxscore(_pk) or {}
+            for pbox in _bx.get('pitchers', []):
+                nk = _normalize_name(pbox.get('name', ''))
+                if not nk:
+                    continue
+                if nk not in box_stats:
+                    box_stats[nk] = {k: 0 for k in ('outs', 'r', 'er', 'h', 'so', 'bb', 'hr', 'tbf', 'g', 'gs')}
+                for k in ('outs', 'r', 'er', 'h', 'so', 'bb', 'hr', 'tbf'):
+                    box_stats[nk][k] += pbox.get(k, 0)
+                box_stats[nk]['g'] += 1
+                if pbox.get('is_starter'):
+                    box_stats[nk]['gs'] += 1
+    for t in ([] if scratch_tab else teams):
       for gd in sorted(team_dates.get(t, ())):
         print(f"  Fetching boxscores for {gd} ({t})...")
         day_box = fetch_boxscores_for_team(gd, t, include_live=bool(game_pk), game_pk=game_pk if _single_date else None)
@@ -2121,8 +2158,15 @@ def main():
         # Get boxscore stats
         box = box_stats.get(_normalize_name(pitcher_name))
         if not box:
-            print(f"  WARNING: No boxscore data found for {pitcher_name}, skipping")
-            continue
+            if scratch_tab:
+                # Scratch-tab data has no official boxscore trail — render the
+                # card from pitch-level data with zeroed line-score fields.
+                box = {'outs': 0, 'g': 0, 'gs': 0, 'w': 0, 'l': 0, 'sv': 0,
+                       'er': 0, 'r': 0, 'h': 0, 'hr': 0, 'so': 0, 'bb': 0,
+                       'hbp': 0, 'tbf': 0}
+            else:
+                print(f"  WARNING: No boxscore data found for {pitcher_name}, skipping")
+                continue
 
         ip_str = outs_to_ip_str(box['outs'])
         ip_float = box['outs'] / 3.0
