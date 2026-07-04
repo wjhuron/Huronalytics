@@ -913,9 +913,14 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
         return
 
     grid_h = grid_top - grid_bot
-    SECTION_HEADER_H = 0.020
-    SECTION_TOP_GAP  = 0.006
-    SECTION_GAP      = 0.016
+    # Vertical spacing is fixed in INCHES (converted to fig fractions here) so
+    # the rail renders identically whatever the figure's total height (the
+    # season card grew 0.7in for the velo sparkline). Inch values = the
+    # original fractions x the classic 17.5in frame.
+    _fh_in = fig.get_size_inches()[1]
+    SECTION_HEADER_H = 0.350 / _fh_in   # 0.020 * 17.5
+    SECTION_TOP_GAP  = 0.105 / _fh_in   # 0.006 * 17.5
+    SECTION_GAP      = 0.280 / _fh_in   # 0.016 * 17.5
     fixed_overhead = (n_sections * (SECTION_HEADER_H + SECTION_TOP_GAP)
                        + (n_sections - 1) * SECTION_GAP)
     row_h = (grid_h - fixed_overhead) / total_rows
@@ -953,8 +958,8 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
         ax.text(grid_left, header_y, section, ha='left', va='top',
                 fontsize=12.5, fontfamily='Avenir Next', fontweight='700',
                 color=TEXT_SECONDARY)
-        rule_y = header_y - SECTION_HEADER_H + 0.002
-        ax.add_patch(Rectangle((grid_left, rule_y), col_w, 0.0010,
+        rule_y = header_y - SECTION_HEADER_H + 0.035 / _fh_in   # 0.002 * 17.5
+        ax.add_patch(Rectangle((grid_left, rule_y), col_w, 0.0175 / _fh_in,
                                 facecolor=TEXT_FAINT, edgecolor='none', alpha=0.5))
         y_cursor = header_y - SECTION_HEADER_H - SECTION_TOP_GAP
 
@@ -1200,7 +1205,12 @@ def render_card(config, pitches, output_file):
         print(f"  WARNING: No pitch type data for {config['display_name']}, skipping")
         return False
 
-    fig_h = 14.3 if not config.get('mvn_models') else FIG_H   # single-game = old wider frame (~1.22 ratio)
+    # Single-game keeps the old wider frame (~1.22 ratio). Season cards grew
+    # 0.7in taller than the classic 17.5in frame to make room for the velo
+    # sparkline; everything below the header block is re-anchored in INCHES so
+    # it renders pixel-identical to the classic card (the extra height is
+    # absorbed between the boxscore strip and the percentile rail).
+    fig_h = 14.3 if not config.get('mvn_models') else FIG_H + 0.7
     fig = plt.figure(figsize=(FIG_W, fig_h), dpi=DPI)
     fig.patch.set_facecolor(BG)
     ax_main = fig.add_axes([0,0,1,1])
@@ -1263,11 +1273,82 @@ def render_card(config, pitches, output_file):
         ax_main.text(x+col_w/2, stat_y_value+cell_h/2, val_str, fontsize=14, ha='center', va='center', color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
     ax_main.add_patch(Rectangle((photo_left, stat_y_value), len(config['stat_headers'])*col_w, stat_y_header+cell_h-stat_y_value, fill=False, edgecolor=ACCENT, linewidth=2, zorder=5))
 
+    # ── FB velo-by-start sparkline — season cards only, thin strip directly
+    # under the boxscore line. Fastball (FF; SI fallback when no FF) average
+    # velo per game date: muted dots on a thin line, dotted season-average
+    # reference, "last · avg · max" annotation right-aligned above, first/mid/
+    # last date labels below. Skips gracefully with fewer than 3 starts. Lives
+    # in the 0.7in of extra card height, so nothing below has to yield.
+    if config.get('mvn_models'):
+        _fb_type = 'FF' if any(p.get('Pitch Type') == 'FF' for p in pitches) else 'SI'
+        _velo_by_start = defaultdict(list)
+        for p in pitches:
+            if p.get('Pitch Type') != _fb_type:
+                continue
+            _v = sf(p.get('Velocity')); _gd = p.get('Game Date')
+            if _v is not None and _gd:
+                _velo_by_start[_gd].append(_v)
+        _sdates = sorted(_velo_by_start)
+        if len(_sdates) >= 3:
+            _svelos = [float(np.mean(_velo_by_start[d])) for d in _sdates]
+            _savg = float(np.mean([v for d in _sdates for v in _velo_by_start[d]]))
+            strip_w_in = len(config['stat_headers']) * col_w   # same width as the stat strip
+            strip_h_in = 0.27                                  # ~40 px at save scale
+            strip_top = stat_y_value - 0.36
+            ax_spark = fig.add_axes([photo_left / FIG_W, (strip_top - strip_h_in) / fig_h,
+                                     strip_w_in / FIG_W, strip_h_in / fig_h])
+            ax_spark.set_facecolor(BG)
+            _sxs = np.arange(len(_sdates))
+            ax_spark.set_xlim(-0.6, len(_sdates) - 0.4)
+            _spad = 0.6
+            ax_spark.set_ylim(min(_svelos) - _spad, max(_svelos) + _spad)
+            ax_spark.axhline(_savg, color=TEXT_FAINT, lw=0.8, ls=(0, (2, 3)), alpha=0.8, zorder=1)
+            ax_spark.plot(_sxs, _svelos, color=TEXT_MUTED, lw=1.1, alpha=0.85, zorder=2)
+            ax_spark.scatter(_sxs, _svelos, s=16, c=TEXT_MUTED, zorder=3)
+            # accent the season high + latest start
+            _shi = int(np.argmax(_svelos))
+            ax_spark.scatter([_shi], [_svelos[_shi]], s=22,
+                             c=PITCH_COLORS.get(_fb_type, '#0072B2'), zorder=4)
+            ax_spark.scatter([_sxs[-1]], [_svelos[-1]], s=22, c=ACCENT, zorder=4)
+            ax_spark.axis('off')
+
+            _label_y = strip_top + 0.07
+            ax_main.text(photo_left, _label_y, 'FB VELO BY START', fontsize=8.5,
+                         color=TEXT_SECONDARY, fontweight='bold',
+                         fontfamily='Avenir Next', va='bottom')
+            ax_main.text(photo_left + strip_w_in, _label_y,
+                         f'{_svelos[-1]:.1f} last  ·  {_savg:.1f} avg  ·  {max(_svelos):.1f} max',
+                         fontsize=8.5, color=TEXT_MUTED, fontweight='bold',
+                         fontfamily='Avenir Next', va='bottom', ha='right')
+
+            def _fmt_spark_date(d):
+                try:
+                    return datetime.strptime(d, '%Y-%m-%d').strftime('%b %-d')
+                except Exception:
+                    return str(d)
+
+            _date_y = strip_top - strip_h_in - 0.12
+            ax_main.text(photo_left, _date_y, _fmt_spark_date(_sdates[0]), fontsize=7.5,
+                         color=TEXT_FAINT, fontfamily='Avenir Next', va='top', ha='left')
+            ax_main.text(photo_left + strip_w_in / 2, _date_y,
+                         _fmt_spark_date(_sdates[len(_sdates) // 2]), fontsize=7.5,
+                         color=TEXT_FAINT, fontfamily='Avenir Next', va='top', ha='center')
+            ax_main.text(photo_left + strip_w_in, _date_y, _fmt_spark_date(_sdates[-1]),
+                         fontsize=7.5, color=TEXT_FAINT, fontfamily='Avenir Next',
+                         va='top', ha='right')
+
     # Movement plot — right-upper, near-square (movement is read to-scale). Season
     # centers over the location block beneath it; single-game uses the old wider
     # frame that fills to the right edge.
     if config.get('mvn_models'):
-        ax_plot = fig.add_axes([0.5125, 0.575, 0.405, 0.355]); _mv_cx, _mv_ty = 0.715, 0.947
+        # Season: classic-frame geometry (fractions of the 17.5in card, fixed
+        # in inches) anchored to the TOP of the taller card so the plot keeps
+        # its exact size/position relative to the header; the sparkline's
+        # extra height falls into the gap below the legend.
+        _mv_h_in = 0.355 * FIG_H
+        _mv_y0_in = fig_h - (1 - 0.575 - 0.355) * FIG_H - _mv_h_in
+        ax_plot = fig.add_axes([0.5125, _mv_y0_in / fig_h, 0.405, _mv_h_in / fig_h])
+        _mv_cx, _mv_ty = 0.715, (fig_h - (1 - 0.947) * FIG_H) / fig_h
     else:
         ax_plot = fig.add_axes([0.585, 0.575, 0.405, 0.385]); _mv_cx, _mv_ty = 0.7875, 0.975
     ax_plot.set_xlim(-25,25); ax_plot.set_ylim(-25,25)
@@ -1349,7 +1430,14 @@ def render_card(config, pitches, output_file):
     # donut/bars above and the usage bars on the right.
     is_season_loc = bool(config.get('mvn_models'))
     if is_season_loc:
-        LOC_TITLE_Y=0.498; LOC_BOTTOM=0.255; LOC_HEIGHT=0.225
+        # Classic-frame inches: titles + top edge unchanged (top at 0.480 of
+        # the 17.5in card), bottom edge pulled DOWN to align with the
+        # percentile rail's bottom (0.235 * 17.5in). The panels are ~8.9%
+        # taller than the classic 0.225 height; draw_zone shrinks the x-span
+        # by the same factor so the zone/plate/ellipses enlarge uniformly.
+        LOC_TITLE_Y = (0.498 * FIG_H) / fig_h
+        LOC_BOTTOM  = (0.235 * FIG_H) / fig_h
+        LOC_HEIGHT  = ((0.480 - 0.235) * FIG_H) / fig_h
         LOC_L_X=0.445; LOC_R_X=0.720; LOC_W=0.265
     else:
         LOC_TITLE_Y=0.555; LOC_BOTTOM=0.25; LOC_HEIGHT=0.29
@@ -1367,10 +1455,21 @@ def render_card(config, pitches, output_file):
     # when many pitch types are crammed into the same plot.
     zone_ellipse_min = 10 if is_season_loc else 6
 
-    # Fixed zone bounds — same size for every pitcher, every card
+    # Fixed zone bounds — same size for every pitcher, every card.
+    # Season cards TRANSLATE the window so the plate/zone sits middle-right
+    # (the lateral shift opens a gutter on the left where the pitch-mix legend
+    # lives with clear separation from the ellipses, while preserving
+    # glove-side coverage on the right) and SHRINK the x-span by the panels'
+    # height-growth factor (4.2875/3.9375 vs the classic frame) so the taller
+    # panel enlarges zone/plate/ellipses uniformly — no distortion. The plate
+    # center stays at the same horizontal fraction as the classic (-2.3, 1.5)
+    # window.
     def draw_zone(ax, hand):
         ax.set_facecolor(PLOT_PANEL)
-        ax.set_xlim(-1.9, 1.9); ax.set_ylim(0.5, 4.2)
+        if is_season_loc:
+            ax.set_xlim(-2.112, 1.378); ax.set_ylim(0.5, 4.2)
+        else:
+            ax.set_xlim(-1.9, 1.9); ax.set_ylim(0.5, 4.2)
         ax.add_patch(Rectangle((-PLATE_HALF, avg_bot), PLATE_HALF*2, avg_top-avg_bot, fill=False, edgecolor=TEXT_SECONDARY, linewidth=1.5, zorder=2))
         tw = PLATE_HALF*2/3; th = (avg_top-avg_bot)/3
         for i in range(1,3):
@@ -1381,36 +1480,48 @@ def render_card(config, pitches, output_file):
         ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
         for spine in ax.spines.values(): spine.set_color(TEXT_FAINT)
 
-        # Per-hand pitch-mix readout — top-left corner (axes coords). Pitch
-        # colors are hard to read directly on cream (yellow/cyan vanish), so
-        # each row is a solid pitch-color chip + the usage % in dark bold text,
-        # over a translucent backing panel that lifts it off the ellipses.
-        # STUB placement pending Wally's example.
-        # Season cards show the pitch-mix readout in-plot; single-game cards have
+        # Per-hand pitch-mix legend — opaque paper panel in the reserved LEFT
+        # GUTTER (the zone sits middle-right), drawn ON TOP of any ellipse
+        # spill (zorder 8+) so it is always fully legible. Each row is a solid
+        # pitch-color chip + the usage % in dark bold text.
+        # Season cards show the pitch-mix legend in-plot; single-game cards have
         # dedicated usage bars right beside the locations, so skip it there.
         _u = hand_usage[hand]; _tot = hand_tot[hand]
         if is_season_loc and _tot > 0:
             _mix = sorted(_u.items(), key=lambda kv: -kv[1])
-            _x0 = 0.035; _row_h = 0.072; _y_top = 0.965
-            _cy = _y_top - 0.020
+            _row_h = 0.072
+            _panel_w = 0.215
+            _panel_h = len(_mix) * _row_h + 0.035
+            _px0, _py1 = 0.022, 0.978
+            ax.add_patch(FancyBboxPatch(
+                (_px0, _py1 - _panel_h), _panel_w, _panel_h,
+                boxstyle='round,pad=0.008,rounding_size=0.012',
+                transform=ax.transAxes, facecolor=BG,
+                edgecolor=SUBTLE_BORDER, linewidth=1.0, zorder=8))
+            _cy = _py1 - 0.033
             for _pt, _cnt in _mix:
                 _col = PITCH_COLORS.get(_pt, TEXT_SECONDARY)
-                ax.add_patch(Rectangle((_x0, _cy - _row_h * 0.34), 0.095, _row_h * 0.68,
+                ax.add_patch(Rectangle((_px0 + 0.014, _cy - _row_h * 0.34), 0.095, _row_h * 0.68,
                                        transform=ax.transAxes, facecolor=_col,
-                                       edgecolor='none', zorder=6))
-                ax.text(_x0 + 0.0475, _cy, _pt, transform=ax.transAxes,
+                                       edgecolor='none', zorder=9))
+                ax.text(_px0 + 0.0615, _cy, _pt, transform=ax.transAxes,
                         ha='center', va='center', fontsize=8, fontweight='bold',
-                        color=badge_text_color(_col), zorder=7, fontfamily='Avenir Next')
-                ax.text(_x0 + 0.125, _cy, f'{_cnt / _tot * 100:.0f}%',
+                        color=badge_text_color(_col), zorder=10, fontfamily='Avenir Next')
+                ax.text(_px0 + 0.135, _cy, f'{_cnt / _tot * 100:.0f}%',
                         transform=ax.transAxes, ha='left', va='center',
                         fontsize=9.5, fontweight='bold', color=TEXT_PRIMARY,
-                        zorder=7, fontfamily='Avenir Next')
+                        zorder=10, fontfamily='Avenir Next')
                 _cy -= _row_h
 
         is_season = bool(config.get('mvn_models'))
-        # Location ellipses (1.0σ covariance)
+        # Location ellipses (1.0σ covariance). Season cards: outline-only, for
+        # every pitch type thrown >= 10% of the time vs this handedness (plus
+        # the pitch-count minimum below). Single-game keeps the filled look.
+        _ellipse_types = {pt for pt, cnt in _u.items()
+                          if _tot > 0 and cnt / _tot >= 0.10}
         for pt in PITCH_ORDER:
             if pt not in locations[hand]: continue
+            if is_season and pt not in _ellipse_types: continue
             pts = locations[hand][pt]
             if len(pts) >= zone_ellipse_min:
                 xs = np.array([p[0] for p in pts])
@@ -1420,35 +1531,44 @@ def render_card(config, pitches, output_file):
                 if vals[0] > 0 and vals[1] > 0:
                     angle = np.degrees(np.arctan2(vecs[1, 1], vecs[0, 1]))
                     mx, my = np.mean(xs), np.mean(ys)
-                    e_alpha = 0.42 if is_season else 0.28
-                    e_lw = 2.0 if is_season else 1.3
                     _pc = PITCH_COLORS[pt]
-                    # Faint fill + a bold darker edge so the ellipse is defined
-                    # even when the fill is light. Separate fill/edge alphas, so
-                    # no single `alpha=`.
-                    ax.add_patch(Ellipse(
-                        (mx, my),
-                        2 * 1.0 * np.sqrt(vals[1]), 2 * 1.0 * np.sqrt(vals[0]),
-                        angle=angle, fill=True,
-                        facecolor=_rgba(_pc, e_alpha),
-                        edgecolor=_rgba(_darken(_pc, 0.6), 0.9),
-                        linewidth=e_lw, zorder=1
-                    ))
-                    # Season view: center dot at mean
                     if is_season:
+                        # Outline-only ellipse + center dot at the mean.
+                        ax.add_patch(Ellipse(
+                            (mx, my),
+                            2 * 1.0 * np.sqrt(vals[1]), 2 * 1.0 * np.sqrt(vals[0]),
+                            angle=angle, fill=False,
+                            edgecolor=_rgba(_pc, 0.95),
+                            linewidth=2.2, zorder=1
+                        ))
                         ax.scatter([mx], [my], c=_pc, s=32, alpha=1.0,
                                    edgecolors=TEXT_PRIMARY, linewidths=0.6, zorder=4)
-        # Pitch dots and W/B annotations
-        for pt in PITCH_ORDER:
-            if pt not in locations[hand]: continue
-            color = PITCH_COLORS[pt]
-            for px_val, pz_val, desc, barrel_flag in locations[hand][pt]:
-                if desc == 'Swinging Strike':
-                    ax.text(px_val, pz_val, 'W', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
-                elif barrel_flag:
-                    ax.text(px_val, pz_val, 'B', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
-                elif not is_season:
-                    ax.scatter([px_val], [pz_val], c=[color], s=55, alpha=1.0, edgecolors='none', zorder=3)
+                    else:
+                        # Faint fill + a bold darker edge so the ellipse is
+                        # defined even when the fill is light. Separate
+                        # fill/edge alphas, so no single `alpha=`.
+                        ax.add_patch(Ellipse(
+                            (mx, my),
+                            2 * 1.0 * np.sqrt(vals[1]), 2 * 1.0 * np.sqrt(vals[0]),
+                            angle=angle, fill=True,
+                            facecolor=_rgba(_pc, 0.28),
+                            edgecolor=_rgba(_darken(_pc, 0.6), 0.9),
+                            linewidth=1.3, zorder=1
+                        ))
+        # Pitch dots and W/B annotations — single-game cards only. Season
+        # panels show just the outline ellipses, per-type center dots,
+        # zone/plate, and the legend panel (no per-pitch marks).
+        if not is_season:
+            for pt in PITCH_ORDER:
+                if pt not in locations[hand]: continue
+                color = PITCH_COLORS[pt]
+                for px_val, pz_val, desc, barrel_flag in locations[hand][pt]:
+                    if desc == 'Swinging Strike':
+                        ax.text(px_val, pz_val, 'W', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
+                    elif barrel_flag:
+                        ax.text(px_val, pz_val, 'B', fontsize=8, fontweight='bold', color=color, ha='center', va='center', zorder=3)
+                    else:
+                        ax.scatter([px_val], [pz_val], c=[color], s=55, alpha=1.0, edgecolors='none', zorder=3)
 
     ax_loc_l = fig.add_axes([LOC_L_X, LOC_BOTTOM, LOC_W, LOC_HEIGHT])
     ax_loc_r = fig.add_axes([LOC_R_X, LOC_BOTTOM, LOC_W, LOC_HEIGHT])
@@ -1456,14 +1576,10 @@ def render_card(config, pitches, output_file):
     fig.text(LOC_L_X+LOC_W/2, LOC_TITLE_Y, 'VS RHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='DIN Condensed', ha='center', va='center')
     fig.text(LOC_R_X+LOC_W/2, LOC_TITLE_Y, 'VS LHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='DIN Condensed', ha='center', va='center')
 
-    # W/B legend. Season: one centered line beneath the plots. Single-game (old
-    # layout): stacked to the right of the location plots.
-    if is_season_loc:
-        _loc_mid_x = (LOC_L_X + LOC_R_X + LOC_W) / 2
-        fig.text(_loc_mid_x, LOC_BOTTOM - 0.018,
-            f'W = Whiff    ·    B = Barrel    ·    Min. {zone_ellipse_min} pitches for ellipse',
-            fontsize=8, color=TEXT_MUTED, va='top', ha='center', fontfamily='Avenir Next', fontweight='bold')
-    else:
+    # Footnote — single-game only (old layout): W/B legend + ellipse minimum
+    # stacked to the right of the location plots. Season panels carry no
+    # footnote (the 10-pitch ellipse minimum still applies, just unlabeled).
+    if not is_season_loc:
         _wx = LOC_R_X + LOC_W + 0.012
         for _dy, _txt in [(0.055, 'W = Whiff'), (0.033, 'B = Barrel'),
                           (0.011, f'Min. {zone_ellipse_min} pitches for ellipse')]:
@@ -1476,14 +1592,25 @@ def render_card(config, pitches, output_file):
     if config.get('mvn_models'):
         if p_row:
             bubble_cols = _bubble_columns_for(config, p_row)
+            # Classic-frame inches (0.790/0.235 of the 17.5in card) so the
+            # rail's physical geometry is untouched by the taller figure; the
+            # sparkline lives entirely in the extra height above the rail.
             _render_percentile_bubbles(fig, p_row,
                                        grid_left=0.015, grid_right=0.405,
-                                       grid_top=0.790, grid_bot=0.235, columns=bubble_cols)
+                                       grid_top=(0.790 * FIG_H) / fig_h,
+                                       grid_bot=(0.235 * FIG_H) / fig_h,
+                                       columns=bubble_cols)
     else:
         _render_single_game_panel(fig, pitches)
 
-    # Metrics table — full-width bottom band.
-    ax_table = fig.add_axes([TABLE_LEFT_FIG, 0.015, TABLE_RIGHT_FIG-TABLE_LEFT_FIG, 0.205])
+    # Metrics table — full-width bottom band. Season: classic-frame inches so
+    # the band is physically identical on the taller card.
+    if is_season_loc:
+        ax_table = fig.add_axes([TABLE_LEFT_FIG, (0.015 * FIG_H) / fig_h,
+                                 TABLE_RIGHT_FIG - TABLE_LEFT_FIG,
+                                 (0.205 * FIG_H) / fig_h])
+    else:
+        ax_table = fig.add_axes([TABLE_LEFT_FIG, 0.015, TABLE_RIGHT_FIG-TABLE_LEFT_FIG, 0.205])
     ax_table.axis('off'); ax_table.set_facecolor(BG)
 
     tc = len(pitches)
@@ -1876,15 +2003,17 @@ def render_card(config, pitches, output_file):
     # Stuff+ footnote — season cards only, just below the table's bottom border.
     # Left edge aligned under the Stuff+ column (the outcomes-block divider);
     # two lines so it never runs past the card's right edge.
+    # Below-table drop: classic-frame inches on season cards (0.008 * 17.5in).
+    _below_off = (0.008 * FIG_H) / fig_h if is_season else 0.008
     if is_season and 'Stuff+' in col_headers:
         _sp_cell = table.get_celld()[(0, col_headers.index('Stuff+'))]
         _sp_x = _sp_cell.get_window_extent(renderer).x0 / fig_bbox.width
-        fig.text(_sp_x, b - 0.008,
+        fig.text(_sp_x, b - _below_off,
                  'Per-pitch Stuff+ graded vs same pitch type (100 = average for that type)\nOverall Stuff+ = full-arsenal pitch value, mix included',
                  fontsize=8, color=TEXT_MUTED, va='top', ha='left', fontfamily='Avenir Next', fontweight='bold', linespacing=1.5)
 
     # Watermark — bottom-left of the card, just below the table border.
-    fig.text(l, b - 0.008, 'Huronalytics', fontsize=9, ha='left', va='top', color=TEXT_FAINT, style='italic', fontfamily='DIN Condensed')
+    fig.text(l, b - _below_off, 'Huronalytics', fontsize=9, ha='left', va='top', color=TEXT_FAINT, style='italic', fontfamily='DIN Condensed')
     plt.savefig(output_file, dpi=SAVE_DPI, bbox_inches='tight', facecolor=BG, pad_inches=0.1)
     plt.close()
 
