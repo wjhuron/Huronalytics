@@ -1497,6 +1497,8 @@ def render_card(config, pitches, output_file):
     is_milb = config.get('team') in MILB_TEAMS
     nvaa_by_pt = {pt: d.get('nVAA') for pt, d in pitch_lb.items()}
     nvaa_pctl_by_pt = {pt: d.get('nVAA_pctl') for pt, d in pitch_lb.items()}
+    # nHAA is hand-signed — display as-is (no |value| flip, no leading '+').
+    nhaa_by_pt = {pt: d.get('nHAA') for pt, d in pitch_lb.items()}
     xrv_by_pt = {pt: d.get('xRunValue') for pt, d in pitch_lb.items()}
     xrv100_by_pt = {pt: d.get('xRv100') for pt, d in pitch_lb.items()}
     rv100_by_pt = {pt: d.get('rv100') for pt, d in pitch_lb.items()}
@@ -1569,11 +1571,13 @@ def render_card(config, pitches, output_file):
         xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else None
         pt_name='Fastball' if pt=='FF' else PITCH_NAMES.get(pt,pt)
         _nvaa = nvaa_by_pt.get(pt)
+        _nhaa = nhaa_by_pt.get(pt)
         row=[pt_name,str(n),("< 1%" if 0 < n/tc*100 < 1 else f"{n/tc*100:.1f}%"),
             f"{sum(velos)/len(velos):.1f}" if velos else '—',f"{max(velos):.1f}" if velos else '—',
             f"{int(sum(spins)/len(spins))}" if spins else '—',
             f'{sum(ivbs)/len(ivbs):.1f}"' if ivbs else '—',f'{sum(hbs)/len(hbs):.1f}"' if hbs else '—',
             f"{_nvaa:.2f}" if _nvaa is not None else '—',
+            f"{_nhaa:.2f}" if _nhaa is not None else '—',
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
@@ -1622,7 +1626,7 @@ def render_card(config, pitches, output_file):
         total_xrv_cum = (round(sum(t_rvs_x), 1) + 0.0) if t_rvs_x else None
     _trvmap = {'PitchRV': None, 'xPitchRV': total_xrv_cum,
                'PitchRV/100': total_prv_100, 'xPitchRV/100': total_xrv_100}
-    total_row=['Total',str(tc),'100.0%','—','—','—','—','—','—',
+    total_row=['Total',str(tc),'100.0%','—','—','—','—','—','—','—',
         fmt_fi(sum(t_relzs)/len(t_relzs)) if t_relzs else '—',
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
         fmt_fi(sum(t_exts)/len(t_exts)) if t_exts else '—',
@@ -1640,7 +1644,7 @@ def render_card(config, pitches, output_file):
     # Source-data presence check — RV needs RunExp on at least one pitch.
     has_pitchrv_data = any(p.get('RunExp') is not None and str(p.get('RunExp','')).strip() != '' for p in pitches)
 
-    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','RelZ','RelX','Ext','Arm Angle','Zone%','Stuff+','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_cols
+    all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','nHAA','RelZ','RelX','Ext','Arm Angle','Zone%','Stuff+','Loc+','Whiff%','Chase%','xwOBAcon'] + rv_cols
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
     # Columns to force-exclude based on data availability and card type.
@@ -1879,6 +1883,336 @@ def render_card(config, pitches, output_file):
 
 
 # ═══════════════════════════════════════════════════════════════
+# SCRATCH-TAB MLB-STYLE CONTEXT (computed, not looked up)
+#
+# Scratch-tab pitchers (Pitcher2026 player_id pulls into a non-team tab of
+# NLE2026) never enter the leaderboards, so a full MLB-style card can't look
+# anything up. Instead we follow the ROC translation pattern: every derived
+# quantity is COMPUTED from the scratch pitches against MLB baselines, then
+# RANKED into the MLB leaderboard pools:
+#   Stuff+  — stuff_plus_v11 bundle (full model when the pitcher has ArmAngle
+#             data, else the no-arm companion + its MLB anchor scales)
+#   Loc+    — pipeline_locplus.compute_loc_plus with MLB pickle pitches as the
+#             baseline/pool and the scratch pitchers keyed under 'AAA' (scored
+#             against MLB surfaces, excluded from the (mu, sigma) pool)
+#   RV/xRV  — pipeline_compute.compute_stats / compute_xrv with the same
+#             count-anchoring offsets the leaderboard uses
+#   nVAA/nHAA — metadata vaaRegressions / haaRegressions applied to the
+#             scratch pitches' mean VAA/HAA + plate coords per pitch type
+#   bubbles — pitcher-level stats ranked against pitcher_leaderboard_rs.json
+#             (interpolation: fraction below + half ties, same as
+#             compute_percentile_ranks_with_aaa's interp path)
+# ═══════════════════════════════════════════════════════════════
+
+# Pitcher-level stats whose percentile is inverted (lower = better for the
+# pitcher). Mirrors PITCHER_ALL_INVERT in process_data for the bubble stats.
+_SCRATCH_INVERT_PITCHER = {'bbPct', 'xwOBA', 'xwOBAcon', 'hardHitPct', 'barrelPctAgainst'}
+# Bubble-panel stats we compute and rank (everything BUBBLE_COLUMNS reads).
+_SCRATCH_POOL_STATS = ['xRv100', 'xwOBA', 'kPct', 'bbPct', 'kbbPct',
+                       'swStrPct', 'chasePct', 'izWhiffPct', 'twoStrikeWhiffPct',
+                       'xwOBAcon', 'hardHitPct', 'barrelPctAgainst', 'gbPct',
+                       'fbVelo', 'stuffScore', 'locPlus', 'izPct', 'fpsPct']
+
+
+def _normalize_scratch_pitch(row):
+    """Sheet row → pipeline-format pitch dict. Mirrors
+    pipeline_fetch.read_pitches_from_sheet: blanks → None, adjusted-movement
+    fallback, Barrel recompute fallback, plus the InZone recompute the
+    pipeline applies in process_data (the scratch tab has no InZone column)."""
+    from pipeline_utils import compute_in_zone, is_barrel
+    p = {k: (None if v == '' else v) for k, v in row.items()}
+    if p.get('xIndVrtBrk') is None and p.get('IndVertBrk') is not None:
+        p['xIndVrtBrk'] = p['IndVertBrk']
+    if p.get('xHorzBrk') is None and p.get('HorzBrk') is not None:
+        p['xHorzBrk'] = p['HorzBrk']
+    if not p.get('Barrel'):
+        p['Barrel'] = '6' if is_barrel(sf(p.get('ExitVelo')), sf(p.get('LaunchAngle'))) else ''
+    p['InZone'] = compute_in_zone(p)
+    return p
+
+
+def _rank_in_mlb_pool(val, sorted_pool, invert=False):
+    """Percentile of val against a sorted MLB value pool — the interpolation
+    path of pipeline_compute.compute_percentile_ranks_with_aaa (fraction
+    below + half ties, rounded, clamped)."""
+    if val is None or len(sorted_pool) < 2:
+        return None
+    import bisect
+    below = bisect.bisect_left(sorted_pool, val)
+    above = bisect.bisect_right(sorted_pool, val)
+    pctl = max(0, min(100, round((below + 0.5 * (above - below)) / len(sorted_pool) * 100)))
+    return 100 - pctl if invert else pctl
+
+
+def _scratch_mlb_pool_rows(rows):
+    """MLB percentile pool from leaderboard rows: one row per player (a
+    combined 2TM/3TM row replaces its per-team stints), ROC/AAA rows excluded.
+    Mirrors compute_percentile_ranks_with_aaa's pool construction."""
+    from pipeline_utils import AAA_TEAMS
+
+    def _pkey(r):
+        mid = r.get('mlbId')
+        if mid is not None and mid != '':
+            return 'id:' + str(mid)
+        return 'nm:' + (r.get('pitcher') or '')
+
+    combined = {_pkey(r) for r in rows if str(r.get('team', '')).endswith('TM')}
+    out = []
+    for r in rows:
+        t = str(r.get('team', ''))
+        if t in AAA_TEAMS:
+            continue
+        if not t.endswith('TM') and _pkey(r) in combined:
+            continue
+        out.append(r)
+    return out
+
+
+def _scratch_stuff_scores(norm_by_pitcher):
+    """Stuff+ v11 for scratch pitchers. Returns ({pitcher: overall},
+    {(pitcher, pitch_type): score}). Full model when the pitcher has any
+    ArmAngle data (build_df fills gaps with his own average); otherwise the
+    no-arm companion model anchored to its MLB (no-arm) scales — exactly the
+    ROC path in train_stuff_v11.main()."""
+    import pickle as _pickle
+    _sv_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stuff_plus_v11')
+    if _sv_dir not in sys.path:
+        sys.path.insert(0, _sv_dir)
+    import train_stuff_v11 as _sv
+
+    with open(os.path.join(_sv_dir, 'stuff_models_v11.pkl'), 'rb') as f:
+        bundle = _pickle.load(f)
+
+    all_pitches = [p for pl in norm_by_pitcher.values() for p in pl]
+    df = _sv.build_df(all_pitches)
+    overall, per_pt = {}, {}
+    if not len(df):
+        return overall, per_pt
+
+    def _shrunk(rawmean, n, scale):
+        if not scale:
+            return None
+        mu, sd = scale.get('mu'), scale.get('sd')
+        if mu is None or sd is None or not sd > 0:
+            return None
+        adj = (n * rawmean + _sv.K_SHRINK * mu) / (n + _sv.K_SHRINK)
+        return round(min(180.0, max(40.0, 100 + _sv.K_SCALE * (adj - mu) / sd)), 1)
+
+    for pitcher, sub in df.groupby('pitcher'):
+        has_arm = any(sf(p.get('ArmAngle')) is not None
+                      for p in norm_by_pitcher.get(pitcher, []))
+        if has_arm:
+            model = bundle['model']
+            X = _sv.design(sub).reindex(columns=bundle['features'], fill_value=0)
+            pt_scale, ov_scale = bundle['league'], bundle['league'].get('_overall')
+        else:
+            model = bundle['model_na']
+            na_cols = model.get_booster().feature_names
+            X = _sv.design(sub, bundle['noarm_feats']).reindex(columns=na_cols, fill_value=0)
+            pt_scale, ov_scale = bundle['na_pt_scale'], bundle['na_ov_scale']
+        raw = -model.predict(X)
+        overall[pitcher] = _shrunk(float(raw.mean()), len(raw), ov_scale)
+        sub = sub.reset_index(drop=True)
+        for pt in sub['pitch_type'].unique():
+            mask = (sub['pitch_type'] == pt).values
+            per_pt[(pitcher, pt)] = _shrunk(float(raw[mask].mean()),
+                                            int(mask.sum()), pt_scale.get(pt))
+    return overall, per_pt
+
+
+def _build_scratch_league_context(norm_by_pitcher):
+    """Heavy one-time setup for scratch-tab cards: MLB pickle baselines
+    (Loc+ surfaces + norm pool, xRV count anchoring), Stuff+ v11 scoring,
+    leaderboard percentile pools, nVAA/nHAA regressions."""
+    import pickle as _pickle
+    from pipeline_compute import build_bip_count_means
+    from pipeline_sdplus import build_bip_count_offsets
+    from pipeline_locplus import compute_loc_plus
+
+    t0 = time_module.time()
+    ctx = {'norm_by_pitcher': norm_by_pitcher}
+
+    print("  [scratch] Loading MLB pitch pickle for league baselines...")
+    with open(os.path.join(os.path.dirname(METADATA_PATH), 'all_pitches_rs_cache.pkl'), 'rb') as f:
+        _all = _pickle.load(f)
+    mlb = [p for p in _all if p.get('_source') == 'MLB']
+    print(f"  [scratch] {len(mlb)} MLB pitches loaded ({time_module.time()-t0:.0f}s)")
+
+    # xRV count anchoring — same currency as the leaderboard's xRV.
+    ctx['count_offsets'] = build_bip_count_offsets(mlb, GUTS_LG_WOBA, GUTS_WOBA_SCALE)
+    ctx['bip_count_means'] = build_bip_count_means(mlb, GUTS_LG_WOBA, GUTS_WOBA_SCALE,
+                                                   ctx['count_offsets'])
+
+    # Loc+ — the pipeline's own entry point. Scratch pitchers are keyed under
+    # team 'AAA' so they score against the MLB surfaces but stay OUT of the
+    # normalization (mu, sigma) pool, exactly like ROC pitchers.
+    print("  [scratch] Building Loc+ surfaces + scoring MLB pool...")
+    by_pitcher, by_pt = defaultdict(list), defaultdict(list)
+    for p in mlb:
+        k = (p.get('Pitcher'), p.get('PTeam'), p.get('Throws'))
+        by_pitcher[k].append(p)
+        by_pt[(k[0], k[1], p.get('Pitch Type'), k[2])].append(p)
+    for name, plist in norm_by_pitcher.items():
+        for p in plist:
+            by_pitcher[(name, 'AAA', p.get('Throws'))].append(p)
+            by_pt[(name, 'AAA', p.get('Pitch Type'), p.get('Throws'))].append(p)
+    loc_pr, loc_ptr, _ = compute_loc_plus(mlb, by_pitcher, by_pt,
+                                          GUTS_LG_WOBA, GUTS_WOBA_SCALE)
+    ctx['loc_overall'] = {k[0]: v.get('locPlus') for k, v in loc_pr.items()
+                          if k[1] == 'AAA' and k[0] in norm_by_pitcher}
+    ctx['loc_pt'] = {(k[0], k[2]): v.get('locPlus') for k, v in loc_ptr.items()
+                     if k[1] == 'AAA' and k[0] in norm_by_pitcher}
+    print(f"  [scratch] Loc+ done ({time_module.time()-t0:.0f}s)")
+
+    # Stuff+ v11
+    print("  [scratch] Scoring Stuff+ v11...")
+    try:
+        ctx['stuff_overall'], ctx['stuff_pt'] = _scratch_stuff_scores(norm_by_pitcher)
+    except Exception as _e:
+        print(f"  WARNING: Stuff+ scoring failed for scratch pitches: {_e}")
+        ctx['stuff_overall'], ctx['stuff_pt'] = {}, {}
+
+    # Percentile pools from the leaderboard JSONs.
+    _data_dir = os.path.dirname(METADATA_PATH)
+    ctx['pitcher_pools'], ctx['pitch_pools'] = {}, {}
+    try:
+        with open(os.path.join(_data_dir, 'pitcher_leaderboard_rs.json')) as f:
+            _prows = _scratch_mlb_pool_rows(json.load(f))
+        for s in _SCRATCH_POOL_STATS:
+            vals = [r.get(s) for r in _prows]
+            ctx['pitcher_pools'][s] = sorted(v for v in vals if v is not None)
+        with open(os.path.join(_data_dir, 'pitch_leaderboard_rs.json')) as f:
+            _plrows = _scratch_mlb_pool_rows(json.load(f))
+        pt_pools = defaultdict(dict)
+        by_type = defaultdict(list)
+        for r in _plrows:
+            by_type[r.get('pitchType')].append(r)
+        for pt, rows in by_type.items():
+            for s in ('velocity', 'nVAA', 'stuffScore', 'locPlus'):
+                pt_pools[pt][s] = sorted(v for v in (r.get(s) for r in rows) if v is not None)
+        ctx['pitch_pools'] = dict(pt_pools)
+    except Exception as _e:
+        print(f"  WARNING: could not build scratch percentile pools: {_e}")
+
+    # nVAA / nHAA regressions from metadata.
+    ctx['vaa_reg'], ctx['haa_reg'] = {}, {}
+    if os.path.exists(METADATA_PATH):
+        with open(METADATA_PATH) as f:
+            _m = json.load(f)
+        ctx['vaa_reg'] = _m.get('vaaRegressions') or {}
+        ctx['haa_reg'] = _m.get('haaRegressions') or {}
+
+    print(f"  [scratch] League context ready ({time_module.time()-t0:.0f}s)")
+    return ctx
+
+
+def _compute_scratch_pitcher_context(pitcher_name, ctx):
+    """One scratch pitcher's MLB-style card context, computed from his scratch
+    pitches. Returns (pctl_row, pitch_lb, locplus_by_pt) shaped exactly like
+    the leaderboard-sourced structures the regular MLB render path consumes."""
+    from pipeline_compute import (compute_stats, compute_expected_stats,
+                                  compute_pitcher_batted_ball, compute_xrv)
+
+    pitches = ctx['norm_by_pitcher'].get(pitcher_name) or []
+    n = len(pitches)
+    if n == 0:
+        return None, {}, {}
+    throws = pitches[0].get('Throws')
+
+    row = {'count': n}
+    row.update(compute_stats(pitches))
+    row.update(compute_expected_stats(pitches, None))
+    row.update(compute_pitcher_batted_ball(pitches))
+    rv = row.get('runValue')
+    row['rv100'] = rv / n * 100 if rv is not None else None
+    xrv = compute_xrv(pitches, GUTS_LG_WOBA, GUTS_WOBA_SCALE,
+                      count_offsets=ctx.get('count_offsets'),
+                      bip_count_means=ctx.get('bip_count_means'))['xRunValue']
+    row['xRunValue'] = xrv
+    row['xRv100'] = xrv / n * 100 if xrv is not None else None
+
+    # fbVelo — avg velo of the most-used fastball (FF/SI), matching process_data.
+    fb_by_type = defaultdict(list)
+    for p in pitches:
+        if p.get('Pitch Type') in ('FF', 'SI'):
+            v = sf(p.get('Velocity'))
+            if v is not None:
+                fb_by_type[p['Pitch Type']].append(v)
+    if fb_by_type:
+        fbv = fb_by_type[max(fb_by_type, key=lambda t: len(fb_by_type[t]))]
+        row['fbVelo'] = round(sum(fbv) / len(fbv), 1)
+    else:
+        row['fbVelo'] = None
+
+    row['stuffScore'] = ctx.get('stuff_overall', {}).get(pitcher_name)
+    row['locPlus'] = ctx.get('loc_overall', {}).get(pitcher_name)
+
+    # Percentile bubbles — rank each computed stat into the MLB pool.
+    for s in _SCRATCH_POOL_STATS:
+        row[s + '_pctl'] = _rank_in_mlb_pool(row.get(s), ctx['pitcher_pools'].get(s) or [],
+                                             invert=(s in _SCRATCH_INVERT_PITCHER))
+
+    # Per-pitch-type rows (nVAA/nHAA, velo, RV rates, Stuff+, Loc+).
+    by_pt = defaultdict(list)
+    for p in pitches:
+        if p.get('Pitch Type'):
+            by_pt[p['Pitch Type']].append(p)
+    pitch_lb, locplus_by_pt = {}, {}
+    for pt, pp in by_pt.items():
+        npt = len(pp)
+        d = {}
+        velos = [v for v in (sf(x.get('Velocity')) for x in pp) if v is not None]
+        d['velocity'] = round(sum(velos) / len(velos), 1) if velos else None
+
+        # nVAA — mean VAA normalized to the league-average plate height.
+        vaas = [v for v in (sf(x.get('VAA')) for x in pp) if v is not None]
+        pzs = [v for v in (sf(x.get('PlateZ')) for x in pp) if v is not None]
+        reg = ctx['vaa_reg'].get(pt)
+        if vaas and pzs and reg:
+            d['nVAA'] = round(sum(vaas) / len(vaas)
+                              - reg['slope'] * (sum(pzs) / len(pzs) - reg['leagueAvgPlateZ']), 2)
+        else:
+            d['nVAA'] = None
+
+        # nHAA — mean HAA normalized to the hand-specific league plate side.
+        haas = [v for v in (sf(x.get('HAA')) for x in pp) if v is not None]
+        pxs = [v for v in (sf(x.get('PlateX')) for x in pp) if v is not None]
+        hreg = ctx['haa_reg'].get(pt)
+        lg_px = (hreg or {}).get('leagueAvgPlateX', {}).get(throws)
+        if haas and pxs and hreg and lg_px is not None:
+            d['nHAA'] = round(sum(haas) / len(haas)
+                              - hreg['slope'] * (sum(pxs) / len(pxs) - lg_px), 2)
+        else:
+            d['nHAA'] = None
+
+        rvs = [v for v in (sf(x.get('RunExp')) for x in pp) if v is not None]
+        d['rv100'] = sum(rvs) / npt * 100 if rvs else None
+        xrv_pt = compute_xrv(pp, GUTS_LG_WOBA, GUTS_WOBA_SCALE,
+                             count_offsets=ctx.get('count_offsets'),
+                             bip_count_means=ctx.get('bip_count_means'))['xRunValue']
+        d['xRunValue'] = xrv_pt
+        d['xRv100'] = xrv_pt / npt * 100 if xrv_pt is not None else None
+
+        d['stuffScore'] = ctx.get('stuff_pt', {}).get((pitcher_name, pt))
+        lp = ctx.get('loc_pt', {}).get((pitcher_name, pt))
+        if lp is not None:
+            locplus_by_pt[pt] = lp
+
+        pools = ctx['pitch_pools'].get(pt, {})
+        d['velocity_pctl'] = _rank_in_mlb_pool(d['velocity'], pools.get('velocity') or [])
+        nvp = _rank_in_mlb_pool(d['nVAA'], pools.get('nVAA') or [])
+        # nVAA direction flips by pitch type (matches process_data's
+        # VAA_NO_INVERT_TYPES): steeper is better except for FF/FC.
+        if nvp is not None and pt not in ('FF', 'FC'):
+            nvp = 100 - nvp
+        d['nVAA_pctl'] = nvp
+        d['stuffScore_pctl'] = _rank_in_mlb_pool(d['stuffScore'], pools.get('stuffScore') or [])
+        pitch_lb[pt] = d
+
+    return row, pitch_lb, locplus_by_pt
+
+
+# ═══════════════════════════════════════════════════════════════
 # MAIN BATCH LOGIC
 # ═══════════════════════════════════════════════════════════════
 def main():
@@ -2021,6 +2355,7 @@ def main():
                         locplus_by_pitcher[_lbkey][_lbpt] = _r['locPlus']
                     pitch_lb_by_pitcher[_lbkey][_lbpt] = {
                         'nVAA': _r.get('nVAA'), 'nVAA_pctl': _r.get('nVAA_pctl'),
+                        'nHAA': _r.get('nHAA'),
                         'velocity': _r.get('velocity'), 'velocity_pctl': _r.get('velocity_pctl'),
                         'xRunValue': _r.get('xRunValue'), 'xRv100': _r.get('xRv100'),
                         'rv100': _r.get('rv100'),
@@ -2089,6 +2424,20 @@ def main():
         if filter_pitchers:
             print(f"  (filter_pitchers was set to: {filter_pitchers})")
         sys.exit(0)
+
+    # Scratch-tab season cards: build the computed MLB-style context (Stuff+,
+    # Loc+, xRV anchoring, percentile pools, nVAA/nHAA regressions) once for
+    # all card pitchers. Heavy (loads the MLB pitch pickle) — scratch only.
+    scratch_ctx = None
+    if scratch_tab and is_multi_game:
+        print("\nStep 1b: Computing scratch-tab MLB-style context...")
+        try:
+            _norm = {nm: [_normalize_scratch_pitch(r) for r in pl]
+                     for nm, pl in pitches_by_pitcher.items()}
+            scratch_ctx = _build_scratch_league_context(_norm)
+        except Exception as _e:
+            import traceback; traceback.print_exc()
+            print(f"  WARNING: scratch context failed ({_e}) — rendering MiLB-style")
 
     # Step 2: Fetch boxscore stats (per source team, aggregated across game dates)
     print("\nStep 2: Fetching boxscore stats from MLB API...")
@@ -2240,8 +2589,19 @@ def main():
         # wrong team's tiny sample. Season cards only (single-game cards have no
         # season percentile context); pass None otherwise so the panel is empty.
         pctl_row = None
+        scratch_pitch_lb, scratch_locplus = {}, {}
         if is_multi_game:
-            if len(teams) > 1:
+            if scratch_tab:
+                # Scratch-tab pitchers are NOT in the leaderboards. Compute the
+                # full MLB-style context from the scratch pitches themselves
+                # (ROC-translation pattern: score against MLB baselines, rank
+                # into the MLB leaderboard pools).
+                if scratch_ctx is not None:
+                    pctl_row, scratch_pitch_lb, scratch_locplus = \
+                        _compute_scratch_pitcher_context(pitcher_name, scratch_ctx)
+                    print(f"  Scratch context: Stuff+ {pctl_row.get('stuffScore')} | "
+                          f"Loc+ {pctl_row.get('locPlus')} | xRV/100 {pctl_row.get('xRv100') if pctl_row.get('xRv100') is None else round(pctl_row['xRv100'], 1)}")
+            elif len(teams) > 1:
                 pctl_row = pctl_by_name.get((pitcher_name, team))   # 2TM/3TM combined row
             else:
                 pctl_row = pctl_by_name.get((pitcher_name, team)) \
@@ -2263,8 +2623,10 @@ def main():
             'pitcher_league_avgs': overall_avgs,
             'mvn_models': mvn_models if is_multi_game else {},
             'pctl_row': pctl_row,
-            'pitch_locplus': (locplus_by_pitcher.get((pitcher_name, team), {}) if is_multi_game else {}),
-            'pitch_lb': (pitch_lb_by_pitcher.get((pitcher_name, team), {}) if is_multi_game else {}),
+            'pitch_locplus': ((scratch_locplus if scratch_tab else
+                               locplus_by_pitcher.get((pitcher_name, team), {})) if is_multi_game else {}),
+            'pitch_lb': ((scratch_pitch_lb if scratch_tab else
+                          pitch_lb_by_pitcher.get((pitcher_name, team), {})) if is_multi_game else {}),
         }
 
         # Output file — DateSlug-LastFirst format
