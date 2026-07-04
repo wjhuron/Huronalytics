@@ -1920,7 +1920,10 @@ def main():
     # Teams: a comma-separated --team (e.g. TOR,LAD) combines a multi-team
     # pitcher's full season. Pitch data is read from each team's worksheet; the
     # bubbles use the pipeline's synthetic 2TM/3TM combined leaderboard row.
-    scratch_tab = args.tab
+    # team = "NEW" selects the scratch tab of the same name in the NLE2026
+    # workbook (never read by the pipeline, so it cannot reach the site);
+    # --tab overrides for other scratch tab names.
+    scratch_tab = args.tab or ('NEW' if str(team).strip().upper() == 'NEW' else None)
     if scratch_tab:
         # Scratch-tab mode: pitch data comes from a non-team tab (never read
         # by the pipeline, so it can't leak to the site). MiLB-style render.
