@@ -218,8 +218,16 @@ def build_df(pitches):
     return pd.DataFrame(rows)
 
 def design(df, feats=BASE_FEATS):
-    dum = pd.get_dummies(df['pitch_type'], prefix='pt')
-    return pd.concat([df[feats].reset_index(drop=True), dum.reset_index(drop=True),
+    # PITCH-TYPE AGNOSTIC (2026-07-04, per Wally, FanGraphs-style): no pitch-
+    # type dummies — every pitch is judged purely on its physics (velocity,
+    # movement, release, fastball-relative diffs). Pitch type survives only
+    # for display grouping / per-type standardization downstream. Validated
+    # on the season-blocked harness (scripts/agnostic_stuff_experiment.py):
+    # pred future xRV 0.244 -> 0.265, reliability flat (0.867 -> 0.865),
+    # descriptive 0.333 -> 0.339, Rogers SI 126.5 -> 128.1. Also makes
+    # training fully immune to cross-year retag drift (labels are no longer
+    # model inputs).
+    return pd.concat([df[feats].reset_index(drop=True),
                       df[['platoon_same']].reset_index(drop=True)], axis=1)
 
 # ROC/AAA has no arm angle (0% populated), so ROC pitchers are scored with a
