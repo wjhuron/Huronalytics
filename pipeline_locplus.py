@@ -73,6 +73,18 @@ SWING_PRIOR_COUNT_LEVEL = True # count-specific swing surfaces shrink toward
                                # toward a ~46% swing rate instead of ~10%).
                                # WON objective 2: whiff leak 0.031->0.019,
                                # rel +0.005, pred -0.006 (noise-level).
+CS_COUNT_TRANSFORM = True      # count-transform on the called-strike surface:
+                               # umpires expand the zone with more balls and
+                               # shrink it with more strikes, so the SAME
+                               # location is called a strike at different rates
+                               # by count. One baseline CS surface + a per-
+                               # (hand,count) logit intercept calibrated so the
+                               # predicted called-strike count matches observed
+                               # among that count's takes (BP framing-model
+                               # style). WON (scripts/locplus_cs_transform_test
+                               # .py): rel 0.591->0.602, stuff-leak flat, pred
+                               # -0.007 (noise); learned shifts monotonic and
+                               # match umpire behavior (3-0 +0.32, 0-2 -0.67).
 
 # ── Pitch-type grouping ─────────────────────────────────────────────────
 GROUP = {
@@ -224,6 +236,13 @@ def _smooth(num, den, prior, kprior):
 def _gsum(a):
     return sum(sum(r) for r in a)
 
+def _logit(p):
+    p = min(max(p, 1e-6), 1.0 - 1e-6)
+    return math.log(p / (1.0 - p))
+
+def _sig(x):
+    return 1.0 / (1.0 + math.exp(-x))
+
 
 # ═════════════════════════════════════════════════════════════════════════
 #  BUILD LEAGUE SURFACES
@@ -266,6 +285,8 @@ def build_surfaces(baseline, lg_woba, woba_scale):
     csn = {h: _zeros() for h in HANDS}
     csd = {h: _zeros() for h in HANDS}
     cnt_sw = defaultdict(lambda: [0, 0])   # count -> [swings, pitches] (league)
+    csd_hc = defaultdict(_zeros)           # (hand,count) -> take-count grid
+    cs_obs_hc = defaultdict(int)           # (hand,count) -> observed called strikes
 
     for p in baseline:
         bh = p['Bats']
@@ -290,8 +311,10 @@ def build_surfaces(baseline, lg_woba, woba_scale):
                     a['bipd'][i][j] += 1
         if d in TAKE_DESC:
             csd[bh][i][j] += 1
+            csd_hc[(bh, c)][i][j] += 1
             if d == 'Called Strike':
                 csn[bh][i][j] += 1
+                cs_obs_hc[(bh, c)] += 1
 
     # Called-strike surface: per batter hand (PCS_BY_HAND) or pooled. Stored
     # as {hand: grid} either way so score_pitch has one lookup shape.
@@ -307,6 +330,34 @@ def build_surfaces(baseline, lg_woba, woba_scale):
                     pn[i][j] += csn[h][i][j]; pd_[i][j] += csd[h][i][j]
         pooled = _smooth(pn, pd_, _gsum(pn) / max(_gsum(pd_), 1), K_CS)
         PCS = {h: pooled for h in HANDS}
+
+    # Count-transform (CS_COUNT_TRANSFORM): keep one baseline CS surface per hand
+    # and shift it per count by a single logit intercept, calibrated so the
+    # predicted called-strike count matches the observed count among that
+    # (hand,count)'s takes. Reshapes PCS to {hand: {count: grid}} so score_pitch
+    # indexes by count. Sparse counts (< MIN_CT_TAKES) keep the base surface.
+    MIN_CT_TAKES = 50
+    PCS_c = {}
+    for h in HANDS:
+        base = PCS[h]
+        PCS_c[h] = {}
+        for c in COUNTS:
+            delta = 0.0
+            if CS_COUNT_TRANSFORM:
+                tk = csd_hc.get((h, c)); obs = cs_obs_hc.get((h, c), 0)
+                if tk is not None:
+                    tk_n = _gsum(tk)
+                    if tk_n >= MIN_CT_TAKES and 0 < obs < tk_n:
+                        pred = sum(tk[i][j] * base[i][j]
+                                   for i in range(NX) for j in range(NZ))
+                        if pred > 0:
+                            delta = _logit(obs / tk_n) - _logit(pred / tk_n)
+            if delta == 0.0:
+                PCS_c[h][c] = base
+            else:
+                PCS_c[h][c] = [[_sig(_logit(base[i][j]) + delta)
+                                for j in range(NZ)] for i in range(NX)]
+    PCS = PCS_c
 
     # League per-count swing-rate multipliers for the count-level prior.
     tot_sw = sum(v[0] for v in cnt_sw.values())
@@ -363,7 +414,7 @@ def score_pitch(p, S):
     # BIP value count-anchored into the same delta-RE currency as the other
     # four outcome values (offset dict is empty when the option is off).
     vbip = S['XW'][key][i][j] + S['BIPOFF'].get(c, 0.0)
-    pcs = S['PCS'][p['Bats']][i][j]
+    pcs = S['PCS'][p['Bats']][c][i][j]
     RV = S['RV']
     swing_val = pwh * RV['whiff'].get(c, 0.0) + pfl * RV['foul'].get(c, 0.0) + pbip * vbip
     take_val = pcs * RV['cs'].get(c, 0.0) + (1 - pcs) * RV['ball'].get(c, 0.0)
@@ -508,7 +559,8 @@ def serialize_surfaces(S):
                    'nPriorPt': N_PRIOR_PT, 'groups': GROUPS,
                    'pcsByHand': PCS_BY_HAND,
                    'bipCountAnchor': BIP_COUNT_ANCHOR,
-                   'swingPriorCountLevel': SWING_PRIOR_COUNT_LEVEL},
+                   'swingPriorCountLevel': SWING_PRIOR_COUNT_LEVEL,
+                   'csCountTransform': CS_COUNT_TRANSFORM},
         'countValues': {slot: {f"{c[0]}-{c[1]}": round(v, 5) for c, v in d.items()}
                         for slot, d in S['RV'].items()},
     }
