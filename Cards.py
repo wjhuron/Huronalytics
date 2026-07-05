@@ -1630,6 +1630,10 @@ def render_card(config, pitches, output_file):
     xrv100_by_pt = {pt: d.get('xRv100') for pt, d in pitch_lb.items()}
     rv100_by_pt = {pt: d.get('rv100') for pt, d in pitch_lb.items()}
     stuff_by_pt = {pt: d.get('stuffScore') for pt, d in pitch_lb.items()}
+    # Low-model-support daggers (season cards only): the pitch sits far from
+    # the Stuff+ model's training data (worst ~1.5% of units league-wide), so
+    # its per-type Stuff+ is an extrapolation — marked with a superscript †.
+    stuff_lowsup_by_pt = {pt: bool(d.get('stuffScore_lowSupport')) for pt, d in pitch_lb.items()}
     # RV columns: season cards show the actual + expected per-100 pair (PitchRV/100
     # + xPitchRV/100). PitchRV/100 is the real RunExp-based rate for MLB and the
     # contact-wOBA proxy for ROC. Single-game keeps the cumulative xPitchRV.
@@ -1708,7 +1712,9 @@ def render_card(config, pitches, output_file):
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
-            (f"{int(round(stuff_by_pt[pt]))}" if stuff_by_pt.get(pt) is not None else '—'),
+            ((f"{int(round(stuff_by_pt[pt]))}" +
+              ('†' if is_season and stuff_lowsup_by_pt.get(pt) else ''))
+             if stuff_by_pt.get(pt) is not None else '—'),
             (f"{int(round(locplus_by_pt[pt]))}" if locplus_by_pt.get(pt) is not None else '—'),
             f"{iz_n/n*100:.1f}%" if n else '—',
             f"{len(whiffs)/len(swings)*100:.1f}%" if swings else '—',
@@ -2008,8 +2014,12 @@ def render_card(config, pitches, output_file):
     if is_season and 'Stuff+' in col_headers:
         _sp_cell = table.get_celld()[(0, col_headers.index('Stuff+'))]
         _sp_x = _sp_cell.get_window_extent(renderer).x0 / fig_bbox.width
-        fig.text(_sp_x, b - _below_off,
-                 'Per-pitch Stuff+ graded vs same pitch type (100 = average for that type)\nOverall Stuff+ = full-arsenal pitch value, mix included',
+        _sp_note = ('Per-pitch Stuff+ graded vs same pitch type (100 = average for that type)\n'
+                    'Overall Stuff+ = full-arsenal pitch value, mix included')
+        if any(stuff_lowsup_by_pt.get(_pt) and stuff_by_pt.get(_pt) is not None
+               for _pt, _ in pitch_stats):
+            _sp_note += '\n† = low model support (unusual pitch profile, score less certain)'
+        fig.text(_sp_x, b - _below_off, _sp_note,
                  fontsize=8, color=TEXT_MUTED, va='top', ha='left', fontfamily='Avenir Next', fontweight='bold', linespacing=1.5)
 
     # Watermark — bottom-left of the card, just below the table border.
@@ -2511,6 +2521,7 @@ def main():
                         'xRunValue': _r.get('xRunValue'), 'xRv100': _r.get('xRv100'),
                         'rv100': _r.get('rv100'),
                         'stuffScore': _r.get('stuffScore'), 'stuffScore_pctl': _r.get('stuffScore_pctl'),
+                        'stuffScore_lowSupport': _r.get('stuffScore_lowSupport'),
                     }
         except Exception as _e:
             print(f"  WARNING: could not load pitch leaderboard for Loc+: {_e}")

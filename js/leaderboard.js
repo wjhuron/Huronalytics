@@ -838,6 +838,15 @@ const Leaderboard = {
       if (col.sectionStart) td.classList.add('section-start');
       if (val === null || val === undefined) td.classList.add('col-null');
 
+      // Stuff+ low-model-support marker: this (pitcher, pitch type) sits far
+      // from the model's training data (worst ~1.5% of units) — the score is
+      // an extrapolation. Surfaced in the hover tooltip (app.js reads the
+      // data attribute).
+      if (col.key === 'stuffScore' && !isAvgRow && row.stuffScore_lowSupport &&
+          val !== null && val !== undefined) {
+        td.setAttribute('data-low-support', '1');
+      }
+
       // Percentile coloring (only for qualified players, with exceptions)
       if (!col.noPercentile && !isAvgRow) {
         const pctlKey = col.key + '_pctl';

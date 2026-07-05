@@ -108,7 +108,16 @@ def _harmonize_tags(prior, current):
 BASE_FEATS = ['velocity', 'ivb', 'hb', 'velo_diff', 'ivb_diff', 'hb_diff',
               'spin_rate', 'extension', 'arm_angle', 'rel_z', 'vaa', 'vaa_diff',
               'rel_x']
-TUNED = dict(max_depth=4, n_estimators=800, learning_rate=0.025, min_child_weight=10,
+# 2026-07-04 re-tune at the ~1.08M-row season-blocked scale (scripts/
+# stuff_hp_retune.py): max_depth 4 -> 6. Depth 4 was tuned at ~375k rows
+# (2026-only); with 2025 joining every fold, the deeper tree wins the 8-fold
+# production protocol outright: pred future xRV 0.265 -> 0.298, split-half
+# reliability 0.865 -> 0.857 (within the -0.010 guard), descriptive 0.339 ->
+# 0.368. Runner-up d6/n1400/lr.015/mcw40 (pred 0.296, rel 0.858) rejected on
+# stability bias — bigger config change, no gain. Recency weighting of the
+# 2025 rows tested in the same harness: w25 0.5/0.75 hurt (pred 0.282/0.289
+# at 4-fold vs 0.291), 1.25 tied 1.0 -> 2025 rows keep uniform weight 1.0.
+TUNED = dict(max_depth=6, n_estimators=800, learning_rate=0.025, min_child_weight=10,
              reg_lambda=1.5, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, tree_method='hist')
 MONO_FEAT = 'velocity'
 
@@ -235,6 +244,88 @@ def design(df, feats=BASE_FEATS):
 # the MLB (no-arm) distribution. This applies ONLY to ROC; MLB keeps the full model.
 NOARM_FEATS = [f for f in BASE_FEATS if f != 'arm_angle']
 
+# ── Low-model-support indicator (2026-07-04) ──
+# A Stuff+ number is only as good as the training data near the pitch. For each
+# MLB (pitcher, team, pitch_type) unit we measure how close its feature centroid
+# sits to the data that actually trains the model scoring it: mean z-scored
+# BASE_FEATS-space Euclidean distance to the SUPPORT_K nearest pitches in a
+# random <=SUPPORT_POOL_MAX subsample of the training pool. The pool EXCLUDES
+# the pitcher's own current-season pitches (mirroring production OOF, where his
+# own 2026 outcomes never train the model that scores him) but KEEPS his
+# prior-season pitches — cross-season identity is real support (2025 Tyler
+# Rogers supports 2026 Tyler Rogers, so Rogers must NOT flag). Because the
+# subsample dilutes a single pitcher's rows ~20x (which falsely flagged
+# Rogers's sweeper despite 249 supporting 2025 pitches), the unit pitcher's
+# own prior-season pitches are ALWAYS in his neighbor pool at full density,
+# appended per-unit alongside the shared subsample. The worst
+# (100 - SUPPORT_FLAG_PCT)% of units flag as low-support; surfaced as
+# stuffScore_lowSupport on both leaderboards, a tooltip note on the site, and
+# a dagger on season cards. ROC units are NOT scored for support (companion
+# no-arm model, anchored baseline, never in the training pool) — always False.
+SUPPORT_K = 25
+SUPPORT_POOL_MAX = 60000
+SUPPORT_FLAG_PCT = 98.5
+SUPPORT_SEED = 20260704
+
+def compute_support(df, df_prior):
+    """Support score + low_support flag per MLB (pitcher, team, pitch_type).
+
+    Features: BASE_FEATS only (platoon_same excluded — averaging a binary
+    usage mix isn't a physical coordinate). z-scored by the FULL training
+    pool's mean/std; NaN dims imputed at the training median.
+    """
+    feats = list(BASE_FEATS)
+    parts = [df[feats].assign(_pitcher=df['pitcher'].values, _prior=0)]
+    if df_prior is not None and len(df_prior):
+        parts.append(df_prior[feats].assign(_pitcher=df_prior['pitcher'].values, _prior=1))
+    pool = pd.concat(parts, ignore_index=True)
+    mu, sd = pool[feats].mean(), pool[feats].std().replace(0, 1.0)
+    med = pool[feats].median()
+    rng = np.random.RandomState(SUPPORT_SEED)
+    if len(pool) > SUPPORT_POOL_MAX:
+        idx = rng.choice(len(pool), SUPPORT_POOL_MAX, replace=False)
+        pool = pool.iloc[idx].reset_index(drop=True)
+    Z = ((pool[feats].fillna(med) - mu) / sd).values.astype(np.float32)
+    pool_pitcher = pool['_pitcher'].values
+    # per-pitcher full-density prior-season rows (appended per unit below)
+    own_prior = {}
+    if df_prior is not None and len(df_prior):
+        Zp = ((df_prior[feats].fillna(med) - mu) / sd).values.astype(np.float32)
+        for pit, ix in df_prior.groupby('pitcher').indices.items():
+            own_prior[pit] = Zp[ix]
+
+    cent = df.groupby(['pitcher', 'team', 'pitch_type'])[feats].mean().reset_index()
+    C = ((cent[feats].fillna(med) - mu) / sd).values.astype(np.float32)
+    cent_pitcher = cent['pitcher'].values
+
+    Z2 = (Z ** 2).sum(1)
+    support = np.empty(len(cent))
+    CH = 256
+    for i0 in range(0, len(cent), CH):
+        i1 = min(i0 + CH, len(cent))
+        Cc = C[i0:i1]
+        D = (Cc ** 2).sum(1)[:, None] + Z2[None, :] - 2.0 * (Cc @ Z.T)
+        for j in range(i0, i1):
+            row = D[j - i0].copy()
+            # drop ALL of this pitcher's sampled rows (own-current excluded by
+            # design; own-prior re-enters at full density, so drop the sampled
+            # copies to avoid double counting)
+            row[pool_pitcher == cent_pitcher[j]] = np.inf
+            op = own_prior.get(cent_pitcher[j])
+            if op is not None:
+                dop = ((op - C[j][None, :]) ** 2).sum(1)
+                row = np.concatenate([row, dop])
+            near = np.partition(row, SUPPORT_K)[:SUPPORT_K]
+            support[j] = float(np.sqrt(np.maximum(near, 0.0)).mean())
+    cent = cent[['pitcher', 'team', 'pitch_type']].copy()
+    cent['support'] = np.round(support, 4)
+    thr = float(np.percentile(support, SUPPORT_FLAG_PCT))
+    cent['low_support'] = cent['support'] > thr
+    n_flag = int(cent['low_support'].sum())
+    print(f'  model support: {len(cent)} units, flag threshold {thr:.3f} '
+          f'({SUPPORT_FLAG_PCT} pctl), {n_flag} low-support units')
+    return cent
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--inject', action='store_true', help='write stuffScore into the pitch leaderboard')
@@ -332,9 +423,24 @@ def main():
         return a, scale
 
     agg, league = _standardize(['pitcher', 'team', 'pitch_type'], QUAL_N)
+
+    # low-model-support flag per unit (see compute_support docstring)
+    sup = compute_support(df, df_prior)
+    agg = agg.merge(sup, on=['pitcher', 'team', 'pitch_type'], how='left')
+    agg['low_support'] = agg['low_support'].fillna(False).astype(bool)
     agg.to_csv(os.path.join(HERE, 'pitcher_stuff_v11.csv'), index=False)
     overall, overall_scale = _standardize(['pitcher', 'team', 'throws'], 2 * QUAL_N)
     league['_overall'] = overall_scale['ALL']
+    # Pitcher-level flag = USAGE-WEIGHTED (judgment call, documented): flagged
+    # only when low-support units account for >=50% of his scored pitches — a
+    # single fringe show-me pitch shouldn't taint the whole-arsenal grade,
+    # while a pitcher whose primary offerings sit off the training manifold
+    # (the actual "model can't see him" case) still flags.
+    _fs = agg.assign(_fn=agg['n'] * agg['low_support']).groupby(
+        ['pitcher', 'team'])[['_fn', 'n']].sum()
+    _fs = (_fs['_fn'] / _fs['n'] >= 0.5).rename('low_support').reset_index()
+    overall = overall.merge(_fs, on=['pitcher', 'team'], how='left')
+    overall['low_support'] = overall['low_support'].fillna(False).astype(bool)
 
     # ── ROC/AAA: no-arm companion model, scored against the MLB baseline. This
     #    ONLY affects ROC; MLB above is untouched (keeps real arm angle). ──
@@ -382,6 +488,11 @@ def main():
             return a
         roc_agg = _score_roc(['pitcher', 'team', 'pitch_type'], na_pt, True)
         roc_overall = _score_roc(['pitcher', 'team', 'throws'], na_ov, False)
+        # ROC is scored by the no-arm companion model against an anchored MLB
+        # baseline and never enters the training pool — the support diagnostic
+        # doesn't apply there (see compute_support docstring).
+        roc_agg['low_support'] = False
+        roc_overall['low_support'] = False
         agg = pd.concat([agg, roc_agg], ignore_index=True)
         overall = pd.concat([overall, roc_overall], ignore_index=True)
         print(f'  ROC (no-arm, vs MLB baseline): {len(roc_agg)} pitch-type rows, '
@@ -477,22 +588,32 @@ def inject(agg, overall, league):
     pl_path = os.path.join(DATA, 'pitch_leaderboard_rs.json')
     pl = json.load(open(pl_path))
     look = {(r.pitcher, r.team, r.pitch_type): r.stuff_mean for r in agg.itertuples()}
+    flag_look = {(r.pitcher, r.team, r.pitch_type): bool(getattr(r, 'low_support', False))
+                 for r in agg.itertuples()}
     # Pool a pitcher's MLB per-team RAW predictions to score the combined 2TM/3TM row.
+    # Combined-row low-support = ANY stint flagged (the flag is about the pitch's
+    # physics vs the training manifold, which doesn't change with the uniform).
     pool_pt = defaultdict(list)
+    flag_pt = defaultdict(bool)
     for r in agg.itertuples():
         if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
             pool_pt[(r.pitcher, r.pitch_type)].append((r.rawmean, r.n))
+            flag_pt[(r.pitcher, r.pitch_type)] |= bool(getattr(r, 'low_support', False))
     for row in pl:
         key = (row['pitcher'], row['team'], row['pitchType'])
         if key in look:
             row['stuffScore'] = look[key]
+            row['stuffScore_lowSupport'] = flag_look.get(key, False)
         elif _is_combined_team(row['team']):
             sc = league.get(row['pitchType'])
             row['stuffScore'] = _combo_score(
                 pool_pt.get((row['pitcher'], row['pitchType'])),
                 sc['mu'] if sc else None, sc['sd'] if sc else None)
+            row['stuffScore_lowSupport'] = (flag_pt.get((row['pitcher'], row['pitchType']), False)
+                                            if row['stuffScore'] is not None else False)
         else:
             row['stuffScore'] = None
+            row['stuffScore_lowSupport'] = False
     # Pool: MLB rows with >=25 pitches of the type; combined 2TM/3TM rows
     # excluded from the POOL (their stints already represent them). Every
     # scored row gets a rank; coloring is gated at render time.
@@ -515,21 +636,29 @@ def inject(agg, overall, league):
     pp_path = os.path.join(DATA, 'pitcher_leaderboard_rs.json')
     pp = json.load(open(pp_path))
     olook = {(r.pitcher, r.team, r.throws): r.stuff_mean for r in overall.itertuples()}
+    oflag = {(r.pitcher, r.team, r.throws): bool(getattr(r, 'low_support', False))
+             for r in overall.itertuples()}
     pool_ov = defaultdict(list)
+    flag_ov = defaultdict(bool)
     for r in overall.itertuples():
         if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
             pool_ov[(r.pitcher, r.throws)].append((r.rawmean, r.n))
+            flag_ov[(r.pitcher, r.throws)] |= bool(getattr(r, 'low_support', False))
     ov_scale = league.get('_overall')
     for row in pp:
         key = (row['pitcher'], row['team'], row.get('throws'))
         if key in olook:
             row['stuffScore'] = olook[key]
+            row['stuffScore_lowSupport'] = oflag.get(key, False)
         elif _is_combined_team(row['team']):
             row['stuffScore'] = _combo_score(
                 pool_ov.get((row['pitcher'], row.get('throws'))),
                 ov_scale['mu'] if ov_scale else None, ov_scale['sd'] if ov_scale else None)
+            row['stuffScore_lowSupport'] = (flag_ov.get((row['pitcher'], row.get('throws')), False)
+                                            if row['stuffScore'] is not None else False)
         else:
             row['stuffScore'] = None
+            row['stuffScore_lowSupport'] = False
     qpool = [row['stuffScore'] for row in pp
              if row.get('stuffScore') is not None and (row.get('count') or 0) >= 25
              and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])]

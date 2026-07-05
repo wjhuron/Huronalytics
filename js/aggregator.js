@@ -746,7 +746,7 @@ const Aggregator = {
                      // model unavailable client-side), so always surface the season
                      // value even under filters.
                      'locPlus', 'locPlus_pctl', 'locPlusN', 'locPlusRaw',
-                     'stuffScore', 'stuffScore_pctl',
+                     'stuffScore', 'stuffScore_pctl', 'stuffScore_lowSupport',
                      'armAngle'];
     const preAgg = window.PITCHER_DATA || [];
     const preAggMap = {};
@@ -1663,6 +1663,7 @@ const Aggregator = {
         // Stuff+ (pre-computed, always merge from JSON — not recomputable in browser)
         if (ppre.stuffScore !== undefined) rows[pmi].stuffScore = ppre.stuffScore;
         if (ppre.stuffScore_pctl !== undefined) rows[pmi].stuffScore_pctl = ppre.stuffScore_pctl;
+        if (ppre.stuffScore_lowSupport !== undefined) rows[pmi].stuffScore_lowSupport = ppre.stuffScore_lowSupport;
         // Loc+ (pre-computed; needs the league weight table unavailable client-side)
         if (ppre.locPlus !== undefined) rows[pmi].locPlus = ppre.locPlus;
         if (ppre.locPlus_pctl !== undefined) rows[pmi].locPlus_pctl = ppre.locPlus_pctl;

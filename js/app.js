@@ -1269,7 +1269,10 @@
       const label = td.getAttribute('data-col-label');
       const colKey = td.getAttribute('data-col-key');
 
-      const text = pctl + 'th percentile';
+      let text = pctl + 'th percentile';
+      if (td.getAttribute('data-low-support')) {
+        text += ' · low model support (unusual profile, score less certain)';
+      }
       tooltip.textContent = text;
       tooltip.classList.add('visible');
     });
