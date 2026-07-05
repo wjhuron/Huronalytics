@@ -32,7 +32,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKL = os.path.join(DATA, 'all_pitches_rs_cache.pkl')
-LG_WOBA, WOBA_SCALE = 0.3169, 1.2393
+
+# Live 2026 FanGraphs Guts — read from metadata_rs.json (written by
+# pipeline_fetch.scrape_guts each process_data run) so the BIP target matches
+# whatever Guts the leaderboard used, and refreshes daily while the season is
+# live. Same source as Cards._load_guts. Fallback only on a missing/broken file.
+def _load_live_guts():
+    try:
+        with open(os.path.join(DATA, 'metadata_rs.json')) as _f:
+            _g = json.load(_f).get('gutsConstants') or {}
+        _lg, _sc = _g.get('lgWOBA'), _g.get('wOBAScale')
+        if _lg and _sc:
+            return float(_lg), float(_sc)
+    except Exception:
+        pass
+    return 0.3172, 1.2343
+
+LG_WOBA, WOBA_SCALE = _load_live_guts()
 sys.path.insert(0, ROOT)
 try:
     from pipeline_utils import AAA_TEAMS
