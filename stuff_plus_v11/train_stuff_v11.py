@@ -135,7 +135,15 @@ def sf(x):
     try: return float(x)
     except (TypeError, ValueError): return None
 
-def build_df(pitches):
+# Cutter-primary pitchers: their cutter IS their fastball, so anchor the
+# differential features to the FC even though they throw a lightly-used
+# sinker. Hand-curated by Wally 2026-07-05 from the 41 arms whose anchor the
+# true-fastball rule would otherwise flip (all three have no four-seam and a
+# cutter thrown far more than any sinker). Name-keyed so it applies across
+# seasons and to daily/scratch cards. Extend as needed.
+FC_ANCHOR_PITCHERS = {'Jansen, Kenley', 'Maton, Phil', 'Spence, Mitch'}
+
+def build_df(pitches, prefer_true_fastball=True):
     # pass 1: per-pitcher primary fastball reference (handedness-normalized).
     # VAA gets its own count: a pitch missing VAA must not dilute the mean
     # toward 0 by incrementing the shared n while contributing 0.0.
@@ -152,7 +160,20 @@ def build_df(pitches):
             a['vaa'] += vaa; a['n_vaa'] += 1
     primary = {}
     for k, bt in fb.items():
-        b = max(bt.values(), key=lambda d: d['n']); n = b['n']
+        # Reference = most-thrown TRUE fastball (FF/SI); the cutter (FC) is a
+        # reference ONLY when the pitcher throws neither a four-seam nor a
+        # sinker (2026-07-05, per Wally, validated on the season-blocked
+        # harness). A secondary's separation is most meaningful vs the
+        # velocity anchor hitters gear for, not vs a movement-y cutter.
+        if prefer_true_fastball:
+            if k[0] in FC_ANCHOR_PITCHERS and 'FC' in bt:
+                cand = {'FC': bt['FC']}
+            else:
+                cand = {pt: d for pt, d in bt.items() if pt in ('FF', 'SI')} or bt
+        else:
+            cand = bt
+        sel = max(cand, key=lambda pt: cand[pt]['n'])
+        b = cand[sel]; n = b['n']
         primary[k] = {'v': b['v']/n, 'iv': b['iv']/n, 'hb': b['hb']/n,
                       'vaa': (b['vaa']/b['n_vaa']) if b['n_vaa'] else None}
 
