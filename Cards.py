@@ -1780,6 +1780,20 @@ def render_card(config, pitches, output_file):
     all_col_headers=['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate','IVB','HB','nVAA','nHAA','RelZ','RelX','Ext','Arm Angle','Stuff+','Loc+','Zone%','Whiff%','Chase%','xwOBAcon'] + rv_cols
     all_cell_data=[r[1] for r in pitch_stats]+[total_row]
 
+    # Daily cards use a different column ORDER than season (Wally's layout):
+    # nVAA/nHAA sit after the release block (Ext/Arm Angle) rather than after
+    # HB, and Stuff+/Loc+ form their own section AFTER Chase% rather than
+    # leading the outcomes block. Reorder headers + cells together (a pure
+    # permutation of the same column set); the downstream keep/color logic is
+    # name-indexed so it follows. Season layout is unchanged.
+    if not is_season:
+        _daily_order = ['Pitch Type','Count','Usage','Avg Velo','Max Velo','Spin Rate',
+                        'IVB','HB','RelZ','RelX','Ext','Arm Angle','nVAA','nHAA',
+                        'Zone%','Whiff%','Chase%','Stuff+','Loc+','xwOBAcon'] + rv_cols
+        _perm = [all_col_headers.index(h) for h in _daily_order]
+        all_col_headers = _daily_order
+        all_cell_data = [[row[i] for i in _perm] for row in all_cell_data]
+
     # Columns to force-exclude based on data availability and card type.
     force_exclude = set()
     _have_xrv = any(v is not None for v in xrv100_by_pt.values()) if is_season else has_pitchrv_data
@@ -1799,8 +1813,10 @@ def render_card(config, pitches, output_file):
         force_exclude.add('RelZ')
         force_exclude.add('RelX')
 
-    # Drop columns where ALL pitch-type rows have '—' OR source data is missing
-    pitch_rows_only = [r[1] for r in pitch_stats]  # exclude total row
+    # Drop columns where ALL pitch-type rows have '—' OR source data is missing.
+    # Derive from all_cell_data (NOT pitch_stats) so the keep-check stays aligned
+    # to all_col_headers after the daily reorder above.
+    pitch_rows_only = all_cell_data[:-1]  # all but the Total row
     cols_to_keep = []
     for ci in range(len(all_col_headers)):
         col_name = all_col_headers[ci]
@@ -2129,12 +2145,22 @@ def _scratch_mlb_pool_rows(rows):
     return out
 
 
-def _scratch_stuff_scores(norm_by_pitcher):
+# Stuff+ shrinkage for DAILY (single-game) cards. Season/scratch-season cards
+# use train_stuff_v11.K_SHRINK (=100) because they estimate a stable between-
+# pitcher grade over hundreds of pitches. On one game that would compress every
+# pitch type toward 100. Stuff+ grades pitch SHAPES, which stabilize in ~10
+# pitches, so a daily card can grade the shapes he actually threw with light
+# shrinkage — the number moves game-to-game (Wally's "grade today's shapes").
+K_SHRINK_DAILY = 5
+
+
+def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     """Stuff+ v11 for scratch pitchers. Returns ({pitcher: overall},
     {(pitcher, pitch_type): score}). Full model when the pitcher has any
     ArmAngle data (build_df fills gaps with his own average); otherwise the
     no-arm companion model anchored to its MLB (no-arm) scales — exactly the
-    ROC path in train_stuff_v11.main()."""
+    ROC path in train_stuff_v11.main(). k_shrink overrides the season K_SHRINK
+    (used lightly for daily cards)."""
     import pickle as _pickle
     _sv_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stuff_plus_v11')
     if _sv_dir not in sys.path:
@@ -2150,13 +2176,14 @@ def _scratch_stuff_scores(norm_by_pitcher):
     if not len(df):
         return overall, per_pt
 
+    _k = k_shrink if k_shrink is not None else _sv.K_SHRINK
     def _shrunk(rawmean, n, scale):
         if not scale:
             return None
         mu, sd = scale.get('mu'), scale.get('sd')
         if mu is None or sd is None or not sd > 0:
             return None
-        adj = (n * rawmean + _sv.K_SHRINK * mu) / (n + _sv.K_SHRINK)
+        adj = (n * rawmean + _k * mu) / (n + _k)
         return round(min(180.0, max(40.0, 100 + _sv.K_SCALE * (adj - mu) / sd)), 1)
 
     for pitcher, sub in df.groupby('pitcher'):
@@ -2181,10 +2208,15 @@ def _scratch_stuff_scores(norm_by_pitcher):
     return overall, per_pt
 
 
-def _build_scratch_league_context(norm_by_pitcher):
-    """Heavy one-time setup for scratch-tab cards: MLB pickle baselines
+_MLB_PICKLE_CACHE = None   # module-level: load the 382k-pitch pickle once per process
+
+
+def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
+    """Heavy one-time setup for scratch-tab / daily cards: MLB pickle baselines
     (Loc+ surfaces + norm pool, xRV count anchoring), Stuff+ v11 scoring,
-    leaderboard percentile pools, nVAA/nHAA regressions."""
+    leaderboard percentile pools, nVAA/nHAA regressions. stuff_k_shrink is
+    passed through to Stuff+ scoring (light for daily cards)."""
+    global _MLB_PICKLE_CACHE
     import pickle as _pickle
     from pipeline_compute import build_bip_count_means
     from pipeline_sdplus import build_bip_count_offsets
@@ -2193,11 +2225,13 @@ def _build_scratch_league_context(norm_by_pitcher):
     t0 = time_module.time()
     ctx = {'norm_by_pitcher': norm_by_pitcher}
 
-    print("  [scratch] Loading MLB pitch pickle for league baselines...")
-    with open(os.path.join(os.path.dirname(METADATA_PATH), 'all_pitches_rs_cache.pkl'), 'rb') as f:
-        _all = _pickle.load(f)
-    mlb = [p for p in _all if p.get('_source') == 'MLB']
-    print(f"  [scratch] {len(mlb)} MLB pitches loaded ({time_module.time()-t0:.0f}s)")
+    if _MLB_PICKLE_CACHE is None:
+        print("  [ctx] Loading MLB pitch pickle for league baselines...")
+        with open(os.path.join(os.path.dirname(METADATA_PATH), 'all_pitches_rs_cache.pkl'), 'rb') as f:
+            _all = _pickle.load(f)
+        _MLB_PICKLE_CACHE = [p for p in _all if p.get('_source') == 'MLB']
+    mlb = _MLB_PICKLE_CACHE
+    print(f"  [ctx] {len(mlb)} MLB pitches ready ({time_module.time()-t0:.0f}s)")
 
     # xRV count anchoring — same currency as the leaderboard's xRV.
     ctx['count_offsets'] = build_bip_count_offsets(mlb, GUTS_LG_WOBA, GUTS_WOBA_SCALE)
@@ -2228,7 +2262,7 @@ def _build_scratch_league_context(norm_by_pitcher):
     # Stuff+ v11
     print("  [scratch] Scoring Stuff+ v11...")
     try:
-        ctx['stuff_overall'], ctx['stuff_pt'] = _scratch_stuff_scores(norm_by_pitcher)
+        ctx['stuff_overall'], ctx['stuff_pt'] = _scratch_stuff_scores(norm_by_pitcher, stuff_k_shrink)
     except Exception as _e:
         print(f"  WARNING: Stuff+ scoring failed for scratch pitches: {_e}")
         ctx['stuff_overall'], ctx['stuff_pt'] = {}, {}
@@ -2600,6 +2634,20 @@ def main():
         except Exception as _e:
             import traceback; traceback.print_exc()
             print(f"  WARNING: scratch context failed ({_e}) — rendering MiLB-style")
+    elif not is_multi_game:
+        # Daily (single-game) cards: compute per-game Stuff+/Loc+/nVAA/nHAA from
+        # the game's pitches via the same engine (the season leaderboard row is
+        # the wrong number for one game). Stuff+ uses LIGHT shrinkage (grade the
+        # shapes). Works for regular-team and scratch daily; context stays
+        # non-season (mvn_models empty) so the daily layout is preserved.
+        print("\nStep 1b: Computing daily Stuff+/Loc+ context...")
+        try:
+            _norm = {nm: [_normalize_scratch_pitch(r) for r in pl]
+                     for nm, pl in pitches_by_pitcher.items()}
+            scratch_ctx = _build_scratch_league_context(_norm, stuff_k_shrink=K_SHRINK_DAILY)
+        except Exception as _e:
+            import traceback; traceback.print_exc()
+            print(f"  WARNING: daily Stuff+/Loc+ context failed ({_e}) — omitting those columns")
 
     # Step 2: Fetch boxscore stats (per source team, aggregated across game dates)
     print("\nStep 2: Fetching boxscore stats from MLB API...")
@@ -2768,6 +2816,14 @@ def main():
             else:
                 pctl_row = pctl_by_name.get((pitcher_name, team)) \
                            or (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None)
+        elif scratch_ctx is not None:
+            # Daily card with a computed league context: per-game Stuff+/Loc+/
+            # nVAA/nHAA from this pitcher's game pitches. pctl_row supplies the
+            # Total-row overall Stuff+/Loc+ (daily has no bubble panel).
+            pctl_row, scratch_pitch_lb, scratch_locplus = \
+                _compute_scratch_pitcher_context(pitcher_name, scratch_ctx)
+            print(f"  Daily context: Stuff+ {pctl_row.get('stuffScore')} | "
+                  f"Loc+ {pctl_row.get('locPlus')}")
 
         # Build config
         config = {
@@ -2783,12 +2839,15 @@ def main():
             'league_avgs': league_avgs,
             'overall_avgs': overall_avgs,
             'pitcher_league_avgs': overall_avgs,
+            # mvn_models stays empty for daily → is_season False → daily layout
+            # (RelZ/RelX kept, no RV pair, † off). Stuff+/Loc+/nVAA/nHAA come
+            # from the computed context maps below regardless.
             'mvn_models': mvn_models if is_multi_game else {},
             'pctl_row': pctl_row,
-            'pitch_locplus': ((scratch_locplus if scratch_tab else
-                               locplus_by_pitcher.get((pitcher_name, team), {})) if is_multi_game else {}),
-            'pitch_lb': ((scratch_pitch_lb if scratch_tab else
-                          pitch_lb_by_pitcher.get((pitcher_name, team), {})) if is_multi_game else {}),
+            'pitch_locplus': (scratch_locplus if (scratch_tab or not is_multi_game)
+                              else locplus_by_pitcher.get((pitcher_name, team), {})),
+            'pitch_lb': (scratch_pitch_lb if (scratch_tab or not is_multi_game)
+                         else pitch_lb_by_pitcher.get((pitcher_name, team), {})),
         }
 
         # Output file — DateSlug-LastFirst format
