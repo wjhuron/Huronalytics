@@ -251,6 +251,32 @@ class BaseballSavantFocusedDownloader:
             return 'L' if p_throws == 'R' else 'R'
         return code
 
+    @staticmethod
+    def _replaced_id_from_desc(e, game_data):
+        """Outgoing player id parsed from a substitution description
+        ("... X replaces Y."). The feed sometimes omits the replacedPlayer field on
+        mid-PA changes (e.g. an injury-driven pitching change), which would otherwise
+        leave the pre-substitution pitches credited to the finisher."""
+        import unicodedata
+        low = ((e.get('details', {}) or {}).get('description', '') or '').lower()
+        if 'replaces' not in low:
+            return None
+        name = low.split('replaces', 1)[1].strip().rstrip('.')
+
+        def _toks(n):
+            s = unicodedata.normalize('NFKD', str(n)).encode('ascii', 'ignore').decode().lower()
+            for ch in ',.-':
+                s = s.replace(ch, ' ')
+            return frozenset(p for p in s.split() if len(p) > 1 and p not in ('jr', 'sr', 'ii', 'iii', 'iv'))
+
+        want = _toks(name)
+        if not want:
+            return None
+        for _p in game_data.get('players', {}).values():
+            if _toks(_p.get('fullName', '')) == want:
+                return _p.get('id')
+        return None
+
     def _parse_player_name(self, full_name):
         """
         Fallback parser for player names when API player data is unavailable.
@@ -814,14 +840,16 @@ class BaseballSavantFocusedDownloader:
                 start_pitcher_id = pitcher_id
                 for e in play_events:
                     if self._is_pitching_sub(e):
-                        rp = (e.get('replacedPlayer') or {}).get('id')
+                        rp = (e.get('replacedPlayer') or {}).get('id') \
+                            or self._replaced_id_from_desc(e, game_data)
                         if rp:
                             start_pitcher_id = rp
                         break
                 start_batter_id = batter_id
                 for e in play_events:
                     if self._is_pinch_hitter(e):
-                        rp = (e.get('replacedPlayer') or {}).get('id')
+                        rp = (e.get('replacedPlayer') or {}).get('id') \
+                            or self._replaced_id_from_desc(e, game_data)
                         if rp:
                             start_batter_id = rp
                         break
@@ -928,7 +956,11 @@ class BaseballSavantFocusedDownloader:
                             cp_throws = self._throws_of(cur_pitcher_id, game_data)
                             cp_name = self.get_player_name(cur_pitcher_id, '', game_data)
                         if cur_batter_id == batter_id:
-                            cb_name, cb_bats = batter_name, bats
+                            # matchup.batSide is the actual side used (already resolves
+                            # switch hitters); fall back to registered side only if the
+                            # feed left it 'S'/blank.
+                            cb_name = batter_name
+                            cb_bats = bats if bats in ('L', 'R') else self._batside_of(batter_id, game_data, cp_throws)
                         else:
                             cb_name = self.get_player_name(cur_batter_id, '', game_data)
                             cb_bats = self._batside_of(cur_batter_id, game_data, cp_throws)
