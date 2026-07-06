@@ -995,7 +995,12 @@ class BaseballSavantFocusedDownloader:
                             'Bats': cb_bats,
                             'Count': count_str,
                             'Runners': None,  # filled by Statcast supplement (on_1b/on_2b/on_3b)
-                            'Outs': play.get('about', {}).get('outs'),
+                            # about.outs is absent in the Triple-A feed (and now the
+                            # archived MLB feed), so fall back to this pitch's
+                            # count.outs — verified identical to about.outs (822757: 157/157).
+                            'Outs': (play.get('about', {}).get('outs')
+                                     if play.get('about', {}).get('outs') is not None
+                                     else (pitch.get('count', {}) or {}).get('outs')),
                             'Description': self.simplify_description(pitch.get('details', {}).get('description', '')),
                             'Event': pa_event if is_final_pitch else '',
                             'ExitVelo': hit_data.get('launchSpeed'),
