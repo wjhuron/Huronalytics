@@ -1223,19 +1223,32 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # AAA tab pitches: only the hitter side matters (pitchers are AAA opponents)
     roc_pitcher_count = 0
     roc_hitter_count = 0
+    roc_opp_batter_count = 0
     for p in all_pitches:
         source = p.get('_source', 'MLB')
         if source == 'ROC':
             p['_roc_pitcher_pitch'] = True  # Pitcher is ROC, batter is AAA opponent
             roc_pitcher_count += 1
         elif source == 'AAA':
-            p['_roc_hitter_pitch'] = True   # Hitter is ROC, pitcher is AAA opponent
-            # Normalize BTeam to 'ROC' if it's 'AAA'
-            if p.get('BTeam') == 'AAA':
-                p['BTeam'] = 'ROC'
-            roc_hitter_count += 1
-    if roc_pitcher_count or roc_hitter_count:
-        print(f"  Tagged {roc_pitcher_count} ROC pitcher pitches, {roc_hitter_count} ROC hitter pitches")
+            # AAA tab: the pitcher (PTeam='AAA') is always an opponent, so keep
+            # it out of pitcher stats via _roc_hitter_pitch. The batter is a
+            # tracked Rochester hitter ONLY when BTeam=='ROC'. Every other batter
+            # (BTeam 'AAA' or blank) is an opponent that got scraped as byproduct
+            # (e.g. the opposing lineup facing a moved-to-AAA arm) and must stay
+            # out of hitter stats too — so it also gets _roc_pitcher_pitch, the
+            # flag that excludes a pitch's batter from every hitter aggregation.
+            # (Previously all 'AAA' BTeams were normalized to 'ROC', dumping ~90
+            # opponent batters into the ROC hitter leaderboard.)
+            p['_roc_hitter_pitch'] = True        # pitcher is an AAA opponent
+            if p.get('BTeam') == 'ROC':
+                roc_hitter_count += 1
+            else:
+                p['_roc_pitcher_pitch'] = True   # batter is an AAA opponent too
+                roc_opp_batter_count += 1
+    if roc_pitcher_count or roc_hitter_count or roc_opp_batter_count:
+        print(f"  Tagged {roc_pitcher_count} ROC pitcher pitches, "
+              f"{roc_hitter_count} ROC hitter pitches, "
+              f"{roc_opp_batter_count} AAA-opponent-batter pitches excluded")
 
     # --- Tier 2: fill xwOBA for ROC pitches (Savant doesn't publish their
     # per-pitch xwOBA model output for AAA). The fix unlocks xwOBAcon,
