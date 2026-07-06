@@ -43,6 +43,17 @@ VENUE_ELEVATION_FT_OVERRIDE = {
     4895: 16,    # London Stadium, London
     5355: 3010,  # Las Vegas Ballpark, Summerlin (Athletics temp. home) — high on
                  # the valley's western bench; MLB feed omits the elevation
+    # Triple-A (ROC/AAA) parks — the MiLB feed omits elevation for all of them,
+    # so without these the minor-league xIVB/xHB go un-adjusted (factor 1.0).
+    2773: 505,   # ESL Ballpark, Rochester NY (ROC home)
+    2756: 600,   # Sahlen Field, Buffalo NY
+    3230: 350,   # Coca-Cola Park, Allentown PA
+    2797: 920,   # PNC Field, Moosic PA (Scranton/WB)
+    2823: 400,   # NBT Bank Stadium, Syracuse NY
+    4670: 730,   # Truist Field, Charlotte NC
+    5410: 475,   # Polar Park, Worcester MA
+    2852: 20,    # VyStar Ballpark, Jacksonville FL
+    4271: 1150,  # Werner Park, Papillion NE (Omaha)
 }
 
 
