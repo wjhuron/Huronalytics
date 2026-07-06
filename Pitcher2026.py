@@ -220,6 +220,37 @@ class BaseballSavantFocusedDownloader:
         # Fallback: parse the fullName string (least reliable)
         return self._parse_player_name(player_full_name)
 
+    # ── Mid-PA substitution helpers ─────────────────────────────────────
+    # A pitcher or batter replaced mid-plate-appearance (injury/ejection) means
+    # the pitches thrown/faced before the change belong to the OUTGOING player,
+    # not the of-record finisher the matchup reports. These identify the two
+    # substitution kinds that move pitches (pitching change; pinch-hitter). A
+    # pinch-RUNNER changes a baserunner, not the batter, so it is excluded.
+    @staticmethod
+    def _is_pitching_sub(e):
+        return (e.get('type') == 'action'
+                and (e.get('details', {}) or {}).get('eventType') == 'pitching_substitution')
+
+    @staticmethod
+    def _is_pinch_hitter(e):
+        d = (e.get('details', {}) or {})
+        return (e.get('type') == 'action' and d.get('eventType') == 'offensive_substitution'
+                and 'pinch-hitter' in (d.get('description', '') or '').lower())
+
+    @staticmethod
+    def _throws_of(player_id, game_data):
+        pi = game_data.get('players', {}).get(f"ID{player_id}", {})
+        return (pi.get('pitchHand', {}) or {}).get('code', 'R')
+
+    @staticmethod
+    def _batside_of(player_id, game_data, p_throws):
+        """Registered bat side; switch hitters bat opposite the pitcher's hand."""
+        code = (game_data.get('players', {}).get(f"ID{player_id}", {})
+                .get('batSide', {}) or {}).get('code', '')
+        if code == 'S':
+            return 'L' if p_throws == 'R' else 'R'
+        return code
+
     def _parse_player_name(self, full_name):
         """
         Fallback parser for player names when API player data is unavailable.
@@ -775,7 +806,39 @@ class BaseballSavantFocusedDownloader:
                         last_pitch_idx = i
                         break
 
+                # Mid-PA substitution reattribution: pitcher_id/batter_id above are
+                # the finishers. Seed the "current" ids with whoever STARTED the PA
+                # (the outgoing player of the first mid-PA sub, if any), then advance
+                # them as substitution events are hit inside the pitch loop so each
+                # pitch is credited to the player actually in at the time.
+                start_pitcher_id = pitcher_id
+                for e in play_events:
+                    if self._is_pitching_sub(e):
+                        rp = (e.get('replacedPlayer') or {}).get('id')
+                        if rp:
+                            start_pitcher_id = rp
+                        break
+                start_batter_id = batter_id
+                for e in play_events:
+                    if self._is_pinch_hitter(e):
+                        rp = (e.get('replacedPlayer') or {}).get('id')
+                        if rp:
+                            start_batter_id = rp
+                        break
+                cur_pitcher_id = start_pitcher_id
+                cur_batter_id = start_batter_id
+
                 for pitch_idx, pitch in enumerate(play_events):
+                    # Advance current pitcher/batter on in-sequence substitutions.
+                    if pitch.get('type') == 'action':
+                        if self._is_pitching_sub(pitch):
+                            _np = (pitch.get('player') or {}).get('id')
+                            if _np:
+                                cur_pitcher_id = _np
+                        elif self._is_pinch_hitter(pitch):
+                            _nb = (pitch.get('player') or {}).get('id')
+                            if _nb:
+                                cur_batter_id = _nb
                     if pitch.get('isPitch', False):
                         # Get velocity and acceleration data for angle calculations
                         coords = pitch.get('pitchData', {}).get('coordinates', {})
@@ -844,12 +907,27 @@ class BaseballSavantFocusedDownloader:
                             adj_ivb = ivb  # fall back to raw
                             adj_hb = hb
 
+                        # Per-pitch pitcher/batter identity + handedness. Differs
+                        # from the of-record finisher ONLY on mid-PA substitutions;
+                        # the team never changes (a sub is always same-team), so
+                        # PTeam/BTeam stay as computed above.
+                        if cur_pitcher_id == pitcher_id:
+                            cp_name, cp_throws = pitcher_name, p_throws
+                        else:
+                            cp_throws = self._throws_of(cur_pitcher_id, game_data)
+                            cp_name = self.get_player_name(cur_pitcher_id, '', game_data)
+                        if cur_batter_id == batter_id:
+                            cb_name, cb_bats = batter_name, bats
+                        else:
+                            cb_name = self.get_player_name(cur_batter_id, '', game_data)
+                            cb_bats = self._batside_of(cur_batter_id, game_data, cp_throws)
+
                         # Extract pitch data
                         pitch_data = {
                             'Game Date': game_date,
                             'PTeam': pitcher_team,
-                            'Pitcher': pitcher_name,
-                            'Throws': p_throws,
+                            'Pitcher': cp_name,
+                            'Throws': cp_throws,
                             'Pitch Type': pitch_type,
                             'Velocity': pitch_velo,
                             'Spin Rate': pitch.get('pitchData', {}).get('breaks', {}).get('spinRate'),
@@ -870,8 +948,8 @@ class BaseballSavantFocusedDownloader:
                             'VAA': VAA,
                             'HAA': HAA,
                             'BTeam': b_team,
-                            'Batter': batter_name,
-                            'Bats': bats,
+                            'Batter': cb_name,
+                            'Bats': cb_bats,
                             'Count': count_str,
                             'Runners': None,  # filled by Statcast supplement (on_1b/on_2b/on_3b)
                             'Outs': play.get('about', {}).get('outs'),
