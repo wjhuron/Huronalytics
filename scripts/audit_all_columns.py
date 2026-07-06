@@ -9,12 +9,18 @@ Plus global checks: PitchID uniqueness, and per-tab row counts.
 
   python3 scripts/audit_all_columns.py
 """
-import os, sys, re, time, warnings
+import os, sys, re, time, argparse, warnings
 from collections import defaultdict, Counter
 warnings.filterwarnings('ignore')
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, ROOT)
 import gspread
 import backfill_supplement as B
+
+# --milb audits the ROC/AAA tabs instead of the 30 MLB tabs (Statcast is thinner
+# in the minors, so blanks are expected — we still check formats/ranges/domains).
+_ap = argparse.ArgumentParser()
+_ap.add_argument('--milb', action='store_true')
+MILB = _ap.parse_args().milb
 
 # categorical -> allowed set (None = just list, don't flag)
 CATEGORICAL = {
@@ -74,7 +80,10 @@ def main():
         sh = gc.open_by_key(sid)
         for ws in sh.worksheets():
             t = ws.title.upper()
-            if t not in B.ALL_TRACKED_TEAMS or t in ('ROC', 'AAA', 'FCL'):
+            if MILB:
+                if t not in ('ROC', 'AAA'):
+                    continue
+            elif t not in B.ALL_TRACKED_TEAMS or t in ('ROC', 'AAA', 'FCL'):
                 continue  # MLB tabs only
             time.sleep(0.5)
             vals = ws.get_all_values()
