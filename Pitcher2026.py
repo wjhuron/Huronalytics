@@ -550,12 +550,16 @@ class BaseballSavantFocusedDownloader:
 
         Grouped:
         - In Play: covers all hit-into-play variants
-        - Swinging Strike: includes swinging strike blocked and foul tips
+        - Swinging Strike: swinging strike blocked, foul tips, AND swinging
+          pitchout (a swing-and-miss at a pitchout is a whiff)
+        - Foul: includes foul pitchout (a foul off a pitchout is a foul/strike)
         - Ball: includes blocked balls
 
         Standalone (kept granular for analysis):
-        - Called Strike, Hit By Pitch, Foul, Foul Bunt, Bunt Foul Tip,
-          Missed Bunt, Intent Ball, Pitchout, Swinging Pitchout, Foul Pitchout
+        - Called Strike, Hit By Pitch, Foul Bunt, Bunt Foul Tip, Missed Bunt,
+          Intent Ball, Pitchout. NOTE: 'Pitchout' (a taken pitchout) stays its
+          own label but is treated as a ball everywhere in the metrics (it's in
+          the not-a-strike set and not a swing).
 
         Returns simplified description or original if no mapping found
         """
@@ -568,24 +572,25 @@ class BaseballSavantFocusedDownloader:
             'in play, out(s)': 'In Play',
             'in play, no out': 'In Play',
             'in play, run(s)': 'In Play',
-            # Grouped: Swinging Strike
+            # Grouped: Swinging Strike (a swinging pitchout is a whiff)
             'swinging strike': 'Swinging Strike',
             'swinging strike (blocked)': 'Swinging Strike',
             'foul tip': 'Swinging Strike',
+            'swinging pitchout': 'Swinging Strike',
+            # Grouped: Foul (a foul off a pitchout is a foul)
+            'foul': 'Foul',
+            'foul pitchout': 'Foul',
             # Grouped: Ball
             'ball': 'Ball',
             'ball in dirt': 'Ball',
             # Standalone
             'called strike': 'Called Strike',
             'hit by pitch': 'Hit By Pitch',
-            'foul': 'Foul',
             'foul bunt': 'Foul Bunt',
             'bunt foul tip': 'Bunt Foul Tip',
             'missed bunt': 'Missed Bunt',
             'intent ball': 'Intent Ball',
-            'pitchout': 'Pitchout',
-            'swinging pitchout': 'Swinging Pitchout',
-            'foul pitchout': 'Foul Pitchout',
+            'pitchout': 'Pitchout',   # taken pitchout: kept as its own label, counts as a ball
         }
 
         return DESCRIPTION_MAP.get(description.lower(), description)
