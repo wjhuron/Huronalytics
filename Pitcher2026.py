@@ -839,6 +839,17 @@ class BaseballSavantFocusedDownloader:
                             _nb = (pitch.get('player') or {}).get('id')
                             if _nb:
                                 cur_batter_id = _nb
+                    # Automatic ball/strike (pitcher/catcher/batter pitch-timer
+                    # violation, or intentional walk) arrives as a no_pitch event
+                    # with no pitch thrown. Advance the running count so the NEXT
+                    # pitch's stored count reflects it (the feed re-syncs the count
+                    # after each real pitch, so this never double-counts).
+                    if not pitch.get('isPitch', False):
+                        _ad = ((pitch.get('details', {}) or {}).get('description', '') or '').lower()
+                        if 'automatic ball' in _ad:
+                            pre_pitch_balls += 1
+                        elif 'automatic strike' in _ad:
+                            pre_pitch_strikes += 1
                     if pitch.get('isPitch', False):
                         # Get velocity and acceleration data for angle calculations
                         coords = pitch.get('pitchData', {}).get('coordinates', {})
