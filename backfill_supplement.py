@@ -231,11 +231,28 @@ def download_statcast(team_tab, date_min, date_max, session):
         statcast_cols = list(SUPPLEMENT_MAP.values())
         available = [c for c in statcast_cols if c in df.columns]
 
-        # Build string keys once (vectorised)
+        # ---- Align Savant pitch_number with the MLB feed numbering ----
+        # Savant counts automatic balls/strikes (pitch-timer violations,
+        # intentional walks) as pitch_number entries; the MLB Stats API feed —
+        # and therefore Wally's PitchID — counts only real pitches. Left as-is,
+        # every pitch AFTER an auto ball keys to the wrong Savant row, so its
+        # supplement fields (xwOBA, RunExp, etc.) get filled from the neighbour.
+        # Fix: within each plate appearance, drop the automatic rows and
+        # renumber the real pitches 1..N so the key matches the sheet.
+        if 'description' in df.columns:
+            is_auto = df['description'].astype(str).str.lower().str.contains('automatic', na=False)
+        else:
+            is_auto = pd.Series(False, index=df.index)
+        _order = df.sort_values(['game_pk', 'at_bat_number', 'pitch_number']).index
+        _sdf = df.loc[_order]
+        feed_num = (~is_auto.loc[_order]).groupby(
+            [_sdf['game_pk'], _sdf['at_bat_number']]).cumsum().reindex(df.index)
+
+        # Build string keys once (vectorised). k2 uses the feed-aligned number.
         keys_df = pd.DataFrame({
             'k0': df['game_pk'].astype(int).astype(str),
             'k1': df['at_bat_number'].astype(int).astype(str),
-            'k2': df['pitch_number'].astype(int).astype(str),
+            'k2': feed_num.astype(int).astype(str),
         })
 
         # Swing-cluster invalidity mask: BatSpeed missing or <50 means the
@@ -298,6 +315,8 @@ def download_statcast(team_tab, date_min, date_max, session):
         # Assemble lookup dict
         lookup = {}
         for i in df.index:
+            if is_auto.at[i]:
+                continue   # automatic ball/strike: not a real pitch, no key
             key = (keys_df.at[i, 'k0'], keys_df.at[i, 'k1'], keys_df.at[i, 'k2'])
             data = {}
             for sheet_col in formatted:
