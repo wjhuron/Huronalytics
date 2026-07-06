@@ -79,18 +79,16 @@ def feed_platez(pk):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--days', type=int, default=35)
-    ap.add_argument('--apply', action='store_true')
-    args = ap.parse_args()
-
-    pks = recent_game_pks(args.days)
-    print(f"recent games (last {args.days}d, final): {len(pks)}", flush=True)
+def resync(gc, days=35, apply=False, log=print):
+    """Re-sync recent games' PlateZ to the current feed using an existing
+    (write-capable) gspread client. Returns the number of cells written (0 on a
+    dry run or when nothing changed). Safe to call from backfill_supplement."""
+    pks = recent_game_pks(days)
+    log(f"recent games (last {days}d, final): {len(pks)}")
     if not pks:
-        print("no games in window — nothing to do."); return
+        log("no games in window — nothing to do."); return 0
 
-    print("pulling feeds ...", flush=True)
+    log("pulling feeds ...")
     feed = {}; failed = []
     with cf.ThreadPoolExecutor(max_workers=8) as ex:
         futs = {ex.submit(feed_platez, pk): pk for pk in pks}
@@ -98,10 +96,9 @@ def main():
             res = fu.result()
             if res is None: failed.append(futs[fu])
             else: feed.update(res)
-    print(f"feed pitches: {len(feed)}   failed games: {len(failed)} {failed[:6]}", flush=True)
+    log(f"feed pitches: {len(feed)}   failed games: {len(failed)} {failed[:6]}")
 
-    gc = gspread_client()
-    staged = []   # (label,title,ws,ri,cz,sheet_pz,feed_pz)
+    staged = []   # (title, ws, ri, cz, sheet_pz, feed_pz)
     for label, sid in B.SPREADSHEET_IDS.items():
         sh = gc.open_by_key(sid)
         for ws in sh.worksheets():
@@ -129,27 +126,36 @@ def main():
                 if sz is None:
                     continue
                 if THRESH < abs(sz - fz) <= CAP:
-                    staged.append((label, ws.title, ws, ri + 1, zc + 1, sz, fz))
+                    staged.append((ws.title, ws, ri + 1, zc + 1, sz, fz))
 
     bytab = defaultdict(int)
     for s in staged:
-        bytab[s[1]] += 1
-    print(f"\nPlateZ cells to sync: {len(staged)}" + (f"   {dict(bytab)}" if staged else ""), flush=True)
+        bytab[s[0]] += 1
+    log(f"PlateZ cells to sync: {len(staged)}" + (f"   {dict(bytab)}" if staged else ""))
 
-    if not args.apply:
-        print("=== DRY RUN (no writes) — pass --apply to write ===")
-        return
+    if not apply:
+        log("=== DRY RUN (no writes) — pass --apply to write ===")
+        return 0
     byws = defaultdict(list)
-    for label, title, ws, ri, cz, sz, fz in staged:
+    for title, ws, ri, cz, sz, fz in staged:
         byws[(title, ws)].append((ri, cz, fz))
     total = 0
     for (title, ws), items in byws.items():
         cells = [gspread.Cell(ri, cz, f"{fz:.3f}") for (ri, cz, fz) in items]
         B.update_cells_with_retry(ws, cells, value_input_option='USER_ENTERED')
         total += len(cells)
-        print(f"  [{title}] wrote {len(cells)}", flush=True)
+        log(f"  [{title}] wrote {len(cells)}")
         time.sleep(1.0)
-    print(f"=== APPLIED: {total} PlateZ cells across {len(byws)} tabs ===")
+    log(f"=== APPLIED: {total} PlateZ cells across {len(byws)} tabs ===")
+    return total
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--days', type=int, default=35)
+    ap.add_argument('--apply', action='store_true')
+    args = ap.parse_args()
+    resync(gspread_client(), days=args.days, apply=args.apply)
 
 
 if __name__ == '__main__':

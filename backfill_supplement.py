@@ -29,6 +29,13 @@ filter_teams = None
 
 # Produce an Excel report of all changes? "yes" or "no"
 produce_report = "no"
+
+# Also re-sync recent games' PlateZ to the current feed? "yes" or "no".
+# Statcast reprocesses plate_z weeks after games (esp. the early-season vertical
+# recalibration); this catches up the last RESYNC_PLATEZ_DAYS of games. Off by
+# default — flip to "yes" (or pass --resync-platez yes) when you want it.
+resync_platez = "no"
+resync_platez_days = 35
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Six 2026 per-division workbooks (huronalytics account), replacing the two old
@@ -648,6 +655,15 @@ def main():
         if report_path:
             print(f"Report saved to: {report_path}")
 
+    if resync_platez == 'yes':
+        print(f"\n{'='*60}\n[PlateZ re-sync] catching up recent games to the current feed\n{'='*60}")
+        import importlib.util
+        _rp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'scripts', 'resync_recent_platez.py')
+        _spec = importlib.util.spec_from_file_location('resync_recent_platez', _rp)
+        _mod = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_mod)
+        _mod.resync(gc, days=resync_platez_days, apply=True)  # reuses the write-capable client
+
 
 if __name__ == '__main__':
     # ── CLI overrides (optional — edit start_date/end_date at top of file as before) ──
@@ -656,6 +672,8 @@ if __name__ == '__main__':
     parser.add_argument('--end', default=None, help='End date YYYY-MM-DD, or "none" for all dates')
     parser.add_argument('--teams', default=None, help='Comma-separated team abbreviations (e.g., BOS,NYY)')
     parser.add_argument('--report', default=None, help='"yes" to produce an Excel report of changes')
+    parser.add_argument('--resync-platez', default=None,
+                        help='"yes" to also re-sync recent games\' PlateZ to the current feed')
     args = parser.parse_args()
 
     # Only override module-level globals if CLI args were explicitly passed
@@ -667,5 +685,7 @@ if __name__ == '__main__':
         filter_teams = [t.strip().upper() for t in args.teams.split(',') if t.strip()]
     if args.report is not None:
         produce_report = args.report.lower()
+    if args.resync_platez is not None:
+        resync_platez = args.resync_platez.lower()
 
     main()
