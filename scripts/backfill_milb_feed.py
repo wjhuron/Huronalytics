@@ -48,9 +48,13 @@ def feed_gamestate(pk):
     prev_half = None
     base = {'1B': False, '2B': False, '3B': False}
     for play in plays:
-        key = (play.get('about', {}).get('inning'), play.get('about', {}).get('halfInning'))
-        if key != prev_half:                       # new half-inning -> bases empty
-            base = {'1B': False, '2B': False, '3B': False}; prev_half = key
+        inning = play.get('about', {}).get('inning')
+        key = (inning, play.get('about', {}).get('halfInning'))
+        if key != prev_half:                       # new half-inning
+            # extra innings (10th+) start with the automatic runner ("ghost"/Manfred
+            # runner) on 2B — MLB and MiLB regular season both use it.
+            base = {'1B': False, '2B': bool(inning and inning >= 10), '3B': False}
+            prev_half = key
         ab = play.get('atBatIndex', 0) + 1
         # runner movements grouped by the playEvent index where they occur
         mv = defaultdict(list)
