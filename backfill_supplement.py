@@ -36,6 +36,12 @@ produce_report = "no"
 # default — flip to "yes" (or pass --resync-platez yes) when you want it.
 resync_platez = "no"
 resync_platez_days = 35
+
+# Also backfill the ROC/AAA (MiLB) tabs? "yes" or "no". The main loop above is
+# MLB-only (Savant serves no minor-league supplement data), so ROC/AAA are filled
+# separately from the MLB Stats API feed — the only two recoverable columns are
+# Outs and Runners (ArmAngle/xStats/bat-tracking don't exist for MiLB). Fill-only.
+backfill_milb = "yes"
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Six 2026 per-division workbooks (huronalytics account), replacing the two old
@@ -664,6 +670,15 @@ def main():
         _mod = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_mod)
         _mod.resync(gc, days=resync_platez_days, apply=True)  # reuses the write-capable client
 
+    if backfill_milb == 'yes':
+        print(f"\n{'='*60}\n[MiLB backfill] Outs + Runners for ROC/AAA (feed)\n{'='*60}")
+        import importlib.util
+        _mp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'scripts', 'backfill_milb_feed.py')
+        _spec = importlib.util.spec_from_file_location('backfill_milb_feed', _mp)
+        _mod = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_mod)
+        _mod.run(gc, apply=True)   # fill-only; reuses the write-capable client
+
 
 if __name__ == '__main__':
     # ── CLI overrides (optional — edit start_date/end_date at top of file as before) ──
@@ -674,6 +689,8 @@ if __name__ == '__main__':
     parser.add_argument('--report', default=None, help='"yes" to produce an Excel report of changes')
     parser.add_argument('--resync-platez', default=None,
                         help='"yes" to also re-sync recent games\' PlateZ to the current feed')
+    parser.add_argument('--backfill-milb', default=None,
+                        help='"yes"/"no" to backfill ROC/AAA Outs+Runners from the feed (default yes)')
     args = parser.parse_args()
 
     # Only override module-level globals if CLI args were explicitly passed
@@ -687,5 +704,7 @@ if __name__ == '__main__':
         produce_report = args.report.lower()
     if args.resync_platez is not None:
         resync_platez = args.resync_platez.lower()
+    if args.backfill_milb is not None:
+        backfill_milb = args.backfill_milb.lower()
 
     main()
