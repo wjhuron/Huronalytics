@@ -121,8 +121,18 @@ def _harmonize_tags(prior, current):
 #   systematic stuff penalty for their home air)
 # - monotone velocity constraint (rel +0.008, pred flat): more velo, same
 #   everything else, never grades worse — kills sparse-region artifacts
+# 2026-07-07 feature-weighting audit (scripts/stuff_weight_audit.py): rel_z
+# DROPPED — redundant with arm_angle (r=0.78) and actively harmful; removing
+# it improves pred future xRV 0.304 -> 0.315 (8-fold, seeds 0/1/2), desc
+# +0.007, reliab +0.002, and helps the no-arm ROC companion (pred 0.258 ->
+# 0.272). It double-penalized low-slot arms (Kevin Kelly SI 96 -> 111; SI
+# desc r 0.461 -> 0.488). RelPosZ stays in build_df rows/row-filter so the
+# training sample is unchanged. All other features re-confirmed: drop-one
+# hb_diff/spin_rate gains at 4-fold were noise at 8-fold; platoon_same keeps
+# real descriptive value; arm_angle is tied-most load-bearing (pred -0.049
+# when dropped) despite a small SHAP share.
 BASE_FEATS = ['velocity', 'ivb', 'hb', 'velo_diff', 'ivb_diff', 'hb_diff',
-              'spin_rate', 'extension', 'arm_angle', 'rel_z', 'vaa', 'vaa_diff',
+              'spin_rate', 'extension', 'arm_angle', 'vaa', 'vaa_diff',
               'rel_x']
 # 2026-07-04 re-tune at the ~1.08M-row season-blocked scale (scripts/
 # stuff_hp_retune.py): max_depth 4 -> 6. Depth 4 was tuned at ~375k rows
