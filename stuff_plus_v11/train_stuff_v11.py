@@ -640,6 +640,18 @@ def _blend(stuff, loc):
             + (1.0 - PITCHING_W_STUFF) * (loc - 100.0) / 10.0)
 
 
+def _ols_slope(xs, ys):
+    """Least-squares slope of ys on xs (pure Python). None if degenerate."""
+    n = len(xs)
+    if n < 20:
+        return None
+    mx = sum(xs) / n; my = sum(ys) / n
+    var = sum((x - mx) ** 2 for x in xs)
+    if var <= 1e-12:
+        return None
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / var
+
+
 def _inject_pitching(rows, key_of, qualifies):
     """Write pitchingScore + pitchingScore_pctl into leaderboard rows.
 
@@ -679,6 +691,29 @@ def _inject_pitching(rows, key_of, qualifies):
         sc = row.get('pitchingScore')
         pool = pool_s.get(key_of(row))
         row['pitchingScore_pctl'] = _pctl(sc, pool) if (sc is not None and pool) else None
+
+    # pitchingRuns100 — a run-denominated companion for the hover tooltip.
+    # Deliberately a MONOTONIC transform of pitchingScore (slope * (P+ - 100)),
+    # so it can never invert against the displayed number the way a run-space
+    # re-blend (0.7*stuffRuns + 0.3*locRuns) would (stuff and loc have
+    # different run SDs, so that reordering lopsided arms — the exact
+    # FanGraphs-style inconsistency we avoid). The slope is the pooled OLS of
+    # actual xRV/100 on Pitching+ over the qualified pool: it answers "a
+    # pitcher at this Pitching+ has historically prevented ~this many runs/100
+    # vs average," self-calibrating each retrain. One global slope per
+    # leaderboard (not per pitch-type) so the runs read on the same scale
+    # across a pitcher's arsenal.
+    xs = [row['pitchingScore'] for row in rows
+          if row.get('pitchingScore') is not None and row.get('xRv100') is not None
+          and qualifies(row)]
+    ys = [row['xRv100'] for row in rows
+          if row.get('pitchingScore') is not None and row.get('xRv100') is not None
+          and qualifies(row)]
+    slope = _ols_slope(xs, ys)
+    for row in rows:
+        sc = row.get('pitchingScore')
+        row['pitchingRuns100'] = (round(slope * (sc - 100.0), 2)
+                                  if (sc is not None and slope is not None) else None)
     return n
 
 def inject(agg, overall, league):

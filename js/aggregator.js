@@ -747,7 +747,7 @@ const Aggregator = {
                      // value even under filters.
                      'locPlus', 'locPlus_pctl', 'locPlusN', 'locPlusRaw',
                      'stuffScore', 'stuffScore_pctl', 'stuffScore_lowSupport',
-                     'pitchingScore', 'pitchingScore_pctl',
+                     'pitchingScore', 'pitchingScore_pctl', 'pitchingRuns100',
                      'armAngle'];
     const preAgg = window.PITCHER_DATA || [];
     const preAggMap = {};
@@ -1672,6 +1672,7 @@ const Aggregator = {
         // Pitching+ (pre-computed composite of the two above)
         if (ppre.pitchingScore !== undefined) rows[pmi].pitchingScore = ppre.pitchingScore;
         if (ppre.pitchingScore_pctl !== undefined) rows[pmi].pitchingScore_pctl = ppre.pitchingScore_pctl;
+        if (ppre.pitchingRuns100 !== undefined) rows[pmi].pitchingRuns100 = ppre.pitchingRuns100;
       }
     }
 

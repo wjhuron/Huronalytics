@@ -1270,6 +1270,12 @@
       const colKey = td.getAttribute('data-col-key');
 
       let text = pctl + 'th percentile';
+      const runs100 = td.getAttribute('data-runs100');
+      if (runs100 !== null) {
+        // toFixed keeps the '-' on negatives and adds no '+' on positives
+        // (house number-format rule).
+        text += ' · ' + parseFloat(runs100).toFixed(2) + ' runs/100 vs avg';
+      }
       if (td.getAttribute('data-low-support')) {
         text += ' · low model support (unusual profile, score less certain)';
       }

@@ -850,6 +850,13 @@ const Leaderboard = {
         td.setAttribute('data-low-support', '1');
       }
 
+      // Pitching+ run-value companion: surfaced in the hover tooltip (app.js
+      // reads the data attribute) so the composite index also reads in runs.
+      if (col.key === 'pitchingScore' && !isAvgRow &&
+          row.pitchingRuns100 !== null && row.pitchingRuns100 !== undefined) {
+        td.setAttribute('data-runs100', row.pitchingRuns100);
+      }
+
       // Percentile coloring (only for qualified players, with exceptions)
       if (!col.noPercentile && !isAvgRow) {
         const pctlKey = col.key + '_pctl';
