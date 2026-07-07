@@ -747,6 +747,7 @@ const Aggregator = {
                      // value even under filters.
                      'locPlus', 'locPlus_pctl', 'locPlusN', 'locPlusRaw',
                      'stuffScore', 'stuffScore_pctl', 'stuffScore_lowSupport',
+                     'pitchingScore', 'pitchingScore_pctl',
                      'armAngle'];
     const preAgg = window.PITCHER_DATA || [];
     const preAggMap = {};
@@ -1268,6 +1269,7 @@ const Aggregator = {
     wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
     wadd(a, 'stuffScore', p.stuffScore, p.count);
     wadd(a, 'locPlus', p.locPlus, p.locPlusN);
+    wadd(a, 'pitchingScore', p.pitchingScore, p.count);
     for (let xi = 0; xi < X_KEYS.length; xi++) {
       const xk = X_KEYS[xi];
       const v = (handSfx && p[xk + handSfx] !== undefined) ? p[xk + handSfx] : p[xk];
@@ -1373,7 +1375,7 @@ const Aggregator = {
     const PITCH_BB_INVERT = { avgEVAgainst: true, maxEVAgainst: true, hardHitPct: true, barrelPctAgainst: true, hrFbPct: true, ldPct: true, fbPct: true };
     const PITCH_EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'];
     const PITCH_EXPECTED_INVERT = { wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true, xwOBAsp: true };
-    let PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
+    let PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore', 'pitchingScore']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
     if (teamMode) {
       // Stats merged from pre-agg data carry no team-level _pctl — rank them here
       PITCH_PCTL_KEYS = PITCH_PCTL_KEYS.concat(['runValue', 'rv100', 'xRunValue', 'xRv100', 'strikePct', 'twoStrikeWhiffPct', 'locPlus']);
@@ -1667,6 +1669,9 @@ const Aggregator = {
         // Loc+ (pre-computed; needs the league weight table unavailable client-side)
         if (ppre.locPlus !== undefined) rows[pmi].locPlus = ppre.locPlus;
         if (ppre.locPlus_pctl !== undefined) rows[pmi].locPlus_pctl = ppre.locPlus_pctl;
+        // Pitching+ (pre-computed composite of the two above)
+        if (ppre.pitchingScore !== undefined) rows[pmi].pitchingScore = ppre.pitchingScore;
+        if (ppre.pitchingScore_pctl !== undefined) rows[pmi].pitchingScore_pctl = ppre.pitchingScore_pctl;
       }
     }
 

@@ -620,6 +620,67 @@ def _pctl(sc, pool):
     below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
     return round((below + 0.5 * equal) / len(pool) * 100)
 
+
+# ── Pitching+ (2026-07-07) ──
+# Validated composite of the two shipped scales (scripts/
+# pitching_plus_experiment.py + pitching_plus_stage2.py): 0.70·z(Stuff+) +
+# 0.30·z(Loc+), re-standardized so between-pitcher SD = 10 (the components
+# are near-orthogonal, r=+0.04, so the raw blend has SD ~7.6). w=0.70 is the
+# bootstrap-median optimum (2000 resamples, 95% CI [0.51, 0.91]; flat plateau
+# 0.60-0.80); pred future xRV 0.359 (stuff-only) -> 0.389. The FG-style JOINT
+# model (stuff + location + count in one XGBoost, season-blocked protocol)
+# was built and RACED — it loses to this composite on both axes (best joint:
+# pred 0.373 / rel 0.756 vs composite 0.389 / 0.764; adding count wrecks its
+# reliability, same count-mix contamination as the Loc+ anchoring lesson).
+# Don't revisit joint without multi-season training data.
+PITCHING_W_STUFF = 0.70
+
+def _blend(stuff, loc):
+    return (PITCHING_W_STUFF * (stuff - 100.0) / 10.0
+            + (1.0 - PITCHING_W_STUFF) * (loc - 100.0) / 10.0)
+
+
+def _inject_pitching(rows, key_of, qualifies):
+    """Write pitchingScore + pitchingScore_pctl into leaderboard rows.
+
+    Pool convention matches stuffScore percentiles: MLB rows with >=25
+    pitches, combined 2TM/3TM rows excluded; every row with both component
+    scores gets a score AND a rank (qualification is a render-time coloring
+    gate). key_of(row) -> pool bucket (pitch type at pitch level, 'ALL' at
+    pitcher level); qualifies(row) -> pool membership."""
+    pool_b = defaultdict(list)
+    for row in rows:
+        st, lc = row.get('stuffScore'), row.get('locPlus')
+        if st is not None and lc is not None and qualifies(row):
+            pool_b[key_of(row)].append(_blend(st, lc))
+    scale = {}
+    for k, bs in pool_b.items():
+        if len(bs) >= 5:
+            mu = sum(bs) / len(bs)
+            sd = (sum((b - mu) ** 2 for b in bs) / len(bs)) ** 0.5
+            if sd > 1e-9:
+                scale[k] = (mu, sd)
+    n = 0
+    for row in rows:
+        st, lc = row.get('stuffScore'), row.get('locPlus')
+        sc = scale.get(key_of(row))
+        if st is None or lc is None or sc is None:
+            row['pitchingScore'] = None
+            continue
+        mu, sd = sc
+        row['pitchingScore'] = round(
+            min(180.0, max(40.0, 100.0 + 10.0 * (_blend(st, lc) - mu) / sd)), 1)
+        n += 1
+    pool_s = defaultdict(list)
+    for row in rows:
+        if row.get('pitchingScore') is not None and qualifies(row):
+            pool_s[key_of(row)].append(row['pitchingScore'])
+    for row in rows:
+        sc = row.get('pitchingScore')
+        pool = pool_s.get(key_of(row))
+        row['pitchingScore_pctl'] = _pctl(sc, pool) if (sc is not None and pool) else None
+    return n
+
 def inject(agg, overall, league):
     """Write stuffScore into BOTH leaderboards.
 
@@ -677,6 +738,11 @@ def inject(agg, overall, league):
             row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt])
         else:
             row['stuffScore_pctl'] = None
+    n_ps_pl = _inject_pitching(
+        pl, key_of=lambda r: r['pitchType'],
+        qualifies=lambda r: ((r.get('count') or 0) >= 25
+                             and r.get('team') not in AAA_TEAMS
+                             and not _is_combined_team(r['team'])))
     json.dump(pl, open(pl_path, 'w'))
 
     # ── overall -> pitcher_leaderboard ──
@@ -717,9 +783,16 @@ def inject(agg, overall, league):
             row['stuffScore_pctl'] = _pctl(sc, qpool)
         else:
             row['stuffScore_pctl'] = None
+    n_ps_pp = _inject_pitching(
+        pp, key_of=lambda r: 'ALL',
+        qualifies=lambda r: ((r.get('count') or 0) >= 25
+                             and r.get('team') not in AAA_TEAMS
+                             and not _is_combined_team(r['team'])))
     json.dump(pp, open(pp_path, 'w'))
     print(f'  injected stuffScore: pitch-level {n_pl}/{len(pl)} rows, '
           f'pitcher-level {n_pp}/{len(pp)} rows (qualified pool = {len(qpool)})')
+    print(f'  injected pitchingScore: pitch-level {n_ps_pl}/{len(pl)} rows, '
+          f'pitcher-level {n_ps_pp}/{len(pp)} rows')
 
 if __name__ == '__main__':
     main()

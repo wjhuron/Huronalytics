@@ -168,6 +168,7 @@ var PlayerPage = {
     { key: 'nHAA', label: 'nHAA', format: function(v) { return v != null ? v.toFixed(2) + '\u00B0' : '—'; } },
     { key: 'stuffScore', label: 'Stuff+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'locPlus', label: 'Loc+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'pitchingScore', label: 'Pitching+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
   ],
 
   STATS_COLS: [
