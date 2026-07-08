@@ -1655,6 +1655,12 @@ var PlayerPage = {
         } else {
           var val = row[col.key];
           td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+          // Pitching+ run-value companion on hover (this table has no custom
+          // tooltip layer like the leaderboard, so use a native title). toFixed
+          // keeps '-' on negatives, adds no '+' on positives (house rule).
+          if (col.key === 'pitchingScore' && row.pitchingRuns100 != null) {
+            td.title = parseFloat(row.pitchingRuns100).toFixed(2) + ' runs/100 vs avg';
+          }
         }
         tr.appendChild(td);
       }
