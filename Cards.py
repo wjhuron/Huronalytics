@@ -1246,10 +1246,14 @@ def render_card(config, pitches, output_file):
     ax_main.text(text_x, photo_top-0.85, f"{hand_code}  |  {config['team']}  |  Age: {config['age']}", fontsize=12, fontfamily='Avenir Next', color=TEXT_MUTED, va='top')
     ax_main.text(text_x, photo_top-1.5, config['game_date'], fontsize=24, fontfamily='DIN Condensed', color=ACCENT, va='top')
 
-    # Stat line — widened so the 5-cell strip spans the width of the bubble
-    # column beneath it (rather than a small lonely strip with dead space to
-    # its right now that K%/BB%/Zone%/Whiff%/GB% have moved to bubbles).
-    col_w = 1.25; cell_h = 0.46
+    # Stat line — season cards widen the 5-cell strip so it spans the bubble
+    # column beneath it. Single-game cards have no bubble column, so they use
+    # a much tighter column so the (now 8-cell) strip doesn't run too wide.
+    is_season_strip = bool(config.get('mvn_models'))
+    col_w = 1.25 if is_season_strip else 0.72
+    cell_h = 0.46
+    hdr_fs = 11 if is_season_strip else 10
+    val_fs = 14 if is_season_strip else 13
     stat_y_header = photo_bottom - 0.5; stat_y_value = stat_y_header - cell_h
     pitcher_la = config.get('pitcher_league_avgs', {})
     for i in range(len(config['stat_headers'])):
@@ -1257,7 +1261,7 @@ def render_card(config, pitches, output_file):
         hdr = config['stat_headers'][i]
         val_str = config['stat_values'][i]
         ax_main.add_patch(Rectangle((x, stat_y_header), col_w, cell_h, facecolor=DARKER, edgecolor=SUBTLE_BORDER, linewidth=0.8))
-        ax_main.text(x+col_w/2, stat_y_header+cell_h/2, hdr, fontsize=11, ha='center', va='center', color=TEXT_SECONDARY, fontweight='bold', fontfamily='Avenir Next')
+        ax_main.text(x+col_w/2, stat_y_header+cell_h/2, hdr, fontsize=hdr_fs, ha='center', va='center', color=TEXT_SECONDARY, fontweight='bold', fontfamily='Avenir Next')
         # Determine cell color — blue→red percentile hue (matches the bubbles).
         cell_bg = DARK_CELL
         sl_cfg = STAT_LINE_COLOR.get(hdr)
@@ -1271,7 +1275,7 @@ def render_card(config, pitches, output_file):
                 if tinted:
                     cell_bg = tinted
         ax_main.add_patch(Rectangle((x, stat_y_value), col_w, cell_h, facecolor=cell_bg, edgecolor=SUBTLE_BORDER, linewidth=0.8))
-        ax_main.text(x+col_w/2, stat_y_value+cell_h/2, val_str, fontsize=14, ha='center', va='center', color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
+        ax_main.text(x+col_w/2, stat_y_value+cell_h/2, val_str, fontsize=val_fs, ha='center', va='center', color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
     ax_main.add_patch(Rectangle((photo_left, stat_y_value), len(config['stat_headers'])*col_w, stat_y_header+cell_h-stat_y_value, fill=False, edgecolor=ACCENT, linewidth=2, zorder=5))
 
     # ── FB velo-by-start sparkline — season cards only, thin strip directly
@@ -2834,9 +2838,9 @@ def main():
             # PitchRV/xPitchRV in the metrics table; no need to duplicate it
             # in the box-score header.
             whiff_count = sum(1 for p in pitches if p.get('Description') == 'Swinging Strike')
-            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'Whiffs']
+            stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'K', 'BB', 'Whiffs']
             stat_values = [ip_str, str(pitch_count), str(box['tbf']), str(box['r']),
-                           str(box['er']), str(whiff_count)]
+                           str(box['er']), str(box['so']), str(box['bb']), str(whiff_count)]
 
         print(f"  Stat line: {' | '.join(f'{h}:{v}' for h,v in zip(stat_headers, stat_values))}")
 
