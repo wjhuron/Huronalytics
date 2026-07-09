@@ -2524,8 +2524,8 @@
     "fetched": "2026-07-08"
   },
   "671155": {
-    "position": null,
-    "fetched": "2026-07-01"
+    "position": "2B",
+    "fetched": "2026-07-09"
   },
   "642727": {
     "position": null,
@@ -2670,5 +2670,9 @@
   "687394": {
     "position": "3B",
     "fetched": "2026-07-08"
+  },
+  "702176": {
+    "position": "RF",
+    "fetched": "2026-07-09"
   }
 }
