@@ -1658,7 +1658,11 @@ class BaseballSavantFocusedDownloader:
 
     # Sport IDs for every level with a game log; the gameLog endpoint
     # defaults to sportId=1 (MLB + spring training), so minor league games
-    # must be requested level by level
+    # must be requested level by level.
+    # 22 covers College Baseball feeds (Cape Cod League, NCAA event games,
+    # draft combine); 51 covers international (USA Collegiate National Team).
+    # Only some college parks have Statcast tracking — untracked games are
+    # skipped by the empty-Velocity check like any untracked minors game.
     PLAYER_GAME_SPORT_IDS = {
         1: 'MLB',
         11: 'AAA',
@@ -1666,12 +1670,20 @@ class BaseballSavantFocusedDownloader:
         13: 'High-A',
         14: 'Single-A',
         16: 'Rookie',
+        22: 'College',
+        51: 'International',
     }
+
+    # Levels covered by the minor league Statcast Search (college and
+    # international games have live feed tracking but no Savant search rows,
+    # so they never trigger the minors supplement)
+    MINORS_SUPPLEMENT_SPORT_IDS = {11, 12, 13, 14, 16}
 
     def get_player_games(self, player_id, season, group):
         """
         Get all games a player appeared in for a season from their game logs,
-        across every level (MLB through Rookie ball).
+        across every level (MLB through Rookie ball, plus college and
+        international feeds where MLB tracks them).
 
         group: "pitching" or "hitting" — which game log to pull.
         Uses the same game types as team mode (spring training through World Series).
@@ -1757,7 +1769,7 @@ class BaseballSavantFocusedDownloader:
         seen = set()
         has_minors = False
         for date, game_pk, sport_id in sorted(set(entries)):
-            if sport_id != 1:
+            if sport_id in self.MINORS_SUPPLEMENT_SPORT_IDS:
                 has_minors = True
             if game_pk not in seen:
                 seen.add(game_pk)
@@ -1765,6 +1777,8 @@ class BaseballSavantFocusedDownloader:
 
         if not game_pks:
             print(f"No {season} games found for {player_name}")
+            print("Note: NCAA regular-season games are not in the MLB feed; college "
+                  "coverage is limited to Cape Cod League, Team USA, and special-event games.")
             return None
 
         print(f"Found {len(game_pks)} games for {player_name} in {season}")
