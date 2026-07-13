@@ -2867,43 +2867,50 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         _compute_hitter_lg_avg(stat)
     hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
-    # BB+ — composite batted-ball index indexed to 100 = league avg.
-    # 2026-07-02 redefinition: the spray component is now the LA-RESIDUALIZED
-    # sprayVal (zone wOBAcon minus LA-only league wOBAcon per BIP), expressed
-    # as sprayPlus = 100 × (lgXWOBAcon + sprayVal) / lgXWOBAcon. The old
-    # xwOBAsp+ shared its LA dimension with xwOBAcon (corr 0.44, double-
-    # counting); the residualized pair is near-orthogonal (corr 0.07).
-    #
-    # Weights derived PREDICTIVELY (scripts/derive_bbplus_weights.py:
-    # 2nd-half wOBA on standardized 1st-half components, 212 hitters).
-    # HONEST CAVEAT: in this half-season sample the spray beta was
-    # noise-level (~0, slightly negative); 0.15 is a prior-informed weight
-    # (public pull-air research: ~+.005 wOBA per pp above league; sprayVal
-    # split-half r=.33 at 40+ BIP/half says the trait is real) at the
-    # magnitude the sample allows. Re-derive with full-season + multi-season
-    # data before trusting it further; the old same-season wRC+ OLS that
-    # produced 58.5/41.5 structurally flattered the spray side and is retired.
-    BB_PLUS_W_CON = 0.85
-    BB_PLUS_W_SP  = 0.15
-    # Reliability floor: BB+ is the slowest-stabilizing of the three
-    # component "+" stats. Split-half study put the r=.50 (signal=noise)
-    # point at ~80 batted balls (modelled; the same n/(n+n0) model
-    # predicted CT+'s crossing exactly, validating the extrapolation).
-    # Below this, BB+ (and therefore Hitter+, which is 65% BB+) is more
-    # noise than signal, so we don't compute it at all. Mirrored in
-    # js/aggregator.js (the only place BB+ is recomputed client-side).
-    BB_PLUS_MIN_BIP = 80
+    # BB+ — batted-ball contact-quality index indexed to 100 = league avg.
+    # 2026-07-13 redefinition (multi-season derivation): BB+ is PURE
+    # xwOBAcon+. The 0.15 spray weight (prior-informed, 2026-07-02) was
+    # retired by the 2021-2025 season-pair test (scripts/
+    # derive_weights_multiseason.py, 1,181 hitter-pairs, year-N components →
+    # year-N+1 wOBA): sprayVal's univariate r was -0.03 and its ridge beta
+    # NEGATIVE; the pure-con BB+ beat the 85/15 mix in every leave-one-
+    # pair-out fold. sprayVal stays a display/scouting stat — it's a real
+    # trait (split-half r=.33), it just adds nothing to forecasting value
+    # once xwOBAcon is in the composite.
+    BB_PLUS_W_CON = 1.0
+    BB_PLUS_W_SP  = 0.0
+    # Reliability handling: Bayesian shrinkage toward league (100), matching
+    # the SD+/CT+ convention, replacing the old hard 80-BIP gate. n0 = 60:
+    # the same-protocol split-half study (scripts/bbplus_n0_cliff_test.py +
+    # n0_remeasure_ship.py, 2021-2026) put the implied n0 at 54-66 at EVERY
+    # sample size tested (59 consensus for the pure-con definition) — a
+    # near-perfect rel(n)=n/(n+n0) fit. Sub-80-BIP signal is real (50-79
+    # BIP band predicts next-season wOBA at r=+.33 vs +.38 for 80+), so
+    # shrink it, don't hide it. MIN_BIP=30 is a display floor only (below
+    # it a score is >2/3 prior — not worth a cell).
+    # Mirrored in js/aggregator.js via metadata bbPlusWeights/bbPlusShrinkN0
+    # (the only place BB+ is recomputed client-side).
+    BB_PLUS_SHRINK_N0 = 60
+    BB_PLUS_MIN_BIP = 30
     lg_xwobacon_bb = hitter_league_avgs.get('xwOBAcon')
     for row in hitter_leaderboard:
         xc = row.get('xwOBAcon')
         sv = row.get('sprayVal')
-        if (xc is not None and sv is not None and lg_xwobacon_bb
-                and (row.get('nBip') or 0) >= BB_PLUS_MIN_BIP):
+        n_bip = row.get('nBip') or 0
+        sp_ok = (BB_PLUS_W_SP == 0.0 or sv is not None)
+        if (xc is not None and sp_ok and lg_xwobacon_bb
+                and n_bip >= BB_PLUS_MIN_BIP):
             con_plus = 100.0 * xc / lg_xwobacon_bb
             # sprayPlus: the residual re-expressed on the xwOBAcon scale so
             # the ratio-to-100 convention holds (100 + 100·resid/lg).
-            sp_plus = 100.0 * (lg_xwobacon_bb + sv) / lg_xwobacon_bb
-            row['bbPlus'] = round(BB_PLUS_W_CON * con_plus + BB_PLUS_W_SP * sp_plus, 1)
+            # Weight is 0.0 as of 2026-07-13; term kept so the metadata
+            # weight contract (and the JS mirror) stays general.
+            sp_plus = (100.0 * (lg_xwobacon_bb + sv) / lg_xwobacon_bb
+                       if sv is not None else 100.0)
+            raw = BB_PLUS_W_CON * con_plus + BB_PLUS_W_SP * sp_plus
+            row['bbPlus'] = round(
+                (n_bip * raw + BB_PLUS_SHRINK_N0 * 100.0)
+                / (n_bip + BB_PLUS_SHRINK_N0), 1)
         else:
             row['bbPlus'] = None
     hitter_league_avgs['bbPlus'] = 100.0
@@ -2992,26 +2999,24 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     print(f"  Team games played: {dict(sorted(team_games_played.items()))}")
 
     # Hitter+ — composite of BB+ (contact quality), SD+ (decision quality),
-    # CT+ (contact frequency). Weights derived from OLS regression of wRC+ on
-    # z-standardized metrics against the 3.1 × TGP qualified sample: normalized
-    # coefficients come out at ~65/7/28. The ×40 SCALE targets a wRC+-like
-    # spread, but realized SD is meaningfully BELOW 40 because the component
-    # z's are imperfectly correlated (Var(w·z) = w'Σw < 1). Weights are
-    # same-season in-sample OLS — treat as provisional pending out-of-sample
-    # re-derivation (planned alongside the xwOBAsp residualization).
-    # Weights (2026-07-02): prior-informed 70/15/15, replacing the retired
-    # same-season wRC+ OLS's 65/7/28. The out-of-sample derivation
-    # (scripts/derive_hitterplus_weights.py: 1st-half components → 2nd-half
-    # wOBA, 209 hitters) found only BB+ carries detectable prediction
-    # (r=+0.25); the SD+ beta was noise-NEGATIVE and CT+ shrank to ~0 under
-    # ridge — half a season cannot price the two smaller skills, and the old
-    # 7% SD+ was a collinearity artifact of the flawed method. 70/15/15
-    # encodes: contact quality dominates outcomes; decision quality and
-    # contact execution are real, orthogonalized process skills at equal
-    # modest weights. Re-derive with multi-season data.
-    HITTER_PLUS_W_BB = 0.70
-    HITTER_PLUS_W_SD = 0.15
-    HITTER_PLUS_W_CT = 0.15
+    # CT+ (contact frequency), combined on z-scores of the qualified pool.
+    # Weights (2026-07-13): 52/17/31, derived MULTI-SEASON out of sample
+    # (scripts/derive_weights_multiseason.py + derive_weights_lopo2.py:
+    # full-season year-N components → year-N+1 wOBA, pairs 2021→22 …
+    # 2024→25, 1,181 hitter-pairs, components z-scored within pair). The
+    # betas are stable in every pair (bb .51-.54, sd .11-.20, ct .27-.38)
+    # and leave-one-pair-out prediction improves from r=.450 (the old
+    # prior-informed 70/15/15) to r=.497. CT+ is a SUPPRESSOR: corr -0.52
+    # with BB+ (damage swings whiff more), so its univariate r is ~0 while
+    # its partial weight is large — do not "sanity check" it univariately.
+    # The plateau is flat across 50-55/15-20/30, so small perturbations are
+    # style, not signal. (History: 65/7/28 same-season wRC+ OLS retired
+    # 2026-07-02 — collinearity artifact; 70/15/15 prior retired 2026-07-13
+    # by the derivation above. The half-season derivation couldn't price
+    # SD+/CT+ at n=209; four full season pairs can.)
+    HITTER_PLUS_W_BB = 0.52
+    HITTER_PLUS_W_SD = 0.17
+    HITTER_PLUS_W_CT = 0.31
     HITTER_PLUS_TARGET_SD = 40  # realized SD of Hitter+ over the qualified
                                 # pool — enforced exactly below (the old
                                 # fixed ×40 multiplier produced SD well
@@ -3181,10 +3186,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         'locPlusWeights': loc_weights,
         'hitterPlusStandardization': hitter_plus_standardization,
         'plusReanchor': plus_reanchor,
-        # BB+ component weights — single source of truth, read by
+        # BB+ component weights + shrinkage — single source of truth, read by
         # js/aggregator.js so the client recompute can never drift from the
         # server again (the 0.6/0.4 → 0.585/0.415 desync shipped for months).
         'bbPlusWeights': {'con': BB_PLUS_W_CON, 'sp': BB_PLUS_W_SP},
+        'bbPlusShrinkN0': BB_PLUS_SHRINK_N0,
+        'bbPlusMinBip': BB_PLUS_MIN_BIP,
         # Tier 2: 3D xwOBA table used to fill ROC BIP xwOBA (no Savant
         # per-pitch xwOBA available for AAA). For transparency / audit.
         'xwOBA3DTable': (__import__('pipeline_xwoba3d').serialize_table(_xw3d_smoothed_table)

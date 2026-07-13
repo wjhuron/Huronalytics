@@ -2275,32 +2275,41 @@ const Aggregator = {
         xwOBAcon: xwOBAcon_count > 0 ? xwOBAcon_sum / xwOBAcon_count : null,
       };
 
-      // BB+ composite: weighted xwOBAcon+ / sprayPlus, indexed so 100 =
-      // league avg. sprayPlus = 100 + 100·sprayVal/lgXWOBAcon (the
-      // LA-residualized placement skill re-expressed on the xwOBAcon
-      // scale). Weights come from metadata.bbPlusWeights (single source of
+      // BB+ (2026-07-13 definition): weighted xwOBAcon+ / sprayPlus indexed
+      // so 100 = league avg, then Bayesian-regressed toward 100 by sample
+      // size. The shipped weights are pure-con (con 1.0 / sp 0.0 — the
+      // multi-season derivation retired the spray term), but the formula
+      // stays general. Weights AND shrinkage n0 come from metadata
+      // (bbPlusWeights / bbPlusShrinkN0 / bbPlusMinBip — single source of
       // truth, set in process_data.py) so this recompute can never drift
       // from the server definition again.
       const hLgAvgs = (DataStore && DataStore.metadata && DataStore.metadata.hitterLeagueAverages) || {};
       const lgXC = hLgAvgs.xwOBAcon;
-      // Reliability floor: BB+ is majority noise below ~80 batted balls
-      // (split-half r=.50 point). Keep in sync with BB_PLUS_MIN_BIP in
-      // process_data.py. Matters most here because date/hand filters
-      // shrink the sample. (Hitter+ is pass-through season value, not
-      // recomputed client-side, so it's gated server-side instead.)
-      var BB_PLUS_MIN_BIP = 80;
+      // Reliability handling: shrink toward 100 with n0 pseudo-BIPs
+      // (measured r=.50 crossing, 2021-2026 study), display-floored at
+      // bbPlusMinBip (below it a score is >2/3 prior). Matters most here
+      // because date/hand filters shrink the sample — a filtered 40-BIP
+      // slice now shows a heavily regressed value instead of a blank.
+      // (Hitter+ is pass-through season value, not recomputed client-side,
+      // so it's gated server-side instead.)
       const bbW = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusWeights) || null;
-      if (obj.xwOBAcon != null && obj.sprayVal != null && lgXC && bbW &&
-          (obj.nBip || 0) >= BB_PLUS_MIN_BIP) {
+      const bbN0 = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusShrinkN0) || 60;
+      const bbMinBip = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusMinBip) || 30;
+      const nBipBB = obj.nBip || 0;
+      const spOk = bbW && (bbW.sp === 0 || obj.sprayVal != null);
+      if (obj.xwOBAcon != null && spOk && lgXC && bbW && nBipBB >= bbMinBip) {
         const conPlus = 100 * obj.xwOBAcon / lgXC;
-        const spPlus = 100 * (lgXC + obj.sprayVal) / lgXC;
+        const spPlus = obj.sprayVal != null ? 100 * (lgXC + obj.sprayVal) / lgXC : 100;
+        const rawBB = bbW.con * conPlus + bbW.sp * spPlus;
+        // Shrink BEFORE the re-anchor, mirroring the server order.
+        const shrunkBB = (nBipBB * rawBB + bbN0 * 100) / (nBipBB + bbN0);
         // Mirror the server's re-anchor (all-MLB PA-weighted mean = 100).
         // sd/ct/hitterPlus are pass-through; bbPlus is the only "+"
         // recomputed client-side, so it must apply the same factor.
         const bbReAnchor = (DataStore && DataStore.metadata &&
                             DataStore.metadata.plusReanchor &&
                             DataStore.metadata.plusReanchor.bbPlus) || 1;
-        obj.bbPlus = Math.round((bbW.con * conPlus + bbW.sp * spPlus) * bbReAnchor * 10) / 10;
+        obj.bbPlus = Math.round(shrunkBB * bbReAnchor * 10) / 10;
       } else {
         obj.bbPlus = null;
       }

@@ -177,7 +177,7 @@ const COLUMNS = {
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
     { key: 'xwOBAsp',    label: 'xwOBAsp',  format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA spray-adjusted — avg zone wOBA by LA × spray direction', group: 'expected' },
     { key: 'sprayVal',   label: 'SprayVal', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Placement skill (wOBA pts): zone wOBAcon minus LA-only league wOBAcon per BIP — where the ball goes given how high it\'s hit (mostly pull-air). The Paredes-style xwOBA-beater signal', group: 'expected' },
-    { key: 'bbPlus',     label: 'BB+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Batted-ball composite: 85% xwOBAcon+ + 15% SprayVal+ (LA-residualized placement), indexed so 100 = league avg', group: 'expected' },
+    { key: 'bbPlus',     label: 'BB+',      format: Utils.formatInt, sortType: 'numeric', desc: 'Batted-ball contact quality: xwOBAcon indexed so 100 = league avg, regressed to league by sample (n0=60 BIP)', group: 'expected' },
     // Composition
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'composition' },
     { key: 'ldPct',       label: 'LD%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Line drive rate', group: 'composition' },
