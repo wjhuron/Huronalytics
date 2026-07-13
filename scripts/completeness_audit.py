@@ -6,22 +6,22 @@ accounted for:
 
   1. No-pitch intentional walks — since 2017 an automatic IBB contains no
      pitches, so it can never appear in pitch-level data (~290/season).
-  2. Position-player pitching — every pitch of an EP appearance IS in the
-     Sheets, but process_data.py deliberately drops them before the cache /
-     all stat computation ("EP must not contribute to ANY count anywhere").
-     This audit therefore reads the Sheets-mirroring cache BEFORE that filter
-     would apply — i.e., it must run against raw sheet reads, not
-     all_pitches_rs_cache.pkl.
+  2. Position-player pitching — historical only: through 2026-07-13 the
+     pipeline dropped every EP-appearance pitch before the cache, so cache
+     audits under-counted (~437 PAs). Policy changed the same day: EP PAs now
+     stay in the cache and count in hitter/league data (position players are
+     excluded from pitcher-facing views instead), so --cache audits should
+     now pass too.
 
 HISTORY (2026-07-13): a first version of this audit compared boxscores to
-all_pitches_rs_cache.pkl (post-EP-filter) and wrongly concluded 80 games
-were missing 437 PAs; every one of them was an EP-appearance PA that the
-pipeline drops on purpose. The Sheets were complete. Lesson encoded here:
-audit the SHEETS, not the cache.
+all_pitches_rs_cache.pkl (then post-EP-filter) and wrongly concluded 80
+games were missing 437 PAs; every one was an EP-appearance PA the pipeline
+dropped on purpose. The Sheets were complete. Sheets remain the
+ground-truth source for this audit; --cache additionally validates that the
+pipeline's read/keep path loses nothing.
 
 Usage: python3 scripts/completeness_audit.py            # reads sheets (slow, ~4 min)
-       python3 scripts/completeness_audit.py --cache    # fast, but EP PAs will
-                                                        # show as "missing" by design
+       python3 scripts/completeness_audit.py --cache    # fast; validates the pipeline kept everything
 """
 import os, sys, json, argparse, pickle
 from collections import defaultdict
@@ -93,7 +93,7 @@ def main():
         return
     flagged.sort(key=lambda t: -t[2])
     print(f"{len(flagged)} game(s) with unexplained missing PAs "
-          f"(source: {'cache — NOTE: EP PAs show as missing by design' if args.cache else 'sheets'}):")
+          f"(source: {'cache' if args.cache else 'sheets'}):")
     print(f"{'gamePk':>8s}  {'date':10s}  {'teams':11s}  {'missing':>7s}  note")
     for gid, b, miss, note in flagged:
         print(f"{gid:8d}  {b['date']}  {b['teams']:11s}  {miss:7d}  {note}")

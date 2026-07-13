@@ -71,8 +71,13 @@ def _bip_woba_value(event):
     return 0.0
 
 
-def generate_micro_data(all_pitches, mlb_id_cache=None):
+def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
     """Generate micro-aggregate data for client-side date and opponent-hand filtering.
+
+    ep_pitchers: set of (Pitcher, PTeam) position-player appearances. Their
+    pitches are EXCLUDED from pitcher micro rows (so no client-side filter can
+    surface a position player as a pitcher) but INCLUDED in hitter micro rows
+    (all PAs count in hitter stats, matching official totals).
 
     Groups pitches by (person, date, opponent_hand) with summable counts.
     Returns a dict with compact arrays-of-arrays format for JSON serialization.
@@ -94,8 +99,9 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
     date_set = set()
     pitch_type_set = set()
 
+    ep_pitchers = ep_pitchers or set()
     for p in all_pitches:
-        if p.get('Pitcher'):
+        if p.get('Pitcher') and (p.get('Pitcher'), p.get('PTeam')) not in ep_pitchers:
             pitcher_set.add(p['Pitcher'])
         if p.get('PTeam') and p['PTeam'] in ALL_TEAMS:
             team_set.add(p['PTeam'])
@@ -148,6 +154,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
 
         if not pitcher or not team or team not in ALL_TEAMS:
             continue
+        if (pitcher, team) in ep_pitchers:
+            continue  # position players never get pitcher micro rows
         if p.get('_roc_hitter_pitch'):
             continue  # Skip AAA pitchers facing ROC hitters
         if not date or not batter_hand:
@@ -266,6 +274,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
 
         if not pitcher or not team or team not in ALL_TEAMS or not pitch_type:
             continue
+        if (pitcher, team) in ep_pitchers:
+            continue  # position players never get pitcher micro rows
         if p.get('_roc_hitter_pitch'):
             continue  # Skip AAA pitchers facing ROC hitters
         if not date or not batter_hand:
@@ -367,6 +377,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
 
         if not pitcher or not team or team not in ALL_TEAMS:
             continue
+        if (pitcher, team) in ep_pitchers:
+            continue  # position players never get pitcher micro rows
         if p.get('_roc_hitter_pitch'):
             continue  # Skip AAA pitchers facing ROC hitters
         if not date or not batter_hand:
@@ -1015,6 +1027,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None):
 
         if not pitcher or not team or team not in ALL_TEAMS or not pitch_type:
             continue
+        if (pitcher, team) in ep_pitchers:
+            continue  # position players never get pitcher micro rows
         if p.get('_roc_hitter_pitch'):
             continue
         if not date or velo is None:
@@ -1171,26 +1185,28 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
             'hitter_swing_locations': {},
         }
 
-    # ─── Drop position-player pitching (EP / Eephus) at the source ───
+    # ─── Position-player pitching (EP / Eephus): count the PAs, hide the
+    #     "pitchers" (2026-07-13 policy change) ───
     # Wally tags EVERY pitch of a position player's blowout mop-up as EP, so an
-    # EP pitch marks a non-pitcher appearance (in practice these appearances are
-    # 100% EP). EP must not contribute to ANY count anywhere — team totals,
-    # micro-data used for client-side filtering, league averages, percentile
-    # pools, hitter pitch-quality metrics — and any pitcher who threw an EP pitch
-    # must never surface on a leaderboard under any filter. Removing every pitch
-    # by an EP pitcher here, before the pickle dump / reclassification / micro-
-    # data / all stat computation, makes that true globally and filter-proof: an
-    # EP pitcher ends up with zero micro rows, so no client-side filter can
-    # resurrect them. The per-leaderboard ep_pitchers guards further below are
-    # left in place as a now-redundant safety net.
-    ep_pitcher_ids = {(p.get('Pitcher'), p.get('PTeam'))
-                      for p in all_pitches if p.get('Pitch Type') == 'EP'}
-    if ep_pitcher_ids:
-        _before = len(all_pitches)
-        all_pitches = [p for p in all_pitches
-                       if (p.get('Pitcher'), p.get('PTeam')) not in ep_pitcher_ids]
-        print(f"  [{label}] Dropped {_before - len(all_pitches)} EP pitch(es) "
-              f"from {len(ep_pitcher_ids)} position-player pitching appearance(s)")
+    # EP pitch marks a non-pitcher appearance. Old policy dropped every EP pitch
+    # here at the source, which also erased those PAs from HITTER stats and the
+    # league pitch data — making pitch-derived aggregates disagree with official
+    # totals (~440 PAs/season, and hitters bat ~.406 in them, so the gap was
+    # hit-rich). New policy: ALL PAs count, matching official stats — EP pitches
+    # stay in the pitch data (hitter metrics, SD+/CT+/xwOBAsp tables, micro
+    # hitter records, league aggregates). Position players are excluded from
+    # everything PITCHER-facing instead: the ep_pitchers guards below keep them
+    # out of pitcher/pitch leaderboards, usage, details, and Loc+/Stuff+ scoring
+    # (both consume the guarded groups), and generate_micro_data skips their
+    # pitcher micro rows so no client-side filter can resurrect them.
+    _ep_ids = {(p.get('Pitcher'), p.get('PTeam'))
+               for p in all_pitches if p.get('Pitch Type') == 'EP'}
+    if _ep_ids:
+        _ep_ct = sum(1 for p in all_pitches
+                     if (p.get('Pitcher'), p.get('PTeam')) in _ep_ids)
+        print(f"  [{label}] Keeping {_ep_ct} pitch(es) from {len(_ep_ids)} "
+              f"position-player appearance(s) in hitter/league data "
+              f"(excluded from all pitcher-facing views)")
 
     # --- Recompute InZone from PlateX/PlateZ/SzTop/SzBot with ball-radius adjustment ---
     for p in all_pitches:
@@ -1375,8 +1391,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     print(f"  MLB ID cache: {len(mlb_id_cache)} entries ({new_lookups} new lookups)")
 
     # --- Exclude position players (anyone who threw EP/Eephus) ---
-    # Redundant safety net: EP pitches are already dropped at the top of this
-    # function, so this set is normally empty. Kept as defense-in-depth.
+    # PRIMARY guard (2026-07-13): EP pitches are no longer dropped globally —
+    # their PAs count in hitter/league data — so this set is what keeps
+    # position players out of every pitcher-facing view (leaderboards, usage,
+    # details, and Loc+/Stuff+ via the guarded groups).
     ep_pitchers = set()
     for p in all_pitches:
         if p.get('Pitch Type') == 'EP':
@@ -3200,7 +3218,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
 
     # --- Generate micro-aggregate data ---
     print(f"\n--- Generating micro-aggregate data ({label}) ---")
-    micro_data = generate_micro_data(all_pitches, mlb_id_cache=mlb_id_cache)
+    micro_data = generate_micro_data(all_pitches, mlb_id_cache=mlb_id_cache,
+                                     ep_pitchers=ep_pitchers)
     print(f"  micro_data: {len(micro_data['pitcherMicro'])} pitcher, "
           f"{len(micro_data['pitchMicro'])} pitch, "
           f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "

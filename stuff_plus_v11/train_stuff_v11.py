@@ -403,8 +403,15 @@ def main():
 
     print('loading pitches ...', flush=True)
     D = pickle.load(open(PKL, 'rb'))
-    pitches = [p for p in D if p.get('_source') == 'MLB']
-    roc_pitches = [p for p in D if p.get('_source') in ('ROC', 'AAA')]
+    # Position-player pitching stays in the cache as of 2026-07-13 (the PAs
+    # count in hitter/league data) but must not enter Stuff+ training, the
+    # standardization pools, or the support manifold — an EP pitch marks the
+    # whole appearance as a non-pitcher outing.
+    _ep = {(p.get('Pitcher'), p.get('PTeam')) for p in D if p.get('Pitch Type') == 'EP'}
+    pitches = [p for p in D if p.get('_source') == 'MLB'
+               and (p.get('Pitcher'), p.get('PTeam')) not in _ep]
+    roc_pitches = [p for p in D if p.get('_source') in ('ROC', 'AAA')
+                   and (p.get('Pitcher'), p.get('PTeam')) not in _ep]
     df = build_df(pitches)
     df = df[df['target_xrv'].notna()].reset_index(drop=True)
     print(f'  {len(df)} training pitches, {df.pitcher.nunique()} pitchers')
