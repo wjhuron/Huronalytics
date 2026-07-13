@@ -80,22 +80,27 @@ def cat_of(p):
     return 'BRK'
 
 # ── Hyperparameters ─────────────────────────────────────────────────────
-CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-obs
-HITTER_PRIOR_N = 250      # hitter → league regression pseudo-obs. Set to
-                          # the measured stabilization constant n0 (~233-283
-                          # decisions under the full 2026-07-02 config:
-                          # count-anchored BIP values, true Savant heart,
-                          # FB/BRK/OFF cells, mix-neutral aggregation), i.e.
-                          # the MMSE-optimal pseudo-count K=n0, matching
-                          # CT+'s convention. (The old 400 was tuned for
-                          # the pre-anchor config and over-shrank ~1.6x.)
-MIN_HITTER_DECISIONS = 250  # floor = split-half r=.50 point (signal=
-                            # noise). Re-measured 2026-07-02 on the full
-                            # config via scripts/phase2_sdplus_extensions.py
-                            # (n0 estimates 233 @high-n / 283 @low-n strata;
-                            # 250 is the midpoint). Leaderboard
-                            # qualification (3.1 × TGP) is a separate
-                            # stricter gate.
+CELL_SHRINK_K  = 200      # cell → zone shrinkage pseudo-obs. Raised from 50
+                          # on 2026-07-13: the k-sweep (scripts/
+                          # sdct_constant_sweeps.py + sdct_k_predictive.py,
+                          # 2021-2026) showed split-half reliability rising
+                          # monotonically with k (SD+ .655→.682 at 200) while
+                          # next-season prediction stayed dead flat — the
+                          # count-level cell detail beyond k=200 was noise
+                          # hitters were being scored against.
+HITTER_PRIOR_N = 200      # hitter → league regression pseudo-obs. Set to
+                          # the measured stabilization constant n0, i.e. the
+                          # MMSE-optimal pseudo-count K=n0, matching CT+'s
+                          # convention. Re-measured 2026-07-13 for the k=200
+                          # tables (scripts/n0_remeasure_ship.py, 2024-2026:
+                          # implied n0 193-212 at every N, consensus 198);
+                          # the old 250 was measured on k=50 tables —
+                          # heavier cell smoothing removes table noise, so
+                          # the hitter estimate stabilizes faster.
+MIN_HITTER_DECISIONS = 200  # floor = split-half r=.50 point (signal=
+                            # noise), = n0 by construction; moves with the
+                            # re-measure above. Leaderboard qualification
+                            # (3.1 × TGP) is a separate stricter gate.
 
 # MLB standard qualification: PA ≥ 3.1 × team games played.
 PA_PER_TEAM_GAME = 3.1
@@ -209,6 +214,20 @@ def rv_hitter_runexp(p):
     return -rv if rv is not None else None
 
 
+# Multi-season pooled count-anchor offsets (2021-2026 means, measured
+# 2026-07-13 via scripts/sdct_constant_sweeps.py Part C). The per-count
+# offsets are near-constants of baseball (cross-season spread ≤0.016 runs
+# for most counts, 0.045 worst case at 3-0), so when the in-season sample
+# fails min_n — early season only — this is strictly better information
+# than the old 0.0 fallback.
+FALLBACK_COUNT_OFFSETS = {
+    (0, 0): -0.002, (0, 1): +0.033, (0, 2): +0.095,
+    (1, 0): -0.038, (1, 1): +0.010, (1, 2): +0.073,
+    (2, 0): -0.102, (2, 1): -0.041, (2, 2): +0.035,
+    (3, 0): -0.157, (3, 1): -0.148, (3, 2): -0.056,
+}
+
+
 def build_bip_count_offsets(pitches, lg_woba, woba_scale, min_n=50):
     """Per-count additive offset that puts the BIP xwOBA-value branch in the
     same count-conditional delta-RE currency as takes/whiffs/fouls.
@@ -224,7 +243,10 @@ def build_bip_count_offsets(pitches, lg_woba, woba_scale, min_n=50):
     scripts/count_anchor_offsets.py. Because the offset is a count-level
     constant, within-count variation stays 100% xwOBA-driven (luck-neutral).
 
-    Counts with < min_n BIPs on either side fall back to 0.0 (neutral)."""
+    Counts with < min_n BIPs on either side fall back to the multi-season
+    pooled offset (FALLBACK_COUNT_OFFSETS) — the offsets are near-constants
+    across 2021-2026, so a pooled value beats the old 0.0 (neutral)
+    fallback whenever the in-season sample is thin (early season)."""
     if lg_woba is None or woba_scale in (None, 0):
         return {}
     acc = {}
@@ -241,7 +263,7 @@ def build_bip_count_offsets(pitches, lg_woba, woba_scale, min_n=50):
             a[0] += -re; a[1] += 1
         if xw is not None:
             a[2] += (xw - lg_woba) / woba_scale; a[3] += 1
-    offsets = {}
+    offsets = dict(FALLBACK_COUNT_OFFSETS)
     for c, (rs, rn, xs, xn) in acc.items():
         if rn >= min_n and xn >= min_n:
             offsets[c] = rs / rn - xs / xn

@@ -44,27 +44,29 @@ from pipeline_sdplus import (
 )
 
 # ── Hyperparameters ─────────────────────────────────────────────────────
-CELL_SHRINK_K  = 50       # cell → zone shrinkage pseudo-swings
-HITTER_PRIOR_N = 85       # hitter → league regression pseudo-swings.
-                          #   Set to the metric's stabilization constant
-                          #   n0 (~84 swings, measured via the split-half
-                          #   reliability study). For a shrinkage estimator
-                          #   adj=(n·obs+K·lg)/(n+K), the MMSE-optimal
-                          #   pseudo-count is exactly K=n0. The old K=400
-                          #   over-shrank ~4.7×, compressing ~55% of the
-                          #   real between-hitter spread (SD 3.7 vs a true
-                          #   ~6.5). Coherent with MIN_HITTER_SWINGS=85:
-                          #   at the display floor the estimate is 50/50
-                          #   own-data/league. Rank-preserving (ρ≈.999 vs
-                          #   K=400); the qualified-pool re-anchor still
-                          #   re-centers the median to 100 downstream.
-MIN_HITTER_SWINGS = 85    # computation floor = split-half r=.50 point
-                          #   (signal=noise). Measured directly via the
-                          #   reliability study (n0~84 swings; model
-                          #   prediction matched the measured crossing
-                          #   exactly). Below this CT+ is majority noise.
-                          #   Leaderboard qualification (3.1 × TGP) is a
-                          #   separate, stricter gate applied downstream.
+CELL_SHRINK_K  = 200      # cell → zone shrinkage pseudo-swings. Raised from
+                          #   50 on 2026-07-13 alongside SD+ (see
+                          #   pipeline_sdplus.CELL_SHRINK_K): the 2021-2026
+                          #   k-sweep showed reliability up (+.007 for CT+)
+                          #   with prediction flat.
+HITTER_PRIOR_N = 65       # hitter → league regression pseudo-swings.
+                          #   Set to the metric's stabilization constant n0.
+                          #   For a shrinkage estimator adj=(n·obs+K·lg)/(n+K),
+                          #   the MMSE-optimal pseudo-count is exactly K=n0.
+                          #   Re-measured 2026-07-13 for the k=200 tables
+                          #   (scripts/n0_remeasure_ship.py, 2024-2026:
+                          #   implied n0 62-67 at every N, consensus 64) —
+                          #   the old 85 was measured on k=50 tables; the
+                          #   smoother tables stabilize the hitter estimate
+                          #   faster. Coherent with MIN_HITTER_SWINGS: at
+                          #   the display floor the estimate is 50/50
+                          #   own-data/league. The qualified-pool re-anchor
+                          #   still re-centers the median to 100 downstream.
+MIN_HITTER_SWINGS = 65    # computation floor = split-half r=.50 point
+                          #   (signal=noise), = n0 by construction; moves
+                          #   with the re-measure above. Leaderboard
+                          #   qualification (3.1 × TGP) is a separate,
+                          #   stricter gate applied downstream.
 
 # ── Classification helpers ──────────────────────────────────────────────
 
