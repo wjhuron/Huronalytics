@@ -391,6 +391,14 @@ def compute_support(df, df_prior):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--inject', action='store_true', help='write stuffScore into the pitch leaderboard')
+    ap.add_argument('--score-only', action='store_true',
+                    help='score with the cached fold models from the saved bundle '
+                         '(no training, no prior pickles needed — seconds instead '
+                         'of ~30 min). Leakage-free because the OOF is pitcher-'
+                         'grouped: a fold model never saw its test pitchers\' 2026 '
+                         'data, so it can score their NEW pitches too; pitchers '
+                         'absent from every fold were never trained on at all. '
+                         'Run a full retrain periodically to refresh the models.')
     args = ap.parse_args()
 
     print('loading pitches ...', flush=True)
@@ -414,7 +422,16 @@ def main():
     # 0.274 -> 0.333, YoY-only model beats the 2026-only config outright.
     # 2025 targets use 2025 Guts constants (run environment differs).
     df_prior = None
-    if os.path.exists(PRIOR_PKL):
+    B = None
+    if args.score_only:
+        _bp = os.path.join(HERE, 'stuff_models_v11.pkl')
+        with open(_bp, 'rb') as f:
+            B = pickle.load(f)
+        if 'fold_models' not in B:
+            sys.exit('--score-only needs a bundle with fold models — run a full retrain first')
+        print(f'  score-only: using cached bundle ({len(B["fold_models"])} fold models, '
+              f'trained {B.get("trained_through", "unknown")})')
+    elif os.path.exists(PRIOR_PKL):
         global LG_WOBA, WOBA_SCALE
         _lg26, _sc26 = LG_WOBA, WOBA_SCALE
 
@@ -445,6 +462,8 @@ def main():
         print('  (no prior-season pickle found — training on current season only)')
 
     X = design(df); y = df['target_xrv'].values
+    if B is not None:
+        X = X.reindex(columns=B['features'], fill_value=0)
 
     # Production MLB scores are OUT-OF-FOLD (pitcher-grouped): a pitcher's own
     # 2026 outcomes never train the model that scores his pitches. In-sample
@@ -453,12 +472,17 @@ def main():
     # qualified units) — the shipped number must come from the validated path.
     groups = df['pitcher'].values
     def _oof_predict(Xd, feats=None, n_splits=8):
+        """Returns (-oof, fold_models, fold_pitchers). The fitted fold models
+        + their test-fold pitcher lists are saved in the bundle so
+        --score-only runs can reproduce leakage-free OOF scoring without
+        retraining (each model scores exactly the pitchers it never saw)."""
         oof = np.full(len(y), np.nan)
         pp = _params_for(Xd)
         Xp, yp = None, None
         if df_prior is not None:
             Xp = design(df_prior, feats or BASE_FEATS).reindex(columns=Xd.columns, fill_value=0)
             yp = df_prior['target_xrv'].values
+        fold_models, fold_pitchers = [], []
         for tr, te in GroupKFold(n_splits=n_splits).split(Xd, y, groups):
             if Xp is not None:
                 Xtr = pd.concat([Xd.iloc[tr], Xp], ignore_index=True)
@@ -466,19 +490,42 @@ def main():
             else:
                 Xtr, ytr = Xd.iloc[tr], y[tr]
             mm = xgb.XGBRegressor(**pp); mm.fit(Xtr, ytr); oof[te] = mm.predict(Xd.iloc[te])
-        return -oof
-    df['stuff_raw'] = _oof_predict(X)
+            fold_models.append(mm)
+            fold_pitchers.append(sorted(set(groups[te])))
+        return -oof, fold_models, fold_pitchers
 
-    # full-data model: kept in the bundle for scoring pitches outside the
-    # training set (ROC uses the no-arm companion; any future out-of-sample
-    # scoring uses this). It no longer scores MLB leaderboard rows.
-    if df_prior is not None:
-        X_all = pd.concat([X, design(df_prior).reindex(columns=X.columns, fill_value=0)],
-                          ignore_index=True)
-        y_all = np.concatenate([y, df_prior['target_xrv'].values])
+    def _cached_oof(Xd, models, fold_pitchers):
+        """Score with the bundle's fold models: each pitcher goes to the fold
+        that held him out (his data never trained that model); pitchers new
+        since the retrain default to fold 0 (they were in NO fold's training
+        set, so any fold model is leakage-free for them)."""
+        fold_of = {p: k for k, ps in enumerate(fold_pitchers) for p in ps}
+        pf = np.array([fold_of.get(p, 0) for p in groups])
+        out = np.full(len(Xd), np.nan)
+        for k, mm in enumerate(models):
+            mask = pf == k
+            if mask.any():
+                out[mask] = mm.predict(Xd[mask])
+        n_new = int((~np.isin(groups, list(fold_of))).sum())
+        if n_new:
+            print(f'  score-only: {n_new} pitches from pitchers newer than the '
+                  f'bundle (scored leakage-free by fold 0)')
+        return -out
+
+    if B is not None:
+        df['stuff_raw'] = _cached_oof(X, B['fold_models'], B['fold_pitchers'])
+        model = B['model']
     else:
-        X_all, y_all = X, y
-    model = xgb.XGBRegressor(**_params_for(X)); model.fit(X_all, y_all)
+        df['stuff_raw'], fold_models, fold_pitchers = _oof_predict(X)
+
+        # full-data model: kept in the bundle for scoring pitches outside the
+        # training set (ROC uses the no-arm companion; any future out-of-sample
+        # scoring uses this). It no longer scores MLB leaderboard rows.
+        X_all = pd.concat([X, design(df_prior).reindex(columns=X.columns, fill_value=0)],
+                          ignore_index=True) if df_prior is not None else X
+        y_all = (np.concatenate([y, df_prior['target_xrv'].values])
+                 if df_prior is not None else y)
+        model = xgb.XGBRegressor(**_params_for(X)); model.fit(X_all, y_all)
 
     # Standardize at the PITCHER level (proper "+"-stat spread: SD=10 between
     # pitchers, not between pitches — averaging pitch-level z-scores collapses
@@ -505,7 +552,19 @@ def main():
     agg, league = _standardize(['pitcher', 'team', 'pitch_type'], QUAL_N)
 
     # low-model-support flag per unit (see compute_support docstring)
-    sup = compute_support(df, df_prior)
+    if B is not None:
+        # Score-only: carry the flags forward from the last full retrain's CSV
+        # (recomputing needs the 3.5M-row training pool). Unit centroids move
+        # slowly, so days-stale flags are fine; new units default to unflagged
+        # until the next retrain measures them.
+        _csv = os.path.join(HERE, 'pitcher_stuff_v11.csv')
+        if os.path.exists(_csv):
+            sup = pd.read_csv(_csv)[['pitcher', 'team', 'pitch_type', 'support', 'low_support']]
+            sup = sup.drop_duplicates(['pitcher', 'team', 'pitch_type'])
+        else:
+            sup = pd.DataFrame(columns=['pitcher', 'team', 'pitch_type', 'support', 'low_support'])
+    else:
+        sup = compute_support(df, df_prior)
     agg = agg.merge(sup, on=['pitcher', 'team', 'pitch_type'], how='left')
     agg['low_support'] = agg['low_support'].fillna(False).astype(bool)
     agg.to_csv(os.path.join(HERE, 'pitcher_stuff_v11.csv'), index=False)
@@ -525,17 +584,24 @@ def main():
     # ── ROC/AAA: no-arm companion model, scored against the MLB baseline. This
     #    ONLY affects ROC; MLB above is untouched (keeps real arm angle). ──
     Xna = design(df, NOARM_FEATS)
-    if df_prior is not None:
-        Xna_all = pd.concat([Xna, design(df_prior, NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)],
-                            ignore_index=True)
-        yna_all = np.concatenate([y, df_prior['target_xrv'].values])
+    if B is not None:
+        Xna = Xna.reindex(columns=B['features_na'], fill_value=0)
+        model_na = B['model_na']
+        # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC
+        # scores are ranked against carry no in-sample luck inflation.
+        df['raw_na'] = _cached_oof(Xna, B['fold_models_na'], B['fold_pitchers'])
     else:
-        Xna_all, yna_all = Xna, y
-    model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna_all, yna_all)
-    # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
-    # are ranked against carry no in-sample luck inflation. ROC pitches are not
-    # in the training set, so model_na's predictions on ROC are truly OOS.
-    df['raw_na'] = _oof_predict(Xna, feats=NOARM_FEATS)
+        if df_prior is not None:
+            Xna_all = pd.concat([Xna, design(df_prior, NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)],
+                                ignore_index=True)
+            yna_all = np.concatenate([y, df_prior['target_xrv'].values])
+        else:
+            Xna_all, yna_all = Xna, y
+        model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna_all, yna_all)
+        # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
+        # are ranked against carry no in-sample luck inflation. ROC pitches are not
+        # in the training set, so model_na's predictions on ROC are truly OOS.
+        df['raw_na'], fold_models_na, _fp_na = _oof_predict(Xna, feats=NOARM_FEATS)
 
     def _na_scale(keys, qual_min):
         a = df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
@@ -578,12 +644,21 @@ def main():
         print(f'  ROC (no-arm, vs MLB baseline): {len(roc_agg)} pitch-type rows, '
               f'{len(roc_overall)} pitchers')
 
-    # save bundle
-    with open(os.path.join(HERE, 'stuff_models_v11.pkl'), 'wb') as f:
-        pickle.dump({'model': model, 'features': list(X.columns), 'base_feats': BASE_FEATS,
-                     'league': league, 'params': TUNED, 'version': 'v11',
-                     'model_na': model_na, 'noarm_feats': NOARM_FEATS,
-                     'na_pt_scale': na_pt, 'na_ov_scale': na_ov}, f)
+    # save bundle (retrain only — a score-only run must not overwrite the
+    # fold models it just loaded). fold_models/fold_pitchers power the
+    # --score-only path; the na fold split is identical to the main one
+    # (GroupKFold is deterministic for the same groups), so one
+    # fold_pitchers list serves both model sets.
+    if B is None:
+        with open(os.path.join(HERE, 'stuff_models_v11.pkl'), 'wb') as f:
+            pickle.dump({'model': model, 'features': list(X.columns), 'base_feats': BASE_FEATS,
+                         'league': league, 'params': TUNED, 'version': 'v11',
+                         'model_na': model_na, 'noarm_feats': NOARM_FEATS,
+                         'features_na': list(Xna.columns),
+                         'na_pt_scale': na_pt, 'na_ov_scale': na_ov,
+                         'fold_models': fold_models, 'fold_pitchers': fold_pitchers,
+                         'fold_models_na': fold_models_na,
+                         'trained_through': max((d for d in df['date'].dropna()), default='')}, f)
 
     # report + metric history (drift visibility: every retrain appends its
     # OOF descriptive r and split-half reliability to data/, which CI
