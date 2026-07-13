@@ -639,16 +639,33 @@ class BaseballSavantFocusedDownloader:
 
             data = response.json()
 
-            # Extract game PKs
+            # Extract game PKs — FINAL games only. Nothing previously
+            # enforced the "only pull finished games" workflow: the feed
+            # happily serves a partial allPlays for an in-progress game, and
+            # a truncated pull would never be revisited once its rows are in
+            # the Sheets. (The 2026-07-13 completeness audit found NO such
+            # truncations in practice — the sheets were complete — but the
+            # guard makes the intended workflow enforced rather than
+            # habitual.) Explicit --game-id mode is NOT filtered (live pulls
+            # there are a feature).
             game_pks = []
+            skipped = []
 
             if "dates" in data:
                 for date_data in data["dates"]:
                     if "games" in date_data:
                         for game in date_data["games"]:
-                            game_pks.append(game["gamePk"])
+                            state = (game.get("status", {}) or {}).get("abstractGameState", "")
+                            if state == "Final":
+                                game_pks.append(game["gamePk"])
+                            else:
+                                skipped.append((game["gamePk"], state or "Unknown"))
 
-            print(f"Found {len(game_pks)} games for {team_abbrev} in the specified date range.")
+            print(f"Found {len(game_pks)} FINAL games for {team_abbrev} in the specified date range.")
+            if skipped:
+                print(f"  SKIPPED {len(skipped)} non-final game(s) — re-run after they finish:")
+                for pk, st in skipped:
+                    print(f"    gamePk {pk} ({st})")
             return game_pks
 
         except Exception as e:

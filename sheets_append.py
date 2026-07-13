@@ -299,7 +299,24 @@ def push_team_data(df, team, gc=None, verbose=True):
     if n_cols > ws.col_count:
         ws.add_cols(n_cols - ws.col_count)
 
-    ws.update(range_name, rows, value_input_option='USER_ENTERED')
+    # Retry on write-quota 429s (60 writes/min/user): a single daily team
+    # push never trips this, but multi-team pushes (ROC splits, bulk
+    # backfills like 2026-07-13's 50-team recovery) can. Non-quota errors
+    # raise immediately.
+    import time as _time
+    import gspread as _gspread
+    for _attempt in range(4):
+        try:
+            ws.update(range_name, rows, value_input_option='USER_ENTERED')
+            break
+        except _gspread.exceptions.APIError as _e:
+            if '429' in str(_e) and _attempt < 3:
+                _wait = 70
+                print(f"  [sheets] write quota hit for {team}; waiting {_wait}s "
+                      f"(retry {_attempt + 1}/3)...")
+                _time.sleep(_wait)
+            else:
+                raise
 
     # Inherit per-column number formats from an existing data row so values
     # like Velocity 82.0 don't display as "82" (Automatic format strips

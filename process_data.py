@@ -3492,8 +3492,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # first pass above runs before the boxscore merge, so these are None on every
     # row at that point. Fill in anything still missing; leave the plus-metrics
     # (bbPlus/pdPlus/hitterPlus = 100) and already-computed avgs alone.
+    #
+    # wOBA is special-cased: pass 1 DID compute it (pitch-derived), but the
+    # boxscore merge then overwrites every player's displayed wOBA with the
+    # official-stats version — so without a recompute the League Avg row
+    # disagrees with the rows around it (shipped .3162 vs FG's .3169 on
+    # 2026-07-13; pitch data structurally misses no-pitch IBBs and any
+    # source-lagged PAs). Recompute it here from the merged official values.
     for stat in HITTER_STAT_KEYS:
-        if hitter_league_avgs.get(stat) is not None:
+        if stat != 'wOBA' and hitter_league_avgs.get(stat) is not None:
             continue
         _compute_hitter_lg_avg(stat)
 
