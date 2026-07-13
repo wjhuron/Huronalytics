@@ -467,12 +467,14 @@ def main():
     report_data = {}  # team -> list of {header, row_values, changes}
 
     for sheet_label, sheet_id in SPREADSHEET_IDS.items():
-        sh = gc.open_by_key(sheet_id)
+        # Metadata calls 503 sporadically too (open_by_key killed a CI
+        # leaderboard run on 2026-07-13) — same retry as reads/writes.
+        sh = _retry_sheets_call(lambda: gc.open_by_key(sheet_id), 'workbook open')
         print(f"\n{'='*60}")
         print(f"[{sheet_label}] {sh.title}")
         print(f"{'='*60}")
 
-        for i, ws in enumerate(sh.worksheets()):
+        for i, ws in enumerate(_retry_sheets_call(sh.worksheets, 'tab list')):
             tab_name = ws.title.upper()
 
             # Skip WBC and non-tracked tabs
