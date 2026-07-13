@@ -37,10 +37,10 @@ Pitch-type groups (validated by clustering value surfaces):
   FF | SI | FC | SL(+ST,SW,SV) | CU(+KC,CS) | CH(+FS) | OTHER
 
 Normalization: locPlus = 100 + 10·(mu - raw_adj)/sigma  (sign-flipped so
-higher = better). mu, sigma from qualified MLB pitchers; n_prior=117 overall,
-100 per pitch type (N_PRIOR_OVERALL / N_PRIOR_PT below — measured split-half
-r=0.5 crossings). ROC pitchers are scored against the MLB surfaces but
-excluded from the (mu, sigma) pool.
+higher = better). mu, sigma from qualified MLB pitchers; n_prior=135 overall,
+per-group dict per pitch type (N_PRIOR_OVERALL / N_PRIOR_PT below — measured
+split-half r=0.5 crossings, 10-seed re-measure 2026-07-13). ROC pitchers are
+scored against the MLB surfaces but excluded from the (mu, sigma) pool.
 """
 import math
 from collections import defaultdict
@@ -123,12 +123,18 @@ K_WHIFF, K_FOUL, K_XWCON = 8, 8, 200
 K_SWING_COLL, K_SWING_COUNT, K_CS = 6, 20, 10
 
 # Per-pitcher regression + normalization. n_prior values are the measured
-# split-half r=0.5 crossings (regression constant), averaged over 25 random
-# splits for stability: 117 pitches overall. Per-pitch-type rows use 100 (the
-# fastball family stabilizes ~75-80, breakers are noisier/unmeasurable this
-# season; 100 is the robust central value, and output is low-sensitivity here).
-N_PRIOR_OVERALL = 117
-N_PRIOR_PT = 100
+# split-half r=0.5 crossings (regression constant). Re-measured 2026-07-13
+# on the full season, 10 shuffle seeds (scripts/locplus_nprior_multiseed.py):
+# overall mean 135 (median 134, seed range 118-155) — the early-season 117
+# under-regressed. Per-group is now measurable (was "breakers unmeasurable"
+# in the April measurement); values are the 10-seed medians. FF/SL stabilize
+# fastest (~71-74), the cutter slowest (~117). OTHER is unmeasured → 100.
+# Output is low-sensitivity here, but each group should be regressed by its
+# own evidence rate.
+N_PRIOR_OVERALL = 135
+N_PRIOR_PT = {'FF': 71, 'SI': 85, 'FC': 117, 'SL': 74, 'CU': 95, 'CH': 104,
+              'OTHER': 100}
+N_PRIOR_PT_DEFAULT = 100
 LOC_SCALE_K = 10
 MIN_POOL_OVERALL = 250             # min pitches to enter the (mu,sigma) pool
 MIN_POOL_PT = 60                   # min pitches of a type to enter its group pool
@@ -510,7 +516,9 @@ def _normalize(raw, n_prior, min_pool, pool_filter):
 
 
 def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
-    """Per-pitch-type rows standardized within their pitch-type GROUP."""
+    """Per-pitch-type rows standardized within their pitch-type GROUP.
+    n_prior may be a scalar or a per-group dict (measured per-group
+    stabilization constants)."""
     if not raw:
         return raw
     combined_ids = {_pool_identity(k) for k in raw if _is_combined_team(k[1])}
@@ -518,6 +526,8 @@ def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
     for k, v in raw.items():
         by_group[group_fn(k)][k] = v
     for grp, rows in by_group.items():
+        grp_prior = (n_prior.get(grp, N_PRIOR_PT_DEFAULT)
+                     if isinstance(n_prior, dict) else n_prior)
         pool = {k: v for k, v in rows.items()
                 if _in_norm_pool(k, pool_filter, combined_ids) and v['n_pitches'] >= min_pool}
         if not pool:
@@ -527,7 +537,7 @@ def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
         lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
         for v in rows.values():
             n = v['n_pitches']
-            v['raw_loc_adj'] = (n * v['raw_loc'] + n_prior * lg_raw) / (n + n_prior)
+            v['raw_loc_adj'] = (n * v['raw_loc'] + grp_prior * lg_raw) / (n + grp_prior)
         pool_adj = [rows[k]['raw_loc_adj'] for k in pool]
         mu = sum(pool_adj) / len(pool_adj)
         sigma = math.sqrt(sum((x - mu) ** 2 for x in pool_adj) / len(pool_adj))
