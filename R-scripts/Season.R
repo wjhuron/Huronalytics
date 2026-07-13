@@ -5,7 +5,7 @@ output_directory <- "/Users/wallyhuron/Downloads/"
 # ---- Optional Filtering Parameters ----
 # Set these to NULL to disable filtering
 selected_pitcher_filter <- NULL  # Example format: "Bieber, Shane" 
-start_date_filter <- "2026-02-07"        # Example format: "2025-04-01"
+start_date_filter <- "2026-01-01"        # Example format: "2025-04-01"
 end_date_filter <- "2026-11-28"         # Example format: "2025-04-20"
 
 # ---- Required Libraries ----
