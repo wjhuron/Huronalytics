@@ -34,7 +34,7 @@ roughly doubles the run-prevention signal of the old 5-zone metric while
 becoming markedly more stuff-independent.
 
 Pitch-type groups (validated by clustering value surfaces):
-  FF | SI | FC | SL(+ST,SW,SV) | CU(+KC,CS) | CH(+FS) | OTHER
+  FF | SI | FC | SL(+ST,SW,SV) | CU(+KC,CS) | CH(+FS,KN,SC) | OTHER
 
 Normalization: locPlus = 100 + 10·(mu - raw_adj)/sigma  (sign-flipped so
 higher = better). mu, sigma from qualified MLB pitchers; n_prior=135 overall,
@@ -93,7 +93,11 @@ GROUP = {
     'FC': 'FC', 'CF': 'FC',
     'SL': 'SL', 'ST': 'SL', 'SW': 'SL', 'SV': 'SL',
     'CU': 'CU', 'KC': 'CU', 'CS': 'CU',
-    'CH': 'CH', 'FS': 'CH',
+    # KN/SC ride with offspeed (Wally, 2026-07-13): same speed band and
+    # location logic (below-zone chase, low-heart avoidance), and it gives
+    # the league's lone knuckleballer a real peer baseline instead of the
+    # degenerate one-pitcher OTHER group (which returned a flat 100).
+    'CH': 'CH', 'FS': 'CH', 'KN': 'CH', 'SC': 'CH',
 }
 GROUPS = ['FF', 'SI', 'FC', 'SL', 'CU', 'CH', 'OTHER']
 
