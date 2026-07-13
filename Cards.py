@@ -2475,10 +2475,10 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
 # ═══════════════════════════════════════════════════════════════
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team            = "KCR"
+    team            = "NEW"
     start_date      = None    # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
-    filter_pitchers = "Lugo, Seth"                 # Semicolon-separated "Last, First" names, or "" for all
+    filter_pitchers = ""                 # Semicolon-separated "Last, First" names, or "" for all
     game_pk         = ""                 # Optional game PK for live/in-progress games
     output_dir      = OUTPUT_DIR
 
