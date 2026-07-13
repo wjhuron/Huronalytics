@@ -2724,7 +2724,7 @@
 "elevationFt": 270.0,
 "factor": 1.01025,
 "rho": 1.18345,
-"tempF": 68.0,
+"tempF": 72.0,
 "venueId": 14
 },
 "822821": {
@@ -2820,7 +2820,7 @@
 "elevationFt": 270.0,
 "factor": 1.01025,
 "rho": 1.18345,
-"tempF": 68.0,
+"tempF": 72.0,
 "venueId": 14
 },
 "822833": {
@@ -2836,7 +2836,7 @@
 "elevationFt": 270.0,
 "factor": 1.01025,
 "rho": 1.18345,
-"tempF": 68.0,
+"tempF": 72.0,
 "venueId": 14
 },
 "822835": {
@@ -2988,7 +2988,7 @@
 "elevationFt": 545.0,
 "factor": 1.02088,
 "rho": 1.17171,
-"tempF": 74.0,
+"tempF": 72.0,
 "venueId": 5325
 },
 "822889": {
@@ -3004,7 +3004,7 @@
 "elevationFt": 545.0,
 "factor": 1.02088,
 "rho": 1.17171,
-"tempF": 74.0,
+"tempF": 72.0,
 "venueId": 5325
 },
 "822891": {
@@ -3076,7 +3076,7 @@
 "elevationFt": 545.0,
 "factor": 1.02088,
 "rho": 1.17171,
-"tempF": 74.0,
+"tempF": 72.0,
 "venueId": 5325
 },
 "822900": {
@@ -7388,7 +7388,7 @@
 "elevationFt": 597.0,
 "factor": 1.0229,
 "rho": 1.1695,
-"tempF": 64.0,
+"tempF": 72.0,
 "venueId": 32
 },
 "823796": {
@@ -7412,7 +7412,7 @@
 "elevationFt": 597.0,
 "factor": 1.0229,
 "rho": 1.1695,
-"tempF": 67.0,
+"tempF": 72.0,
 "venueId": 32
 },
 "823799": {
@@ -9188,7 +9188,7 @@
 "elevationFt": 45.0,
 "factor": 1.00166,
 "rho": 1.19312,
-"tempF": 73.0,
+"tempF": 72.0,
 "venueId": 2392
 },
 "824185": {
@@ -9300,7 +9300,7 @@
 "elevationFt": 45.0,
 "factor": 1.00166,
 "rho": 1.19312,
-"tempF": 73.0,
+"tempF": 72.0,
 "venueId": 2392
 },
 "824199": {
@@ -13324,7 +13324,7 @@
 "elevationFt": 1086.0,
 "factor": 1.04217,
 "rho": 1.1489,
-"tempF": 75.0,
+"tempF": 72.0,
 "venueId": 15
 },
 "825069": {
@@ -13364,7 +13364,7 @@
 "elevationFt": 1086.0,
 "factor": 1.04217,
 "rho": 1.1489,
-"tempF": 75.0,
+"tempF": 72.0,
 "venueId": 15
 },
 "825074": {

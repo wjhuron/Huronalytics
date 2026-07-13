@@ -45,7 +45,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-13 19:45",
+  "generatedAt": "2026-07-13 17:47",
   "totalPitches": 423358,
   "totalPitchers": 742,
   "totalHitters": 623,
@@ -391,7 +391,7 @@
   },
   "hitterLeagueAverages": {
     "babip": 0.2886,
-    "wOBA": 0.3162,
+    "wOBA": 0.317,
     "xBA": 0.2427,
     "xSLG": 0.3969,
     "xwOBA": 0.3173,
