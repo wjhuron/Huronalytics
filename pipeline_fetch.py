@@ -204,13 +204,15 @@ def fetch_park_factors(year=2026):
 
 # ── Google Sheets reading ────────────────────────────────────────────────
 
-def read_sheet_with_retry(ws, max_retries=5):
-    """Read a worksheet with retry logic for rate-limit (429) and transient
-    backend errors (500, 502, 503, 504). Backs off exponentially."""
+def sheets_call_with_retry(fn, max_retries=5):
+    """Run any gspread call with retry logic for rate-limit (429) and
+    transient backend errors (500, 502, 503, 504). Backs off exponentially.
+    Google returns sporadic 503s on metadata calls too (open_by_key killed a
+    CI run on 2026-07-13), so every Sheets round-trip goes through this."""
     transient_codes = ('429', '500', '502', '503', '504')
     for attempt in range(max_retries):
         try:
-            return ws.get_all_values()
+            return fn()
         except gspread.exceptions.APIError as e:
             msg = str(e)
             code = next((c for c in transient_codes if c in msg), None)
@@ -224,13 +226,19 @@ def read_sheet_with_retry(ws, max_retries=5):
                 raise
 
 
+def read_sheet_with_retry(ws, max_retries=5):
+    """Read a worksheet's values through the transient-error retry wrapper."""
+    return sheets_call_with_retry(ws.get_all_values, max_retries)
+
+
 def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
     """Read all pitches from a single Google Sheets spreadsheet. Returns a list of pitch dicts."""
     pitches = []
     extra_tabs = extra_tabs or set()
-    sh = gc.open_by_key(sheet_id)
-    print(f"  {sh.title} ({len(sh.worksheets())} tabs)")
-    for i, ws in enumerate(sh.worksheets()):
+    sh = sheets_call_with_retry(lambda: gc.open_by_key(sheet_id))
+    tabs = sheets_call_with_retry(sh.worksheets)
+    print(f"  {sh.title} ({len(tabs)} tabs)")
+    for i, ws in enumerate(tabs):
         tab_name = ws.title
         is_extra = tab_name in extra_tabs
         if tab_name not in MLB_TEAMS and not is_extra:
