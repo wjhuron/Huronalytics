@@ -2211,8 +2211,14 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Also computes per-pitch-type Loc+ for the Arsenal tab (each row in
     # pitch_leaderboard gets a Loc+ standardized within its pitch-type group).
     from pipeline_locplus import compute_loc_plus
+    # Loc+ is a PITCHER metric end to end, so position-player pitching is
+    # excluded from its league baseline surfaces too, not just from scoring
+    # (pitcher_groups/pitch_groups are already EP-guarded). EP pitches stay
+    # in hitter-side league tables (SD+/CT+/xwOBAsp) — those measure hitters.
+    _loc_baseline = [p for p in all_pitches
+                     if (p.get('Pitcher'), p.get('PTeam')) not in ep_pitchers]
     loc_results, pitch_loc_results, loc_weights = compute_loc_plus(
-        all_pitches, pitcher_groups, pitch_groups,
+        _loc_baseline, pitcher_groups, pitch_groups,
         lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
         woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
     )
