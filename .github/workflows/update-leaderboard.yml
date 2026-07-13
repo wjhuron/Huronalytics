@@ -53,6 +53,21 @@ jobs:
                  -in /tmp/p25.enc -out data/_pitches2025_training.pkl \
             || echo "prior-season asset unavailable — trainer will fall back"
 
+      - name: Fetch 2021-24 volume prior (plain release assets)
+        # Public-Statcast reconstructions (scripts/
+        # build_historical_training_set.py) — no retagged IP, so no
+        # encryption needed, unlike the 2025 set above. Adopted 2026-07-13
+        # (multi-season prior beat 2025-only on all three objectives; see
+        # train_stuff_v11.HIST_YEARS). Missing assets degrade gracefully —
+        # the trainer skips absent seasons.
+        run: |
+          for yr in 2021 2022 2023 2024; do
+            curl -sL -o /tmp/p${yr}.gz \
+              https://github.com/wjhuron/Huronalytics/releases/download/latest-data/_pitches${yr}_training.pkl.gz \
+              && gunzip -c /tmp/p${yr}.gz > data/_pitches${yr}_training.pkl \
+              || echo "${yr} asset unavailable — trainer will skip it"
+          done
+
       - name: Compute Stuff+ (train on fresh pickle, inject into leaderboards)
         # Retrain ONLY when the prior-season (2025) training pickle is present:
         # the model is now season-blocked multi-season (see train_stuff_v11.py),

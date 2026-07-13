@@ -63,6 +63,21 @@ FB_TYPES = {'FF', 'SI', 'FC'}
 PRIOR_PKL = os.path.join(DATA, '_pitches2025_training.pkl')
 PRIOR_LG_WOBA, PRIOR_WOBA_SCALE = 0.3131, 1.2317
 
+# 2021-24 volume prior (2026-07-13): public-Statcast reconstructions
+# (scripts/build_historical_training_set.py — public tags are fine, the
+# model is pitch-type agnostic so labels only feed the fastball anchor,
+# computed within-season). Adopted after scripts/multi_season_retrain.py
+# showed FULL_21_25 beats the 2025-only prior on all three objectives
+# (reliab .864→.870, pred .309→.310, desc .370→.375) and shrinks the
+# off-manifold region the low-support flag guards. Per-season FG Guts
+# center each season's BIP target in its own run environment.
+HIST_YEARS = (2021, 2022, 2023, 2024)
+HIST_PKL = os.path.join(DATA, '_pitches{year}_training.pkl')
+HIST_GUTS = {
+    2021: (0.314, 1.209), 2022: (0.310, 1.259),
+    2023: (0.318, 1.204), 2024: (0.310, 1.242),
+}
+
 
 def _harmonize_tags(prior, current):
     """Map prior-season tags to the pitcher's nearest current-season tag when
@@ -401,13 +416,31 @@ def main():
     df_prior = None
     if os.path.exists(PRIOR_PKL):
         global LG_WOBA, WOBA_SCALE
-        p25 = pickle.load(open(PRIOR_PKL, 'rb'))
         _lg26, _sc26 = LG_WOBA, WOBA_SCALE
-        LG_WOBA, WOBA_SCALE = PRIOR_LG_WOBA, PRIOR_WOBA_SCALE
-        df_prior = build_df(_harmonize_tags(p25, pitches))
-        LG_WOBA, WOBA_SCALE = _lg26, _sc26
-        df_prior = df_prior[df_prior['target_xrv'].notna()].reset_index(drop=True)
-        print(f'  + {len(df_prior)} prior-season (2025) training pitches')
+
+        def _build_with_guts(season_pitches, lg, sc):
+            global LG_WOBA, WOBA_SCALE
+            LG_WOBA, WOBA_SCALE = lg, sc
+            d = build_df(season_pitches)
+            LG_WOBA, WOBA_SCALE = _lg26, _sc26
+            return d[d['target_xrv'].notna()].reset_index(drop=True)
+
+        p25 = pickle.load(open(PRIOR_PKL, 'rb'))
+        prior_dfs = [_build_with_guts(_harmonize_tags(p25, pitches),
+                                      PRIOR_LG_WOBA, PRIOR_WOBA_SCALE)]
+        print(f'  + {len(prior_dfs[0])} prior-season (2025) training pitches')
+        # 2021-24 volume prior (see HIST_YEARS note above). No tag
+        # harmonization: public tags never enter the agnostic model.
+        for _yr in HIST_YEARS:
+            _pkl = HIST_PKL.format(year=_yr)
+            if not os.path.exists(_pkl):
+                print(f'  ({_yr} training pickle missing — skipped)')
+                continue
+            _d = _build_with_guts(pickle.load(open(_pkl, 'rb')), *HIST_GUTS[_yr])
+            prior_dfs.append(_d)
+            print(f'  + {len(_d)} prior-season ({_yr}) training pitches')
+        df_prior = pd.concat(prior_dfs, ignore_index=True)
+        print(f'  prior total: {len(df_prior)} pitches across {len(prior_dfs)} seasons')
     else:
         print('  (no prior-season pickle found — training on current season only)')
 
