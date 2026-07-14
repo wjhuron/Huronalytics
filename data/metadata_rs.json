@@ -46,7 +46,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-13 23:05",
+  "generatedAt": "2026-07-14 02:26",
   "totalPitches": 424545,
   "totalPitchers": 742,
   "totalHitters": 624,
@@ -6890,7 +6890,13 @@
       "ct": 0.31
     },
     "scale": 88.375,
-    "nQualified": 150
+    "nQualified": 150,
+    "wrcScaleMatch": {
+      "poolWrcSd": 23.664,
+      "poolHpSd": 39.998,
+      "factor": 0.5916,
+      "n": 150
+    }
   },
   "plusReanchor": {
     "bbPlus": 0.988444,
