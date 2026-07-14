@@ -148,7 +148,19 @@ def _harmonize_tags(prior, current):
 # when dropped) despite a small SHAP share.
 BASE_FEATS = ['velocity', 'ivb', 'hb', 'velo_diff', 'ivb_diff', 'hb_diff',
               'spin_rate', 'extension', 'arm_angle', 'vaa', 'vaa_diff',
-              'rel_x']
+              'rel_x', 'axis_dev', 'axis_dev_abs']
+# axis_dev/axis_dev_abs (2026-07-14): the seam-shifted-wake proxy — signed,
+# hand-normalized circular OTilt-RTilt deviation + its magnitude, per pitch
+# (Wally's tilt conventions; see _axis_dev_deg). ADOPTED after the
+# definitive 100%-coverage retest (scripts/axis_retest.py: pred .2942 ->
+# .2979, desc flat, reliab -.0011). NOTE the coverage lesson: the same
+# feature FAILED at 80% prior coverage (2025 season missing SpinAxis —
+# scripts/v12_round2_battery.py, pred -.003) because a whole-season feature
+# gap acts as an era marker; augment_2025_spinaxis.py closed the gap
+# (99.6% via strict game_pk-constrained fingerprint re-join). Never test a
+# feature with a season-shaped hole in it. The research loop called this
+# one: persistent xRVOE overperformers (Cruz FS, Lee/Hoffman SL) live at
+# extreme |axis_dev| in both directions.
 # Depth history: 4 -> 6 at the ~1.08M-row scale (2026-07-04,
 # scripts/stuff_hp_retune.py: pred 0.265 -> 0.298 within the -0.010
 # reliability guard); 6 -> 7 at the 3.5M-row 2021-25-prior scale
