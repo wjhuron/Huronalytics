@@ -1634,19 +1634,29 @@ def render_card(config, pitches, output_file):
     xrv_by_pt = {pt: d.get('xRunValue') for pt, d in pitch_lb.items()}
     xrv100_by_pt = {pt: d.get('xRv100') for pt, d in pitch_lb.items()}
     rv100_by_pt = {pt: d.get('rv100') for pt, d in pitch_lb.items()}
+    rv_by_pt = {pt: d.get('runValue') for pt, d in pitch_lb.items()}
+    # Leaderboard per-type xwOBAcon — fallback for ROC cards, whose sheet
+    # pitches carry no per-pitch xwOBA (the Tier-2 fill is pipeline-only).
+    xwc_by_pt = {pt: d.get('xwOBAcon') for pt, d in pitch_lb.items()}
     stuff_by_pt = {pt: d.get('stuffScore') for pt, d in pitch_lb.items()}
     # Low-model-support daggers (season cards only): the pitch sits far from
     # the Stuff+ model's training data (worst ~1.5% of units league-wide), so
     # its per-type Stuff+ is an extrapolation — marked with a superscript †.
     stuff_lowsup_by_pt = {pt: bool(d.get('stuffScore_lowSupport')) for pt, d in pitch_lb.items()}
     pitching_by_pt = {pt: d.get('pitchingScore') for pt, d in pitch_lb.items()}
-    # RV columns: season cards show the actual + expected per-100 pair (PitchRV/100
-    # + xPitchRV/100). PitchRV/100 is the real RunExp-based rate for MLB and the
-    # contact-wOBA proxy for ROC. Single-game keeps the cumulative xPitchRV.
+    # RV columns: season cards default to the actual + expected per-100 pair
+    # (PitchRV/100 + xPitchRV/100); --rv-mode totals swaps in the cumulative
+    # pair (PitchRV + xPitchRV), --rv-mode both shows all four. PitchRV is
+    # the real RunExp-based value for MLB and the contact-wOBA proxy for ROC.
+    # Single-game keeps the cumulative xPitchRV.
     if is_season:
-        rv_cols = ['PitchRV/100', 'xPitchRV/100']
+        rv_cols = {'per100': ['PitchRV/100', 'xPitchRV/100'],
+                   'totals': ['PitchRV', 'xPitchRV'],
+                   'both':   ['PitchRV', 'xPitchRV', 'PitchRV/100', 'xPitchRV/100'],
+                   }[config.get('rv_mode') or 'per100']
     else:
         rv_cols = ['xPitchRV']
+    _pt_qual_min = config.get('pitch_qual') or PITCH_QUAL_MIN
 
     # Sort pitch types by usage (descending), with PITCH_ORDER as tiebreaker
     pitch_counts = {}
@@ -1689,23 +1699,42 @@ def render_card(config, pitches, output_file):
             prv_100 = rv100_by_pt.get(pt)
         xrv_100 = (round(xrv_100, 1) + 0.0) if xrv_100 is not None else None
         prv_100 = (round(prv_100, 1) + 0.0) if prv_100 is not None else None
+        # Cumulative pair. Season cards: expected from the leaderboard's
+        # stored xRunValue (full precision, rounded once here); actual from
+        # the leaderboard runValue for MLB or the contact-proxy sum for ROC.
         # Single-game keeps the in-card cumulative xPitchRV.
-        xrv_cum = None
-        if not is_season:
+        prv_cum = None
+        if is_season:
+            xrv_cum = xrv_by_pt.get(pt)
+            xrv_cum = (round(xrv_cum, 1) + 0.0) if xrv_cum is not None else None
+            if is_milb:
+                _prv_c = _compute_pitch_rv(pp)
+                prv_cum = (round(sum(_prv_c), 1) + 0.0) if _prv_c else None
+            else:
+                prv_cum = rv_by_pt.get(pt)
+                prv_cum = (round(prv_cum, 1) + 0.0) if prv_cum is not None else None
+        else:
             rvs_x = _compute_pitch_xrv(pp)
             xrv_cum = (round(sum(rvs_x), 1) + 0.0) if rvs_x else None   # +0.0 kills -0.0
-        # Qualification gate: below the pitch-type minimum the per-100 RV is noise.
-        if n < PITCH_QUAL_MIN:
+        # Qualification gate: below the pitch-type minimum the RV cells are
+        # noise (rates especially, but totals blank too so cards read
+        # consistently). Single-game cumulative stays ungated as before.
+        if n < _pt_qual_min:
             prv_100 = xrv_100 = None
-        _rvmap = {'PitchRV': None, 'xPitchRV': xrv_cum,
+            if is_season:
+                prv_cum = xrv_cum = None
+        _rvmap = {'PitchRV': prv_cum, 'xPitchRV': xrv_cum,
                   'PitchRV/100': prv_100, 'xPitchRV/100': xrv_100}
         # Chase% — swings on out-of-zone pitches over OoZ pitches.
         oop_swings_n = sum(1 for p in pp if p.get('Description') in SWING_DESC and compute_iz(p) == False)
         oop_pitches_n = sum(1 for p in pp if compute_iz(p) == False)
         chase_pct = oop_swings_n / oop_pitches_n if oop_pitches_n else None
-        # xwOBAcon — average xwOBA on BIPs only.
+        # xwOBAcon — average xwOBA on BIPs only. ROC sheet pitches carry no
+        # per-pitch xwOBA, so fall back to the leaderboard's per-type value
+        # (pipeline-computed via the Tier-2 3D fill) so the column renders
+        # on ROC cards too.
         bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pp if p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt')) if v is not None]
-        xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else None
+        xwobacon = sum(bip_xw) / len(bip_xw) if bip_xw else xwc_by_pt.get(pt)
         pt_name='Fastball' if pt=='FF' else PITCH_NAMES.get(pt,pt)
         _nvaa = nvaa_by_pt.get(pt)
         _nhaa = nhaa_by_pt.get(pt)
@@ -1748,7 +1777,8 @@ def render_card(config, pitches, output_file):
     t_chase = t_oop_sw / t_oop_n if t_oop_n else None
     # xwOBAcon total — average xwOBA on BIPs.
     t_bip_xw = [v for v in (sf(p.get('xwOBA')) for p in pitches if p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt')) if v is not None]
-    t_xwobacon = sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw else None
+    t_xwobacon = (sum(t_bip_xw) / len(t_bip_xw) if t_bip_xw
+                  else (config.get('pctl_row') or {}).get('xwOBAcon'))
     # Pitcher-level Loc+ for the Total row (from the bubble's leaderboard row).
     _total_locplus = (config.get('pctl_row') or {}).get('locPlus')
     _total_stuff = (config.get('pctl_row') or {}).get('stuffScore')
@@ -1762,10 +1792,19 @@ def render_card(config, pitches, output_file):
         total_prv_100 = (round(sum(_tprv) / tc * 100, 1) + 0.0) if (_tprv and tc) else None
     else:
         total_prv_100 = (round(_pr['rv100'], 1) + 0.0) if _pr.get('rv100') is not None else None
-    total_xrv_cum = None
-    if not is_season:
+    total_prv_cum = None
+    if is_season:
+        total_xrv_cum = _pr.get('xRunValue')
+        total_xrv_cum = (round(total_xrv_cum, 1) + 0.0) if total_xrv_cum is not None else None
+        if is_milb:
+            _tprv_c = _compute_pitch_rv(pitches)
+            total_prv_cum = (round(sum(_tprv_c), 1) + 0.0) if _tprv_c else None
+        else:
+            total_prv_cum = _pr.get('runValue')
+            total_prv_cum = (round(total_prv_cum, 1) + 0.0) if total_prv_cum is not None else None
+    else:
         total_xrv_cum = (round(sum(t_rvs_x), 1) + 0.0) if t_rvs_x else None
-    _trvmap = {'PitchRV': None, 'xPitchRV': total_xrv_cum,
+    _trvmap = {'PitchRV': total_prv_cum, 'xPitchRV': total_xrv_cum,
                'PitchRV/100': total_prv_100, 'xPitchRV/100': total_xrv_100}
     total_row=['Total',str(tc),'100.0%','—','—','—','—','—','—','—',
         fmt_fi(sum(t_relzs)/len(t_relzs)) if t_relzs else '—',
@@ -1809,8 +1848,9 @@ def render_card(config, pitches, output_file):
     if not _have_xrv:
         for _h in ('PitchRV', 'xPitchRV', 'PitchRV/100', 'xPitchRV/100'):
             force_exclude.add(_h)
-    # If no xwOBA on any BIP, xwOBAcon column drops too.
-    has_xwoba_bip = any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt') for p in pitches)
+    # If no xwOBA on any BIP AND no leaderboard fallback, xwOBAcon drops.
+    has_xwoba_bip = (any(sf(p.get('xwOBA')) is not None and p.get('Description') == 'In Play' and not str(p.get('BBType', '')).startswith('bunt') for p in pitches)
+                     or any(v is not None for v in xwc_by_pt.values()))
     if not has_xwoba_bip: force_exclude.add('xwOBAcon')
     # Conditional RelZ/RelX: always exclude on season cards. On single-game cards,
     # exclude only when Arm Angle data exists (Arm Angle conveys the same release
@@ -2490,6 +2530,12 @@ def main():
     parser.add_argument('--pitchers', default=None, help='Semicolon-separated "Last, First" names')
     parser.add_argument('--game-pk', default=None, help='Game PK for live/in-progress games')
     parser.add_argument('--output-dir', default=None, help=f'Output directory (default: {OUTPUT_DIR})')
+    parser.add_argument('--rv-mode', default='per100', choices=['per100', 'totals', 'both'],
+                        help='Season-card RV columns: per-100 rates (default), cumulative '
+                             'totals (PitchRV/xPitchRV), or both pairs. Single-game cards '
+                             'always show cumulative xPitchRV.')
+    parser.add_argument('--pitch-qual', type=int, default=None,
+                        help=f'Min pitches for a pitch type\'s RV cells (default {PITCH_QUAL_MIN})')
     parser.add_argument('--tab', default=None,
                         help='Read pitches from this scratch tab in the NLE2026 '
                              'workbook (e.g. Sheet2) instead of a team tab. '
@@ -2503,6 +2549,8 @@ def main():
     if args.pitchers is not None: filter_pitchers = args.pitchers
     if args.game_pk is not None: game_pk = args.game_pk
     if args.output_dir is not None: output_dir = args.output_dir
+    rv_mode = args.rv_mode
+    pitch_qual = args.pitch_qual
 
     # Parse filter_pitchers string into list
     if filter_pitchers:
@@ -2616,7 +2664,8 @@ def main():
                         'nHAA': _r.get('nHAA'),
                         'velocity': _r.get('velocity'), 'velocity_pctl': _r.get('velocity_pctl'),
                         'xRunValue': _r.get('xRunValue'), 'xRv100': _r.get('xRv100'),
-                        'rv100': _r.get('rv100'),
+                        'rv100': _r.get('rv100'), 'runValue': _r.get('runValue'),
+                        'xwOBAcon': _r.get('xwOBAcon'),
                         'stuffScore': _r.get('stuffScore'), 'stuffScore_pctl': _r.get('stuffScore_pctl'),
                         'stuffScore_lowSupport': _r.get('stuffScore_lowSupport'),
                         'pitchingScore': _r.get('pitchingScore'),
@@ -2912,6 +2961,8 @@ def main():
                               else locplus_by_pitcher.get((pitcher_name, team), {})),
             'pitch_lb': (scratch_pitch_lb if (scratch_tab or not is_multi_game)
                          else pitch_lb_by_pitcher.get((pitcher_name, team), {})),
+            'rv_mode': rv_mode,
+            'pitch_qual': pitch_qual,
         }
 
         # Output file — DateSlug-LastFirst format
