@@ -46,7 +46,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-14 18:09",
+  "generatedAt": "2026-07-14 20:08",
   "totalPitches": 424545,
   "totalPitchers": 742,
   "totalHitters": 624,
@@ -442,10 +442,10 @@
     "sdPlus": 100.0,
     "ctPlus": 100.0,
     "hitterPlus": 100.0,
-    "avg": 0.2436,
-    "obp": 0.3186,
+    "avg": 0.2437,
+    "obp": 0.3187,
     "slg": 0.4023,
-    "ops": 0.7209,
+    "ops": 0.721,
     "iso": 0.1587,
     "kPct": 0.221,
     "bbPct": 0.0898,
@@ -8928,7 +8928,7 @@
       "n": 5
     }
   },
-  "sieraConstant": 6.1416,
+  "sieraConstant": 6.1427,
   "gutsConstants": {
     "lgWOBA": 0.3169,
     "wOBAScale": 1.2323,
