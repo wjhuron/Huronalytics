@@ -149,16 +149,15 @@ def _harmonize_tags(prior, current):
 BASE_FEATS = ['velocity', 'ivb', 'hb', 'velo_diff', 'ivb_diff', 'hb_diff',
               'spin_rate', 'extension', 'arm_angle', 'vaa', 'vaa_diff',
               'rel_x']
-# 2026-07-04 re-tune at the ~1.08M-row season-blocked scale (scripts/
-# stuff_hp_retune.py): max_depth 4 -> 6. Depth 4 was tuned at ~375k rows
-# (2026-only); with 2025 joining every fold, the deeper tree wins the 8-fold
-# production protocol outright: pred future xRV 0.265 -> 0.298, split-half
-# reliability 0.865 -> 0.857 (within the -0.010 guard), descriptive 0.339 ->
-# 0.368. Runner-up d6/n1400/lr.015/mcw40 (pred 0.296, rel 0.858) rejected on
-# stability bias — bigger config change, no gain. Recency weighting of the
-# 2025 rows tested in the same harness: w25 0.5/0.75 hurt (pred 0.282/0.289
-# at 4-fold vs 0.291), 1.25 tied 1.0 -> 2025 rows keep uniform weight 1.0.
-TUNED = dict(max_depth=6, n_estimators=800, learning_rate=0.025, min_child_weight=10,
+# Depth history: 4 -> 6 at the ~1.08M-row scale (2026-07-04,
+# scripts/stuff_hp_retune.py: pred 0.265 -> 0.298 within the -0.010
+# reliability guard); 6 -> 7 at the 3.5M-row 2021-25-prior scale
+# (2026-07-14, scripts/stuff_v12_battery.py + depth7_confirm.py: full-prior
+# 8-fold pred 0.2823 -> 0.2942, desc 0.3815 -> 0.3922, reliability
+# 0.8751 -> 0.8717 — well within guard; depth 8 decayed desc and was
+# rejected). Each 3-4x of training data has bought one level of depth.
+# Recency weighting of prior rows tested and rejected (uniform 1.0 stays).
+TUNED = dict(max_depth=7, n_estimators=800, learning_rate=0.025, min_child_weight=10,
              reg_lambda=1.5, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, tree_method='hist')
 MONO_FEAT = 'velocity'
 
