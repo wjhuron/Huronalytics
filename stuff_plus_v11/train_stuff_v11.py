@@ -183,6 +183,48 @@ def sf(x):
 # seasons and to daily/scratch cards. Extend as needed.
 FC_ANCHOR_PITCHERS = {'Jansen, Kenley', 'Maton, Phil', 'Spence, Mitch'}
 
+# ── axis deviation (SSW proxy) + spin efficiency helpers ──
+# OTilt-RTilt circular difference in degrees, per pitch, Wally's tilt
+# conventions (Pitcher2026.spin_axis_to_tilt / calculate_break_tilt):
+# RTilt hours = spin_axis/30 - 6; OTilt = atan2(HB_raw, IVB_raw) clockwise
+# from 12:00 with arm-side HB positive. Sheets carry RTilt/OTilt as "H:MM"
+# strings; augmented training pickles carry SpinAxis degrees + raw movement.
+def _tilt_min(val):
+    """Clock value -> minutes (0-719). Accepts 'H:MM' strings or numeric
+    minutes; None-safe."""
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val) % 720.0
+    if isinstance(val, str) and ':' in val:
+        try:
+            h, m = val.strip().split(':')[:2]
+            return (int(h) % 12) * 60.0 + int(m)
+        except (ValueError, IndexError):
+            return None
+    return None
+
+
+def _axis_dev_deg(p):
+    """Signed circular OTilt-RTilt in degrees, [-180, 180). NOT hand-signed
+    (caller applies the throws sign)."""
+    rt = _tilt_min(p.get('RTilt'))
+    if rt is None:
+        sa = sf(p.get('SpinAxis'))
+        rt = ((sa / 30.0 - 6.0) % 12.0) * 60.0 if sa is not None else None
+    ot = _tilt_min(p.get('OTilt'))
+    if ot is None:
+        ivb_r, hb_r = sf(p.get('IndVertBrk')), sf(p.get('HorzBrk'))
+        if ivb_r is not None and hb_r is not None and not (ivb_r == 0 and hb_r == 0):
+            ot = (math.degrees(math.atan2(hb_r, ivb_r)) % 360.0) * 2.0
+    if rt is None or ot is None:
+        return None
+    d = (ot - rt) % 720.0
+    if d >= 360.0:
+        d -= 720.0
+    return d * 0.5
+
+
 def build_df(pitches, prefer_true_fastball=True):
     # pass 1: per-pitcher primary fastball reference (handedness-normalized).
     # VAA gets its own count: a pitch missing VAA must not dilute the mean
@@ -276,6 +318,18 @@ def build_df(pitches, prefer_true_fastball=True):
             target = -re
         else:
             target = None
+        # v12 candidates (emitted always; BASE_FEATS decides what trains):
+        # axis_dev = hand-signed OTilt-RTilt circular deviation (SSW proxy),
+        # spin_eff = total raw break per kRPM (movement the spin doesn't
+        # "pay for" — seam effects / efficient spin).
+        _dev = _axis_dev_deg(p)
+        ivb_r = sf(p.get('IndVertBrk'))
+        hb_r = sf(p.get('HorzBrk'))
+        if ivb_r is None: ivb_r = iv
+        if hb_r is None: hb_r = hb_raw
+        spin_eff = (math.hypot(ivb_r, hb_r) / (spin / 1000.0)
+                    if (spin and spin > 0 and ivb_r is not None and hb_r is not None)
+                    else None)
         rows.append({
             'pitcher': p.get('Pitcher'), 'team': p.get('PTeam'), 'throws': thr,
             'date': p.get('Game Date'),
@@ -285,6 +339,9 @@ def build_df(pitches, prefer_true_fastball=True):
             'ivb_diff': ivb_diff, 'hb_diff': hb_diff, 'spin_rate': spin,
             'extension': ext, 'arm_angle': arm, 'rel_z': rel_z, 'rel_x': rel_x,
             'vaa': vaa, 'vaa_diff': vaa_diff, 'target_xrv': target,
+            'axis_dev': (_dev * s) if _dev is not None else None,
+            'axis_dev_abs': abs(_dev) if _dev is not None else None,
+            'spin_eff': spin_eff,
         })
     return pd.DataFrame(rows)
 
