@@ -3041,11 +3041,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     HITTER_PLUS_W_BB = 0.52
     HITTER_PLUS_W_SD = 0.17
     HITTER_PLUS_W_CT = 0.31
-    HITTER_PLUS_TARGET_SD = 40  # realized SD of Hitter+ over the qualified
-                                # pool — enforced exactly below (the old
-                                # fixed ×40 multiplier produced SD well
-                                # under 40 because Var(w·z) = w'Σw < 1 for
-                                # imperfectly correlated components)
+    HITTER_PLUS_TARGET_SD = 40  # interim/fallback scale. The final display
+                                # scale is set AFTER the FG override fills
+                                # wRC+: the wRC+ scale-match step re-scales
+                                # the qualified pool's SD to the pool's
+                                # measured wRC+ SD (~23 mid-season), so
+                                # Hitter+ reads in wRC+'s currency. This 40
+                                # only survives if wRC+ fails to populate.
 
     # Standardization uses the leaderboard-qualified hitter pool (ROC-aware:
     # 3.1 PA×TG for MLB, 2.7 for ROC). In practice ROC hitters have None
@@ -3528,6 +3530,48 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         if stat != 'wOBA' and hitter_league_avgs.get(stat) is not None:
             continue
         _compute_hitter_lg_avg(stat)
+
+    # ── Hitter+ → wRC+ scale match (2026-07-13) ──
+    # The composite's SD over the qualified pool is a free display parameter
+    # (the exact-SD rescale in the Hitter+ block above targets 40). Re-scale
+    # it here — after the FG override has populated wRC+ — to the SAME
+    # pool's measured wRC+ SD, so Hitter+ and wRC+ speak one currency and a
+    # gap between them reads directly as "process ahead of/behind results".
+    # Dynamic rather than hard-coded because wRC+'s spread shrinks as PAs
+    # accumulate (~23 mid-season, ~20 full-season); a fixed target drifts.
+    # Linear around 100: ranks, percentiles, and coloring are unchanged, and
+    # the PA-weighted mean stays pinned at 100 by the reanchor. If wRC+
+    # didn't populate (FG override failure), the SD-40 scale stands.
+    _pool_hp, _pool_wrc = [], []
+    for _row in hitter_leaderboard:
+        if _row.get('_isROC') or _row.get('_isCombined'):
+            continue
+        _team_g = team_games_played.get(_row.get('team'))
+        if _team_g is None and team_games_played:
+            _team_g = max(team_games_played.values())
+        if not _team_g or _row.get('pa', 0) < _hitter_pa_per_game(False) * _team_g:
+            continue
+        if _row.get('hitterPlus') is None or _row.get('wRCplus') is None:
+            continue
+        _pool_hp.append(_row['hitterPlus'])
+        _pool_wrc.append(_row['wRCplus'])
+    if len(_pool_hp) >= 10:
+        def _psd(vals):
+            m = sum(vals) / len(vals)
+            return math.sqrt(sum((x - m) ** 2 for x in vals) / len(vals))
+        _sd_hp, _sd_wrc = _psd(_pool_hp), _psd(_pool_wrc)
+        if _sd_hp > 1e-9 and _sd_wrc > 1e-9:
+            _f = _sd_wrc / _sd_hp
+            for _row in hitter_leaderboard:
+                if _row.get('hitterPlus') is not None:
+                    _row['hitterPlus'] = round(100.0 + (_row['hitterPlus'] - 100.0) * _f, 1)
+            hitter_plus_standardization['wrcScaleMatch'] = {
+                'poolWrcSd': round(_sd_wrc, 3), 'poolHpSd': round(_sd_hp, 3),
+                'factor': round(_f, 4), 'n': len(_pool_hp)}
+            print(f"  Hitter+ rescaled to the wRC+ spread (pool wRC+ SD {_sd_wrc:.1f}, "
+                  f"factor {_f:.3f}, n={len(_pool_hp)}).")
+    else:
+        print("  Hitter+ wRC+ scale match skipped (wRC+ pool too small) — SD-40 scale stands.")
 
     # Compute total ER and outs for league ERA (needed for SIERA constant calibration)
     # Use ALL MLB pitchers from boxscore data (including EP pitchers excluded from leaderboard)

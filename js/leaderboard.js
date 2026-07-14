@@ -141,7 +141,7 @@ const COLUMNS = {
     { key: 'xwOBAcon',    label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'expected' },
     { key: 'wRCplus',     label: 'wRC+',     format: Utils.formatInt, sortType: 'numeric', desc: 'Weighted runs created+ (100 = league avg, park-adjusted, from actual wOBA)', group: 'expected' },
     { key: 'xWRCplus',    label: 'xWRC+',    format: Utils.formatInt, sortType: 'numeric', desc: 'Expected wRC+ (derived from xwOBA, park-adjusted)', group: 'expected' },
-    { key: 'hitterPlus',  label: 'Hitter+',  format: Utils.formatInt, sortType: 'numeric', desc: 'Hitter composite: weighted blend of BB+ (contact quality), SD+ (swing decisions), CT+ (contact rate). 100 = league avg.', group: 'expected' },
+    { key: 'hitterPlus',  label: 'Hitter+',  format: Utils.formatInt, sortType: 'numeric', desc: 'Hitter composite: weighted blend of BB+ (contact quality), SD+ (swing decisions), CT+ (contact rate). 100 = league avg, scaled to wRC+\'s spread — a gap vs wRC+ reads as process ahead of/behind results.', group: 'expected' },
     // Counting
     { key: 'doubles',     label: '2B',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, noPercentile: true, group: 'counting' },
     { key: 'triples',     label: '3B',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
