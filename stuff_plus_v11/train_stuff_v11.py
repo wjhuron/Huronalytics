@@ -282,6 +282,7 @@ def build_df(pitches, prefer_true_fastball=True):
             'date': p.get('Game Date'),
             'pitch_type': pt, 'platoon_same': 1 if bats == thr else 0,
             'velocity': v, 'ivb': iv, 'hb': hb, 'velo_diff': velo_diff,
+            'pid': p.get('PitchID'),   # per-pitch join key (xRVOE loc join)
             'ivb_diff': ivb_diff, 'hb_diff': hb_diff, 'spin_rate': spin,
             'extension': ext, 'arm_angle': arm, 'rel_z': rel_z, 'rel_x': rel_x,
             'vaa': vaa, 'vaa_diff': vaa_diff, 'target_xrv': target,
@@ -707,7 +708,8 @@ def main():
     print(f'\n  saved bundle + pitcher_stuff_v11.csv to {HERE}')
 
     if args.inject:
-        inject(agg, overall, league)
+        xrvoe_pt, xrvoe_ov = compute_xrvoe(df, pitches)
+        inject(agg, overall, league, xrvoe_pt=xrvoe_pt, xrvoe_ov=xrvoe_ov)
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
@@ -831,7 +833,78 @@ def _inject_pitching(rows, key_of, qualifies):
                                   if (sc is not None and slope is not None) else None)
     return n
 
-def inject(agg, overall, league):
+# ── xRVOE: per-pitch outperformance vs the stuff+location expectation ──
+# Validated 2026-07-14 (scripts/xrvoe_feasibility.py + xrvoe_crossyear.py):
+# within-season split-half n0 ~250-300; cross-year persistence r=+0.41
+# pooled over 2021->2026 pairs (leave-two-years-out models); adding year-Y
+# xRVOE to the expectation lifts next-year actual-xRV prediction r from
+# .366 to .492. It is a durable pitch trait (deception / seam effects /
+# tunneling / framing — everything the stuff+loc models can't see).
+XRVOE_N0 = 275        # shrinkage pseudo-pitches toward 0 (measured n0)
+XRVOE_MIN_PT = 150    # display floor per pitch type (below: >2/3 prior)
+XRVOE_MIN_OV = 300    # display floor pitcher-level
+
+
+def compute_xrvoe(df, pitches):
+    """Per-unit xRVOE/100 (pitcher-positive) from the OOF stuff predictions
+    already in df['stuff_raw'] and per-pitch Loc ExpRV built here.
+    Stacking is fit PER PITCH GROUP (fixes the loc-correlation calibration
+    wrinkle found in feasibility). Returns (per_pitch_type, per_pitcher)
+    dicts: key -> {'v': shrunk xRVOE/100, 'n': pitches}."""
+    import pipeline_locplus as LOC
+    baseline = [p for p in pitches if LOC.is_eligible_baseline(p)]
+    S = LOC.build_surfaces(baseline, LG_WOBA, WOBA_SCALE)
+    exprv = {}
+    for p in baseline:
+        v = LOC.score_pitch(p, S)
+        if v is not None and p.get('PitchID'):
+            exprv[p['PitchID']] = v
+
+    d = df[['pid', 'pitcher', 'team', 'pitch_type', 'target_xrv', 'stuff_raw']].copy()
+    d['loc_exprv'] = d['pid'].map(exprv)
+    d = d[d['loc_exprv'].notna() & d['stuff_raw'].notna()]
+    d['stuff_hit'] = -d['stuff_raw']          # back to hitter perspective
+    d['grp'] = d['pitch_type'].map(LOC.group_of_code)
+
+    # global stacking as fallback, then per-group where the sample allows
+    def _stack(sub):
+        A = np.column_stack([np.ones(len(sub)), sub['stuff_hit'].values,
+                             sub['loc_exprv'].values])
+        beta, *_ = np.linalg.lstsq(A, sub['target_xrv'].values, rcond=None)
+        return beta, A
+    beta_g, _ = _stack(d)
+    d['expect'] = np.nan
+    for grp, sub in d.groupby('grp'):
+        beta = _stack(sub)[0] if len(sub) >= 5000 else beta_g
+        A = np.column_stack([np.ones(len(sub)), sub['stuff_hit'].values,
+                             sub['loc_exprv'].values])
+        d.loc[sub.index, 'expect'] = A @ beta
+    d['resid'] = d['target_xrv'] - d['expect']
+
+    # calibration report (unit level, n>=100): should be ~0 after per-group fit
+    gq = d.groupby(['pitcher', 'team', 'pitch_type']).agg(
+        resid=('resid', 'mean'), n=('resid', 'size'),
+        stuff=('stuff_hit', 'mean'), loc=('loc_exprv', 'mean'))
+    gq = gq[gq['n'] >= 100]
+    if len(gq) > 50:
+        print(f"  xRVOE calibration: corr(resid, stuff) "
+              f"{np.corrcoef(gq['resid'], gq['stuff'])[0,1]:+.3f}, "
+              f"corr(resid, loc) {np.corrcoef(gq['resid'], gq['loc'])[0,1]:+.3f}")
+
+    def _units(keys, min_n):
+        g = d.groupby(keys).agg(resid=('resid', 'mean'), n=('resid', 'size'))
+        out = {}
+        for key, r in g.iterrows():
+            if r['n'] < min_n:
+                continue
+            shrunk = (r['n'] / (r['n'] + XRVOE_N0)) * r['resid']
+            out[key] = {'v': round(-shrunk * 100.0, 2), 'n': int(r['n'])}
+        return out
+    return (_units(['pitcher', 'team', 'pitch_type'], XRVOE_MIN_PT),
+            _units(['pitcher', 'team'], XRVOE_MIN_OV))
+
+
+def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
     """Write stuffScore into BOTH leaderboards.
 
     Percentile convention (site standard, aligned 2026-07-02): the pool that
@@ -893,6 +966,22 @@ def inject(agg, overall, league):
         qualifies=lambda r: ((r.get('count') or 0) >= 25
                              and r.get('team') not in AAA_TEAMS
                              and not _is_combined_team(r['team'])))
+    # ── xRVOE -> pitch rows (MLB only; ROC lacks non-BIP RunExp for the
+    # actual side, and combined rows stay None — stints carry the value) ──
+    if xrvoe_pt:
+        pool_x = defaultdict(list)
+        for row in pl:
+            k = (row['pitcher'], row['team'], row['pitchType'])
+            rec = xrvoe_pt.get(k)
+            row['xrvoe100'] = rec['v'] if rec else None
+            if (rec and row.get('team') not in AAA_TEAMS
+                    and not _is_combined_team(row['team'])):
+                pool_x[row['pitchType']].append(rec['v'])
+        for row in pl:
+            v = row.get('xrvoe100')
+            row['xrvoe100_pctl'] = (_pctl(v, pool_x[row['pitchType']])
+                                    if v is not None and pool_x.get(row['pitchType'])
+                                    else None)
     json.dump(pl, open(pl_path, 'w'))
 
     # ── overall -> pitcher_leaderboard ──
@@ -938,11 +1027,29 @@ def inject(agg, overall, league):
         qualifies=lambda r: ((r.get('count') or 0) >= 25
                              and r.get('team') not in AAA_TEAMS
                              and not _is_combined_team(r['team'])))
+    n_x = 0
+    if xrvoe_ov:
+        pool_xo = []
+        for row in pp:
+            rec = xrvoe_ov.get((row['pitcher'], row['team']))
+            row['xrvoe100'] = rec['v'] if rec else None
+            if (rec and row.get('team') not in AAA_TEAMS
+                    and not _is_combined_team(row['team'])):
+                pool_xo.append(rec['v'])
+        for row in pp:
+            v = row.get('xrvoe100')
+            if v is not None:
+                n_x += 1
+            row['xrvoe100_pctl'] = (_pctl(v, pool_xo)
+                                    if v is not None and pool_xo else None)
     json.dump(pp, open(pp_path, 'w'))
     print(f'  injected stuffScore: pitch-level {n_pl}/{len(pl)} rows, '
           f'pitcher-level {n_pp}/{len(pp)} rows (qualified pool = {len(qpool)})')
     print(f'  injected pitchingScore: pitch-level {n_ps_pl}/{len(pl)} rows, '
           f'pitcher-level {n_ps_pp}/{len(pp)} rows')
+    if xrvoe_ov:
+        print(f'  injected xRVOE/100: pitcher-level {n_x}/{len(pp)} rows '
+              f'(floors {XRVOE_MIN_PT}/{XRVOE_MIN_OV} pitches, n0 {XRVOE_N0})')
 
 if __name__ == '__main__':
     main()

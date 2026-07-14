@@ -4015,7 +4015,9 @@ def write_json_outputs(result, suffix):
                     key = (row.get('pitcher'), row.get('team'), row.get('pitchType'))
                     stuff_map[key] = {
                         'stuffScore': row['stuffScore'],
-                        'stuffScore_pctl': row.get('stuffScore_pctl')
+                        'stuffScore_pctl': row.get('stuffScore_pctl'),
+                        'xrvoe100': row.get('xrvoe100'),
+                        'xrvoe100_pctl': row.get('xrvoe100_pctl'),
                     }
             if stuff_map:
                 n_merged = 0
@@ -4025,6 +4027,9 @@ def write_json_outputs(result, suffix):
                         row['stuffScore'] = stuff_map[key]['stuffScore']
                         if stuff_map[key]['stuffScore_pctl'] is not None:
                             row['stuffScore_pctl'] = stuff_map[key]['stuffScore_pctl']
+                        if stuff_map[key].get('xrvoe100') is not None:
+                            row['xrvoe100'] = stuff_map[key]['xrvoe100']
+                            row['xrvoe100_pctl'] = stuff_map[key].get('xrvoe100_pctl')
                         n_merged += 1
                 print(f"  Preserved Stuff+ scores: {n_merged}/{len(stuff_map)} rows merged")
         except (json.JSONDecodeError, KeyError):
@@ -4041,7 +4046,9 @@ def write_json_outputs(result, suffix):
                 if row.get('stuffScore') is not None:
                     key = (row.get('pitcher'), row.get('team'), row.get('throws'))
                     stuff_map[key] = {'stuffScore': row['stuffScore'],
-                                      'stuffScore_pctl': row.get('stuffScore_pctl')}
+                                      'stuffScore_pctl': row.get('stuffScore_pctl'),
+                                      'xrvoe100': row.get('xrvoe100'),
+                                      'xrvoe100_pctl': row.get('xrvoe100_pctl')}
             if stuff_map:
                 n_merged = 0
                 for row in result['pitcher_leaderboard']:
@@ -4050,6 +4057,9 @@ def write_json_outputs(result, suffix):
                         row['stuffScore'] = stuff_map[key]['stuffScore']
                         if stuff_map[key]['stuffScore_pctl'] is not None:
                             row['stuffScore_pctl'] = stuff_map[key]['stuffScore_pctl']
+                        if stuff_map[key].get('xrvoe100') is not None:
+                            row['xrvoe100'] = stuff_map[key]['xrvoe100']
+                            row['xrvoe100_pctl'] = stuff_map[key].get('xrvoe100_pctl')
                         n_merged += 1
                 print(f"  Preserved overall Stuff+ scores: {n_merged}/{len(stuff_map)} rows merged")
         except (json.JSONDecodeError, KeyError):
