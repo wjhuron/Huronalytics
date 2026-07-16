@@ -53,7 +53,7 @@ def load():
         tot = sum(usage[key].values())
         rec = {f: r.get(f) for f in ATTRS}
         rec.update(name=r['pitcher'], team=r['team'], throws=r.get('throws'),
-                   n=r.get('count') or 0,
+                   n=r.get('count') or 0, ip=r.get('ip'),
                    mix={g: usage[key].get(g, 0.0) / tot for g in GROUPS} if tot else None)
         rows.append(rec)
     return rows
@@ -144,13 +144,22 @@ def main():
     ap.add_argument('--pitcher-team', default='ROC')
     ap.add_argument('--team', default=None)
     ap.add_argument('--min-pitches', type=int, default=250)
+    ap.add_argument('--min-ip', type=float, default=None,
+                    help='batch mode: qualify targets by IP instead of pitches')
+    ap.add_argument('--mlb-pool', action='store_true',
+                    help='draw comps from MLB pitchers only (no ROC)')
     args = ap.parse_args()
 
+    from pipeline_utils import ip_str_to_float
     rows = load()
     targets = []
     if args.team:
-        targets = sorted([r for r in rows if r['team'] == args.team
-                          and r['n'] >= args.min_pitches], key=lambda r: -r['n'])
+        cand = [r for r in rows if r['team'] == args.team]
+        if args.min_ip is not None:
+            cand = [r for r in cand if (ip_str_to_float(r.get('ip') or '0') or 0) >= args.min_ip]
+        else:
+            cand = [r for r in cand if r['n'] >= args.min_pitches]
+        targets = sorted(cand, key=lambda r: -r['n'])
     else:
         name = args.pitcher or 'Lara, Andry'
         targets = [next(r for r in rows
@@ -158,6 +167,8 @@ def main():
     for t in targets:
         pool = [r for r in rows if r['n'] >= 400 and r['throws'] == t['throws']
                 and (r['name'], r['team']) != (t['name'], t['team'])]
+        if args.mlb_pool:
+            pool = [r for r in pool if r['team'] != 'ROC']
         stats = zstats(pool + [t])
         report(t, pool, stats)
 
