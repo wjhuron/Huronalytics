@@ -748,6 +748,7 @@ const Aggregator = {
                      'locPlus', 'locPlus_pctl', 'locPlusN', 'locPlusRaw',
                      'stuffScore', 'stuffScore_pctl', 'stuffScore_lowSupport',
                      'pitchingScore', 'pitchingScore_pctl', 'pitchingRuns100',
+                     'xrvoe100', 'xrvoe100_pctl',
                      'armAngle'];
     const preAgg = window.PITCHER_DATA || [];
     const preAggMap = {};
@@ -1673,6 +1674,10 @@ const Aggregator = {
         if (ppre.pitchingScore !== undefined) rows[pmi].pitchingScore = ppre.pitchingScore;
         if (ppre.pitchingScore_pctl !== undefined) rows[pmi].pitchingScore_pctl = ppre.pitchingScore_pctl;
         if (ppre.pitchingRuns100 !== undefined) rows[pmi].pitchingRuns100 = ppre.pitchingRuns100;
+        // xRVOE (pre-computed residual vs the stuff+loc expectation — needs
+        // the OOF fold models + Loc surfaces, unavailable client-side)
+        if (ppre.xrvoe100 !== undefined) rows[pmi].xrvoe100 = ppre.xrvoe100;
+        if (ppre.xrvoe100_pctl !== undefined) rows[pmi].xrvoe100_pctl = ppre.xrvoe100_pctl;
       }
     }
 
