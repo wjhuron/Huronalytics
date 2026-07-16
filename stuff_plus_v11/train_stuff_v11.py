@@ -351,6 +351,7 @@ def build_df(pitches, prefer_true_fastball=True):
             'ivb_diff': ivb_diff, 'hb_diff': hb_diff, 'spin_rate': spin,
             'extension': ext, 'arm_angle': arm, 'rel_z': rel_z, 'rel_x': rel_x,
             'vaa': vaa, 'vaa_diff': vaa_diff, 'target_xrv': target,
+            'rv_raw': (-re) if re is not None else None,  # actual RV incl. BIP luck (RVOE)
             'axis_dev': (_dev * s) if _dev is not None else None,
             'axis_dev_abs': abs(_dev) if _dev is not None else None,
             'spin_eff': spin_eff,
@@ -911,6 +912,10 @@ def _inject_pitching(rows, key_of, qualifies):
 XRVOE_N0 = 275        # shrinkage pseudo-pitches toward 0 (measured n0)
 XRVOE_MIN_PT = 150    # display floor per pitch type (below: >2/3 prior)
 XRVOE_MIN_OV = 300    # display floor pitcher-level
+# leaderboard field -> compute_xrvoe unit-record key. xrvoe100 is the shrunk
+# skill estimate; rvoe/xrvoe/rvoe100 are raw accounting (unshrunk).
+XRVOE_FIELDS = {'xrvoe100': 'v', 'rvoe100': 'rvoe100',
+                'rvoe': 'rvoe', 'xrvoe': 'xrvoe'}
 
 
 def compute_xrvoe(df, pitches):
@@ -928,7 +933,8 @@ def compute_xrvoe(df, pitches):
         if v is not None and p.get('PitchID'):
             exprv[p['PitchID']] = v
 
-    d = df[['pid', 'pitcher', 'team', 'pitch_type', 'target_xrv', 'stuff_raw']].copy()
+    d = df[['pid', 'pitcher', 'team', 'pitch_type', 'target_xrv', 'stuff_raw',
+            'rv_raw']].copy()
     d['loc_exprv'] = d['pid'].map(exprv)
     d = d[d['loc_exprv'].notna() & d['stuff_raw'].notna()]
     d['stuff_hit'] = -d['stuff_raw']          # back to hitter perspective
@@ -948,6 +954,9 @@ def compute_xrvoe(df, pitches):
                              sub['loc_exprv'].values])
         d.loc[sub.index, 'expect'] = A @ beta
     d['resid'] = d['target_xrv'] - d['expect']
+    # RVOE: same expectation, but the actual side is raw RV (RunExp, luck
+    # included). RVOE - xRVOE = contact luck. Accounting flavor -> unshrunk.
+    d['resid_raw'] = d['rv_raw'] - d['expect']
 
     # calibration report (unit level, n>=100): should be ~0 after per-group fit
     gq = d.groupby(['pitcher', 'team', 'pitch_type']).agg(
@@ -960,13 +969,24 @@ def compute_xrvoe(df, pitches):
               f"corr(resid, loc) {np.corrcoef(gq['resid'], gq['loc'])[0,1]:+.3f}")
 
     def _units(keys, min_n):
-        g = d.groupby(keys).agg(resid=('resid', 'mean'), n=('resid', 'size'))
+        # v (xRVOE/100) is the shrunk skill estimate; xrvoe/rvoe/rvoe100 are
+        # raw accounting (unshrunk, full precision — display layer rounds),
+        # matching the site's RV/xRV convention.
+        g = d.groupby(keys).agg(resid=('resid', 'mean'), n=('resid', 'size'),
+                                resid_sum=('resid', 'sum'),
+                                raw_sum=('resid_raw', 'sum'),
+                                raw_n=('resid_raw', 'count'))
         out = {}
         for key, r in g.iterrows():
             if r['n'] < min_n:
                 continue
             shrunk = (r['n'] / (r['n'] + XRVOE_N0)) * r['resid']
-            out[key] = {'v': round(-shrunk * 100.0, 2), 'n': int(r['n'])}
+            has_raw = r['raw_n'] > 0
+            out[key] = {'v': round(-shrunk * 100.0, 2), 'n': int(r['n']),
+                        'xrvoe': -r['resid_sum'],
+                        'rvoe': -r['raw_sum'] if has_raw else None,
+                        'rvoe100': (-(r['raw_sum'] / r['raw_n']) * 100.0
+                                    if has_raw else None)}
         return out
     return (_units(['pitcher', 'team', 'pitch_type'], XRVOE_MIN_PT),
             _units(['pitcher', 'team'], XRVOE_MIN_OV))
@@ -1037,18 +1057,21 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
     # ── xRVOE -> pitch rows (MLB only; ROC lacks non-BIP RunExp for the
     # actual side, and combined rows stay None — stints carry the value) ──
     if xrvoe_pt:
-        pool_x = defaultdict(list)
+        pools = {f: defaultdict(list) for f in XRVOE_FIELDS}
         for row in pl:
             k = (row['pitcher'], row['team'], row['pitchType'])
             rec = xrvoe_pt.get(k)
-            row['xrvoe100'] = rec['v'] if rec else None
-            if (rec and row.get('team') not in AAA_TEAMS
-                    and not _is_combined_team(row['team'])):
-                pool_x[row['pitchType']].append(rec['v'])
+            for f, src in XRVOE_FIELDS.items():
+                row[f] = rec[src] if rec else None
+                if (rec and rec[src] is not None
+                        and row.get('team') not in AAA_TEAMS
+                        and not _is_combined_team(row['team'])):
+                    pools[f][row['pitchType']].append(rec[src])
         for row in pl:
-            v = row.get('xrvoe100')
-            row['xrvoe100_pctl'] = (_pctl(v, pool_x[row['pitchType']])
-                                    if v is not None and pool_x.get(row['pitchType'])
+            for f in XRVOE_FIELDS:
+                v = row.get(f)
+                row[f + '_pctl'] = (_pctl(v, pools[f][row['pitchType']])
+                                    if v is not None and pools[f].get(row['pitchType'])
                                     else None)
     json.dump(pl, open(pl_path, 'w'))
 
@@ -1097,19 +1120,22 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
                              and not _is_combined_team(r['team'])))
     n_x = 0
     if xrvoe_ov:
-        pool_xo = []
+        pools_o = {f: [] for f in XRVOE_FIELDS}
         for row in pp:
             rec = xrvoe_ov.get((row['pitcher'], row['team']))
-            row['xrvoe100'] = rec['v'] if rec else None
-            if (rec and row.get('team') not in AAA_TEAMS
-                    and not _is_combined_team(row['team'])):
-                pool_xo.append(rec['v'])
+            for f, src in XRVOE_FIELDS.items():
+                row[f] = rec[src] if rec else None
+                if (rec and rec[src] is not None
+                        and row.get('team') not in AAA_TEAMS
+                        and not _is_combined_team(row['team'])):
+                    pools_o[f].append(rec[src])
         for row in pp:
-            v = row.get('xrvoe100')
-            if v is not None:
+            if row.get('xrvoe100') is not None:
                 n_x += 1
-            row['xrvoe100_pctl'] = (_pctl(v, pool_xo)
-                                    if v is not None and pool_xo else None)
+            for f in XRVOE_FIELDS:
+                v = row.get(f)
+                row[f + '_pctl'] = (_pctl(v, pools_o[f])
+                                    if v is not None and pools_o[f] else None)
     json.dump(pp, open(pp_path, 'w'))
     print(f'  injected stuffScore: pitch-level {n_pl}/{len(pl)} rows, '
           f'pitcher-level {n_pp}/{len(pp)} rows (qualified pool = {len(qpool)})')

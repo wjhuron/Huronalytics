@@ -1635,6 +1635,10 @@ def render_card(config, pitches, output_file):
     xrv100_by_pt = {pt: d.get('xRv100') for pt, d in pitch_lb.items()}
     rv100_by_pt = {pt: d.get('rv100') for pt, d in pitch_lb.items()}
     rv_by_pt = {pt: d.get('runValue') for pt, d in pitch_lb.items()}
+    # xRVOE/100 — per-type outperformance vs the stuff+location expectation.
+    # MLB-only (leaderboard-computed, 150-pitch floor); ROC rows carry None
+    # so the column auto-drops via the keep-check.
+    xrvoe100_by_pt = {pt: d.get('xrvoe100') for pt, d in pitch_lb.items()}
     # Leaderboard per-type xwOBAcon — fallback for ROC cards, whose sheet
     # pitches carry no per-pitch xwOBA (the Tier-2 fill is pipeline-only).
     xwc_by_pt = {pt: d.get('xwOBAcon') for pt, d in pitch_lb.items()}
@@ -1653,7 +1657,7 @@ def render_card(config, pitches, output_file):
         rv_cols = {'per100': ['PitchRV/100', 'xPitchRV/100'],
                    'totals': ['PitchRV', 'xPitchRV'],
                    'both':   ['PitchRV', 'xPitchRV', 'PitchRV/100', 'xPitchRV/100'],
-                   }[config.get('rv_mode') or 'per100']
+                   }[config.get('rv_mode') or 'per100'] + ['xRVOE/100']
     else:
         rv_cols = ['xPitchRV']
     _pt_qual_min = config.get('pitch_qual') or PITCH_QUAL_MIN
@@ -1724,7 +1728,9 @@ def render_card(config, pitches, output_file):
             if is_season:
                 prv_cum = xrv_cum = None
         _rvmap = {'PitchRV': prv_cum, 'xPitchRV': xrv_cum,
-                  'PitchRV/100': prv_100, 'xPitchRV/100': xrv_100}
+                  'PitchRV/100': prv_100, 'xPitchRV/100': xrv_100,
+                  'xRVOE/100': ((round(xrvoe100_by_pt[pt], 1) + 0.0)
+                                if xrvoe100_by_pt.get(pt) is not None else None)}
         # Chase% — swings on out-of-zone pitches over OoZ pitches.
         oop_swings_n = sum(1 for p in pp if p.get('Description') in SWING_DESC and compute_iz(p) == False)
         oop_pitches_n = sum(1 for p in pp if compute_iz(p) == False)
@@ -1805,7 +1811,9 @@ def render_card(config, pitches, output_file):
     else:
         total_xrv_cum = (round(sum(t_rvs_x), 1) + 0.0) if t_rvs_x else None
     _trvmap = {'PitchRV': total_prv_cum, 'xPitchRV': total_xrv_cum,
-               'PitchRV/100': total_prv_100, 'xPitchRV/100': total_xrv_100}
+               'PitchRV/100': total_prv_100, 'xPitchRV/100': total_xrv_100,
+               'xRVOE/100': ((round(_pr['xrvoe100'], 1) + 0.0)
+                             if _pr.get('xrvoe100') is not None else None)}
     total_row=['Total',str(tc),'100.0%','—','—','—','—','—','—','—',
         fmt_fi(sum(t_relzs)/len(t_relzs)) if t_relzs else '—',
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
@@ -2515,7 +2523,7 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
 # ═══════════════════════════════════════════════════════════════
 def main():
     # ── Settings (edit these directly or override via command line) ──
-    team            = "NEW"
+    team            = "ROC"
     start_date      = None    # Set to None for full season
     end_date        = None              # Set to a date for date range, or None for single day
     filter_pitchers = ""                 # Semicolon-separated "Last, First" names, or "" for all
@@ -2669,6 +2677,7 @@ def main():
                         'stuffScore': _r.get('stuffScore'), 'stuffScore_pctl': _r.get('stuffScore_pctl'),
                         'stuffScore_lowSupport': _r.get('stuffScore_lowSupport'),
                         'pitchingScore': _r.get('pitchingScore'),
+                        'xrvoe100': _r.get('xrvoe100'),
                     }
         except Exception as _e:
             print(f"  WARNING: could not load pitch leaderboard for Loc+: {_e}")
