@@ -285,6 +285,23 @@ const Utils = {
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
 
+  // Percentile color for BUBBLES (player-page circles + bars). Unlike the cell
+  // scale above, this keeps a VISIBLE warm-greige floor at the 50th percentile
+  // so a mid bubble still reads as a filled disc on cream instead of vanishing
+  // into the paper. Endpoints kept light enough for ink text. Cells (dense
+  // tables) deliberately keep the near-paper midpoint via percentileColor.
+  percentileBubbleColor: function (pctl) {
+    if (pctl === null || pctl === undefined) return 'rgb(210, 194, 168)';
+    const neutral = [210, 194, 168];                   // warm greige (visible on cream)
+    const target = pctl >= 50 ? [188, 96, 78]          // brick (good), ink-safe
+                              : [118, 144, 172];        // slate (bad), ink-safe
+    const t = Math.pow(Math.abs(pctl - 50) / 50, 0.75);
+    const r = Math.round(neutral[0] + (target[0] - neutral[0]) * t);
+    const g = Math.round(neutral[1] + (target[1] - neutral[1]) * t);
+    const b = Math.round(neutral[2] + (target[2] - neutral[2]) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  },
+
   // Text color for percentile backgrounds — always ink on the print scale
   percentileTextColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;

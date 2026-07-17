@@ -932,7 +932,7 @@ var PlayerPage = {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
         if (showColor) {
-          var bgColor = Utils.percentileColor(pctl);
+          var bgColor = Utils.percentileBubbleColor(pctl);
           var textColor = Utils.percentileTextColor(pctl);
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
@@ -956,7 +956,7 @@ var PlayerPage = {
       if (pctl != null) {
         barFill.style.width = Math.round(pctl) + '%';
         if (showColor) {
-          var barColor = Utils.percentileColor(pctl);
+          var barColor = Utils.percentileBubbleColor(pctl);
           barFill.style.background = barColor;
         } else {
           // Unqualified: gray bar with white diagonal hatching
@@ -1030,7 +1030,7 @@ var PlayerPage = {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
         if (rvQualified) {
-          var bgColor = Utils.percentileColor(pctl);
+          var bgColor = Utils.percentileBubbleColor(pctl);
           var textColor = Utils.percentileTextColor(pctl);
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
@@ -1051,7 +1051,7 @@ var PlayerPage = {
       if (pctl != null) {
         barFill.style.width = Math.round(pctl) + '%';
         if (rvQualified) {
-          var barColor = Utils.percentileColor(pctl);
+          var barColor = Utils.percentileBubbleColor(pctl);
           barFill.style.background = barColor;
         } else {
           var barBg = '#d8ccb4';
@@ -1135,7 +1135,7 @@ var PlayerPage = {
       var circle = document.createElement('div');
       circle.className = 'pctl-circle';
       if (isQualified) {
-        var bgColor = Utils.percentileColor(pctl);
+        var bgColor = Utils.percentileBubbleColor(pctl);
         var textColor = Utils.percentileTextColor(pctl);
         circle.style.backgroundColor = bgColor;
         circle.style.color = textColor;
@@ -1157,7 +1157,7 @@ var PlayerPage = {
     if (pctl != null) {
       barFill.style.width = Math.round(pctl) + '%';
       if (isQualified) {
-        var barColor = Utils.percentileColor(pctl);
+        var barColor = Utils.percentileBubbleColor(pctl);
         barFill.style.background = barColor;
       } else {
         var barBg = '#d8ccb4';
