@@ -942,8 +942,8 @@ var PlayerPage = {
         } else {
           // Unqualified: outline ring instead of filled circle
           circle.style.backgroundColor = 'transparent';
-          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
-          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
+          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #b3a68c';
+          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#8a7f75';
           circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
@@ -961,8 +961,8 @@ var PlayerPage = {
           barFill.style.background = barColor;
         } else {
           // Unqualified: gray bar with white diagonal hatching
-          var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
-          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+          var barBg = isDark ? 'rgba(140,140,140,0.25)' : '#d8ccb4';
+          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(240,232,216,0.85)';
           barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
         }
       }
@@ -1038,8 +1038,8 @@ var PlayerPage = {
           circle.style.color = textColor;
         } else {
           circle.style.backgroundColor = 'transparent';
-          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
-          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
+          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #b3a68c';
+          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#8a7f75';
           circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
@@ -1056,8 +1056,8 @@ var PlayerPage = {
           var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
           barFill.style.background = barColor;
         } else {
-          var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
-          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+          var barBg = isDark ? 'rgba(140,140,140,0.25)' : '#d8ccb4';
+          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(240,232,216,0.85)';
           barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
         }
       }
@@ -1145,8 +1145,8 @@ var PlayerPage = {
         circle.title = Utils.ordinal(Math.round(pctl)) + ' percentile among qualified hitters';
       } else {
         circle.style.backgroundColor = 'transparent';
-        circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #bbb';
-        circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#999';
+        circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #b3a68c';
+        circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#8a7f75';
         circle.title = 'Below minimum qualification threshold';
       }
       circle.textContent = Math.round(pctl);
@@ -1163,8 +1163,8 @@ var PlayerPage = {
         var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
         barFill.style.background = barColor;
       } else {
-        var barBg = isDark ? 'rgba(140,140,140,0.25)' : 'rgba(180,180,180,0.5)';
-        var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.5)';
+        var barBg = isDark ? 'rgba(140,140,140,0.25)' : '#d8ccb4';
+        var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(240,232,216,0.85)';
         barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
       }
     }
@@ -1224,7 +1224,7 @@ var PlayerPage = {
     var ellipseMeta = [];
     var pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
     // Hairline edge matching the panel bg — de-blobs dense clusters without a contrasting ring
-    var dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
+    var dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(240,232,216,0.9)';
 
     for (var j = 0; j < pitchTypes.length; j++) {
       var pt = pitchTypes[j];
@@ -1253,9 +1253,9 @@ var PlayerPage = {
     var ctx = canvas.getContext('2d');
 
     var isDark = document.body.classList.contains('dark');
-    var gridColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)';
-    var tickColor = isDark ? '#ccc' : '#666';
-    var crossColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.15)';
+    var gridColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(58,48,38,0.12)';
+    var tickColor = isDark ? '#ccc' : '#6a5f55';
+    var crossColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(58,48,38,0.22)';
 
     this.chart = new Chart(ctx, {
       type: 'scatter',
@@ -1493,7 +1493,7 @@ var PlayerPage = {
     avgLine.setAttribute('y1', avgY.toFixed(1));
     avgLine.setAttribute('x2', PAD_L + plotW);
     avgLine.setAttribute('y2', avgY.toFixed(1));
-    avgLine.setAttribute('stroke', '#555');
+    avgLine.setAttribute('stroke', '#8a7f75');
     avgLine.setAttribute('stroke-width', '0.75');
     avgLine.setAttribute('stroke-dasharray', '3,2');
     svg.appendChild(avgLine);
@@ -1534,7 +1534,7 @@ var PlayerPage = {
     var startLabel = document.createElementNS(ns, 'text');
     startLabel.setAttribute('x', PAD_L);
     startLabel.setAttribute('y', H - 1);
-    startLabel.setAttribute('fill', '#666');
+    startLabel.setAttribute('fill', '#6a5f55');
     startLabel.setAttribute('font-size', '9');
     startLabel.setAttribute('font-family', 'Barlow, sans-serif');
     startLabel.textContent = formatDate(points[0].date);
@@ -1544,7 +1544,7 @@ var PlayerPage = {
     endLabel.setAttribute('x', PAD_L + plotW);
     endLabel.setAttribute('y', H - 1);
     endLabel.setAttribute('text-anchor', 'end');
-    endLabel.setAttribute('fill', '#666');
+    endLabel.setAttribute('fill', '#6a5f55');
     endLabel.setAttribute('font-size', '9');
     endLabel.setAttribute('font-family', 'Barlow, sans-serif');
     endLabel.textContent = formatDate(points[points.length - 1].date);
@@ -1552,7 +1552,7 @@ var PlayerPage = {
 
     // Invisible hover rects for each data point (tooltip targets)
     var tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;display:none;background:#1e2127;border:1px solid #444;border-radius:4px;padding:3px 7px;font-size:11px;color:#ddd;white-space:nowrap;pointer-events:none;z-index:10;font-family:JetBrains Mono,monospace;';
+    tooltip.style.cssText = 'position:absolute;display:none;background:#2a241d;border:1px solid #6a5f55;border-radius:4px;padding:3px 7px;font-size:11px;color:#f0e8d8;white-space:nowrap;pointer-events:none;z-index:10;font-family:IBM Plex Sans,sans-serif;font-variant-numeric:tabular-nums;';
     wrapper.appendChild(tooltip);
 
     var segW = plotW / (points.length - 1 || 1);
@@ -1573,7 +1573,7 @@ var PlayerPage = {
         hDot.setAttribute('cy', coords[idx].y.toFixed(1));
         hDot.setAttribute('r', '3');
         hDot.setAttribute('fill', color || '#888');
-        hDot.setAttribute('stroke', '#fff');
+        hDot.setAttribute('stroke', '#f0e8d8');
         hDot.setAttribute('stroke-width', '1');
         hDot.style.display = 'none';
         svg.appendChild(hDot);
@@ -1820,7 +1820,7 @@ var PlayerPage = {
     if (totalRow) {
       var totalTr = document.createElement('tr');
       totalTr.style.fontWeight = '700';
-      totalTr.style.borderTop = '2px solid #333840';
+      totalTr.style.borderTop = '2px solid #9f3026';
       for (var c2 = 0; c2 < cols.length; c2++) {
         var col2 = cols[c2];
         var td2 = document.createElement('td');
@@ -1977,7 +1977,7 @@ var PlayerPage = {
     function cx(px) { return ((px - xMin) / (xMax - xMin)) * W; }
     function cy(zn) { return ((znMax - zn) / (znMax - znMin)) * H; } // flip: top = high z
 
-    ctx.fillStyle = isDark ? '#1e1e3a' : '#f8f8f8';
+    ctx.fillStyle = isDark ? '#1e1e3a' : '#e8dfcb';
     ctx.fillRect(0, 0, W, H);
 
     var nMax = 1;
@@ -2000,10 +2000,10 @@ var PlayerPage = {
 
     // Strike zone (zone-normalized 0..1; plate half-width ~0.83 ft)
     var zl = cx(-0.83), zr = cx(0.83), zt = cy(1), zb = cy(0);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(58,48,38,0.65)';
     ctx.lineWidth = 2;
     ctx.strokeRect(zl, zt, zr - zl, zb - zt);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)';
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(58,48,38,0.28)';
     ctx.lineWidth = 1;
     var tw = (zr - zl) / 3, th = (zb - zt) / 3;
     for (var ti = 1; ti < 3; ti++) {
@@ -2012,7 +2012,7 @@ var PlayerPage = {
     }
 
     var py = cy(-0.4), pcx = cx(0);
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(58,48,38,0.18)';
     ctx.beginPath();
     ctx.moveTo(pcx - 8, py); ctx.lineTo(pcx + 8, py); ctx.lineTo(pcx + 5, py + 5);
     ctx.lineTo(pcx, py + 8); ctx.lineTo(pcx - 5, py + 5); ctx.closePath(); ctx.fill();
@@ -2055,7 +2055,7 @@ var PlayerPage = {
     }
 
     // Clear canvas
-    ctx.fillStyle = isDark ? '#1e1e3a' : '#f8f8f8';
+    ctx.fillStyle = isDark ? '#1e1e3a' : '#e8dfcb';
     ctx.fillRect(0, 0, W, H);
 
     // Draw density
@@ -2076,14 +2076,14 @@ var PlayerPage = {
     var zoneTop = ((zMax - szTop) / (zMax - zMin)) * H;
     var zoneBottom = ((zMax - szBot) / (zMax - zMin)) * H;
 
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(58,48,38,0.65)';
     ctx.lineWidth = 2;
     ctx.strokeRect(zoneLeft, zoneTop, zoneRight - zoneLeft, zoneBottom - zoneTop);
 
     // Inner zone thirds — quick "did this pitch hit the up-and-in / down-the-
     // middle / etc." quadrant read without counting pixels. Subtle alpha so
     // the gridlines don't compete with the heat data.
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)';
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(58,48,38,0.28)';
     ctx.lineWidth = 1;
     var thirdW = (zoneRight - zoneLeft) / 3;
     var thirdH = (zoneBottom - zoneTop) / 3;
@@ -2101,7 +2101,7 @@ var PlayerPage = {
     // Draw home plate at bottom
     var plateY = ((zMax - 0.5) / (zMax - zMin)) * H; // approximate bottom
     var plateCX = W / 2;
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(58,48,38,0.18)';
     ctx.beginPath();
     ctx.moveTo(plateCX - 8, plateY);
     ctx.lineTo(plateCX + 8, plateY);
@@ -2115,23 +2115,17 @@ var PlayerPage = {
 
 
   _heatColor: function(t) {
-    // Blue (cold) → white (mid) → red (hot), like Baseball Savant
-    // Uses HSL interpolation for perceptually uniform gradients
-    var h, s, l;
-    if (t < 0.5) {
-      // Blue (h=220) → white: increase lightness, decrease saturation
-      var p = t / 0.5;
-      h = 220;
-      s = Math.round(80 - p * 80);
-      l = Math.round(35 + p * 65);
-    } else {
-      // White → red (h=5): increase saturation, decrease lightness
-      var p = (t - 0.5) / 0.5;
-      h = 5;
-      s = Math.round(p * 85);
-      l = Math.round(100 - p * 55);
-    }
-    return 'hsl(' + h + ',' + s + '%,' + l + '%)';
+    // Print scale: slate (cold) → paper (mid) → brick (hot). RGB blend from
+    // the paper midpoint so heat maps sit on the cream canvases seamlessly
+    // (matches the leaderboard percentile scale in Utils.percentileColor).
+    var base = [240, 232, 216];                       // paper
+    var target = t >= 0.5 ? [176, 64, 47]             // brick (hot)
+                          : [66, 100, 138];           // deep slate (cold)
+    var p = Math.pow(Math.abs(t - 0.5) / 0.5, 0.9);
+    var r = Math.round(base[0] + (target[0] - base[0]) * p);
+    var g = Math.round(base[1] + (target[1] - base[1]) * p);
+    var b = Math.round(base[2] + (target[2] - base[2]) * p);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
 
 
@@ -2196,7 +2190,7 @@ var PlayerPage = {
     var modes = [
       {
         label: 'SWINGS',
-        badgeBg: '#00d4ff', badgeFg: '#0a1118',
+        badgeBg: '#56789b', badgeFg: '#f0e8d8',
         points: filteredSwings,
         weighted: false,
         subtitle: totalPitches > 0
@@ -2205,7 +2199,7 @@ var PlayerPage = {
       },
       {
         label: 'WHIFFS',
-        badgeBg: '#cccccc', badgeFg: '#0a1118',
+        badgeBg: '#d8ccb4', badgeFg: '#1a1612',
         points: whiffPts,
         weighted: false,
         subtitle: totalSwings > 0
@@ -2214,7 +2208,7 @@ var PlayerPage = {
       },
       {
         label: 'DAMAGE',
-        badgeBg: '#f04040', badgeFg: '#fff',
+        badgeBg: '#9f3026', badgeFg: '#f0e8d8',
         points: damagePts,
         weighted: true,
         subtitle: 'xwOBAcon: ' + dmgFmt + ' (' + damagePts.length + ' BIP)'
@@ -2267,8 +2261,8 @@ var PlayerPage = {
     var bw = 0.32; // bandwidth in feet
     var bw2 = 2 * bw * bw;
 
-    // Clear
-    ctx.fillStyle = '#1a1d23';
+    // Clear — card panel cream (print redesign)
+    ctx.fillStyle = '#e8dfcb';
     ctx.fillRect(0, 0, W, H);
 
     if (points && points.length >= 5) {
@@ -2306,8 +2300,8 @@ var PlayerPage = {
         ctx.globalAlpha = 1.0;
       }
     } else {
-      ctx.fillStyle = '#666';
-      ctx.font = '12px Avenir Next, sans-serif';
+      ctx.fillStyle = '#6a5f55';
+      ctx.font = '12px IBM Plex Sans, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('n = ' + (points ? points.length : 0) + ' (insufficient)', W / 2, H / 2);
     }
@@ -2317,10 +2311,10 @@ var PlayerPage = {
     var zoneRight = ((0.708 - xMin) / (xMax - xMin)) * W;
     var zoneTop = ((zMax - szTop) / (zMax - zMin)) * H;
     var zoneBottom = ((zMax - szBot) / (zMax - zMin)) * H;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.strokeStyle = 'rgba(58,48,38,0.7)';
     ctx.lineWidth = 1.6;
     ctx.strokeRect(zoneLeft, zoneTop, zoneRight - zoneLeft, zoneBottom - zoneTop);
-    ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+    ctx.strokeStyle = 'rgba(58,48,38,0.28)';
     ctx.lineWidth = 1;
     var thirdW = (zoneRight - zoneLeft) / 3;
     var thirdH = (zoneBottom - zoneTop) / 3;
@@ -3999,7 +3993,7 @@ var PlayerPage = {
     if (totalRow) {
       var totalTr = document.createElement('tr');
       totalTr.style.fontWeight = '700';
-      totalTr.style.borderTop = '2px solid #333840';
+      totalTr.style.borderTop = '2px solid #9f3026';
       for (var c2 = 0; c2 < cols.length; c2++) {
         var col2 = cols[c2];
         var td2 = document.createElement('td');

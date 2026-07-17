@@ -44,7 +44,7 @@ const ScatterChart = {
 
       const zeroX = xScale.getPixelForValue(0);
       const zeroY = yScale.getPixelForValue(0);
-      ctx.strokeStyle = '#999';
+      ctx.strokeStyle = '#8a7f75';
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -106,7 +106,7 @@ const ScatterChart = {
     const datasets = [];
     const ellipseMeta = [];
     const pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
-    const dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
+    const dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(240,232,216,0.9)';
 
     for (let j = 0; j < pitchTypes.length; j++) {
       const pt = pitchTypes[j];
@@ -157,13 +157,13 @@ const ScatterChart = {
           x: {
             title: { display: true, text: 'Horizontal Break (in.)', font: { size: 12, weight: 'bold' } },
             min: -25, max: 25,
-            grid: { display: true, color: 'rgba(0,0,0,0.06)' },
+            grid: { display: true, color: 'rgba(58,48,38,0.10)' },
             ticks: { stepSize: 5 },
           },
           y: {
             title: { display: true, text: 'Induced Vertical Break (in.)', font: { size: 12, weight: 'bold' } },
             min: -25, max: 25,
-            grid: { display: true, color: 'rgba(0,0,0,0.06)' },
+            grid: { display: true, color: 'rgba(58,48,38,0.10)' },
             ticks: { stepSize: 5 },
           },
         },
@@ -197,7 +197,7 @@ const ScatterChart = {
 
       const pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
       const markerStyle = this.MARKER_STYLES[pi % this.MARKER_STYLES.length];
-      const dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
+      const dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(240,232,216,0.9)';
 
       for (let j = 0; j < pitchTypes.length; j++) {
         const pt = pitchTypes[j];
@@ -244,13 +244,13 @@ const ScatterChart = {
           x: {
             title: { display: true, text: 'Horizontal Break (in.)', font: { size: 12, weight: 'bold' } },
             min: -25, max: 25,
-            grid: { display: true, color: 'rgba(0,0,0,0.06)' },
+            grid: { display: true, color: 'rgba(58,48,38,0.10)' },
             ticks: { stepSize: 5 },
           },
           y: {
             title: { display: true, text: 'Induced Vertical Break (in.)', font: { size: 12, weight: 'bold' } },
             min: -25, max: 25,
-            grid: { display: true, color: 'rgba(0,0,0,0.06)' },
+            grid: { display: true, color: 'rgba(58,48,38,0.10)' },
             ticks: { stepSize: 5 },
           },
         },
