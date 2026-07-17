@@ -963,7 +963,7 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
             y_cursor -= SECTION_GAP
         header_y = y_cursor
         ax.text(grid_left, header_y, section, ha='left', va='top',
-                fontsize=12.5, fontfamily='IBM Plex Sans', fontweight='700',
+                fontsize=12.5, fontfamily='IBM Plex Sans Condensed', fontweight='700',
                 color=TEXT_SECONDARY)
         rule_y = header_y - SECTION_HEADER_H + 0.035 / _fh_in   # 0.002 * 17.5
         ax.add_patch(Rectangle((grid_left, rule_y), col_w, 0.0175 / _fh_in,
@@ -1267,7 +1267,7 @@ def render_card(config, pitches, output_file):
         hdr = config['stat_headers'][i]
         val_str = config['stat_values'][i]
         ax_main.add_patch(Rectangle((x, stat_y_header), col_w, cell_h, facecolor=DARKER, edgecolor=SUBTLE_BORDER, linewidth=0.8))
-        ax_main.text(x+col_w/2, stat_y_header+cell_h/2, hdr, fontsize=hdr_fs, ha='center', va='center', color=TEXT_SECONDARY, fontweight='bold', fontfamily='IBM Plex Sans')
+        ax_main.text(x+col_w/2, stat_y_header+cell_h/2, hdr, fontsize=hdr_fs, ha='center', va='center', color=TEXT_SECONDARY, fontweight='bold', fontfamily='IBM Plex Sans Condensed')
         # Determine cell color — blue→red percentile hue (matches the bubbles).
         cell_bg = DARK_CELL
         sl_cfg = STAT_LINE_COLOR.get(hdr)
@@ -1914,17 +1914,17 @@ def render_card(config, pitches, output_file):
     for (r,c), cell in table.get_celld().items():
         cell.set_edgecolor(SUBTLE_BORDER); cell.set_linewidth(0.5)
         if r == 0:
-            cell.set_facecolor(DARKER); cell.set_text_props(color=TEXT_SECONDARY, fontweight='bold', fontsize=10)
+            cell.set_facecolor(DARKER); cell.set_text_props(color=TEXT_SECONDARY, fontweight='bold', fontsize=10, fontfamily='IBM Plex Sans Condensed')
         elif r == len(cell_data):
-            cell.set_facecolor(DARKER); cell.set_text_props(fontweight='bold', color=TEXT_PRIMARY)
+            cell.set_facecolor(DARKER); cell.set_text_props(fontweight='bold', color=TEXT_PRIMARY, fontfamily='IBM Plex Sans')
         else:
             bg = DARK_CELL if r%2==1 else ALT_ROW_BG
-            cell.set_facecolor(bg); cell.set_text_props(color=TEXT_PRIMARY, fontweight='bold')
+            cell.set_facecolor(bg); cell.set_text_props(color=TEXT_PRIMARY, fontweight='bold', fontfamily='IBM Plex Sans')
         if c == 0 and r > 0:
             pc = pt_codes[r-1]
             if pc:
                 cell.set_facecolor(PITCH_COLORS.get(pc,'#999'))
-                cell.set_text_props(color=badge_text_color(PITCH_COLORS.get(pc,'#999')), fontweight='bold')
+                cell.set_text_props(color=badge_text_color(PITCH_COLORS.get(pc,'#999')), fontweight='bold', fontfamily='IBM Plex Sans')
 
     # Percentile-based coloring for Zone%, Whiff%, Chase%
     league_avgs = config.get('league_avgs', {})

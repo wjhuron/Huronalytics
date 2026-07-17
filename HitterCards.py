@@ -980,7 +980,7 @@ def _render_percentile_bubbles(fig, h_row):
         header_y = y_cursor
         ax.text(GRID_LEFT, header_y, section,
                 ha='left', va='top',
-                fontsize=13, fontfamily='IBM Plex Sans', fontweight='700',
+                fontsize=13, fontfamily='IBM Plex Sans Condensed', fontweight='700',
                 color=TEXT_SECONDARY)
         rule_y = header_y - SECTION_HEADER_H + 0.002
         ax.add_patch(Rectangle((GRID_LEFT, rule_y),
@@ -1356,7 +1356,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                                      linewidth=0.8))
         ax_main.text(cur_x + cw / 2, stat_y_header + cell_h / 2, k,
                       fontsize=12, ha='center', va='center', color=TEXT_SECONDARY,
-                      fontweight='bold', fontfamily='IBM Plex Sans')
+                      fontweight='bold', fontfamily='IBM Plex Sans Condensed')
         # Value cell — percentile-colored bg
         cell_bg = DARK_CELL
         sl_cfg = HITTER_STAT_LINE_COLOR.get(k)
@@ -2282,17 +2282,17 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         if rr == 0:
             # Header row: off-white, heavy weight, slightly bigger
             cell.set_facecolor(DARKER)
-            cell.set_text_props(color=TEXT_PRIMARY, fontweight='800', fontsize=13)
+            cell.set_text_props(color=TEXT_PRIMARY, fontweight='800', fontsize=13, fontfamily='IBM Plex Sans Condensed')
         elif rr == len(rows):
             # Total row: heavier weight + brighter, edge thickened all-around
             # to read as a distinct summary band
             cell.set_facecolor(DARKER)
             cell.set_edgecolor(TOTAL_BORDER); cell.set_linewidth(1.4)
-            cell.set_text_props(fontweight='800', color=TEXT_PRIMARY, fontsize=13)
+            cell.set_text_props(fontweight='800', color=TEXT_PRIMARY, fontsize=13, fontfamily='IBM Plex Sans')
         else:
             # Body rows: lighter weight to differentiate from header/total
             cell.set_facecolor(DARK_CELL if rr % 2 == 1 else ALT_ROW_BG)
-            cell.set_text_props(color=TEXT_PRIMARY, fontweight='600', fontsize=13)
+            cell.set_text_props(color=TEXT_PRIMARY, fontweight='600', fontsize=13, fontfamily='IBM Plex Sans')
         if cc == 0 and rr > 0:
             row_idx = rr - 1
             grp = group_rows[row_idx]['group'] if row_idx < len(group_rows) else None
@@ -2311,7 +2311,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                 blended = f'#{blend_r:02x}{blend_g:02x}{blend_b:02x}'
                 cell.set_facecolor(blended)
                 cell.set_text_props(color=badge_text_color(blended),
-                                    fontweight='800', fontsize=13)
+                                    fontweight='800', fontsize=13, fontfamily='IBM Plex Sans')
 
     # Color rate-stat cells based on hitter direction
     hl_a = metadata.get('hitterLeagueAverages', {})
