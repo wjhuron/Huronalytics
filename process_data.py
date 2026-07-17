@@ -634,6 +634,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
         bat_side = p.get('Bats')
         if not bat_side:
             bat_side = 'R'  # default to RHB if Bats field missing
+        # Official barrel (launch_speed_angle==6) with is_barrel(ev, la) fallback
+        # when the Barrel column is absent — identical to the hitter barrelPct
+        # logic and the card's damage view, so the site's Damage tiers match.
+        _barrel_raw = str(p.get('Barrel', '')).strip()
+        brl_enc = 1 if (_barrel_raw == '6' or (_barrel_raw == '' and is_barrel(ev, la))) else 0
         hitter_bip_rows.append([
             hi_idx[batter],
             tm_idx[team],
@@ -648,6 +653,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             ev_enc,
             int(round(dist)) if dist is not None else None,
             round(woba_val, 3) if woba_val is not None else None,
+            brl_enc,
         ])
 
     # ==========================================================
@@ -1115,7 +1121,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             'swingsNonBunt', 'contactNonBunt', 'buntAB',
         ],
         'hitterMicro': hitter_rows,
-        'hitterBipCols': ['hitterIdx', 'teamIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval'],
+        'hitterBipCols': ['hitterIdx', 'teamIdx', 'dateIdx', 'pitcherHand', 'batSide', 'exitVelo', 'launchAngle', 'hcX', 'hcY', 'bbType', 'event', 'distance', 'wOBAval', 'barrel'],
         'hitterBip': hitter_bip_rows,
         'hitterPitchCols': [
             'hitterIdx', 'teamIdx', 'bats', 'pitchTypeIdx', 'dateIdx', 'pitcherHand',

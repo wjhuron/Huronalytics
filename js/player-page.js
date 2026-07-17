@@ -3150,6 +3150,7 @@ var PlayerPage = {
     var bbTypeIdx = bipCols.indexOf('bbType');
     var eventIdx = bipCols.indexOf('event');
     var batSideIdx = bipCols.indexOf('batSide');
+    var barrelIdx = bipCols.indexOf('barrel');  // official barrel flag (1/0); -1 on old data
 
     // Find hitter index and team index
     var lookups = microData.lookups;
@@ -3186,6 +3187,7 @@ var PlayerPage = {
         bbType: row[bbTypeIdx],
         event: row[eventIdx],
         bs: (batSideIdx >= 0 ? row[batSideIdx] : null),  // per-BIP bat side for xwOBAsp
+        barrel: (barrelIdx >= 0 ? row[barrelIdx] : null),  // official barrel flag (1/0) or null
         clamped: la !== clampedLA,
       });
     }
@@ -3231,15 +3233,19 @@ var PlayerPage = {
       return 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
     }
 
-    // Barrel id — Statcast heuristic (matches Cards.is_barrel; the client BIP
-    // feed has no official Barrel column, so this is the fallback used site-wide).
+    // Barrel id — prefer the official flag from the pipeline (launch_speed_angle
+    // ==6, matches the card). Falls back to the Statcast is_barrel heuristic only
+    // for old data that predates the barrel column.
     function isBarrel(ev, la) {
       if (ev == null || la == null) return false;
       return (la >= 8 && la <= 50 && ev >= 98 && ev * 1.5 - la >= 117 && ev + la >= 124);
     }
+    function pointIsBarrel(pt) {
+      if (pt.barrel != null) return pt.barrel === 1;
+      return isBarrel(pt.ev, pt.realLA != null ? pt.realLA : pt.y);
+    }
     function damageTier(pt) {
-      var la = pt.realLA != null ? pt.realLA : pt.y;
-      if (isBarrel(pt.ev, la)) return 2;                 // barrel
+      if (pointIsBarrel(pt)) return 2;                   // barrel
       if (pt.ev != null && pt.ev >= 95) return 1;        // hard-hit 95+ (non-barrel)
       return 0;                                          // other BIP
     }
@@ -3377,8 +3383,7 @@ var PlayerPage = {
           var qxs = [], qys = [];
           for (var qi = 0; qi < points.length; qi++) {
             var qp = points[qi];
-            var qla = qp.realLA != null ? qp.realLA : qp.y;
-            if (isBarrel(qp.ev, qla) || (qp.ev != null && qp.ev >= 95)) {
+            if (pointIsBarrel(qp) || (qp.ev != null && qp.ev >= 95)) {
               qxs.push(qp.x); qys.push(qp.y);
             }
           }
