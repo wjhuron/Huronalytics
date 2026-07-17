@@ -308,6 +308,22 @@ const Utils = {
     return '#1a1612';
   },
 
+  // Deep, readable TEXT color carrying the percentile hue — for value text that
+  // sits ON the paper (not a filled cell/bubble). The light bubble/cell tints
+  // are background colors and vanish as text on cream, so this blends warm
+  // ink-gray toward deep terracotta (good) / deep slate (bad) instead.
+  percentileTextInk: function (pctl) {
+    if (pctl === null || pctl === undefined) return '#6a5f55';
+    const neutral = [0x6a, 0x5f, 0x55];                // warm ink-gray
+    const target = pctl >= 50 ? [0x9f, 0x30, 0x26]     // deep terracotta (good)
+                              : [0x2f, 0x55, 0x73];     // deep slate (bad)
+    const t = Math.pow(Math.abs(pctl - 50) / 50, 1.1);
+    const r = Math.round(neutral[0] + (target[0] - neutral[0]) * t);
+    const g = Math.round(neutral[1] + (target[1] - neutral[1]) * t);
+    const b = Math.round(neutral[2] + (target[2] - neutral[2]) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  },
+
 
   TOOLTIPS: {
     '#': 'Rank',

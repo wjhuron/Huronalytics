@@ -3401,7 +3401,7 @@ var PlayerPage = {
     // avg-placement value text (quality story). The marker dot uses the brand
     // terracotta accent so it never collides with the EV-gradient (blue→gray→red)
     // dots in the BIP scatter — it reads as a system annotation, not data.
-    var pctlColor = Utils.percentileColor(data.xwOBAsp_pctl);
+    var pctlColor = Utils.percentileTextInk(data.xwOBAsp_pctl);
     var markerColor = '#9f3026';
 
     // --- xwOBAsp annotation (HTML element, outside chart) ---
@@ -3411,7 +3411,7 @@ var PlayerPage = {
       // Line 1 — xwOBAsp value (percentile-colored)
       var line1 = document.createElement('div');
       var labelSpan = document.createElement('span');
-      labelSpan.style.cssText = 'font-size:18px;font-weight:600;color:#aaa;';
+      labelSpan.style.cssText = 'font-size:18px;font-weight:600;color:#6a5f55;';
       labelSpan.textContent = 'xwOBAsp: ';
       line1.appendChild(labelSpan);
       var valSpan = document.createElement('span');
@@ -3422,7 +3422,7 @@ var PlayerPage = {
       }
       line1.appendChild(valSpan);
       var countSpan = document.createElement('span');
-      countSpan.style.cssText = 'font-size:12px;color:#666;margin-left:4px;';
+      countSpan.style.cssText = 'font-size:12px;color:#8a7f75;margin-left:4px;';
       countSpan.textContent = totalBip > xwOBAsp_count
         ? '(' + xwOBAsp_count + ' of ' + totalBip + ' qualifying BIP)'
         : '(' + xwOBAsp_count + ' qualifying BIP)';
@@ -3435,7 +3435,7 @@ var PlayerPage = {
         var line2 = document.createElement('div');
         line2.style.cssText = 'margin-top:8px;';
         var apLabel = document.createElement('span');
-        apLabel.style.cssText = 'font-size:14px;font-weight:600;color:#aaa;';
+        apLabel.style.cssText = 'font-size:14px;font-weight:600;color:#6a5f55;';
         apLabel.textContent = 'Avg Placement: ';
         line2.appendChild(apLabel);
         var sprayDir = (bats === 'L')
@@ -3446,7 +3446,7 @@ var PlayerPage = {
         sprayValSpan.textContent = Math.abs(med_spray).toFixed(1) + '° ' + sprayDir;
         line2.appendChild(sprayValSpan);
         var sepSpan = document.createElement('span');
-        sepSpan.style.cssText = 'font-size:13px;color:#555;margin:0 6px;';
+        sepSpan.style.cssText = 'font-size:13px;color:#c5b89f;margin:0 6px;';
         sepSpan.textContent = '|';
         line2.appendChild(sepSpan);
         var laValSpan = document.createElement('span');
