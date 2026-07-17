@@ -291,30 +291,6 @@ const Utils = {
     return '#1a1612';
   },
 
-  // Dark mode: vivid blue below 50, neutral gray at 50, vivid red above 50
-  percentileColorDark: function (pctl) {
-    if (pctl === null || pctl === undefined) return null;
-    let r, g, b;
-    if (pctl <= 50) {
-      const t = pctl / 50;
-      // 0th = rgb(0,100,255) pure blue, 50th = rgb(140,140,140) neutral gray
-      r = Math.round(0 + t * 140);
-      g = Math.round(100 + t * 40);
-      b = Math.round(255 - t * 115);
-    } else {
-      const t = (pctl - 50) / 50;
-      // 50th = rgb(140,140,140) neutral gray, 100th = rgb(255,20,20) pure red
-      r = Math.round(140 + t * 115);
-      g = Math.round(140 - t * 120);
-      b = Math.round(140 - t * 120);
-    }
-    return 'rgb(' + r + ',' + g + ',' + b + ')';
-  },
-
-  percentileTextColorDark: function (pctl) {
-    if (pctl === null || pctl === undefined) return null;
-    return '#e6edf3';
-  },
 
   TOOLTIPS: {
     '#': 'Rank',

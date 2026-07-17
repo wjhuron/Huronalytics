@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Huronalytics print-identity mark: paper tile, ink H, pitch stripe -->
+  <rect x="0" y="0" width="64" height="64" rx="10" fill="#f0e8d8"/>
+  <rect x="2" y="2" width="60" height="60" rx="8" fill="none" stroke="#9f3026" stroke-width="4"/>
+  <text x="32" y="41" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="34" fill="#1a1612">H</text>
+  <g>
+    <rect x="10" y="48" width="8.8" height="6" fill="#E0A81E"/>
+    <rect x="18.8" y="48" width="8.8" height="6" fill="#009E73"/>
+    <rect x="27.6" y="48" width="8.8" height="6" fill="#0072B2"/>
+    <rect x="36.4" y="48" width="8.8" height="6" fill="#D55E00"/>
+    <rect x="45.2" y="48" width="8.8" height="6" fill="#8B5A2B"/>
+  </g>
+</svg>

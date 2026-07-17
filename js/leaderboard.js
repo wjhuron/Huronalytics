@@ -546,7 +546,6 @@ const Leaderboard = {
     const tbody = document.getElementById('table-body');
     const pinnedBody = document.getElementById('table-pinned-body');
     const noResults = document.getElementById('no-results');
-    const isDark = document.body.classList.contains('dark');
 
     this._lastRenderOpts = opts;
 
@@ -702,7 +701,7 @@ const Leaderboard = {
       leagueAvgRow.pitcher = 'League Avg';
       leagueAvgRow.hitter = 'League Avg';
       if (opts.viewMode === 'team') leagueAvgRow.team = 'League Avg';
-      const leagueTr = this._createRow(leagueAvgRow, visCols, -1, isDark, true);
+      const leagueTr = this._createRow(leagueAvgRow, visCols, -1, true);
       leagueTr.classList.add('league-avg-row');
       pinnedBody.appendChild(leagueTr);
 
@@ -720,7 +719,7 @@ const Leaderboard = {
     for (let ri = 0; ri < pageData.length; ri++) {
       const row = pageData[ri];
       const globalRank = startIdx + ri + 1;
-      const tr = this._createRow(row, visCols, globalRank, isDark, false);
+      const tr = this._createRow(row, visCols, globalRank, false);
       tr.classList.add('clickable-row');
       tr._playerName = row.pitcher || row.hitter;
       tr._rowData = row;
@@ -760,7 +759,7 @@ const Leaderboard = {
     document.getElementById('row-count').textContent = totalRows;
   },
 
-  _createRow: function (row, visCols, rank, isDark, isAvgRow) {
+  _createRow: function (row, visCols, rank, isAvgRow) {
     const self = this;
     const tr = document.createElement('tr');
 
@@ -959,13 +958,8 @@ const Leaderboard = {
           }
 
           if (showColor) {
-            if (isDark) {
-              td.style.backgroundColor = Utils.percentileColorDark(pctl);
-              td.style.color = Utils.percentileTextColorDark(pctl);
-            } else {
-              td.style.backgroundColor = Utils.percentileColor(pctl);
-              td.style.color = Utils.percentileTextColor(pctl);
-            }
+            td.style.backgroundColor = Utils.percentileColor(pctl);
+            td.style.color = Utils.percentileTextColor(pctl);
           }
           // Store percentile for tooltip
           td.setAttribute('data-pctl', pctl);

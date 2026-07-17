@@ -102,7 +102,6 @@
       setupKeyboardNav();
       setupColumnSettings();
       setupRangeFilters();
-      setupDarkMode();
 
       const pitcherCount = document.getElementById('home-pitcher-count');
       const hitterCount = document.getElementById('home-hitter-count');
@@ -1534,11 +1533,6 @@
       label.appendChild(document.createTextNode(' ' + col.label));
       panel.appendChild(label);
     });
-  }
-
-  function setupDarkMode() {
-    // Print redesign: single (light) theme. The 'dark' body class is no longer
-    // applied, so isDark checks resolve to the light-path percentile colors.
   }
 
   function saveURLState() {

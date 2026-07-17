@@ -830,7 +830,6 @@ var PlayerPage = {
     var container = document.getElementById('player-percentiles');
     if (!append) container.innerHTML = '';
 
-    var isDark = document.body.classList.contains('dark');
     var isPitcher = !!(data.pitcher);
 
     // Determine if player qualifies based on team games played
@@ -933,8 +932,8 @@ var PlayerPage = {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
         if (showColor) {
-          var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-          var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+          var bgColor = Utils.percentileColor(pctl);
+          var textColor = Utils.percentileTextColor(pctl);
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
           var qualPool = isPitcher ? 'qualified pitchers' : 'qualified hitters';
@@ -942,8 +941,8 @@ var PlayerPage = {
         } else {
           // Unqualified: outline ring instead of filled circle
           circle.style.backgroundColor = 'transparent';
-          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #b3a68c';
-          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#8a7f75';
+          circle.style.border = '2px solid #b3a68c';
+          circle.style.color = '#8a7f75';
           circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
@@ -957,12 +956,12 @@ var PlayerPage = {
       if (pctl != null) {
         barFill.style.width = Math.round(pctl) + '%';
         if (showColor) {
-          var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          var barColor = Utils.percentileColor(pctl);
           barFill.style.background = barColor;
         } else {
           // Unqualified: gray bar with white diagonal hatching
-          var barBg = isDark ? 'rgba(140,140,140,0.25)' : '#d8ccb4';
-          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(240,232,216,0.85)';
+          var barBg = '#d8ccb4';
+          var stripColor = 'rgba(240,232,216,0.85)';
           barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
         }
       }
@@ -979,7 +978,6 @@ var PlayerPage = {
 
   _renderPitchRunValues: function (data) {
     var container = document.getElementById('player-percentiles');
-    var isDark = document.body.classList.contains('dark');
 
     // Get this pitcher's pitch rows (use filtered if available)
     var pitchRows = this._filteredPitchRows || this._getPitchRows(data.pitcher, data.team);
@@ -1032,14 +1030,14 @@ var PlayerPage = {
         var circle = document.createElement('div');
         circle.className = 'pctl-circle';
         if (rvQualified) {
-          var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-          var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+          var bgColor = Utils.percentileColor(pctl);
+          var textColor = Utils.percentileTextColor(pctl);
           circle.style.backgroundColor = bgColor;
           circle.style.color = textColor;
         } else {
           circle.style.backgroundColor = 'transparent';
-          circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #b3a68c';
-          circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#8a7f75';
+          circle.style.border = '2px solid #b3a68c';
+          circle.style.color = '#8a7f75';
           circle.title = 'Below minimum qualification threshold';
         }
         circle.textContent = Math.round(pctl);
@@ -1053,11 +1051,11 @@ var PlayerPage = {
       if (pctl != null) {
         barFill.style.width = Math.round(pctl) + '%';
         if (rvQualified) {
-          var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+          var barColor = Utils.percentileColor(pctl);
           barFill.style.background = barColor;
         } else {
-          var barBg = isDark ? 'rgba(140,140,140,0.25)' : '#d8ccb4';
-          var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(240,232,216,0.85)';
+          var barBg = '#d8ccb4';
+          var stripColor = 'rgba(240,232,216,0.85)';
           barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
         }
       }
@@ -1103,7 +1101,6 @@ var PlayerPage = {
     // the Savant/FG convention; was per 100 PA); percentile comes from the
     // pool computed in process_data.py.
     var container = document.getElementById('player-percentiles');
-    var isDark = document.body.classList.contains('dark');
 
     var sectionLabel = document.createElement('div');
     sectionLabel.className = 'pctl-section-label';
@@ -1138,15 +1135,15 @@ var PlayerPage = {
       var circle = document.createElement('div');
       circle.className = 'pctl-circle';
       if (isQualified) {
-        var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-        var textColor = isDark ? '#fff' : Utils.percentileTextColor(pctl);
+        var bgColor = Utils.percentileColor(pctl);
+        var textColor = Utils.percentileTextColor(pctl);
         circle.style.backgroundColor = bgColor;
         circle.style.color = textColor;
         circle.title = Utils.ordinal(Math.round(pctl)) + ' percentile among qualified hitters';
       } else {
         circle.style.backgroundColor = 'transparent';
-        circle.style.border = isDark ? '2px solid rgba(160,160,160,0.5)' : '2px solid #b3a68c';
-        circle.style.color = isDark ? 'rgba(160,160,160,0.7)' : '#8a7f75';
+        circle.style.border = '2px solid #b3a68c';
+        circle.style.color = '#8a7f75';
         circle.title = 'Below minimum qualification threshold';
       }
       circle.textContent = Math.round(pctl);
@@ -1160,11 +1157,11 @@ var PlayerPage = {
     if (pctl != null) {
       barFill.style.width = Math.round(pctl) + '%';
       if (isQualified) {
-        var barColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
+        var barColor = Utils.percentileColor(pctl);
         barFill.style.background = barColor;
       } else {
-        var barBg = isDark ? 'rgba(140,140,140,0.25)' : '#d8ccb4';
-        var stripColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(240,232,216,0.85)';
+        var barBg = '#d8ccb4';
+        var stripColor = 'rgba(240,232,216,0.85)';
         barFill.style.background = barBg + ' repeating-linear-gradient(135deg, ' + stripColor + ', ' + stripColor + ' 2px, transparent 2px, transparent 6px)';
       }
     }
@@ -1224,7 +1221,7 @@ var PlayerPage = {
     var ellipseMeta = [];
     var pitchTypes = Utils.sortPitchTypes(Object.keys(groups));
     // Hairline edge matching the panel bg — de-blobs dense clusters without a contrasting ring
-    var dotEdge = document.body.classList.contains('dark') ? 'rgba(0,0,0,0.55)' : 'rgba(240,232,216,0.9)';
+    var dotEdge = 'rgba(240,232,216,0.9)';
 
     for (var j = 0; j < pitchTypes.length; j++) {
       var pt = pitchTypes[j];
@@ -1252,10 +1249,9 @@ var PlayerPage = {
     var canvas = document.getElementById('player-pitch-chart');
     var ctx = canvas.getContext('2d');
 
-    var isDark = document.body.classList.contains('dark');
-    var gridColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(58,48,38,0.12)';
-    var tickColor = isDark ? '#ccc' : '#6a5f55';
-    var crossColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(58,48,38,0.22)';
+    var gridColor = 'rgba(58,48,38,0.12)';
+    var tickColor = '#6a5f55';
+    var crossColor = 'rgba(58,48,38,0.22)';
 
     this.chart = new Chart(ctx, {
       type: 'scatter',
@@ -1768,7 +1764,6 @@ var PlayerPage = {
 
 
   _renderPerPitchTable: function (container, cols, pitchRows, totalRow) {
-    var isDark = document.body.classList.contains('dark');
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
 
@@ -1803,8 +1798,8 @@ var PlayerPage = {
           var pctl = col.noPctl ? null : row[col.key + '_pctl'];
           if (pctl != null && val != null) {
             if (rowInPool) {
-              var bgColor = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-              var txtColor = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
+              var bgColor = Utils.percentileColor(pctl);
+              var txtColor = Utils.percentileTextColor(pctl);
               td.style.backgroundColor = bgColor;
               td.style.color = txtColor;
             }
@@ -1832,8 +1827,8 @@ var PlayerPage = {
           // Apply percentile coloring to total row (league-wide percentiles)
           var pctl2 = col2.noPctl ? null : totalRow[col2.key + '_pctl'];
           if (pctl2 != null && val2 != null) {
-            var bgColor2 = isDark ? Utils.percentileColorDark(pctl2) : Utils.percentileColor(pctl2);
-            var txtColor2 = isDark ? Utils.percentileTextColorDark(pctl2) : Utils.percentileTextColor(pctl2);
+            var bgColor2 = Utils.percentileColor(pctl2);
+            var txtColor2 = Utils.percentileTextColor(pctl2);
             td2.style.backgroundColor = bgColor2;
             td2.style.color = txtColor2;
             td2.title = Math.round(pctl2) + 'th percentile';
@@ -1968,7 +1963,6 @@ var PlayerPage = {
   _renderLocValueCanvas: function(canvas, hm) {
     var ctx = canvas.getContext('2d');
     var W = canvas.width, H = canvas.height;
-    var isDark = document.body.classList.contains('dark');
 
     // Grid mirrors pipeline_locplus.py: x in feet, z is zone-normalized.
     var X_MIN = -1.5, BIN_X = 2 / 12, Z_MIN = -0.6, BIN_Z = 0.10;
@@ -1977,7 +1971,7 @@ var PlayerPage = {
     function cx(px) { return ((px - xMin) / (xMax - xMin)) * W; }
     function cy(zn) { return ((znMax - zn) / (znMax - znMin)) * H; } // flip: top = high z
 
-    ctx.fillStyle = isDark ? '#1e1e3a' : '#e8dfcb';
+    ctx.fillStyle = '#e8dfcb';
     ctx.fillRect(0, 0, W, H);
 
     var nMax = 1;
@@ -2000,10 +1994,10 @@ var PlayerPage = {
 
     // Strike zone (zone-normalized 0..1; plate half-width ~0.83 ft)
     var zl = cx(-0.83), zr = cx(0.83), zt = cy(1), zb = cy(0);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(58,48,38,0.65)';
+    ctx.strokeStyle = 'rgba(58,48,38,0.65)';
     ctx.lineWidth = 2;
     ctx.strokeRect(zl, zt, zr - zl, zb - zt);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(58,48,38,0.28)';
+    ctx.strokeStyle = 'rgba(58,48,38,0.28)';
     ctx.lineWidth = 1;
     var tw = (zr - zl) / 3, th = (zb - zt) / 3;
     for (var ti = 1; ti < 3; ti++) {
@@ -2012,7 +2006,7 @@ var PlayerPage = {
     }
 
     var py = cy(-0.4), pcx = cx(0);
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(58,48,38,0.18)';
+    ctx.fillStyle = 'rgba(58,48,38,0.18)';
     ctx.beginPath();
     ctx.moveTo(pcx - 8, py); ctx.lineTo(pcx + 8, py); ctx.lineTo(pcx + 5, py + 5);
     ctx.lineTo(pcx, py + 8); ctx.lineTo(pcx - 5, py + 5); ctx.closePath(); ctx.fill();
@@ -2022,7 +2016,6 @@ var PlayerPage = {
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
     var H = canvas.height;
-    var isDark = document.body.classList.contains('dark');
 
     // Plot bounds in feet
     var xMin = -2.0, xMax = 2.0;
@@ -2055,7 +2048,7 @@ var PlayerPage = {
     }
 
     // Clear canvas
-    ctx.fillStyle = isDark ? '#1e1e3a' : '#e8dfcb';
+    ctx.fillStyle = '#e8dfcb';
     ctx.fillRect(0, 0, W, H);
 
     // Draw density
@@ -2076,14 +2069,14 @@ var PlayerPage = {
     var zoneTop = ((zMax - szTop) / (zMax - zMin)) * H;
     var zoneBottom = ((zMax - szBot) / (zMax - zMin)) * H;
 
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(58,48,38,0.65)';
+    ctx.strokeStyle = 'rgba(58,48,38,0.65)';
     ctx.lineWidth = 2;
     ctx.strokeRect(zoneLeft, zoneTop, zoneRight - zoneLeft, zoneBottom - zoneTop);
 
     // Inner zone thirds — quick "did this pitch hit the up-and-in / down-the-
     // middle / etc." quadrant read without counting pixels. Subtle alpha so
     // the gridlines don't compete with the heat data.
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(58,48,38,0.28)';
+    ctx.strokeStyle = 'rgba(58,48,38,0.28)';
     ctx.lineWidth = 1;
     var thirdW = (zoneRight - zoneLeft) / 3;
     var thirdH = (zoneBottom - zoneTop) / 3;
@@ -2101,7 +2094,7 @@ var PlayerPage = {
     // Draw home plate at bottom
     var plateY = ((zMax - 0.5) / (zMax - zMin)) * H; // approximate bottom
     var plateCX = W / 2;
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(58,48,38,0.18)';
+    ctx.fillStyle = 'rgba(58,48,38,0.18)';
     ctx.beginPath();
     ctx.moveTo(plateCX - 8, plateY);
     ctx.lineTo(plateCX + 8, plateY);
@@ -2417,7 +2410,6 @@ var PlayerPage = {
     thead.appendChild(headRow);
     table.appendChild(thead);
 
-    var isDark = document.body.classList.contains('dark');
     // Row-level coloring gate: a pitch type with fewer than 25 total throws is
     // below the per-pitch sample-size threshold used elsewhere on the site, so
     // its bucket-level deviation values are too noisy to color reliably.
@@ -2468,8 +2460,8 @@ var PlayerPage = {
             var ratio = pct / baselinePct;
             // Map ratio to 0-100 scale: 0x=0, 1x=50, 2x=100
             var devPctl = Math.max(0, Math.min(100, 50 + (ratio - 1) * 50));
-            var bgColor = isDark ? Utils.percentileColorDark(devPctl) : Utils.percentileColor(devPctl);
-            var txtColor = isDark ? Utils.percentileTextColorDark(devPctl) : Utils.percentileTextColor(devPctl);
+            var bgColor = Utils.percentileColor(devPctl);
+            var txtColor = Utils.percentileTextColor(devPctl);
             td.style.backgroundColor = bgColor;
             td.style.color = txtColor;
           }
@@ -2743,7 +2735,6 @@ var PlayerPage = {
     var ctx = canvas.getContext('2d');
     var W = canvas.width;
     var H = canvas.height;
-    var isDark = document.body.classList.contains('dark');
 
     ctx.clearRect(0, 0, W, H);
 
@@ -2768,7 +2759,7 @@ var PlayerPage = {
     ctx.clearRect(0, 0, W, H);
 
     // Draw outfield grass (only inside foul lines — no background fill)
-    ctx.fillStyle = isDark ? '#1a3a1a' : '#c8e6c8';
+    ctx.fillStyle = '#c8e6c8';
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY);
     // Foul lines angle: LF line at ~135 deg from right, RF line at ~45 deg
@@ -2795,7 +2786,7 @@ var PlayerPage = {
     ctx.closePath();
     ctx.clip();
     // Draw dirt circle centered on mound
-    ctx.fillStyle = isDark ? '#3a2e1e' : '#d4b896';
+    ctx.fillStyle = '#d4b896';
     ctx.beginPath();
     ctx.arc(moundX, moundY, dirtRadius, 0, Math.PI * 2);
     ctx.fill();
@@ -2805,7 +2796,7 @@ var PlayerPage = {
     var distArcs = [300, 350, 400];
     for (var ai = 0; ai < distArcs.length; ai++) {
       var arcR = distArcs[ai] * fenceScale;
-      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
@@ -2815,14 +2806,14 @@ var PlayerPage = {
       // Label at top of arc
       var labelX = canvasHPX + arcR * Math.cos(-Math.PI / 2);
       var labelY = canvasHPY + arcR * Math.sin(-Math.PI / 2) - 3;
-      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)';
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.font = '10px Barlow, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(distArcs[ai] + 'ft', labelX, labelY);
     }
 
     // Draw foul lines
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.8)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY);
@@ -2848,7 +2839,7 @@ var PlayerPage = {
 
     // Draw infield diamond — 90ft between bases
     var baseDist = 90 * fenceScale;
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(canvasHPX, canvasHPY); // home
@@ -2859,7 +2850,7 @@ var PlayerPage = {
     ctx.stroke();
 
     // Draw home plate
-    ctx.fillStyle = isDark ? '#ddd' : '#fff';
+    ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.moveTo(canvasHPX - 5, canvasHPY);
     ctx.lineTo(canvasHPX + 5, canvasHPY);
@@ -3220,8 +3211,8 @@ var PlayerPage = {
     // Color functions
     var OUTCOME_COLORS = { 0: '#888', 1: '#ff8c00', 2: '#7b68ee', 3: '#20b2aa', 4: '#dc143c', 5: '#888' };
 
-    // EV gradient — bright blue → neutral gray → bright red.
-    // Matches Utils.percentileColorDark so dots stay legible against the heatmap.
+    // EV gradient — bright blue → neutral gray → bright red. Continuous DATA
+    // colormap (like the wOBAcon legend) — kept vivid on purpose; not UI chrome.
     function evColor(ev) {
       if (ev == null) return 'rgba(150,150,150,0.6)';
       var t = Math.max(0, Math.min(1, (ev - 70) / 45)); // 70–115 range
@@ -3408,10 +3399,10 @@ var PlayerPage = {
     }
     // Resolve colors once. Percentile color drives the xwOBAsp value and the
     // avg-placement value text (quality story). The marker dot uses the brand
-    // cyan accent so it never collides with the EV-gradient (blue→gray→red)
+    // terracotta accent so it never collides with the EV-gradient (blue→gray→red)
     // dots in the BIP scatter — it reads as a system annotation, not data.
-    var pctlColor = Utils.percentileColorDark(data.xwOBAsp_pctl);
-    var markerColor = '#00d4ff';
+    var pctlColor = Utils.percentileColor(data.xwOBAsp_pctl);
+    var markerColor = '#9f3026';
 
     // --- xwOBAsp annotation (HTML element, outside chart) ---
     var xwobaspNote = document.getElementById('la-spray-xwobasp-note');
@@ -3815,8 +3806,8 @@ var PlayerPage = {
       if (!col.noPctl) {
         var pctl = data[col.key + '_pctl'];
         if (pctl != null) {
-          var bg = Utils.percentileColorDark(pctl);
-          if (bg) td.style.backgroundColor = bg;
+          var bg2 = Utils.percentileColor(pctl);
+          if (bg2) { td.style.backgroundColor = bg2; td.style.color = Utils.percentileTextColor(pctl); }
         }
       }
       tr.appendChild(td);
@@ -3880,7 +3871,6 @@ var PlayerPage = {
 
   _renderGroupedPitchTable: function (container, cols, categoryRows, totalRow, hitterName, team, subRowsByCategory) {
     var self = this;
-    var isDark = document.body.classList.contains('dark');
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
 
@@ -3904,8 +3894,8 @@ var PlayerPage = {
       if (pctl != null && val != null) {
         var inPool = (row.count || 0) >= QUAL.MIN_HITTER_PT;
         if (inPool) {
-          var bg = isDark ? Utils.percentileColorDark(pctl) : Utils.percentileColor(pctl);
-          var fg = isDark ? Utils.percentileTextColorDark(pctl) : Utils.percentileTextColor(pctl);
+          var bg = Utils.percentileColor(pctl);
+          var fg = Utils.percentileTextColor(pctl);
           td.style.backgroundColor = bg;
           td.style.color = fg;
         }
@@ -4004,8 +3994,8 @@ var PlayerPage = {
           td2.textContent = col2.format ? col2.format(val2) : (val2 != null ? val2 : '—');
           var pctl2 = col2.noPctl ? null : totalRow[col2.key + '_pctl'];
           if (pctl2 != null && val2 != null) {
-            var bgColor2 = isDark ? Utils.percentileColorDark(pctl2) : Utils.percentileColor(pctl2);
-            var txtColor2 = isDark ? Utils.percentileTextColorDark(pctl2) : Utils.percentileTextColor(pctl2);
+            var bgColor2 = Utils.percentileColor(pctl2);
+            var txtColor2 = Utils.percentileTextColor(pctl2);
             td2.style.backgroundColor = bgColor2;
             td2.style.color = txtColor2;
             td2.title = Math.round(pctl2) + 'th percentile';
@@ -4137,8 +4127,8 @@ var PlayerPage = {
       if (!col.noPctl) {
         var pctl = data[col.key + '_pctl'];
         if (pctl != null) {
-          var bg = Utils.percentileColorDark(pctl);
-          if (bg) td.style.backgroundColor = bg;
+          var bg2 = Utils.percentileColor(pctl);
+          if (bg2) { td.style.backgroundColor = bg2; td.style.color = Utils.percentileTextColor(pctl); }
         }
       }
       tr.appendChild(td);
