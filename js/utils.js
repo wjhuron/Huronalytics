@@ -165,14 +165,14 @@ const Utils = {
 
   // Pitch type colors — single source of truth (used by scatter.js, leaderboard, player page)
   PITCH_COLORS: {
-    FF: '#0072B2', SI: '#FFD700', FC: '#8B5A2B', SL: '#D55E00',
+    FF: '#0072B2', SI: '#E0A81E', FC: '#8B5A2B', SL: '#D55E00',
     ST: '#56B4E9', SV: '#882255', CU: '#332288', CH: '#009E73',
     FS: '#CC79A7', KN: '#AAAAAA', SC: '#999999', CS: '#666666',
   },
 
   // Border colors for scatter chart markers (derived from PITCH_COLORS)
   PITCH_BORDER_COLORS: {
-    FF: '#3366CC', SI: '#CCB000', FC: '#CC8400', SL: '#BBBBBB',
+    FF: '#3366CC', SI: '#A87B12', FC: '#CC8400', SL: '#BBBBBB',
     ST: '#CC1076', SV: '#28A428', CU: '#B32626', CH: '#A352BE',
     FS: '#33B3A6', KN: '#888888', SC: '#777777', CS: '#4D4D4D',
   },
@@ -270,31 +270,25 @@ const Utils = {
     return lum > 0.25 ? 'black' : 'white';
   },
 
-  // Percentile color: blue below 50, neutral gray at 50, red above 50
+  // Percentile color — print scale: paper neutral at 50, slate below, brick above.
+  // Blend from mid-paper toward the target with intensity (|p-50|/50)^1.3 * 0.72,
+  // so mid percentiles stay close to the page and extremes read as inked tints.
   percentileColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
-    let r, g, b;
-    if (pctl <= 50) {
-      const t = pctl / 50;
-      // 0th = rgb(30,80,200) vivid blue, 50th = rgb(180,180,180) neutral gray
-      r = Math.round(30 + t * 150);
-      g = Math.round(80 + t * 100);
-      b = Math.round(200 - t * 20);
-    } else {
-      const t = (pctl - 50) / 50;
-      // 50th = rgb(180,180,180) neutral gray, 100th = rgb(200,45,40) vivid red
-      r = Math.round(180 + t * 20);
-      g = Math.round(180 - t * 135);
-      b = Math.round(180 - t * 140);
-    }
+    const base = [236, 227, 209];                      // mid-paper (between row and zebra)
+    const target = pctl >= 50 ? [176, 64, 47]          // brick (good)
+                              : [86, 120, 155];        // slate (bad)
+    const t = Math.pow(Math.abs(pctl - 50) / 50, 1.3) * 0.72;
+    const r = Math.round(base[0] + (target[0] - base[0]) * t);
+    const g = Math.round(base[1] + (target[1] - base[1]) * t);
+    const b = Math.round(base[2] + (target[2] - base[2]) * t);
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   },
 
-  // Text color for percentile backgrounds
+  // Text color for percentile backgrounds — always ink on the print scale
   percentileTextColor: function (pctl) {
     if (pctl === null || pctl === undefined) return null;
-    if (pctl < 25 || pctl > 75) return '#fff';
-    return '#1a1a2e';
+    return '#1a1612';
   },
 
   // Dark mode: vivid blue below 50, neutral gray at 50, vivid red above 50

@@ -1537,7 +1537,8 @@
   }
 
   function setupDarkMode() {
-    document.body.classList.add('dark');
+    // Print redesign: single (light) theme. The 'dark' body class is no longer
+    // applied, so isDark checks resolve to the light-path percentile colors.
   }
 
   function saveURLState() {
