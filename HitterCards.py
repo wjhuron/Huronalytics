@@ -1081,7 +1081,7 @@ def _render_percentile_bubbles(fig, h_row):
 # Card render
 # ─────────────────────────────────────────────────────────────────────
 def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
-                       output_dir=OUTPUT_DIR, layout='bubbles'):
+                       output_dir=OUTPUT_DIR, layout='bubbles', la_view='damage'):
     """Render a seasonal hitter card.
 
     layout:
@@ -1437,6 +1437,9 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         bounds = {'pull': (-50, -30), 'pull_side': (-30, -15), 'center_pull': (-15, 0),
                   'center_oppo': (0, 15), 'oppo_side': (15, 30), 'oppo': (30, 50)}
     LA_RANGES = LA_BINS
+    # Damage-view threshold: zones at/above the cmap's yellow anchor count as
+    # "damage" (kept warm); cooler zones are left unpainted in the damage view.
+    _DAMAGE_THRESH = 0.55
     # Choose value: hand-specific if qualified, else pooled
     for (sd, lb), z_hand in hand_zones.items():
         z_pool = pool_zones.get((sd, lb))
@@ -1449,11 +1452,16 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         if lb >= len(LA_RANGES): continue
         ly = LA_RANGES[lb]
         lo = max(-20, ly[0]); hi = min(60, ly[1])
-        col = WOBA_CMAP(min(1.0, v / 1.0))
-        # Bumped to 0.70 so SACQ zones pop boldly off the cream paper
-        # instead of feeling washed out — high-wOBA red zones now read as
-        # genuinely red, low-wOBA blue zones as genuinely blue.
-        alpha = 0.22 if z.get('count', 0) < 20 else 0.70
+        if la_view == 'damage':
+            # Damage view: only warm (>= yellow-anchor) zones, softened into a
+            # background layer; cooler zones left unpainted.
+            if v < _DAMAGE_THRESH:
+                continue
+            col = WOBA_CMAP(min(1.0, v / 1.0))
+            alpha = 0.14 if z.get('count', 0) < 20 else 0.40
+        else:
+            col = WOBA_CMAP(min(1.0, v / 1.0))
+            alpha = 0.22 if z.get('count', 0) < 20 else 0.70
         ax_spray.add_patch(Rectangle((min(bx), lo), abs(bx[1] - bx[0]), hi - lo,
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
@@ -1466,11 +1474,16 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         if lb >= len(LA_RANGES): continue
         ly = LA_RANGES[lb]
         lo = max(-20, ly[0]); hi = min(60, ly[1])
-        col = WOBA_CMAP(min(1.0, v / 1.0))
-        # Bumped to 0.70 so SACQ zones pop boldly off the cream paper
-        # instead of feeling washed out — high-wOBA red zones now read as
-        # genuinely red, low-wOBA blue zones as genuinely blue.
-        alpha = 0.22 if z.get('count', 0) < 20 else 0.70
+        if la_view == 'damage':
+            # Damage view: only warm (>= yellow-anchor) zones, softened into a
+            # background layer; cooler zones left unpainted.
+            if v < _DAMAGE_THRESH:
+                continue
+            col = WOBA_CMAP(min(1.0, v / 1.0))
+            alpha = 0.14 if z.get('count', 0) < 20 else 0.40
+        else:
+            col = WOBA_CMAP(min(1.0, v / 1.0))
+            alpha = 0.22 if z.get('count', 0) < 20 else 0.70
         ax_spray.add_patch(Rectangle((min(bx), lo), abs(bx[1] - bx[0]), hi - lo,
                                        facecolor=col, alpha=alpha,
                                        edgecolor=GRID_COLOR, linewidth=0.3))
@@ -1504,7 +1517,9 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ev = sf(p.get('ExitVelo'))
         if la is None or ang is None: continue
         event = p.get('Event', '') or ''
-        bip_pts.append((ang, max(-20, min(60, la)), ev, la, event))
+        _bcol = str(p.get('Barrel', '')).strip()
+        _brl = (_bcol == '6') if _bcol else bool(is_barrel(ev, la))
+        bip_pts.append((ang, max(-20, min(60, la)), ev, la, event, _brl))
 
     # Outcome-based dot coloring (replaces the old EV gradient). Warm-paper
     # palette: gray for non-hits, amber for singles, purple for doubles,
@@ -1549,16 +1564,53 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         if ev < 105: return 430
         return 540
 
-    # Render order: outs first (back), then hits in increasing weight order
-    # (1B → 2B → 3B → HR) so the most distinctive markers sit on top and
-    # never get obscured by neighboring out dots.
-    _OUTCOME_Z = {'Out': 0, '1B': 1, '2B': 2, '3B': 3, 'HR': 4}
-    for x, y, ev, _real, event in sorted(bip_pts,
-                                          key=lambda r: _OUTCOME_Z[_outcome_category(r[4])]):
-        cat = _outcome_category(event)
-        ax_spray.scatter([x], [y], s=ev_size(ev), c=[outcome_color(event)],
-                          edgecolors='#1a1612', linewidths=0.6,
-                          zorder=3 + _OUTCOME_Z[cat])
+    if la_view == 'damage':
+        # DAMAGE VIEW: three contact tiers — barrel (crimson), hard-hit 95+
+        # non-barrel (amber), everything else gray. Cream halo + dark ring so
+        # each dot reads on any zone; better tiers drawn on top.
+        _BARREL_RED  = (0.659, 0.149, 0.118, 0.96)
+        _HARDHIT_AMB = (0.878, 0.529, 0.118, 0.93)
+        _OTHER_GRAY  = (0.43, 0.40, 0.35, 0.38)
+        def _tier(ev, brl):
+            if brl:
+                return 2
+            if ev is not None and ev >= 95.0:
+                return 1
+            return 0
+        _TIER_STYLE = {2: (_BARREL_RED, 5), 1: (_HARDHIT_AMB, 4), 0: (_OTHER_GRAY, 3)}
+        from matplotlib.patheffects import withStroke
+        for x, y, ev, _real, event, _brl in sorted(bip_pts, key=lambda r: _tier(r[2], r[5])):
+            _c, _z = _TIER_STYLE[_tier(ev, _brl)]
+            ax_spray.scatter([x], [y], s=ev_size(ev), c=[_c],
+                              edgecolors='#f0e8d8', linewidths=1.1, zorder=_z,
+                              path_effects=[withStroke(linewidth=1.9, foreground='#1a1612')])
+        # Quality-contact concentration ellipse (barrels + hard-hit 95+), ~68%
+        # coverage, outline only — summarizes where the good contact clusters.
+        from matplotlib.patches import Ellipse as _Ellipse
+        _qx = [q[0] for q in bip_pts if q[5] or (q[2] is not None and q[2] >= 95)]
+        _qy = [q[1] for q in bip_pts if q[5] or (q[2] is not None and q[2] >= 95)]
+        if len(_qx) >= 6:
+            _cvm = np.cov(_qx, _qy)
+            _vals, _vecs = np.linalg.eigh(_cvm)
+            _o = _vals.argsort()[::-1]
+            _vals, _vecs = _vals[_o], _vecs[:, _o]
+            if _vals[0] > 0 and _vals[1] > 0:
+                _th = np.degrees(np.arctan2(_vecs[1, 0], _vecs[0, 0]))
+                _w, _h = 2.0 * 1.51 * np.sqrt(_vals)   # 1.51 sigma ~ 68% coverage
+                ax_spray.add_patch(_Ellipse((np.mean(_qx), np.mean(_qy)), _w, _h,
+                                             angle=_th, facecolor='none',
+                                             edgecolor='#9a3b1e', linewidth=2.0,
+                                             linestyle=(0, (5, 3)), zorder=2.6))
+    else:
+        # OUTCOME VIEW: outs first (back), then hits by weight so the most
+        # distinctive markers sit on top and never get obscured.
+        _OUTCOME_Z = {'Out': 0, '1B': 1, '2B': 2, '3B': 3, 'HR': 4}
+        for x, y, ev, _real, event, _brl in sorted(bip_pts,
+                                              key=lambda r: _OUTCOME_Z[_outcome_category(r[4])]):
+            cat = _outcome_category(event)
+            ax_spray.scatter([x], [y], s=ev_size(ev), c=[outcome_color(event)],
+                              edgecolors='#1a1612', linewidths=0.6,
+                              zorder=3 + _OUTCOME_Z[cat])
 
     # Median placement marker — prefer the values stored on the leaderboard
     # row (h_row['medLA'] and h_row['medSpray']). Those are computed by the
@@ -1593,7 +1645,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     # xwOBAsp (hitter overall, hand-specific zones with pooled fallback)
     xwobasp_sum = 0; xwobasp_n = 0; total_bip = 0
-    for ang, _yc, _ev, la_r, _event in bip_pts:
+    for ang, _yc, _ev, la_r, _event, _brl in bip_pts:
         total_bip += 1
         sd = spray_direction(ang, bats)
         lb = la_bin_idx(la_r) if la_r is not None else None
@@ -1748,16 +1800,23 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # palette as the BIP scatter above. Each tuple is (label, color, cat-key)
     # so we can filter out categories the hitter has zero of (e.g. no 3B for
     # a player with no triples) — no point listing what isn't on the chart.
-    OUTCOME_LEGEND_ALL = [
-        ('Out / E / FC', OUTCOME_COLORS['Out'], 'Out'),
-        ('1B',           OUTCOME_COLORS['1B'],  '1B'),
-        ('2B',           OUTCOME_COLORS['2B'],  '2B'),
-        ('3B',           OUTCOME_COLORS['3B'],  '3B'),
-        ('HR',           OUTCOME_COLORS['HR'],  'HR'),
-    ]
-    _present_cats = {_outcome_category(p[4]) for p in bip_pts}
-    OUTCOME_LEGEND = [item for item in OUTCOME_LEGEND_ALL
-                       if item[2] in _present_cats]
+    if la_view == 'damage':
+        OUTCOME_LEGEND = [
+            ('Barrel',       '#a8261e', 'brl'),
+            ('Hard-Hit 95+', '#e0871e', 'hh'),
+            ('Other BIP',    '#6e6557', 'oth'),
+        ]
+    else:
+        OUTCOME_LEGEND_ALL = [
+            ('Out / E / FC', OUTCOME_COLORS['Out'], 'Out'),
+            ('1B',           OUTCOME_COLORS['1B'],  '1B'),
+            ('2B',           OUTCOME_COLORS['2B'],  '2B'),
+            ('3B',           OUTCOME_COLORS['3B'],  '3B'),
+            ('HR',           OUTCOME_COLORS['HR'],  'HR'),
+        ]
+        _present_cats = {_outcome_category(p[4]) for p in bip_pts}
+        OUTCOME_LEGEND = [item for item in OUTCOME_LEGEND_ALL
+                           if item[2] in _present_cats]
     LEGEND_FONTSIZE = 13
     DOT_RADIUS = 0.0065
     ITEM_GAP = 0.026
@@ -2428,6 +2487,11 @@ def main():
                          help="'bubbles' (default) = single-column percentile grid "
                               "(Result / QoC / Plate Discipline / Bat Tracking). "
                               "'classic' = legacy heat maps + contact profile + pitch group table.")
+    parser.add_argument('--la-view', default='damage', choices=['damage', 'outcome'],
+                         help="LA x Spray mode: 'damage' (default) = softened damage-zone "
+                              "gradient + barrel/hard-hit/other dots + quality-contact "
+                              "concentration ellipse; 'outcome' = full wOBAcon zones + "
+                              "1B/2B/3B/HR/out dots.")
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -2435,6 +2499,7 @@ def main():
     if args.year_label is not None: year_label = args.year_label
     if args.output_dir is not None: output_dir = args.output_dir
     layout = args.layout
+    la_view = args.la_view
 
     # Parse filter_hitters string into a list (empty string → render all)
     if filter_hitters:
@@ -2450,7 +2515,7 @@ def main():
         for name in hitter_names:
             render_hitter_card(name, team_abbrev=team,
                                 year_label=year_label, output_dir=output_dir,
-                                layout=layout)
+                                layout=layout, la_view=la_view)
     else:
         # No specific names: render every (qualified) hitter, optionally filtered by team
         leaderboard = load_hitter_leaderboard()
@@ -2463,7 +2528,7 @@ def main():
         for r in targets:
             render_hitter_card(r.get('hitter'), team_abbrev=r.get('team'),
                                 year_label=year_label, output_dir=output_dir,
-                                layout=layout)
+                                layout=layout, la_view=la_view)
 
 
 if __name__ == '__main__':
