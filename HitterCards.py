@@ -714,7 +714,7 @@ def render_rate_kde_to_axes(ax, num_points, num_weights,
     else:
         ax.text(0.5, 0.5, 'n = ' + str(len(num_points or [])) + ' (insufficient)',
                 transform=ax.transAxes, color=TEXT_DIMMED, ha='center',
-                fontstyle='italic', fontfamily='Avenir Next')
+                fontstyle='italic', fontfamily='IBM Plex Sans')
     # Strike-zone overlay — alpha 0.85 (was 0.95) softens the outline
     # slightly so it doesn't read as harsh against the saturated heat blobs.
     ax.add_patch(Rectangle((-PLATE_HALF, sz_bot), PLATE_HALF * 2, sz_top - sz_bot,
@@ -725,12 +725,12 @@ def render_rate_kde_to_axes(ax, num_points, num_weights,
     for s in ax.spines.values(): s.set_visible(False)
     # Title — bigger, brighter for visibility against saturated panels
     ax.set_title(label, color=TEXT_PRIMARY, fontsize=13, fontweight='700',
-                 fontfamily='Avenir Next', pad=8)
+                 fontfamily='IBM Plex Sans', pad=8)
     # Sample-size annotation — backdrop alpha 0.65 (was 0.85) is more
     # subtle, less visible-pill feel.
     ax.text(0.02, 0.97, sample_label, transform=ax.transAxes,
             color=TEXT_MUTED, fontsize=11, fontweight='600',
-            fontfamily='Avenir Next', va='top', ha='left',
+            fontfamily='IBM Plex Sans', va='top', ha='left',
             bbox=dict(facecolor=BG, edgecolor='none', alpha=0.65,
                        boxstyle='round,pad=0.25'),
             zorder=11)
@@ -837,30 +837,22 @@ def _format_bubble_value(v, spec):
 
 
 def _percentile_color(pctl):
-    """Blue → light gray → red gradient matching the website player page.
-    pctl is 0-100; the rank is already directionally normalized (high = good)."""
+    """PRINT-IDENTITY percentile scale — matches the redesigned website's BUBBLE
+    scale (Utils.percentileBubbleColor). Blends from a VISIBLE warm-greige floor
+    at the 50th percentile toward slate (low) or brick (high), so mid-percentile
+    bubbles read as filled discs on cream instead of vanishing into the paper.
+    Endpoints kept light enough for ink text. Returns (fill_rgb01, ring_rgb01)."""
     if pctl is None:
-        return (0.55, 0.55, 0.55), (0.40, 0.40, 0.40)  # bar fill, ring/circle
-    p = max(0, min(100, pctl)) / 100.0
-    # Anchor colors (extreme-blue at 0, neutral at 0.5, extreme-red at 1)
-    blue_dark  = (0.18, 0.30, 0.78)
-    blue_mid   = (0.45, 0.55, 0.82)
-    neutral    = (0.55, 0.55, 0.55)
-    red_mid    = (0.85, 0.45, 0.45)
-    red_dark   = (0.83, 0.15, 0.15)
-    def lerp(a, b, t):
-        return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
-    if p < 0.25:
-        c = lerp(blue_dark, blue_mid, p / 0.25)
-    elif p < 0.50:
-        c = lerp(blue_mid, neutral, (p - 0.25) / 0.25)
-    elif p < 0.75:
-        c = lerp(neutral, red_mid, (p - 0.50) / 0.25)
-    else:
-        c = lerp(red_mid, red_dark, (p - 0.75) / 0.25)
-    # Bar fill: same hue. Ring: slightly darker version of c.
-    ring = tuple(max(0, ch * 0.78) for ch in c)
-    return c, ring
+        return (0.796, 0.722, 0.612), (0.757, 0.682, 0.573)  # greige neutral
+    p = max(0, min(100, pctl))
+    neutral = (203 / 255, 184 / 255, 156 / 255)       # warm greige, visible on cream
+    target = (168 / 255, 54 / 255, 40 / 255) if p >= 50 else (86 / 255, 118 / 255, 152 / 255)
+    t = (abs(p - 50) / 50.0) ** 0.72
+    fill = tuple(neutral[i] + (target[i] - neutral[i]) * t for i in range(3))
+    # Ring: a touch deeper so the circle reads distinct from the bar fill.
+    tr = min(1.0, t * 1.10 + 0.05)
+    ring = tuple(neutral[i] + (target[i] - neutral[i]) * tr for i in range(3))
+    return fill, ring
 
 
 def _hitter_stat_cell_color(value_str, league_avg, scale, higher_is_better,
@@ -988,7 +980,7 @@ def _render_percentile_bubbles(fig, h_row):
         header_y = y_cursor
         ax.text(GRID_LEFT, header_y, section,
                 ha='left', va='top',
-                fontsize=13, fontfamily='Avenir Next', fontweight='700',
+                fontsize=13, fontfamily='IBM Plex Sans', fontweight='700',
                 color=TEXT_SECONDARY)
         rule_y = header_y - SECTION_HEADER_H + 0.002
         ax.add_patch(Rectangle((GRID_LEFT, rule_y),
@@ -1010,7 +1002,7 @@ def _render_percentile_bubbles(fig, h_row):
             # Label
             ax.text(x_label_left, row_mid, label,
                     ha='left', va='center',
-                    fontsize=13, fontfamily='Avenir Next', fontweight='500',
+                    fontsize=13, fontfamily='IBM Plex Sans', fontweight='500',
                     color=TEXT_PRIMARY)
 
             # Pill track — full rounded pill in gray
@@ -1075,13 +1067,13 @@ def _render_percentile_bubbles(fig, h_row):
             label_pctl = f'{int(round(pctl))}' if pctl is not None else '—'
             ax.text(circle_x, row_mid, label_pctl,
                     ha='center', va='center',
-                    fontsize=11, fontfamily='Avenir Next', fontweight='700',
-                    color='#ffffff', zorder=13)
+                    fontsize=11, fontfamily='IBM Plex Sans', fontweight='700',
+                    color=TEXT_PRIMARY, zorder=13)
 
             # Value
             ax.text(x_value_right, row_mid, val_str,
                     ha='right', va='center',
-                    fontsize=13, fontfamily='Avenir Next', fontweight='600',
+                    fontsize=13, fontfamily='IBM Plex Sans', fontweight='600',
                     color=TEXT_PRIMARY)
 
 
@@ -1202,11 +1194,23 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     ax_main.axis('off')
     # Don't fill ax_main background — let the radial gradient show through
 
-    # Layout anchors (the rainbow header stripe was cut — kept the position
-    # variables since the photo + identity zone positions reference them).
+    # Layout anchors.
     stripe_left = 0.01 * FIG_W
     stripe_right = 0.99 * FIG_W
-    stripe_y = FIG_H - 0.20      # was 0.30; pulled up since no stripe
+    stripe_y = FIG_H - 0.20
+
+    # ─── Brand stripe (PRINT-IDENTITY) ──────────────────────────────
+    # Fixed Okabe-Ito pitch palette, spanning the card width — the shared
+    # brand mark used on the website header and the pitcher cards. Unlike the
+    # pitcher card's usage-ordered arsenal stripe, the hitter has no arsenal,
+    # so this is the fixed 5-colour brand bar (SI/CH/FF/SL/FC).
+    _BRAND_STRIPE = ['#E0A81E', '#009E73', '#0072B2', '#D55E00', '#8B5A2B']
+    _seg_w = (stripe_right - stripe_left) / len(_BRAND_STRIPE)
+    _sx = stripe_left
+    for _c in _BRAND_STRIPE:
+        ax_main.add_patch(Rectangle((_sx, FIG_H - 0.18), _seg_w, 0.16,
+                                     facecolor=_c, edgecolor='none', zorder=6))
+        _sx += _seg_w
 
     # ─── Identity zone (top-left) ───────────────────────────────────
     photo_left = stripe_left
@@ -1228,14 +1232,14 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # demoted from cyan display font to a quiet off-white sans subline.
     text_x = photo_left + photo_w + 0.4
     ax_main.text(text_x, photo_top - 0.15, display_name,
-                  fontsize=36, fontfamily='DIN Condensed', color=TEXT_PRIMARY,
-                  va='top', fontweight='bold')
+                  fontsize=31, fontfamily='Bitter', color=TEXT_PRIMARY,
+                  va='top', fontweight='black')
     # Identity line: "POS | B/T | TEAM | Age: N"
     # Bats/throws are shown as "L/R" (single-letter codes joined by slash)
     # so the line stays compact. Switch hitters show "S/<throws>".
     ax_main.text(text_x, photo_top - 1.05,
                   f"{position}  |  {bats}/{throws}  |  {team}  |  Age: {age}",
-                  fontsize=16, fontfamily='Avenir Next', color=TEXT_PRIMARY, va='top',
+                  fontsize=16, fontfamily='IBM Plex Sans', color=TEXT_PRIMARY, va='top',
                   fontweight='600')
     # Year label + "Through {date}" inline data freshness stamp.
     # Resolution order:
@@ -1262,7 +1266,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     except Exception:
         _date_suffix = ''
     ax_main.text(text_x, photo_top - 1.80, year_label + _date_suffix,
-                  fontsize=17, fontfamily='Avenir Next', color=TEXT_SECONDARY,
+                  fontsize=17, fontfamily='IBM Plex Sans', color=TEXT_SECONDARY,
                   va='top', fontweight='600')
 
     # ─── Headline stats strip ────────────────────────────────────────
@@ -1352,7 +1356,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                                      linewidth=0.8))
         ax_main.text(cur_x + cw / 2, stat_y_header + cell_h / 2, k,
                       fontsize=12, ha='center', va='center', color=TEXT_SECONDARY,
-                      fontweight='bold', fontfamily='Avenir Next')
+                      fontweight='bold', fontfamily='IBM Plex Sans')
         # Value cell — percentile-colored bg
         cell_bg = DARK_CELL
         sl_cfg = HITTER_STAT_LINE_COLOR.get(k)
@@ -1375,7 +1379,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ax_main.text(cur_x + cw / 2, stat_y_value + cell_h / 2, val_str,
                       fontsize=15, ha='center', va='center',
                       color=TEXT_PRIMARY, fontweight='bold',
-                      fontfamily='Avenir Next')
+                      fontfamily='IBM Plex Sans')
         cur_x += cw
 
     # Subtle group dividers — thin vertical hairlines between stat groups
@@ -1607,22 +1611,19 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     xwobasp_display = h_row.get('xwOBAsp', xwobasp)
     pctl = h_row.get('xwOBAsp_pctl')
 
-    # Percentile→color (mirrors js/utils.js Utils.percentileColorDark):
-    #   0   = rgb(  0,100,255) bright blue
-    #   50  = rgb(140,140,140) neutral gray
-    #   100 = rgb(255, 20, 20) bright red
+    # PRINT-IDENTITY annotation color. The light paper-blend percentile tint is
+    # a background color — unreadable as TEXT on cream — so this value/placement
+    # text instead blends from warm-gray ink toward a DEEP version of the
+    # percentile hue (deep terracotta for good, deep slate for bad). Stays
+    # readable on paper while carrying the same good/bad hue as the bubbles.
     def _pctl_color_dark(p):
-        if p is None: return PERCENTILE_NEUTRAL
-        if p <= 50:
-            tt = p / 50.0
-            r = int(round(0   + tt * 140))
-            g = int(round(100 + tt * 40))
-            b = int(round(255 - tt * 115))
-        else:
-            tt = (p - 50) / 50.0
-            r = int(round(140 + tt * 115))
-            g = int(round(140 - tt * 120))
-            b = int(round(140 - tt * 120))
+        if p is None: return TEXT_MUTED
+        neutral = (0x6a, 0x5f, 0x55)                 # TEXT_MUTED (warm ink-gray)
+        target = (0x9f, 0x30, 0x26) if p >= 50 else (0x2f, 0x55, 0x73)
+        t = (abs(p - 50) / 50.0) ** 1.1
+        r = int(round(neutral[0] + (target[0] - neutral[0]) * t))
+        g = int(round(neutral[1] + (target[1] - neutral[1]) * t))
+        b = int(round(neutral[2] + (target[2] - neutral[2]) * t))
         return f'#{r:02x}{g:02x}{b:02x}'
 
     pctl_color = _pctl_color_dark(pctl)
@@ -1650,7 +1651,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
         def _place_text(x, y, txt, fontsize, color, fontweight):
             t = fig.text(x, y, txt, color=color, fontsize=fontsize,
-                          fontweight=fontweight, fontfamily='Avenir Next',
+                          fontweight=fontweight, fontfamily='IBM Plex Sans',
                           va='center', ha='left')
             bbox = t.get_window_extent(renderer=renderer)
             bbox_fig = bbox.transformed(inv)
@@ -1671,7 +1672,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
         def _place_text2(x, y, txt, fontsize, color, fontweight):
             t = fig.text(x, y, txt, color=color, fontsize=fontsize,
-                          fontweight=fontweight, fontfamily='Avenir Next',
+                          fontweight=fontweight, fontfamily='IBM Plex Sans',
                           va='center', ha='left')
             bbox = t.get_window_extent(renderer=renderer)
             bbox_fig = bbox.transformed(inv)
@@ -1699,16 +1700,16 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # Title-case throughout — matches the card's typographic voice.
     # Bullet separators avoid the ←→ font-fallback warnings.
     ax_spray.set_xlabel(f'{leftL}   •   Spray Angle   •   {rightL}',
-                         color=TEXT_MUTED, fontsize=10, fontfamily='Avenir Next')
+                         color=TEXT_MUTED, fontsize=10, fontfamily='IBM Plex Sans')
     ax_spray.set_ylabel('Launch Angle', color=TEXT_MUTED, fontsize=10,
-                         fontfamily='Avenir Next')
+                         fontfamily='IBM Plex Sans')
     # Section title (centered ABOVE the annotation block, matches hitter page)
     # Editorial-style title: letterspaced uppercase, off-white, with thin
     # underline rule. Same treatment used for all section titles below.
     title_x = (spray_axes_left + spray_axes_right) / 2
     fig.text(title_x, 0.985 - _LA_SHIFT, 'L A U N C H   A N G L E   ×   S P R A Y   A N G L E',
               color=TEXT_SECONDARY, fontsize=_LA_TITLE_FONTSIZE, fontweight='700',
-              fontfamily='Avenir Next', va='center', ha='center')
+              fontfamily='IBM Plex Sans', va='center', ha='center')
     # Thin underline rule — slightly wider with the bigger title
     rule_w = 0.27
     ax_rule = fig.add_axes([title_x - rule_w / 2, 0.978 - _LA_SHIFT, rule_w, 0.0008])
@@ -1766,7 +1767,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     def _measure_text(txt, fontsize, fontweight='600'):
         t = fig.text(0, 0, txt, color='#000', fontsize=fontsize,
-                      fontweight=fontweight, fontfamily='Avenir Next',
+                      fontweight=fontweight, fontfamily='IBM Plex Sans',
                       va='center', ha='left')
         w = t.get_window_extent(renderer=renderer_l).transformed(inv_l).width
         t.remove()
@@ -1774,7 +1775,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     def _draw_text(x, y, txt, fontsize, color, fontweight='600'):
         t = fig.text(x, y, txt, color=color, fontsize=fontsize,
-                      fontweight=fontweight, fontfamily='Avenir Next',
+                      fontweight=fontweight, fontfamily='IBM Plex Sans',
                       va='center', ha='left')
         return t.get_window_extent(renderer=renderer_l).transformed(inv_l).x1
 
@@ -1903,7 +1904,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
         # Watermark — bottom-right corner.
         fig.text(0.99, 0.012, 'Huronalytics', color=TEXT_DIMMED, fontsize=10,
-                  fontfamily='Avenir Next', ha='right', va='bottom',
+                  fontfamily='IBM Plex Sans', ha='right', va='bottom',
                   fontweight='600')
 
         # Save with _bubbles suffix so the two layouts can coexist.
@@ -2029,7 +2030,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     def _hm_measure(txt, fontsize=HM_FONT, fontweight='600'):
         t = fig.text(0, 0, txt, color='#000', fontsize=fontsize,
-                      fontweight=fontweight, fontfamily='Avenir Next',
+                      fontweight=fontweight, fontfamily='IBM Plex Sans',
                       va='center', ha='left')
         w = t.get_window_extent(renderer=renderer_hm).transformed(inv_hm).width
         t.remove()
@@ -2037,7 +2038,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     def _hm_text(x, y, txt, color, fontsize=HM_FONT, fontweight='600'):
         t = fig.text(x, y, txt, color=color, fontsize=fontsize,
-                      fontweight=fontweight, fontfamily='Avenir Next',
+                      fontweight=fontweight, fontfamily='IBM Plex Sans',
                       va='center', ha='left')
         return t.get_window_extent(renderer=renderer_hm).transformed(inv_hm).x1
 
@@ -2070,7 +2071,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                 tick_fig_x = x + bar_w * mlb_pos
                 fig.text(tick_fig_x, y_center - HM_BAR_H / 2 - 0.006, 'MLB',
                           color=TEXT_SECONDARY, fontsize=8, fontweight='700',
-                          fontfamily='Avenir Next', va='top', ha='center')
+                          fontfamily='IBM Plex Sans', va='top', ha='center')
         _hm_text(bar_right + 0.003, y_center, high_str, TEXT_SECONDARY)
 
     # Side-by-side: WHIFFS (left) + DAMAGE (right), with MLB-avg tick on each.
@@ -2140,7 +2141,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             ax_main.text((cx + cw / 2) * FIG_W,
                            (cp_y_bot + cp_height * 0.75) * FIG_H, lbl,
                            fontsize=11, ha='center', va='center', color=ACCENT,
-                           fontweight='bold', fontfamily='Avenir Next')
+                           fontweight='bold', fontfamily='IBM Plex Sans')
             pctl_key_map = {
                 'Bat Speed': 'batSpeed_pctl', 'Avg EV': 'avgEVAll_pctl',
                 'Max EV': 'maxEV_pctl', 'Squared-Up%': 'squaredUpPct_pctl',
@@ -2171,11 +2172,11 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             ax_main.text((cx + cw / 2) * FIG_W,
                            (cp_y_bot + cp_height * 0.25) * FIG_H, val_str,
                            fontsize=14, ha='center', va='center', color=TEXT_PRIMARY,
-                           fontweight='bold', fontfamily='Avenir Next')
+                           fontweight='bold', fontfamily='IBM Plex Sans')
         # Section title — same letterspaced editorial style as LA × Spray title
         fig.text(0.5, cp_y_top + 0.008, 'C O N T A C T   P R O F I L E',
                   fontsize=12, ha='center', va='bottom', color=TEXT_SECONDARY,
-                  fontweight='700', fontfamily='Avenir Next')
+                  fontweight='700', fontfamily='IBM Plex Sans')
         rule_w_cp = 0.13
         ax_rule_cp = fig.add_axes([0.5 - rule_w_cp / 2, cp_y_top + 0.005,
                                     rule_w_cp, 0.0008])
@@ -2389,7 +2390,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # ─── Watermark ─────────────────────────────────────────────────
     # Watermark — bottom-right corner.
     fig.text(0.99, 0.012, 'Huronalytics', color=TEXT_DIMMED, fontsize=10,
-              fontfamily='Avenir Next', ha='right', va='bottom',
+              fontfamily='IBM Plex Sans', ha='right', va='bottom',
               fontweight='600')
 
     # Save

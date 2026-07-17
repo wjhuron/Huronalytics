@@ -291,11 +291,11 @@ const Utils = {
   // into the paper. Endpoints kept light enough for ink text. Cells (dense
   // tables) deliberately keep the near-paper midpoint via percentileColor.
   percentileBubbleColor: function (pctl) {
-    if (pctl === null || pctl === undefined) return 'rgb(210, 194, 168)';
-    const neutral = [210, 194, 168];                   // warm greige (visible on cream)
-    const target = pctl >= 50 ? [188, 96, 78]          // brick (good), ink-safe
-                              : [118, 144, 172];        // slate (bad), ink-safe
-    const t = Math.pow(Math.abs(pctl - 50) / 50, 0.75);
+    if (pctl === null || pctl === undefined) return 'rgb(203, 184, 156)';
+    const neutral = [203, 184, 156];                   // warm greige (visible on cream)
+    const target = pctl >= 50 ? [168, 54, 40]          // brick (good), ink-safe
+                              : [86, 118, 152];         // slate (bad), ink-safe
+    const t = Math.pow(Math.abs(pctl - 50) / 50, 0.72);
     const r = Math.round(neutral[0] + (target[0] - neutral[0]) * t);
     const g = Math.round(neutral[1] + (target[1] - neutral[1]) * t);
     const b = Math.round(neutral[2] + (target[2] - neutral[2]) * t);

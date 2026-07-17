@@ -23,6 +23,21 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.patches import Ellipse, FancyBboxPatch, Rectangle
+
+# Register the bundled print-identity fonts (Bitter, IBM Plex Sans / Condensed)
+# so cards render in the correct typefaces on any machine, independent of a
+# system font install or a stale matplotlib cache. HitterCards.py imports from
+# this module, so it inherits the registration too.
+import os as _os
+import matplotlib.font_manager as _fm
+_FONT_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'assets', 'fonts')
+if _os.path.isdir(_FONT_DIR):
+    for _fn in sorted(_os.listdir(_FONT_DIR)):
+        if _fn.lower().endswith(('.ttf', '.otf')):
+            try:
+                _fm.fontManager.addfont(_os.path.join(_FONT_DIR, _fn))
+            except Exception:
+                pass
 from PIL import Image
 from io import BytesIO
 import numpy as np
@@ -754,33 +769,24 @@ def _format_bubble_value(v, spec):
 
 
 def _percentile_color(pctl):
-    """Blue → light gray → red gradient matching the website player page.
-    pctl is 0-100, already directionally normalized (high = good for pitcher)."""
+    """PRINT-IDENTITY percentile scale — matches the redesigned website's BUBBLE
+    scale (Utils.percentileBubbleColor) and the hitter cards. Blends from a
+    VISIBLE warm-greige floor at the 50th percentile toward slate (low) or brick
+    (high), so mid-percentile bubbles read as filled discs on cream instead of
+    vanishing into the paper. Endpoints kept light enough for ink text.
+    pctl is 0-100, already directionally normalized (high = good for pitcher).
+    Returns (fill_rgb01, ring_rgb01)."""
     if pctl is None:
-        return (0.55, 0.55, 0.55), (0.40, 0.40, 0.40)  # bar fill, ring/circle
-    p = max(0, min(100, pctl)) / 100.0
-    # Vivid, saturated endpoints — these read bright on the warm cream bg.
-    blue_dark  = (0.05, 0.36, 0.98)   # vivid blue (worst)
-    blue_mid   = (0.36, 0.62, 0.98)
-    # Neutral (~50th pctl): a darker, faintly-cool slate. The old light gray
-    # (0.62) washed out against the warm cream bg, so average bubbles read as
-    # muddy. Darker = more contrast; the whisper of cool separates it from the
-    # warm paper without leaning blue enough to imply "below average".
-    neutral    = (0.52, 0.54, 0.57)
-    red_mid    = (0.98, 0.42, 0.38)
-    red_dark   = (0.93, 0.08, 0.08)   # vivid red (best)
-    def lerp(a, b, t):
-        return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
-    if p < 0.25:
-        c = lerp(blue_dark, blue_mid, p / 0.25)
-    elif p < 0.50:
-        c = lerp(blue_mid, neutral, (p - 0.25) / 0.25)
-    elif p < 0.75:
-        c = lerp(neutral, red_mid, (p - 0.50) / 0.25)
-    else:
-        c = lerp(red_mid, red_dark, (p - 0.75) / 0.25)
-    ring = tuple(max(0, ch * 0.84) for ch in c)  # ring only slightly darker
-    return c, ring
+        return (0.796, 0.722, 0.612), (0.757, 0.682, 0.573)  # greige neutral
+    p = max(0, min(100, pctl))
+    neutral = (203 / 255, 184 / 255, 156 / 255)       # warm greige, visible on cream
+    target = (168 / 255, 54 / 255, 40 / 255) if p >= 50 else (86 / 255, 118 / 255, 152 / 255)
+    t = (abs(p - 50) / 50.0) ** 0.72
+    fill = tuple(neutral[i] + (target[i] - neutral[i]) * t for i in range(3))
+    # Ring: a touch deeper so the circle reads distinct from the bar fill.
+    tr = min(1.0, t * 1.10 + 0.05)
+    ring = tuple(neutral[i] + (target[i] - neutral[i]) * tr for i in range(3))
+    return fill, ring
 
 
 def _pitcher_stat_cell_color(value_str, league_avg, scale, higher_is_better,
@@ -957,7 +963,7 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
             y_cursor -= SECTION_GAP
         header_y = y_cursor
         ax.text(grid_left, header_y, section, ha='left', va='top',
-                fontsize=12.5, fontfamily='Avenir Next', fontweight='700',
+                fontsize=12.5, fontfamily='IBM Plex Sans', fontweight='700',
                 color=TEXT_SECONDARY)
         rule_y = header_y - SECTION_HEADER_H + 0.035 / _fh_in   # 0.002 * 17.5
         ax.add_patch(Rectangle((grid_left, rule_y), col_w, 0.0175 / _fh_in,
@@ -976,7 +982,7 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
             fill_color, ring_color = _percentile_color(pctl)
 
             ax.text(x_label_left, row_mid, label, ha='left', va='center',
-                    fontsize=12.5, fontfamily='Avenir Next', fontweight='500',
+                    fontsize=12.5, fontfamily='IBM Plex Sans', fontweight='500',
                     color=TEXT_PRIMARY)
 
             track_y = row_mid - bar_h_axis / 2
@@ -1009,11 +1015,11 @@ def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid
             ax.add_patch(ell)
             label_pctl = f'{int(round(pctl))}' if pctl is not None else '—'
             ax.text(circle_x, row_mid, label_pctl, ha='center', va='center',
-                    fontsize=10.5, fontfamily='Avenir Next', fontweight='700',
-                    color='#ffffff', zorder=13)
+                    fontsize=10.5, fontfamily='IBM Plex Sans', fontweight='700',
+                    color=TEXT_PRIMARY, zorder=13)
 
             ax.text(x_value_right, row_mid, val_str, ha='right', va='center',
-                    fontsize=12.5, fontfamily='Avenir Next', fontweight='600',
+                    fontsize=12.5, fontfamily='IBM Plex Sans', fontweight='600',
                     color=TEXT_PRIMARY)
 
 
@@ -1129,7 +1135,7 @@ def _render_single_game_panel(fig, pitches):
         ax = fig.add_axes(rect); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
         ax.axis('off'); ax.set_facecolor(BG)
         ax.text(0.5, 0.99, title, fontsize=12, fontweight='bold', ha='center', va='top',
-                color=TEXT_SECONDARY, fontfamily='DIN Condensed')
+                color=TEXT_SECONDARY, fontfamily='IBM Plex Sans')
         spts = sorted(data, key=lambda x: (-data[x], PITCH_ORDER.index(x) if x in PITCH_ORDER else 99))
         if not spts:
             return
@@ -1144,7 +1150,7 @@ def _render_single_game_panel(fig, pitches):
             if pct > 0:
                 ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58 * pct, rh * 0.56, facecolor=color, edgecolor='none'))
             ax.text(0.78, y, ("< 1%" if 0 < pct*100 < 1 else f'{pct*100:.1f}%'), fontsize=10, va='center', ha='left',
-                    color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
+                    color=TEXT_PRIMARY, fontweight='bold', fontfamily='IBM Plex Sans')
 
     _usage([0.55, 0.32, 0.22, 0.17], usage['R'], tot['R'], 'VS RHH')
     _usage([0.77, 0.32, 0.22, 0.17], usage['L'], tot['L'], 'VS LHH')
@@ -1241,10 +1247,10 @@ def render_card(config, pitches, output_file):
     ax_main.add_patch(Rectangle((photo_left, photo_bottom), photo_w, photo_h, fill=False, edgecolor=PHOTO_BORDER, linewidth=1.5, alpha=0.8, zorder=3))
 
     photo_right = photo_left + photo_w; text_x = photo_right + 0.3
-    ax_main.text(text_x, photo_top-0.1, config['display_name'], fontsize=32, fontfamily='DIN Condensed', color=TEXT_PRIMARY, va='top', fontweight='bold')
+    ax_main.text(text_x, photo_top-0.1, config['display_name'], fontsize=28, fontfamily='Bitter', color=TEXT_PRIMARY, va='top', fontweight='black')
     hand_code = 'LHP' if config['hand'] == 'L' else 'RHP'
-    ax_main.text(text_x, photo_top-0.85, f"{hand_code}  |  {config['team']}  |  Age: {config['age']}", fontsize=12, fontfamily='Avenir Next', color=TEXT_MUTED, va='top')
-    ax_main.text(text_x, photo_top-1.5, config['game_date'], fontsize=24, fontfamily='DIN Condensed', color=ACCENT, va='top')
+    ax_main.text(text_x, photo_top-0.85, f"{hand_code}  |  {config['team']}  |  Age: {config['age']}", fontsize=12, fontfamily='IBM Plex Sans', color=TEXT_MUTED, va='top')
+    ax_main.text(text_x, photo_top-1.5, config['game_date'], fontsize=24, fontfamily='IBM Plex Sans', color=ACCENT, va='top')
 
     # Stat line — season cards widen the 5-cell strip so it spans the bubble
     # column beneath it. Single-game cards have no bubble column, so they use
@@ -1261,7 +1267,7 @@ def render_card(config, pitches, output_file):
         hdr = config['stat_headers'][i]
         val_str = config['stat_values'][i]
         ax_main.add_patch(Rectangle((x, stat_y_header), col_w, cell_h, facecolor=DARKER, edgecolor=SUBTLE_BORDER, linewidth=0.8))
-        ax_main.text(x+col_w/2, stat_y_header+cell_h/2, hdr, fontsize=hdr_fs, ha='center', va='center', color=TEXT_SECONDARY, fontweight='bold', fontfamily='Avenir Next')
+        ax_main.text(x+col_w/2, stat_y_header+cell_h/2, hdr, fontsize=hdr_fs, ha='center', va='center', color=TEXT_SECONDARY, fontweight='bold', fontfamily='IBM Plex Sans')
         # Determine cell color — blue→red percentile hue (matches the bubbles).
         cell_bg = DARK_CELL
         sl_cfg = STAT_LINE_COLOR.get(hdr)
@@ -1275,7 +1281,7 @@ def render_card(config, pitches, output_file):
                 if tinted:
                     cell_bg = tinted
         ax_main.add_patch(Rectangle((x, stat_y_value), col_w, cell_h, facecolor=cell_bg, edgecolor=SUBTLE_BORDER, linewidth=0.8))
-        ax_main.text(x+col_w/2, stat_y_value+cell_h/2, val_str, fontsize=val_fs, ha='center', va='center', color=TEXT_PRIMARY, fontweight='bold', fontfamily='Avenir Next')
+        ax_main.text(x+col_w/2, stat_y_value+cell_h/2, val_str, fontsize=val_fs, ha='center', va='center', color=TEXT_PRIMARY, fontweight='bold', fontfamily='IBM Plex Sans')
     ax_main.add_patch(Rectangle((photo_left, stat_y_value), len(config['stat_headers'])*col_w, stat_y_header+cell_h-stat_y_value, fill=False, edgecolor=ACCENT, linewidth=2, zorder=5))
 
     # ── FB velo-by-start sparkline — season cards only, thin strip directly
@@ -1320,11 +1326,11 @@ def render_card(config, pitches, output_file):
             _label_y = strip_top + 0.07
             ax_main.text(photo_left, _label_y, 'FB VELO BY START', fontsize=8.5,
                          color=TEXT_SECONDARY, fontweight='bold',
-                         fontfamily='Avenir Next', va='bottom')
+                         fontfamily='IBM Plex Sans', va='bottom')
             ax_main.text(photo_left + strip_w_in, _label_y,
                          f'{_svelos[-1]:.1f} last  ·  {_savg:.1f} avg  ·  {max(_svelos):.1f} max',
                          fontsize=8.5, color=TEXT_MUTED, fontweight='bold',
-                         fontfamily='Avenir Next', va='bottom', ha='right')
+                         fontfamily='IBM Plex Sans', va='bottom', ha='right')
 
             def _fmt_spark_date(d):
                 try:
@@ -1334,12 +1340,12 @@ def render_card(config, pitches, output_file):
 
             _date_y = strip_top - strip_h_in - 0.12
             ax_main.text(photo_left, _date_y, _fmt_spark_date(_sdates[0]), fontsize=7.5,
-                         color=TEXT_FAINT, fontfamily='Avenir Next', va='top', ha='left')
+                         color=TEXT_FAINT, fontfamily='IBM Plex Sans', va='top', ha='left')
             ax_main.text(photo_left + strip_w_in / 2, _date_y,
                          _fmt_spark_date(_sdates[len(_sdates) // 2]), fontsize=7.5,
-                         color=TEXT_FAINT, fontfamily='Avenir Next', va='top', ha='center')
+                         color=TEXT_FAINT, fontfamily='IBM Plex Sans', va='top', ha='center')
             ax_main.text(photo_left + strip_w_in, _date_y, _fmt_spark_date(_sdates[-1]),
-                         fontsize=7.5, color=TEXT_FAINT, fontfamily='Avenir Next',
+                         fontsize=7.5, color=TEXT_FAINT, fontfamily='IBM Plex Sans',
                          va='top', ha='right')
 
     # Movement plot — right-upper, near-square (movement is read to-scale). Season
@@ -1360,11 +1366,11 @@ def render_card(config, pitches, output_file):
     # Title — parity with the hitter card's titled hero viz.
     fig.text(_mv_cx, _mv_ty, 'PITCH MOVEMENT', ha='center', va='center',
              fontsize=15, fontweight='bold', color=TEXT_SECONDARY,
-             fontfamily='DIN Condensed')
+             fontfamily='IBM Plex Sans')
     ax_plot.axhline(y=0, color=GRID_COLOR, linestyle='--', linewidth=0.6)
     ax_plot.axvline(x=0, color=GRID_COLOR, linestyle='--', linewidth=0.6)
-    ax_plot.set_xlabel('Horizontal Break (in)', fontsize=10, color=TEXT_MUTED, fontweight='bold', fontfamily='Avenir Next')
-    ax_plot.set_ylabel('Induced Vertical Break (in)', fontsize=10, color=TEXT_MUTED, fontweight='bold', fontfamily='Avenir Next')
+    ax_plot.set_xlabel('Horizontal Break (in)', fontsize=10, color=TEXT_MUTED, fontweight='bold', fontfamily='IBM Plex Sans')
+    ax_plot.set_ylabel('Induced Vertical Break (in)', fontsize=10, color=TEXT_MUTED, fontweight='bold', fontfamily='IBM Plex Sans')
     ax_plot.tick_params(labelsize=8, colors=TEXT_MUTED)
     ax_plot.set_xticks(range(-25,26,5)); ax_plot.set_yticks(range(-25,26,5))
     ax_plot.grid(True, alpha=0.5, color=GRID_COLOR); ax_plot.set_facecolor(PLOT_PANEL)
@@ -1426,9 +1432,9 @@ def render_card(config, pitches, output_file):
     # Add movement plot annotations
     if exp_movement:
         ax_plot.text(0.02, 0.035, 'Shaded = expected movement', transform=ax_plot.transAxes,
-                     fontsize=7, color=TEXT_MUTED, fontfamily='Avenir Next', va='bottom')
+                     fontsize=7, color=TEXT_MUTED, fontfamily='IBM Plex Sans', va='bottom')
     ax_plot.text(0.02, 0.005, 'Min. 6 pitches for ellipse', transform=ax_plot.transAxes,
-                 fontsize=6.5, color=TEXT_FAINT, fontfamily='Avenir Next', va='bottom', fontstyle='italic')
+                 fontsize=6.5, color=TEXT_FAINT, fontfamily='IBM Plex Sans', va='bottom', fontstyle='italic')
 
     # Location plots. Season: lower-right quadrant under the movement plot (left
     # column holds the bubbles). Single-game: left side (old layout), with the
@@ -1511,11 +1517,11 @@ def render_card(config, pitches, output_file):
                                        edgecolor='none', zorder=9))
                 ax.text(_px0 + 0.0615, _cy, _pt, transform=ax.transAxes,
                         ha='center', va='center', fontsize=8, fontweight='bold',
-                        color=badge_text_color(_col), zorder=10, fontfamily='Avenir Next')
+                        color=badge_text_color(_col), zorder=10, fontfamily='IBM Plex Sans')
                 ax.text(_px0 + 0.135, _cy, f'{_cnt / _tot * 100:.0f}%',
                         transform=ax.transAxes, ha='left', va='center',
                         fontsize=9.5, fontweight='bold', color=TEXT_PRIMARY,
-                        zorder=10, fontfamily='Avenir Next')
+                        zorder=10, fontfamily='IBM Plex Sans')
                 _cy -= _row_h
 
         is_season = bool(config.get('mvn_models'))
@@ -1578,8 +1584,8 @@ def render_card(config, pitches, output_file):
     ax_loc_l = fig.add_axes([LOC_L_X, LOC_BOTTOM, LOC_W, LOC_HEIGHT])
     ax_loc_r = fig.add_axes([LOC_R_X, LOC_BOTTOM, LOC_W, LOC_HEIGHT])
     draw_zone(ax_loc_l, 'R'); draw_zone(ax_loc_r, 'L')
-    fig.text(LOC_L_X+LOC_W/2, LOC_TITLE_Y, 'VS RHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='DIN Condensed', ha='center', va='center')
-    fig.text(LOC_R_X+LOC_W/2, LOC_TITLE_Y, 'VS LHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='DIN Condensed', ha='center', va='center')
+    fig.text(LOC_L_X+LOC_W/2, LOC_TITLE_Y, 'VS RHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='IBM Plex Sans', ha='center', va='center')
+    fig.text(LOC_R_X+LOC_W/2, LOC_TITLE_Y, 'VS LHH', fontsize=14, fontweight='bold', color=TEXT_SECONDARY, fontfamily='IBM Plex Sans', ha='center', va='center')
 
     # Footnote — single-game only (old layout): W/B legend + ellipse minimum
     # stacked to the right of the location plots. Season panels carry no
@@ -1589,7 +1595,7 @@ def render_card(config, pitches, output_file):
         for _dy, _txt in [(0.055, 'W = Whiff'), (0.033, 'B = Barrel'),
                           (0.011, f'Min. {zone_ellipse_min} pitches for ellipse')]:
             fig.text(_wx, LOC_BOTTOM + _dy, _txt, fontsize=8, color=TEXT_MUTED,
-                     va='bottom', ha='left', fontfamily='Avenir Next', fontweight='bold')
+                     va='bottom', ha='left', fontfamily='IBM Plex Sans', fontweight='bold')
 
     # ── Left column: season cards get the percentile bubble panel; single-game
     # cards (no season pool) get the batted-ball donut + stacked bars + usage. ──
@@ -2104,10 +2110,10 @@ def render_card(config, pitches, output_file):
                for _pt, _ in pitch_stats):
             _sp_note += '\n† = low model support (unusual pitch profile, score less certain)'
         fig.text(_sp_x, b - _below_off, _sp_note,
-                 fontsize=8, color=TEXT_MUTED, va='top', ha='left', fontfamily='Avenir Next', fontweight='bold', linespacing=1.5)
+                 fontsize=8, color=TEXT_MUTED, va='top', ha='left', fontfamily='IBM Plex Sans', fontweight='bold', linespacing=1.5)
 
     # Watermark — bottom-left of the card, just below the table border.
-    fig.text(l, b - _below_off, 'Huronalytics', fontsize=9, ha='left', va='top', color=TEXT_FAINT, style='italic', fontfamily='DIN Condensed')
+    fig.text(l, b - _below_off, 'Huronalytics', fontsize=9, ha='left', va='top', color=TEXT_FAINT, style='italic', fontfamily='IBM Plex Sans')
     plt.savefig(output_file, dpi=SAVE_DPI, bbox_inches='tight', facecolor=BG, pad_inches=0.1)
     plt.close()
 
