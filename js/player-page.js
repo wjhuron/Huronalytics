@@ -3122,7 +3122,7 @@ var PlayerPage = {
 
 
   _laSprayChart: null,
-  _laSprayMode: 'ev',
+  _laSprayMode: 'damage',
 
   _renderLASprayChart: function (data) {
     var canvas = document.getElementById('player-la-spray-chart');
@@ -3231,7 +3231,22 @@ var PlayerPage = {
       return 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
     }
 
+    // Barrel id — Statcast heuristic (matches Cards.is_barrel; the client BIP
+    // feed has no official Barrel column, so this is the fallback used site-wide).
+    function isBarrel(ev, la) {
+      if (ev == null || la == null) return false;
+      return (la >= 8 && la <= 50 && ev >= 98 && ev * 1.5 - la >= 117 && ev + la >= 124);
+    }
+    function damageTier(pt) {
+      var la = pt.realLA != null ? pt.realLA : pt.y;
+      if (isBarrel(pt.ev, la)) return 2;                 // barrel
+      if (pt.ev != null && pt.ev >= 95) return 1;        // hard-hit 95+ (non-barrel)
+      return 0;                                          // other BIP
+    }
+    var DAMAGE_COLORS = { 2: 'rgba(168,38,30,0.96)', 1: 'rgba(224,135,30,0.93)', 0: 'rgba(110,102,89,0.42)' };
+
     function getPointColor(pt) {
+      if (mode === 'damage') return DAMAGE_COLORS[damageTier(pt)];
       if (mode === 'ev') return evColor(pt.ev);
       return OUTCOME_COLORS[pt.event] || '#666'; // outcome
     }
@@ -3250,14 +3265,19 @@ var PlayerPage = {
     }
 
     // Build datasets
+    // Damage view: draw weak contact first, barrels last (on top). Downstream
+    // sums/medians are order-independent, so sorting here is safe.
+    if (mode === 'damage') {
+      points.sort(function (a, b) { return damageTier(a) - damageTier(b); });
+    }
     var pointColors = points.map(function (p) { return getPointColor(p); });
     var pointRadii = points.map(function (p) { return evRadius(p.ev); });
     var pointHoverRadii = pointRadii.map(function (r) { return r + 2; });
     var datasets = [{
       data: points,
       backgroundColor: pointColors,
-      borderColor: 'rgba(0,0,0,0.5)',
-      borderWidth: 1,
+      borderColor: (mode === 'damage' ? 'rgba(240,232,216,0.9)' : 'rgba(0,0,0,0.5)'),
+      borderWidth: (mode === 'damage' ? 1.5 : 1),
       pointRadius: pointRadii,
       pointHoverRadius: pointHoverRadii,
     }];
@@ -3309,6 +3329,8 @@ var PlayerPage = {
           var zone = sacqZones[zi];
           var zoneVal = zone.wobacon != null ? zone.wobacon : zone.woba;
           if (zoneVal == null) continue;
+          // Damage view: only warm (>= yellow-anchor) zones, softened as backdrop.
+          if (mode === 'damage' && zoneVal < 0.55) continue;
           var bounds = sprayBounds[zone.spray];
           if (!bounds) continue;
           var laMin = zone.laMin != null ? zone.laMin : -20;
@@ -3320,7 +3342,7 @@ var PlayerPage = {
           var rgb = wobaColorRGB(zoneVal);
           var lowSample = zone.count < SACQ_MIN_BIP;
           // Improvement 1: stronger opacity (0.25), muted for low-sample zones (0.10)
-          var alpha = lowSample ? 0.10 : 0.25;
+          var alpha = lowSample ? 0.10 : (mode === 'damage' ? 0.34 : 0.25);
           ctx2.fillStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + alpha + ')';
           ctx2.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
           // Improvement 4: diagonal hatch pattern for low-sample zones
@@ -3346,6 +3368,55 @@ var PlayerPage = {
           ctx2.strokeStyle = 'rgba(255,255,255,0.15)';
           ctx2.lineWidth = 0.5;
           ctx2.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+        }
+
+        // Damage view: quality-contact concentration ellipse (barrels + hard-hit
+        // 95+), ~68% coverage (1.51 sigma), outline only. Sampled in data space
+        // and mapped to pixels so the non-uniform x/y scales stay correct.
+        if (mode === 'damage') {
+          var qxs = [], qys = [];
+          for (var qi = 0; qi < points.length; qi++) {
+            var qp = points[qi];
+            var qla = qp.realLA != null ? qp.realLA : qp.y;
+            if (isBarrel(qp.ev, qla) || (qp.ev != null && qp.ev >= 95)) {
+              qxs.push(qp.x); qys.push(qp.y);
+            }
+          }
+          if (qxs.length >= 6) {
+            var qn = qxs.length, qmx = 0, qmy = 0;
+            for (var qk = 0; qk < qn; qk++) { qmx += qxs[qk]; qmy += qys[qk]; }
+            qmx /= qn; qmy /= qn;
+            var caa = 0, cdd = 0, cbb = 0;
+            for (var qk2 = 0; qk2 < qn; qk2++) {
+              var dxq = qxs[qk2] - qmx, dyq = qys[qk2] - qmy;
+              caa += dxq * dxq; cdd += dyq * dyq; cbb += dxq * dyq;
+            }
+            caa /= (qn - 1); cdd /= (qn - 1); cbb /= (qn - 1);
+            var qtr = (caa + cdd) / 2, qdet = caa * cdd - cbb * cbb;
+            var qdisc = Math.sqrt(Math.max(0, qtr * qtr - qdet));
+            var l1 = qtr + qdisc, l2 = qtr - qdisc;
+            if (l1 > 0 && l2 > 0) {
+              var qth = Math.atan2(l1 - caa, cbb);
+              var NS = 1.51;
+              var axA = NS * Math.sqrt(l1), axB = NS * Math.sqrt(l2);
+              ctx2.save();
+              ctx2.beginPath();
+              for (var eq = 0; eq <= 64; eq++) {
+                var ea = (eq / 64) * Math.PI * 2;
+                var exq = axA * Math.cos(ea), eyq = axB * Math.sin(ea);
+                var pxD = qmx + exq * Math.cos(qth) - eyq * Math.sin(qth);
+                var pyD = qmy + exq * Math.sin(qth) + eyq * Math.cos(qth);
+                var PX = xScale.getPixelForValue(pxD), PY = yScale.getPixelForValue(pyD);
+                if (eq === 0) ctx2.moveTo(PX, PY); else ctx2.lineTo(PX, PY);
+              }
+              ctx2.closePath();
+              ctx2.setLineDash([6, 4]);
+              ctx2.lineWidth = 2;
+              ctx2.strokeStyle = '#9a3b1e';
+              ctx2.stroke();
+              ctx2.restore();
+            }
+          }
         }
       }
     };
@@ -3697,7 +3768,13 @@ var PlayerPage = {
     var legendEl = document.getElementById('player-la-spray-legend');
     if (legendEl) {
       var legendItems = [];
-      if (mode === 'outcome') {
+      if (mode === 'damage') {
+        legendItems = [
+          { color: '#a8261e', label: 'Barrel' },
+          { color: '#e0871e', label: 'Hard-Hit 95+' },
+          { color: '#6e6557', label: 'Other BIP' },
+        ];
+      } else if (mode === 'outcome') {
         legendItems = [
           { color: '#888', label: 'Out/E/FC' },
           { color: '#ff8c00', label: '1B' },
