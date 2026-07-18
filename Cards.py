@@ -2192,11 +2192,13 @@ def _pitching_scale(rows, min_pitches=25):
     return (mu, sd) if sd > 1e-9 else None
 
 
-def _pitching_score(stuff, loc, scale):
-    if stuff is None or loc is None or scale is None:
+def _pitching_score(stuff, loc, scale=None):
+    # COHERENT CANON (2026-07-18): Pitching+ = 0.7*Stuff+ + 0.3*Loc+ exactly —
+    # no restandardization, no clip. `scale` is accepted for call-site compat
+    # and ignored.
+    if stuff is None or loc is None:
         return None
-    mu, sd = scale
-    return round(min(180.0, max(40.0, 100.0 + 10.0 * (_pitching_blend(stuff, loc) - mu) / sd)), 1)
+    return round(0.7 * stuff + 0.3 * loc, 1)
 
 
 def _normalize_scratch_pitch(row):
@@ -2259,7 +2261,11 @@ def _scratch_mlb_pool_rows(rows):
 # pitch type toward 100. Stuff+ grades pitch SHAPES, which stabilize in ~10
 # pitches, so a daily card can grade the shapes he actually threw with light
 # shrinkage — the number moves game-to-game (Wally's "grade today's shapes").
-K_SHRINK_DAILY = 5
+# Window cards (single game / date range / scratch) show the PLAIN AVERAGE
+# of per-pitch grades — no shrink (2026-07-18, per Wally: 'card should be
+# average'). k=0 makes _scratch_stuff_scores' unit value exactly the mean
+# of the per-pitch grades on the same scale as the Sheets grade columns.
+K_SHRINK_DAILY = 0
 
 
 def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
@@ -2280,40 +2286,64 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
 
     all_pitches = [p for pl in norm_by_pitcher.values() for p in pl]
     df = _sv.build_df(all_pitches)
-    overall, per_pt = {}, {}
+    overall, per_pt, atoms_by_pid = {}, {}, {}
     if not len(df):
-        return overall, per_pt
+        return overall, per_pt, atoms_by_pid
 
-    _k = k_shrink if k_shrink is not None else _sv.K_SHRINK
-    def _shrunk(rawmean, n, scale):
+    # COHERENT CANON (2026-07-18): window values are plain averages of the
+    # per-pitch INTEGER atoms — the same integers written to the Sheets grade
+    # columns — so AVERAGEIF over the sheet reproduces the card to the digit.
+    # k_shrink is accepted for call-site compat and ignored (always 0).
+    import numpy as _np
+    def _atom(r, scale):
         if not scale:
             return None
         mu, sd = scale.get('mu'), scale.get('sd')
         if mu is None or sd is None or not sd > 0:
             return None
-        adj = (n * rawmean + _k * mu) / (n + _k)
-        return round(min(180.0, max(40.0, 100 + _sv.K_SCALE * (adj - mu) / sd)), 1)
+        return int(round(100 + _sv.K_SCALE * (r - mu) / sd))
 
+    # OOF fold-model discipline — the SAME model choice the pipeline's
+    # per-pitch grade dump uses (each pitcher scored by the fold that held him
+    # out; pitchers newer than the bundle default to fold 0). Without this the
+    # card would score with the full-data model and drift ~1 point from the
+    # sheet atoms, breaking the exact-match guarantee.
+    _folds = bundle.get('fold_pitchers') or []
+    _fold_of = {pp: k for k, ps in enumerate(_folds) for pp in ps}
     for pitcher, sub in df.groupby('pitcher'):
+        _fi = _fold_of.get(pitcher, 0)
         has_arm = any(sf(p.get('ArmAngle')) is not None
                       for p in norm_by_pitcher.get(pitcher, []))
         if has_arm:
-            model = bundle['model']
+            _fms = bundle.get('fold_models') or []
+            model = _fms[_fi] if _fi < len(_fms) else bundle['model']
             X = _sv.design(sub).reindex(columns=bundle['features'], fill_value=0)
-            pt_scale, ov_scale = bundle['league'], bundle['league'].get('_overall')
+            pt_scale = bundle['league']
         else:
-            model = bundle['model_na']
+            _fms = bundle.get('fold_models_na') or []
+            model = _fms[_fi] if _fi < len(_fms) else bundle['model_na']
             na_cols = model.get_booster().feature_names
             X = _sv.design(sub, bundle['noarm_feats']).reindex(columns=na_cols, fill_value=0)
-            pt_scale, ov_scale = bundle['na_pt_scale'], bundle['na_ov_scale']
+            pt_scale = bundle['na_pt_scale']
         raw = -model.predict(X)
-        overall[pitcher] = _shrunk(float(raw.mean()), len(raw), ov_scale)
         sub = sub.reset_index(drop=True)
+        atoms_all = []
         for pt in sub['pitch_type'].unique():
             mask = (sub['pitch_type'] == pt).values
-            per_pt[(pitcher, pt)] = _shrunk(float(raw[mask].mean()),
-                                            int(mask.sum()), pt_scale.get(pt))
-    return overall, per_pt
+            atoms = [a for a in (_atom(float(r), pt_scale.get(pt)) for r in raw[mask])
+                     if a is not None]
+            if atoms:
+                per_pt[(pitcher, pt)] = round(float(_np.mean(atoms)), 1)
+                atoms_all.extend(atoms)
+        # per-pitch atoms by PitchID — the fallback source when a sheet row's
+        # grade cells are still blank (fresh game before the pipeline ran)
+        for _pid, _pt3, _r in zip(sub['pid'], sub['pitch_type'], raw):
+            _a = _atom(float(_r), pt_scale.get(_pt3))
+            if _pid and _a is not None:
+                atoms_by_pid[str(_pid)] = _a
+        overall[pitcher] = (round(float(_np.mean(atoms_all)), 1)
+                            if atoms_all else None)
+    return overall, per_pt, atoms_by_pid
 
 
 _MLB_PICKLE_CACHE = None   # module-level: load the 382k-pitch pickle once per process
@@ -2359,21 +2389,49 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
         for p in plist:
             by_pitcher[(name, 'AAA', p.get('Throws'))].append(p)
             by_pt[(name, 'AAA', p.get('Pitch Type'), p.get('Throws'))].append(p)
-    loc_pr, loc_ptr, _ = compute_loc_plus(mlb, by_pitcher, by_pt,
-                                          GUTS_LG_WOBA, GUTS_WOBA_SCALE)
-    ctx['loc_overall'] = {k[0]: v.get('locPlus') for k, v in loc_pr.items()
-                          if k[1] == 'AAA' and k[0] in norm_by_pitcher}
-    ctx['loc_pt'] = {(k[0], k[2]): v.get('locPlus') for k, v in loc_ptr.items()
-                     if k[1] == 'AAA' and k[0] in norm_by_pitcher}
+    from pipeline_locplus import (group_of, LOC_SCALE_K, score_pitch,
+                                  _is_scorable as _loc_scorable)
+    loc_pr, loc_ptr, _, _loc_anchors = compute_loc_plus(
+        mlb, by_pitcher, by_pt, GUTS_LG_WOBA, GUTS_WOBA_SCALE,
+        return_anchors=True)
+    # COHERENT CANON: window Loc+ = plain average of the per-pitch INTEGER
+    # atoms (group-anchored — identical to the Sheets Loc+ cells), for both
+    # the per-type rows and the overall value. No priors, no clip.
+    _loc_S = _loc_anchors['surfaces']
+    _loc_pt_anc = _loc_anchors['pt']
+    def _loc_atom(p):
+        if not _loc_scorable(p):
+            return None
+        anc = _loc_pt_anc.get(group_of(p))
+        if not anc or anc[0] is None or not anc[1] or anc[1] <= 1e-12:
+            return None
+        v = score_pitch(p, _loc_S)
+        if v is None:
+            return None
+        return int(round(100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]))
+    ctx['loc_atom_fn'] = _loc_atom   # per-pitch fallback for blank sheet cells
+    ctx['loc_overall'], ctx['loc_pt'] = {}, {}
+    for _nm, _plist in norm_by_pitcher.items():
+        _by_type = defaultdict(list)
+        for _p in _plist:
+            _a = _loc_atom(_p)
+            if _a is not None and _p.get('Pitch Type'):
+                _by_type[_p['Pitch Type']].append(_a)
+        _all = [a for arr in _by_type.values() for a in arr]
+        if _all:
+            ctx['loc_overall'][_nm] = round(sum(_all) / len(_all), 1)
+        for _pt2, _arr in _by_type.items():
+            ctx['loc_pt'][(_nm, _pt2)] = round(sum(_arr) / len(_arr), 1)
     print(f"  [scratch] Loc+ done ({time_module.time()-t0:.0f}s)")
 
     # Stuff+ v11
     print("  [scratch] Scoring Stuff+ v11...")
     try:
-        ctx['stuff_overall'], ctx['stuff_pt'] = _scratch_stuff_scores(norm_by_pitcher, stuff_k_shrink)
+        (ctx['stuff_overall'], ctx['stuff_pt'],
+         ctx['stuff_atoms_by_pid']) = _scratch_stuff_scores(norm_by_pitcher, stuff_k_shrink)
     except Exception as _e:
         print(f"  WARNING: Stuff+ scoring failed for scratch pitches: {_e}")
-        ctx['stuff_overall'], ctx['stuff_pt'] = {}, {}
+        ctx['stuff_overall'], ctx['stuff_pt'], ctx['stuff_atoms_by_pid'] = {}, {}, {}
 
     # Percentile pools from the leaderboard JSONs.
     _data_dir = os.path.dirname(METADATA_PATH)
@@ -2452,10 +2510,32 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
     else:
         row['fbVelo'] = None
 
-    row['stuffScore'] = ctx.get('stuff_overall', {}).get(pitcher_name)
-    row['locPlus'] = ctx.get('loc_overall', {}).get(pitcher_name)
-    row['pitchingScore'] = _pitching_score(row['stuffScore'], row['locPlus'],
-                                           ctx.get('pitching_scale'))
+    # COHERENT CANON: atoms come from the sheet's integer grade cells when
+    # present (so card values equal AVERAGEIF over the sheet exactly), with
+    # model-computed fallbacks only for rows whose cells are still blank.
+    def _pitch_atoms(p):
+        s_c, l_c, p_c = sf(p.get('Stuff+')), sf(p.get('Loc+')), sf(p.get('Pitching+'))
+        S = (int(round(s_c)) if s_c is not None
+             else ctx.get('stuff_atoms_by_pid', {}).get(str(p.get('PitchID') or '')))
+        L = (int(round(l_c)) if l_c is not None
+             else (ctx['loc_atom_fn'](p) if ctx.get('loc_atom_fn') else None))
+        if p_c is not None:
+            P = int(round(p_c))
+        elif S is not None and L is not None:
+            P = int(round(0.7 * S + 0.3 * L))
+        else:
+            P = None
+        return S, L, P
+
+    _Sa, _La, _Pa = [], [], []
+    for _p in pitches:
+        _s, _l, _pp = _pitch_atoms(_p)
+        if _s is not None: _Sa.append(_s)
+        if _l is not None: _La.append(_l)
+        if _pp is not None: _Pa.append(_pp)
+    row['stuffScore'] = round(sum(_Sa) / len(_Sa), 1) if _Sa else None
+    row['locPlus'] = round(sum(_La) / len(_La), 1) if _La else None
+    row['pitchingScore'] = round(sum(_Pa) / len(_Pa), 1) if _Pa else None
 
     # Percentile bubbles — rank each computed stat into the MLB pool.
     for s in _SCRATCH_POOL_STATS:
@@ -2503,12 +2583,17 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
         d['xRunValue'] = xrv_pt
         d['xRv100'] = xrv_pt / npt * 100 if xrv_pt is not None else None
 
-        d['stuffScore'] = ctx.get('stuff_pt', {}).get((pitcher_name, pt))
-        lp = ctx.get('loc_pt', {}).get((pitcher_name, pt))
+        _Spt, _Lpt, _Ppt = [], [], []
+        for _p2 in pp:
+            _s2, _l2, _pp2 = _pitch_atoms(_p2)
+            if _s2 is not None: _Spt.append(_s2)
+            if _l2 is not None: _Lpt.append(_l2)
+            if _pp2 is not None: _Ppt.append(_pp2)
+        d['stuffScore'] = round(sum(_Spt) / len(_Spt), 1) if _Spt else None
+        lp = round(sum(_Lpt) / len(_Lpt), 1) if _Lpt else None
         if lp is not None:
             locplus_by_pt[pt] = lp
-        d['pitchingScore'] = _pitching_score(
-            d['stuffScore'], lp, ctx.get('pitching_scale_pt', {}).get(pt))
+        d['pitchingScore'] = round(sum(_Ppt) / len(_Ppt), 1) if _Ppt else None
 
         pools = ctx['pitch_pools'].get(pt, {})
         d['velocity_pctl'] = _rank_in_mlb_pool(d['velocity'], pools.get('velocity') or [])
@@ -2758,17 +2843,17 @@ def main():
         try:
             _norm = {nm: [_normalize_scratch_pitch(r) for r in pl]
                      for nm, pl in pitches_by_pitcher.items()}
-            scratch_ctx = _build_scratch_league_context(_norm)
+            scratch_ctx = _build_scratch_league_context(_norm, stuff_k_shrink=K_SHRINK_DAILY)
         except Exception as _e:
             import traceback; traceback.print_exc()
             print(f"  WARNING: scratch context failed ({_e}) — rendering MiLB-style")
-    elif not is_multi_game:
-        # Daily (single-game) cards: compute per-game Stuff+/Loc+/nVAA/nHAA from
-        # the game's pitches via the same engine (the season leaderboard row is
-        # the wrong number for one game). Stuff+ uses LIGHT shrinkage (grade the
-        # shapes). Works for regular-team and scratch daily; context stays
-        # non-season (mvn_models empty) so the daily layout is preserved.
-        print("\nStep 1b: Computing daily Stuff+/Loc+ context...")
+    elif start_date is not None:
+        # WINDOW cards — single game OR partial date range (2026-07-18, per
+        # Wally): Stuff+/Loc+/Pitching+ are computed from JUST the window's
+        # pitches as the plain average of per-pitch grades (no shrink), scored
+        # against the season league anchors. Full-season cards (start_date
+        # None) keep the season leaderboard values.
+        print("\nStep 1b: Computing window Stuff+/Loc+ context...")
         try:
             _norm = {nm: [_normalize_scratch_pitch(r) for r in pl]
                      for nm, pl in pitches_by_pitcher.items()}
@@ -2928,30 +3013,20 @@ def main():
         # season percentile context); pass None otherwise so the panel is empty.
         pctl_row = None
         scratch_pitch_lb, scratch_locplus = {}, {}
-        if is_multi_game:
-            if scratch_tab:
-                # Scratch-tab pitchers are NOT in the leaderboards. Compute the
-                # full MLB-style context from the scratch pitches themselves
-                # (ROC-translation pattern: score against MLB baselines, rank
-                # into the MLB leaderboard pools).
-                if scratch_ctx is not None:
-                    pctl_row, scratch_pitch_lb, scratch_locplus = \
-                        _compute_scratch_pitcher_context(pitcher_name, scratch_ctx)
-                    print(f"  Scratch context: Stuff+ {pctl_row.get('stuffScore')} | "
-                          f"Loc+ {pctl_row.get('locPlus')} | xRV/100 {pctl_row.get('xRv100') if pctl_row.get('xRv100') is None else round(pctl_row['xRv100'], 1)}")
-            elif len(teams) > 1:
+        if scratch_ctx is not None:
+            # WINDOW context (single game, date range, or scratch tab): all
+            # grades computed from just these pitches — plain averages of
+            # per-pitch values vs the season league anchors.
+            pctl_row, scratch_pitch_lb, scratch_locplus = \
+                _compute_scratch_pitcher_context(pitcher_name, scratch_ctx)
+            print(f"  Window context: Stuff+ {pctl_row.get('stuffScore')} | "
+                  f"Loc+ {pctl_row.get('locPlus')}")
+        elif is_multi_game:
+            if len(teams) > 1:
                 pctl_row = pctl_by_name.get((pitcher_name, team))   # 2TM/3TM combined row
             else:
                 pctl_row = pctl_by_name.get((pitcher_name, team)) \
                            or (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None)
-        elif scratch_ctx is not None:
-            # Daily card with a computed league context: per-game Stuff+/Loc+/
-            # nVAA/nHAA from this pitcher's game pitches. pctl_row supplies the
-            # Total-row overall Stuff+/Loc+ (daily has no bubble panel).
-            pctl_row, scratch_pitch_lb, scratch_locplus = \
-                _compute_scratch_pitcher_context(pitcher_name, scratch_ctx)
-            print(f"  Daily context: Stuff+ {pctl_row.get('stuffScore')} | "
-                  f"Loc+ {pctl_row.get('locPlus')}")
 
         # Build config
         config = {
@@ -2972,9 +3047,9 @@ def main():
             # from the computed context maps below regardless.
             'mvn_models': mvn_models if is_multi_game else {},
             'pctl_row': pctl_row,
-            'pitch_locplus': (scratch_locplus if (scratch_tab or not is_multi_game)
+            'pitch_locplus': (scratch_locplus if scratch_ctx is not None
                               else locplus_by_pitcher.get((pitcher_name, team), {})),
-            'pitch_lb': (scratch_pitch_lb if (scratch_tab or not is_multi_game)
+            'pitch_lb': (scratch_pitch_lb if scratch_ctx is not None
                          else pitch_lb_by_pitcher.get((pitcher_name, team), {})),
             'rv_mode': rv_mode,
             'pitch_qual': pitch_qual,

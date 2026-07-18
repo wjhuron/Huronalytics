@@ -304,7 +304,7 @@ var PlayerPage = {
     document.getElementById('player-percentiles').innerHTML = '';
     var sections = ['player-pitch-usage-table', 'player-stats-table', 'player-expanded-pitch-table',
                     'player-batted-ball-table', 'player-plate-discipline-table',
-                    'player-heat-maps', 'player-count-table'];
+                    'player-heat-maps', 'player-count-table', 'player-game-grades-table'];
     for (var i = 0; i < sections.length; i++) {
       var el = document.getElementById(sections[i]);
       if (el) el.innerHTML = '';
@@ -343,7 +343,59 @@ var PlayerPage = {
     this._renderBattedBallTable(data); // will use _filteredPitchRows
     this._renderHeatMaps(data);
     this._renderCountTable(data);
+    this._renderGameGrades(data);
     this._addAllDownloadButtons(data);
+  },
+
+  // Per-game Stuff+/Loc+/Pitching+ — plain averages of the per-pitch grade
+  // atoms (micro data), so each row matches that outing's card and the
+  // Sheets AVERAGEIF for the date. "Which start had his best stuff."
+  _renderGameGrades: function (data) {
+    var section = document.getElementById('player-game-grades-section');
+    var container = document.getElementById('player-game-grades-table');
+    if (!section || !container) return;
+    container.innerHTML = '';
+
+    var games = (typeof Aggregator !== 'undefined' && Aggregator.loaded)
+      ? Aggregator.getPitcherGameGrades(data.pitcher, data.team) : [];
+    games = games.filter(function (g) { return g.stuffScore != null || g.locPlus != null; });
+    if (games.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    var table = document.createElement('table');
+    table.className = 'count-table';
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    var headers = ['Date', 'Pitches', 'Stuff+', 'Loc+', 'Pitching+'];
+    for (var hi = 0; hi < headers.length; hi++) {
+      var th = document.createElement('th');
+      th.textContent = headers[hi];
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    for (var i = 0; i < games.length; i++) {
+      var g = games[i];
+      var tr = document.createElement('tr');
+      var parts = g.date.split('-');
+      var cells = [
+        parseInt(parts[1]) + '/' + parseInt(parts[2]) + '/' + parts[0],
+        g.n,
+        g.stuffScore != null ? Math.round(g.stuffScore) : '—',
+        g.locPlus != null ? Math.round(g.locPlus) : '—',
+        g.pitchingScore != null ? Math.round(g.pitchingScore) : '—',
+      ];
+      for (var ci = 0; ci < cells.length; ci++) {
+        var td = document.createElement('td');
+        td.textContent = cells[ci];
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
   },
 
   // Get PITCH_DETAILS for this pitcher (already game-type-specific), optionally filtered by _gameDate and _platoonDetailHand
@@ -537,7 +589,7 @@ var PlayerPage = {
     if (sprayLegend) sprayLegend.style.display = '';
     var pitcherSections = ['player-stats-section', 'player-expanded-pitch-section',
       'player-batted-ball-section', 'player-plate-discipline-section',
-      'player-location-section', 'player-count-section'];
+      'player-location-section', 'player-count-section', 'player-game-grades-section'];
     for (var i = 0; i < pitcherSections.length; i++) {
       var el = document.getElementById(pitcherSections[i]);
       if (el) el.style.display = 'none';
@@ -569,6 +621,7 @@ var PlayerPage = {
     this._unbindGameLog();
 
     var sections = ['player-expanded-pitch-section', 'player-location-section', 'player-count-section',
+      'player-game-grades-section',
       'player-spray-section', 'player-la-spray-section', 'player-swing-heatmaps-section',
       'player-hitter-stats-section', 'player-hitter-batted-ball-section',
       'player-hitter-plate-discipline-section', 'player-hitter-bat-tracking-section'];
@@ -4345,6 +4398,7 @@ var PlayerPage = {
       ['player-batted-ball-section',       'batted-ball'],
       ['player-location-section',          'pitch-locations'],
       ['player-count-section',             'usage-by-count'],
+      ['player-game-grades-section',       'game-grades'],
     ] : [
       ['player-spray-section',                       'spray-chart'],
       ['player-la-spray-section',                    'la-spray'],

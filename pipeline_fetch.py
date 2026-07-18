@@ -253,7 +253,7 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
         header = rows[0]
         col_idx = {name: idx for idx, name in enumerate(header) if name}
 
-        for row in rows[1:]:
+        for row_num, row in enumerate(rows[1:], start=2):
             pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
             if not pitcher:
                 continue
@@ -264,6 +264,11 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None):
                     val = None
                 pitch[col_name] = val
             pitch['_source'] = tab_name if is_extra else 'MLB'
+            # Sheet coordinates — join key for the per-pitch Stuff+/Loc+
+            # write-back (scripts/sheets_write_grades.py). Underscore keys are
+            # pipeline-internal (like _source) and never serialized to JSON.
+            pitch['_sheet_tab'] = tab_name
+            pitch['_sheet_row'] = row_num
             # Fallback: use raw movement if adjusted values not yet backfilled
             if pitch.get('xIndVrtBrk') is None and pitch.get('IndVertBrk') is not None:
                 pitch['xIndVrtBrk'] = pitch['IndVertBrk']

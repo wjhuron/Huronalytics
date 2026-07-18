@@ -96,20 +96,36 @@ jobs:
         run: |
           if [ "${{ inputs.retrain }}" = "true" ]; then
             if [ -f data/_pitches2025_training.pkl ]; then
-              python3 stuff_plus_v11/train_stuff_v11.py --inject
+              python3 stuff_plus_v11/train_stuff_v11.py --inject --dump-pitch-grades data/pitch_stuff_grades.json
             else
               echo "prior-season pickle absent — keeping preserved Stuff+ scores"
             fi
           else
             if [ -f stuff_plus_v11/stuff_models_v11.pkl ]; then
-              python3 stuff_plus_v11/train_stuff_v11.py --score-only --inject
+              python3 stuff_plus_v11/train_stuff_v11.py --score-only --inject --dump-pitch-grades data/pitch_stuff_grades.json
             else
               echo "model bundle absent — keeping preserved Stuff+ scores"
             fi
           fi
 
+      # Micro data was generated mid-process_data with the PREVIOUS run's
+      # Stuff+ dump — rebuild it now that this run's dump exists, so filtered
+      # site views (grade atoms) never lag the sheets/cards by a cycle.
+      - name: Refresh micro-data grade atoms
+        run: python3 scripts/refresh_micro_grades.py
+
       - name: Rebuild embedded payload with injected Stuff+
         run: python3 scripts/rebuild_embed.py
+
+      # Per-pitch Stuff+/Loc+/Pitching+ -> the Sheets grade columns (cols
+      # 24-26 after HAA). Full-column overwrite each run (retags / late arm angles /
+      # retrains self-heal). continue-on-error: a Sheets quota hiccup must not
+      # block the site publish — the next run rewrites everything anyway.
+      - name: Write per-pitch grades back to Sheets
+        continue-on-error: true
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        run: python3 scripts/sheets_write_grades.py
 
       - name: Validate output integrity
         run: |

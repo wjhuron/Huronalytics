@@ -75,8 +75,19 @@ def _bip_woba_value(event):
     return 0.0
 
 
-def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
+def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
+                        stuff_grades=None, loc_grades=None):
     """Generate micro-aggregate data for client-side date and opponent-hand filtering.
+
+    stuff_grades / loc_grades: per-pitch grade dumps keyed "tab\\trow"
+    (full-precision floats). Their nearest-integer atoms are summed into the
+    pitcher/pitch micro rows so client-side filters can reproduce windowed
+    Stuff+/Loc+/Pitching+ as plain averages — the same integers the Sheets
+    grade columns hold, so a filtered site view, a window card, and a sheet
+    AVERAGEIF all agree to the digit (coherent canon, 2026-07-18). Pitches
+    absent from a dump are excluded from that metric's atom count (the n
+    fields make partial coverage explicit; scripts/refresh_micro_grades.py
+    re-runs this after the Stuff+ dump lands so nothing stays stale).
 
     ep_pitchers: set of (Pitcher, PTeam) position-player appearances. Their
     pitches are EXCLUDED from pitcher micro rows (so no client-side filter can
@@ -104,6 +115,23 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
     pitch_type_set = set()
 
     ep_pitchers = ep_pitchers or set()
+
+    def _grade_atoms(p):
+        """(stuffAtom, locAtom, pitchingAtom) ints for one pitch, or Nones.
+        Pitching+ atom blends the two INTEGER atoms (matches the sheet's
+        =ROUND(0.7*X+0.3*Y,0) cells and Cards' cell-first atoms)."""
+        tab, rownum = p.get('_sheet_tab'), p.get('_sheet_row')
+        if not tab or not rownum:
+            return None, None, None
+        key = f'{tab}\t{rownum}'
+        sv = stuff_grades.get(key) if stuff_grades else None
+        lv = loc_grades.get(key) if loc_grades else None
+        sa = int(round(sv)) if sv is not None else None
+        la = int(round(lv)) if lv is not None else None
+        pa = (int(round(0.7 * sa + 0.3 * la))
+              if sa is not None and la is not None else None)
+        return sa, la, pa
+
     for p in all_pitches:
         if p.get('Pitcher') and (p.get('Pitcher'), p.get('PTeam')) not in ep_pitchers:
             pitcher_set.add(p['Pitcher'])
@@ -146,8 +174,10 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
     #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (line-drive HRs)
     #  25:pu (popups, for HR/FB denominator)  26:nStrikes  27:ibb
     #  28:oneOneTotal  29:oneOneWins  30:earlyActionPAs
+    #  31:sumStuff  32:nStuff  33:sumLoc  34:nLoc  35:sumPitching  36:nPitching
+    #  (integer grade-atom sums/counts — see _grade_atoms)
     # ==========================================================
-    pitcher_micro = defaultdict(lambda: [0] * 31)
+    pitcher_micro = defaultdict(lambda: [0] * 37)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -238,6 +268,15 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
                 except ValueError:
                     pass
 
+        # Grade-atom sums (filtered overall Stuff+/Loc+/Pitching+)
+        _sa, _la, _pa = _grade_atoms(p)
+        if _sa is not None:
+            c[31] += _sa; c[32] += 1
+        if _la is not None:
+            c[33] += _la; c[34] += 1
+        if _pa is not None:
+            c[35] += _pa; c[36] += 1
+
     pitcher_rows = []
     for (pi, ti, throws, di, bh), c in pitcher_micro.items():
         pitcher_rows.append([pi, ti, throws, di, bh] + c)
@@ -258,6 +297,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
     #  44:sumTiltSin 45:sumTiltCos 46:nTilt
     #  47:sumPlateX 48:nPlateX
     #  49:sumEffVelo 50:nEffVelo
+    #  51:sumStuff 52:nStuff  53:sumLoc 54:nLoc  55:sumPitching 56:nPitching
+    #  (integer grade-atom sums/counts — see _grade_atoms)
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('xIndVrtBrk', 26),
@@ -266,7 +307,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
         ('PlateZ', 42), ('PlateX', 47),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 51)
+    pitch_micro = defaultdict(lambda: [0.0] * 57)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -347,6 +388,15 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             c[45] += math.cos(angle)
             c[46] += 1
 
+        # Grade-atom sums (filtered per-type Stuff+/Loc+/Pitching+)
+        _sa, _la, _pa = _grade_atoms(p)
+        if _sa is not None:
+            c[51] += _sa; c[52] += 1
+        if _la is not None:
+            c[53] += _la; c[54] += 1
+        if _pa is not None:
+            c[55] += _pa; c[56] += 1
+
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
         row = [pi, ti, throws, pti, di, bh]
@@ -363,6 +413,9 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
         row.append(round(c[44], 6))  # sumTiltSin
         row.append(round(c[45], 6))  # sumTiltCos
         row.append(int(c[46]))       # nTilt
+        # Grade-atom sums/counts (all integers)
+        for gi in range(51, 57):
+            row.append(int(c[gi]))
         pitch_rows.append(row)
 
     # ==========================================================
@@ -906,11 +959,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             pmicro_by_pitcher[(pi, throws)].append((ti, di, bh, c))
         for (pi, throws), combined_ti in combined_pitcher_ti.items():
             teamset = pitcher_mlb_team_set_micro[(pi, throws)]
-            by_dibh = defaultdict(lambda: [0] * 31)
+            by_dibh = defaultdict(lambda: [0] * 37)
             for (ti, di, bh, c) in pmicro_by_pitcher[(pi, throws)]:
                 if ti not in teamset:
                     continue
-                _sum_counts(by_dibh[(di, bh)], c, 31)
+                _sum_counts(by_dibh[(di, bh)], c, 37)
             for (di, bh), c in by_dibh.items():
                 pitcher_rows.append([pi, combined_ti, throws, di, bh] + c)
 
@@ -922,11 +975,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             pitchmicro_by_pitcher[(pi, throws)].append((ti, pti, di, bh, c))
         for (pi, throws), combined_ti in combined_pitcher_ti.items():
             teamset = pitcher_mlb_team_set_micro[(pi, throws)]
-            by_key = defaultdict(lambda: [0.0] * 51)
+            by_key = defaultdict(lambda: [0.0] * 57)
             for (ti, pti, di, bh, c) in pitchmicro_by_pitcher[(pi, throws)]:
                 if ti not in teamset:
                     continue
-                _sum_counts(by_key[(pti, di, bh)], c, 51)
+                _sum_counts(by_key[(pti, di, bh)], c, 57)
             for (pti, di, bh), c in by_key.items():
                 # Emit in the SAME reordered layout as the per-team pitch builder
                 # (22 counts, then METRIC_OFFSETS sum/count pairs, then tilt). The
@@ -942,6 +995,9 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
                 row.append(round(c[44], 6))  # sumTiltSin
                 row.append(round(c[45], 6))  # sumTiltCos
                 row.append(int(c[46]))       # nTilt
+                # Grade-atom sums/counts (all integers)
+                for gi in range(51, 57):
+                    row.append(int(c[gi]))
                 pitch_rows.append(row)
 
     # --- Hitter micro: sum across teams for same (bats, di, ph) ---
@@ -1088,6 +1144,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             'pa', 'h', 'hr', 'k', 'bb', 'hbp', 'sf', 'sh', 'ci',
             'izSw', 'izWh', 'firstPitches', 'firstPitchStrikes', 'fb', 'nHrBip', 'ldHr', 'pu', 'nStrikes', 'ibb',
             'oneOneTotal', 'oneOneWins', 'earlyActionPAs',
+            'sumStuff', 'nStuff', 'sumLoc', 'nLoc', 'sumPitching', 'nPitching',
         ],
         'pitcherMicro': pitcher_rows,
         'pitcherBipCols': ['pitcherIdx', 'teamIdx', 'dateIdx', 'batterHand', 'exitVelo', 'launchAngle', 'bbType', 'hcX', 'hcY', 'bats', 'barrel'],
@@ -1104,6 +1161,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None):
             'sumPlateZ', 'nPlateZ',
             'sumPlateX', 'nPlateX',
             'sumTiltSin', 'sumTiltCos', 'nTilt',
+            'sumStuff', 'nStuff', 'sumLoc', 'nLoc', 'sumPitching', 'nPitching',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -1329,12 +1387,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
               f"{_n_bip} BIP, {_n_bb} BB, {_n_hbp} HBP, {_n_k} K")
     else:
         _xw3d_smoothed_table = None
-
-    # --- Cache pitch-level data for downstream per-pitch analysis (SD+, etc.) ---
-    cache_path = os.path.join(DATA_DIR, f'all_pitches_{label.lower()}_cache.pkl')
-    with open(cache_path, 'wb') as f:
-        pickle.dump(all_pitches, f)
-    print(f"  Cached {len(all_pitches)} pitches to {cache_path}")
 
     # --- Reclassify CF (Cut-Fastball) → FF or FC ---
     # CF is not a real Statcast classification. Remap to FF by default,
@@ -2231,6 +2283,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
         _loc_baseline, pitcher_groups, pitch_groups,
         lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
         woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+        # Per-pitch Loc+ grades for the Sheets write-back
+        # (scripts/sheets_write_grades.py); local artifact, gitignored.
+        dump_pitch_grades_path=os.path.join(
+            DATA_DIR, f'pitch_loc_grades_{label.lower()}.json'),
     )
     for row in pitch_leaderboard:
         key = (row['pitcher'], row['team'], row['pitchType'], row.get('throws'))
@@ -3234,10 +3290,35 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
                          if _xw3d_smoothed_table else {}),
     }
 
+    # --- Cache pitch-level data for downstream per-pitch analysis (SD+,
+    # train_stuff_v11, Cards, refresh_micro_grades). Written HERE — after the
+    # CF remap and every other in-place normalization — so the cache is the
+    # EXACT input generate_micro_data sees; scripts/refresh_micro_grades.py
+    # depends on that fidelity to rebuild micro data bit-identically.
+    cache_path = os.path.join(DATA_DIR, f'all_pitches_{label.lower()}_cache.pkl')
+    with open(cache_path, 'wb') as f:
+        pickle.dump(all_pitches, f)
+    print(f"  Cached {len(all_pitches)} pitches to {cache_path}")
+
     # --- Generate micro-aggregate data ---
+    # Grade-atom sources: the Loc+ dump was written earlier THIS run (fresh);
+    # the Stuff+ dump is the previous train_stuff_v11 run's (stale for any
+    # games newer than it). scripts/refresh_micro_grades.py re-runs this
+    # generation after the train step so the embedded micro data never lags.
     print(f"\n--- Generating micro-aggregate data ({label}) ---")
+    _stuff_grades, _loc_grades = {}, {}
+    _sgp = os.path.join(DATA_DIR, 'pitch_stuff_grades.json')
+    if os.path.exists(_sgp):
+        with open(_sgp) as _f:
+            _stuff_grades = json.load(_f)
+    _lgp = os.path.join(DATA_DIR, f'pitch_loc_grades_{label.lower()}.json')
+    if os.path.exists(_lgp):
+        with open(_lgp) as _f:
+            _loc_grades = json.load(_f)
     micro_data = generate_micro_data(all_pitches, mlb_id_cache=mlb_id_cache,
-                                     ep_pitchers=ep_pitchers)
+                                     ep_pitchers=ep_pitchers,
+                                     stuff_grades=_stuff_grades,
+                                     loc_grades=_loc_grades)
     print(f"  micro_data: {len(micro_data['pitcherMicro'])} pitcher, "
           f"{len(micro_data['pitchMicro'])} pitch, "
           f"{len(micro_data['hitterMicro'])} hitter micro-aggs, "

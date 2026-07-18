@@ -17,6 +17,9 @@ data/fg_overrides.json
 # (fallback for local dev + diagnostic scripts). ~51 MB, was tripping
 # GitHub's large-file warning on every data commit.
 data/micro_data*.json
+# per-pitch grade dumps for the Sheets write-back (derived, local-only)
+data/pitch_loc_grades_*.json
+data/pitch_stuff_grades*.json
 
 # Python
 .venv/

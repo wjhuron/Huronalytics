@@ -135,10 +135,16 @@ K_SWING_COLL, K_SWING_COUNT, K_CS = 6, 20, 10
 # fastest (~71-74), the cutter slowest (~117). OTHER is unmeasured → 100.
 # Output is low-sensitivity here, but each group should be regressed by its
 # own evidence rate.
-N_PRIOR_OVERALL = 135
-N_PRIOR_PT = {'FF': 71, 'SI': 85, 'FC': 117, 'SL': 74, 'CU': 95, 'CH': 104,
-              'OTHER': 100}
-N_PRIOR_PT_DEFAULT = 100
+# COHERENT CANON (2026-07-18, per Wally): displayed Loc+ is the PLAIN AVERAGE
+# of per-pitch location grades — priors zeroed. The measured priors (overall
+# 135; per-group FF 71 / SI 85 / FC 117 / SL 74 / CU 95 / CH 104) DO improve
+# small-sample estimation (split-half MAE -2.9 to -5.4 at 25-100 pitches) but
+# buy <1 point at qualified samples, while breaking the ledger property that
+# sheet/card/site averages reconcile exactly. Small samples are handled by
+# qualification gates at render time.
+N_PRIOR_OVERALL = 0
+N_PRIOR_PT = {}
+N_PRIOR_PT_DEFAULT = 0
 LOC_SCALE_K = 10
 MIN_POOL_OVERALL = 250             # min pitches to enter the (mu,sigma) pool
 MIN_POOL_PT = 60                   # min pitches of a type to enter its group pool
@@ -488,19 +494,20 @@ def _in_norm_pool(k, pool_filter, combined_ids):
     return True
 
 
-def _normalize(raw, n_prior, min_pool, pool_filter):
+def _normalize(raw, n_prior, min_pool, pool_filter, return_anchors=False):
     """Bayesian-regress each raw_loc toward the pool league mean, then z-score
     to locPlus = 100 - K·z. Adds 'raw_loc_adj', 'locPlus', 'locRuns100'.
-    Mutates and returns the same dict."""
+    Mutates and returns the same dict. With return_anchors=True also returns
+    (mu, sigma) of the pool — reused for unshrunk window averages on cards."""
     if not raw:
-        return raw
+        return (raw, (None, None)) if return_anchors else raw
     combined_ids = {_pool_identity(k) for k in raw if _is_combined_team(k[1])}
     pool = {k: v for k, v in raw.items()
             if _in_norm_pool(k, pool_filter, combined_ids) and v['n_pitches'] >= min_pool}
     if not pool:
         for v in raw.values():
             v['raw_loc_adj'] = v['raw_loc']; v['locPlus'] = 100.0; v['locRuns100'] = 0.0
-        return raw
+        return (raw, (None, None)) if return_anchors else raw
     lg_raw = sum(v['raw_loc'] for v in pool.values()) / len(pool)
     for v in raw.values():
         n = v['n_pitches']
@@ -516,15 +523,19 @@ def _normalize(raw, n_prior, min_pool, pool_filter):
             v['locPlus'] = 100.0
         # interpretable tooltip: location runs saved per 100 pitches (pitcher persp)
         v['locRuns100'] = round(-(v['raw_loc_adj'] - lg_raw) * 100.0, 3)
-    return raw
+    return (raw, (mu, sigma)) if return_anchors else raw
 
 
-def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
+def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter,
+                        return_anchors=False):
     """Per-pitch-type rows standardized within their pitch-type GROUP.
     n_prior may be a scalar or a per-group dict (measured per-group
-    stabilization constants)."""
+    stabilization constants). With return_anchors=True also returns
+    {group: (mu, sigma)} — the unit-level anchors, reused by the per-pitch
+    grade dump so sheet grades share the exact leaderboard transform."""
+    anchors = {}
     if not raw:
-        return raw
+        return (raw, anchors) if return_anchors else raw
     combined_ids = {_pool_identity(k) for k in raw if _is_combined_team(k[1])}
     by_group = defaultdict(dict)
     for k, v in raw.items():
@@ -545,6 +556,7 @@ def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
         pool_adj = [rows[k]['raw_loc_adj'] for k in pool]
         mu = sum(pool_adj) / len(pool_adj)
         sigma = math.sqrt(sum((x - mu) ** 2 for x in pool_adj) / len(pool_adj))
+        anchors[grp] = (mu, sigma)
         for v in rows.values():
             if sigma > 1e-12:
                 z = (v['raw_loc_adj'] - mu) / sigma
@@ -555,7 +567,7 @@ def _normalize_by_group(raw, group_fn, n_prior, min_pool, pool_filter):
     out = {}
     for rows in by_group.values():
         out.update(rows)
-    return out
+    return (out, anchors) if return_anchors else out
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -584,7 +596,8 @@ def serialize_surfaces(S):
 #  MAIN ENTRY
 # ═════════════════════════════════════════════════════════════════════════
 def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
-                     lg_woba, woba_scale):
+                     lg_woba, woba_scale, dump_pitch_grades_path=None,
+                     return_anchors=False):
     """Main entry point. Signature preserved for process_data.py.
 
     Returns:
@@ -598,16 +611,51 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
     S = build_surfaces(baseline, lg_woba, woba_scale)
 
     pitcher_raw = _aggregate(pitches_by_pitcher, S, want_zone=True, want_heatmap=True)
-    pitcher_results = _normalize(
+    pitcher_results, ov_anchors = _normalize(
         pitcher_raw, N_PRIOR_OVERALL, MIN_POOL_OVERALL,
-        pool_filter=lambda k: k[1] not in AAA_TEAMS)
+        pool_filter=lambda k: k[1] not in AAA_TEAMS,
+        return_anchors=True)
 
     pitch_raw = _aggregate(pitches_by_pitch_type, S)
-    pitch_results = _normalize_by_group(
+    pitch_results, group_anchors = _normalize_by_group(
         pitch_raw, group_fn=lambda k: group_of_code(k[2]),
         n_prior=N_PRIOR_PT, min_pool=MIN_POOL_PT,
-        pool_filter=lambda k: k[1] not in AAA_TEAMS)
+        pool_filter=lambda k: k[1] not in AAA_TEAMS,
+        return_anchors=True)
 
+    # ── Per-pitch grade dump for the Sheets write-back (2026-07-18, per
+    # Wally). Scale (i), unregressed: each pitch's raw ExpRV graded with the
+    # SAME group anchors as the leaderboard Loc+ (no n_prior shrink — a pitch
+    # grade describes the pitch, not the pitcher's sample). Keyed by sheet
+    # position ("tab\trow", attached by pipeline_fetch); EP is excluded
+    # upstream (the caller passes an EP-filtered pitch list).
+    if dump_pitch_grades_path:
+        import json as _json
+        grades = {}
+        for p in all_pitches:
+            tab, rownum = p.get('_sheet_tab'), p.get('_sheet_row')
+            if tab is None or rownum is None or not _is_scorable(p):
+                continue
+            anc = group_anchors.get(group_of(p))
+            if not anc or anc[1] <= 1e-12:
+                continue
+            v = score_pitch(p, S)
+            if v is None:
+                continue
+            # UNCLIPPED full precision: clipping (if any) is display-only.
+            g = 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
+            grades[f'{tab}\t{int(rownum)}'] = round(g, 2)
+        with open(dump_pitch_grades_path, 'w') as f:
+            _json.dump(grades, f, separators=(',', ':'))
+        print(f"  Loc+ per-pitch grade dump: {len(grades)} pitches -> "
+              f"{dump_pitch_grades_path}")
+
+    if return_anchors:
+        # 'surfaces' = the raw surface object (NOT serialized) so callers can
+        # score additional pitches per-pitch via score_pitch(p, surfaces) with
+        # the exact same anchors — the card window-grade path uses this.
+        return (pitcher_results, pitch_results, serialize_surfaces(S),
+                {'overall': ov_anchors, 'pt': group_anchors, 'surfaces': S})
     return pitcher_results, pitch_results, serialize_surfaces(S)
 
 

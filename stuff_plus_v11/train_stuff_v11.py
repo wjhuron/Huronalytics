@@ -55,7 +55,14 @@ try:
 except Exception:
     AAA_TEAMS = {'ROC'}
 
-SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC'}
+SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC', 'KN'}
+# Types whose per-type anchor pool is too thin to trust borrow a donor pool
+# for (mu, sd). KN: one knuckleballer, offspeed family per Loc+ precedent.
+# SV: 25 qualified units; donor is SL alone (2026-07-18, Wally) — SV's unit
+# population sits on SL's (class avg 99.2 under SL anchors, sd ratio 0.94)
+# while ST's runs ~0.47 SD hotter (SV class avg 94.6 under ST, 97.3 under
+# SL+ST). Also makes SL<->SV retags grade-invariant (shared anchor).
+ANCHOR_BORROW = {'KN': ('CH', 'FS'), 'SV': ('SL',)}
 FB_TYPES = {'FF', 'SI', 'FC'}
 
 # Prior-season training data (season-blocked scheme; see main()). The pickle
@@ -181,7 +188,13 @@ def _params_for(X):
     return p
 # Pitcher-level standardization: 10 points per between-pitcher SD, mean shrunk
 # toward the qualified-pool mean by K_SHRINK pseudo-pitches, qualify at QUAL_N.
-K_SCALE, K_SHRINK, QUAL_N = 10, 100, 50
+# COHERENT CANON (2026-07-18, per Wally): every displayed value is the PLAIN
+# AVERAGE of per-pitch grades — no shrink. Validated empirically (split-half +
+# season-blocked MAE): shrinkage HURT Stuff+ at every sample size (model
+# outputs are already regularized; K=100 only added bias). Small samples are
+# handled by qualification gates at render time, not by bending the numbers.
+# Historical value: K_SHRINK was 100 through 2026-07-18.
+K_SCALE, K_SHRINK, QUAL_N = 10, 0, 50
 
 def sf(x):
     try: return float(x)
@@ -345,6 +358,7 @@ def build_df(pitches, prefer_true_fastball=True):
         rows.append({
             'pitcher': p.get('Pitcher'), 'team': p.get('PTeam'), 'throws': thr,
             'date': p.get('Game Date'),
+            'sheet_tab': p.get('_sheet_tab'), 'sheet_row': p.get('_sheet_row'),
             'pitch_type': pt, 'platoon_same': 1 if bats == thr else 0,
             'velocity': v, 'ivb': iv, 'hb': hb, 'velo_diff': velo_diff,
             'pid': p.get('PitchID'),   # per-pitch join key (xRVOE loc join)
@@ -356,7 +370,22 @@ def build_df(pitches, prefer_true_fastball=True):
             'axis_dev_abs': abs(_dev) if _dev is not None else None,
             'spin_eff': spin_eff,
         })
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    # Arm-angle imputation (2026-07-18, per Wally): ArmAngle arrives ~2 days
+    # after the game via the Savant supplement. While it's missing, use the
+    # pitcher's average arm angle for that pitch type (fallback: his overall
+    # average); a debut pitcher with no history stays NaN (XGBoost native
+    # missing handling — prior behavior). Replaced by the actual value on the
+    # first run after the supplement lands.
+    if len(out) and out['arm_angle'].isna().any():
+        _n_miss = int(out['arm_angle'].isna().sum())
+        by_pt = out.groupby(['pitcher', 'pitch_type'])['arm_angle'].transform('mean')
+        by_p = out.groupby('pitcher')['arm_angle'].transform('mean')
+        out['arm_angle'] = out['arm_angle'].fillna(by_pt).fillna(by_p)
+        _n_left = int(out['arm_angle'].isna().sum())
+        print(f'  arm-angle impute: {_n_miss - _n_left}/{_n_miss} missing filled '
+              f'from pitcher averages ({_n_left} left to model-missing)')
+    return out
 
 def design(df, feats=BASE_FEATS):
     # PITCH-TYPE AGNOSTIC (2026-07-04, per Wally, FanGraphs-style): no pitch-
@@ -461,6 +490,11 @@ def compute_support(df, df_prior):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--inject', action='store_true', help='write stuffScore into the pitch leaderboard')
+    ap.add_argument('--dump-pitch-grades', default=None, metavar='PATH',
+                    help='write per-pitch Stuff+ grades keyed by sheet position '
+                         '("tab\trow" -> grade) for the Sheets write-back '
+                         '(scripts/sheets_write_grades.py). Unregressed scale-(i) '
+                         'values: 100 + 10*(raw - mu_type)/sd_type, clip 40-180.')
     ap.add_argument('--score-only', action='store_true',
                     help='score with the cached fold models from the saved bundle '
                          '(no training, no prior pickles needed — seconds instead '
@@ -482,8 +516,12 @@ def main():
                and (p.get('Pitcher'), p.get('PTeam')) not in _ep]
     roc_pitches = [p for p in D if p.get('_source') in ('ROC', 'AAA')
                    and (p.get('Pitcher'), p.get('PTeam')) not in _ep]
-    df = build_df(pitches)
-    df = df[df['target_xrv'].notna()].reset_index(drop=True)
+    df_full = build_df(pitches)
+    df = df_full[df_full['target_xrv'].notna()].reset_index(drop=True)
+    # Pitches with no outcome target yet (pre-supplement, non-BIP with RunExp
+    # blank) can't train or enter the rawmean aggregation, but the model can
+    # still SCORE them — kept aside for the per-pitch grade dump.
+    df_extra = df_full[df_full['target_xrv'].isna()].reset_index(drop=True)
     print(f'  {len(df)} training pitches, {df.pitcher.nunique()} pitchers')
 
     # ── SEASON-BLOCKED prior-season training data (2026-07-03) ──
@@ -618,11 +656,15 @@ def main():
         for key, sub in groups:
             q = sub[sub['n'] >= qual_min]
             base = q if len(q) >= 5 else sub
+            if key in ANCHOR_BORROW and 'pitch_type' in grp_keys:
+                donor = a[a['pitch_type'].isin(ANCHOR_BORROW[key])]
+                dq = donor[donor['n'] >= qual_min]
+                base = dq if len(dq) >= 5 else donor
             mu, sd = float(base['rawmean'].mean()), float(base['rawmean'].std())
             scale[key] = {'mu': mu, 'sd': sd, 'nqual': int(len(q))}
             if sd > 0:
-                adj = (sub['n'] * sub['rawmean'] + K_SHRINK * mu) / (sub['n'] + K_SHRINK)
-                a.loc[sub.index, 'stuff_mean'] = (100 + K_SCALE * (adj - mu) / sd).clip(40, 180)
+                # plain average, unclipped (coherent canon)
+                a.loc[sub.index, 'stuff_mean'] = 100 + K_SCALE * (sub['rawmean'] - mu) / sd
         a['stuff_mean'] = a['stuff_mean'].round(1)
         return a, scale
 
@@ -645,7 +687,21 @@ def main():
     agg = agg.merge(sup, on=['pitcher', 'team', 'pitch_type'], how='left')
     agg['low_support'] = agg['low_support'].fillna(False).astype(bool)
     agg.to_csv(os.path.join(HERE, 'pitcher_stuff_v11.csv'), index=False)
-    overall, overall_scale = _standardize(['pitcher', 'team', 'throws'], 2 * QUAL_N)
+    # COHERENT CANON: overall Stuff+ = pitch-weighted mean of the per-type
+    # atoms (100 + 10*(raw - mu_type)/sd_type per pitch), NOT a separately
+    # anchored arsenal value — so averaging the sheet's Stuff+ column for a
+    # pitcher reproduces his overall number exactly.
+    def _atom_grade(row):
+        sc = league.get(row['pitch_type'])
+        if not sc or not np.isfinite(sc.get('sd', np.nan)) or sc['sd'] <= 0:
+            return np.nan
+        return 100 + K_SCALE * (row['stuff_raw'] - sc['mu']) / sc['sd']
+    df['_atom'] = df.apply(_atom_grade, axis=1)
+    overall = (df.dropna(subset=['_atom'])
+                 .groupby(['pitcher', 'team', 'throws'])['_atom']
+                 .agg(rawmean='mean', n='size').reset_index())
+    overall['stuff_mean'] = overall['rawmean'].round(1)
+    overall_scale = {'ALL': {'mu': 100.0, 'sd': 10.0, 'nqual': 0}}
     league['_overall'] = overall_scale['ALL']
     # Pitcher-level flag = USAGE-WEIGHTED (judgment call, documented): flagged
     # only when low-support units account for >=50% of his scored pitches — a
@@ -686,6 +742,10 @@ def main():
         groups = a.groupby('pitch_type') if 'pitch_type' in keys else [('ALL', a)]
         for key, sub in groups:
             q = sub[sub['n'] >= qual_min]; base = q if len(q) >= 5 else sub
+            if key in ANCHOR_BORROW and 'pitch_type' in keys:
+                donor = a[a['pitch_type'].isin(ANCHOR_BORROW[key])]
+                dq = donor[donor['n'] >= qual_min]
+                base = dq if len(dq) >= 5 else donor
             out[key] = {'mu': float(base['rawmean'].mean()), 'sd': float(base['rawmean'].std())}
         return out
     na_pt = _na_scale(['pitcher', 'team', 'pitch_type'], QUAL_N)
@@ -705,12 +765,21 @@ def main():
                 if not sc or not np.isfinite(sc.get('sd', np.nan)) or sc['sd'] <= 0:
                     continue
                 mu, sd = sc['mu'], sc['sd']
-                adj = (sub['n'] * sub['rawmean'] + K_SHRINK * mu) / (sub['n'] + K_SHRINK)
-                a.loc[sub.index, 'stuff_mean'] = (100 + K_SCALE * (adj - mu) / sd).clip(40, 180)
+                # plain average, unclipped (coherent canon)
+                a.loc[sub.index, 'stuff_mean'] = 100 + K_SCALE * (sub['rawmean'] - mu) / sd
             a['stuff_mean'] = a['stuff_mean'].round(1)
             return a
         roc_agg = _score_roc(['pitcher', 'team', 'pitch_type'], na_pt, True)
-        roc_overall = _score_roc(['pitcher', 'team', 'throws'], na_ov, False)
+        def _roc_atom(row):
+            sc = na_pt.get(row['pitch_type'])
+            if not sc or not np.isfinite(sc.get('sd', np.nan)) or sc['sd'] <= 0:
+                return np.nan
+            return 100 + K_SCALE * (row['raw_na'] - sc['mu']) / sc['sd']
+        roc_df['_atom'] = roc_df.apply(_roc_atom, axis=1)
+        roc_overall = (roc_df.dropna(subset=['_atom'])
+                         .groupby(['pitcher', 'team', 'throws'])['_atom']
+                         .agg(rawmean='mean', n='size').reset_index())
+        roc_overall['stuff_mean'] = roc_overall['rawmean'].round(1)
         # ROC is scored by the no-arm companion model against an anchored MLB
         # baseline and never enters the training pool — the support diagnostic
         # doesn't apply there (see compute_support docstring).
@@ -720,6 +789,49 @@ def main():
         overall = pd.concat([overall, roc_overall], ignore_index=True)
         print(f'  ROC (no-arm, vs MLB baseline): {len(roc_agg)} pitch-type rows, '
               f'{len(roc_overall)} pitchers')
+
+    # ── Per-pitch grade dump for the Sheets write-back ──
+    # Scale (i), unregressed (2026-07-18, per Wally): each pitch graded with the
+    # SAME per-type anchors as the leaderboard value, no K_SHRINK (a pitch grade
+    # describes the pitch, not the pitcher's sample size). Keyed by sheet
+    # position ("tab\trow", attached by pipeline_fetch). Rows without sheet
+    # coordinates (stale cache) or without a valid anchor are skipped -> blank.
+    if args.dump_pitch_grades:
+        _fm = B['fold_models'] if B is not None else fold_models
+        _fp = B['fold_pitchers'] if B is not None else fold_pitchers
+        def _grade(raw, sc):
+            # UNCLIPPED full precision: clipping is display-only (write-back),
+            # so window averages and the composite stay exact.
+            if raw is None or not np.isfinite(raw): return None
+            if not sc or not np.isfinite(sc.get('sd', np.nan)) or sc['sd'] <= 0: return None
+            return float(100 + K_SCALE * (raw - sc['mu']) / sc['sd'])
+        grades = {}
+        def _emit(frame, raw_col, anchors):
+            for tab, rownum, pt, raw in zip(frame['sheet_tab'], frame['sheet_row'],
+                                            frame['pitch_type'], frame[raw_col]):
+                if tab is None or rownum is None: continue
+                g = _grade(raw, anchors.get(pt))
+                if g is not None:
+                    grades[f'{tab}\t{int(rownum)}'] = round(g, 2)
+        _emit(df, 'stuff_raw', league)
+        # target-less pitches (pre-supplement): score with the same OOF fold
+        # discipline — each pitcher's held-out fold model, new pitchers fold 0.
+        if len(df_extra):
+            Xe = design(df_extra).reindex(columns=X.columns, fill_value=0)
+            fold_of = {pp: k for k, ps in enumerate(_fp) for pp in ps}
+            pf = np.array([fold_of.get(pp, 0) for pp in df_extra['pitcher']])
+            raw_e = np.full(len(df_extra), np.nan)
+            for k, mm in enumerate(_fm):
+                mask = pf == k
+                if mask.any():
+                    raw_e[mask] = -mm.predict(Xe[mask])
+            df_extra = df_extra.assign(stuff_raw=raw_e)
+            _emit(df_extra, 'stuff_raw', league)
+        if len(roc_df):
+            _emit(roc_df, 'raw_na', na_pt)
+        with open(args.dump_pitch_grades, 'w') as f:
+            json.dump(grades, f, separators=(',', ':'))
+        print(f'  per-pitch grade dump: {len(grades)} pitches -> {args.dump_pitch_grades}')
 
     # save bundle (retrain only — a score-only run must not overwrite the
     # fold models it just loaded). fold_models/fold_pitchers power the
@@ -736,6 +848,14 @@ def main():
                          'fold_models': fold_models, 'fold_pitchers': fold_pitchers,
                          'fold_models_na': fold_models_na,
                          'trained_through': max((d for d in df['date'].dropna()), default='')}, f)
+    else:
+        # Score-only: refresh the anchor scales in place (models untouched).
+        # Cards' cell-fallback atoms read bundle['league'] — if the scales
+        # went stale between retrains (new data, or an ANCHOR_BORROW change),
+        # fallback grades would drift from the sheet's, breaking exact-match.
+        B['league'], B['na_pt_scale'], B['na_ov_scale'] = league, na_pt, na_ov
+        with open(os.path.join(HERE, 'stuff_models_v11.pkl'), 'wb') as f:
+            pickle.dump(B, f)
 
     # report + metric history (drift visibility: every retrain appends its
     # OOF descriptive r and split-half reliability to data/, which CI
@@ -798,7 +918,7 @@ def _combo_score(parts, mu, sd):
     if tot_n <= 0:
         return None
     combined_rawmean = sum(rm * n for rm, n in parts) / tot_n
-    adj = (tot_n * combined_rawmean + K_SHRINK * mu) / (tot_n + K_SHRINK)
+    adj = combined_rawmean   # plain pitch-weighted average (coherent canon)
     return round(min(180.0, max(40.0, 100 + K_SCALE * (adj - mu) / sd)), 1)
 
 
@@ -846,28 +966,18 @@ def _inject_pitching(rows, key_of, qualifies):
     scores gets a score AND a rank (qualification is a render-time coloring
     gate). key_of(row) -> pool bucket (pitch type at pitch level, 'ALL' at
     pitcher level); qualifies(row) -> pool membership."""
-    pool_b = defaultdict(list)
-    for row in rows:
-        st, lc = row.get('stuffScore'), row.get('locPlus')
-        if st is not None and lc is not None and qualifies(row):
-            pool_b[key_of(row)].append(_blend(st, lc))
-    scale = {}
-    for k, bs in pool_b.items():
-        if len(bs) >= 5:
-            mu = sum(bs) / len(bs)
-            sd = (sum((b - mu) ** 2 for b in bs) / len(bs)) ** 0.5
-            if sd > 1e-9:
-                scale[k] = (mu, sd)
+    # COHERENT CANON: Pitching+ is the transparent blend of the two displayed
+    # components — pitchingScore = 0.7*Stuff+ + 0.3*Loc+, no restandardization,
+    # no clip. Auditable from the component columns; averages of per-pitch
+    # Pitching+ atoms reconcile to it by linearity. (The old version
+    # restandardized the blend to SD=10 per pool, which broke that audit.)
     n = 0
     for row in rows:
         st, lc = row.get('stuffScore'), row.get('locPlus')
-        sc = scale.get(key_of(row))
-        if st is None or lc is None or sc is None:
+        if st is None or lc is None:
             row['pitchingScore'] = None
             continue
-        mu, sd = sc
-        row['pitchingScore'] = round(
-            min(180.0, max(40.0, 100.0 + 10.0 * (_blend(st, lc) - mu) / sd)), 1)
+        row['pitchingScore'] = round(100.0 + 10.0 * _blend(st, lc), 1)
         n += 1
     pool_s = defaultdict(list)
     for row in rows:

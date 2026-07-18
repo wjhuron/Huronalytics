@@ -270,6 +270,29 @@ def push_team_data(df, team, gc=None, verbose=True):
     if not rows:
         return None
 
+    # ── Schema guard (2026-07-18) ── The appended rows are POSITIONAL: if the
+    # tab's header row doesn't match the DataFrame's columns exactly, every
+    # value after the divergence point lands in the wrong column — silent row
+    # corruption. Refuse loudly instead. This is the tripwire that makes
+    # schema migrations (e.g. the Stuff+/Loc+ insert after HAA) safe: a tab
+    # missed by the migration, or an old Pitcher2026 running against a
+    # migrated tab, fails here with an explicit diff instead of appending
+    # misaligned rows. An entirely empty header row (brand-new tab) is
+    # allowed through — there is nothing to misalign against.
+    sheet_header = ws.row_values(1)
+    expected = [str(c) for c in df.columns]
+    if sheet_header and sheet_header != expected:
+        diffs = [f"col {i+1}: sheet={sh!r} != df={ex!r}"
+                 for i, (sh, ex) in enumerate(
+                     __import__('itertools').zip_longest(sheet_header, expected))
+                 if sh != ex][:6]
+        raise RuntimeError(
+            f"[sheets] SCHEMA MISMATCH on tab {team!r} — refusing to append "
+            f"({len(sheet_header)} sheet cols vs {len(expected)} df cols). "
+            f"First diffs: {'; '.join(diffs)}. If the schema just changed, "
+            f"run the column migration (scripts/migrate_sheets_grade_columns.py) "
+            f"or update Pitcher2026's final_columns to match.")
+
     # First blank row in column A. Header row 1 stays untouched. Using
     # col_values('A') is more reliable than get_all_values() because trailing
     # blank rows are correctly trimmed.
