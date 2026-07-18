@@ -46,9 +46,12 @@ from pipeline_compute import (
 )
 
 
-# Stuff-injected xRVOE family preserved across re-processing (values are
-# computed by train_stuff_v11 --inject; process_data only carries them over).
-XRVOE_KEYS = ('xrvoe100', 'rvoe100', 'rvoe', 'xrvoe')
+# Stuff-injected keys preserved across re-processing (values are computed by
+# train_stuff_v11 --inject; process_data only carries them over). Includes
+# Pitching+ — omitting it here once shipped an embed with a blank Pitching+
+# column whenever process_data ran without a subsequent --inject (2026-07-18).
+XRVOE_KEYS = ('xrvoe100', 'rvoe100', 'rvoe', 'xrvoe',
+              'pitchingScore', 'pitchingRuns100')
 
 # ── Runtime state (set in main) ──────────────────────────────────────────
 WOBA_WEIGHTS = None
