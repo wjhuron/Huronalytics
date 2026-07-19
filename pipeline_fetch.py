@@ -384,12 +384,14 @@ def _gspread_client():
     the GOOGLE_SERVICE_ACCOUNT_JSON env var (GitHub secret SERVICE_ACCOUNT_JSON);
     locally it falls back to the default gspread file (~/.config/gspread/
     service_account.json — the huronalytics account the six books are shared
-    with). The SA used here must have at least read access to all six books.
+    with). Full spreadsheets scope (not readonly): the same client serves
+    scripts/sheets_write_grades.py in CI, which 403'd on readonly scopes
+    (2026-07-19). Actual access is still governed by the books' sharing.
     """
     sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
     if sa_json:
         from google.oauth2.service_account import Credentials
-        scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        scopes = ['https://www.googleapis.com/auth/spreadsheets']
         creds = Credentials.from_service_account_info(json.loads(sa_json), scopes=scopes)
         return gspread.authorize(creds)
     return gspread.service_account()

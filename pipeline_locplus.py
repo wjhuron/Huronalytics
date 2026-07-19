@@ -623,6 +623,45 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
         pool_filter=lambda k: k[1] not in AAA_TEAMS,
         return_anchors=True)
 
+    # ── COHERENT CANON (2026-07-18, per Wally): every displayed Loc+ —
+    # overall AND per-type — is the plain mean of the per-pitch INTEGER
+    # atoms (the same integers in the Sheets Loc+ column), so a sheet
+    # AVERAGEIF, a window card, a filtered site view, and these leaderboard
+    # values agree to the digit. The _normalize machinery above still
+    # supplies the anchors and the raw_loc_adj / locRuns100 / heatmap
+    # fields; only the displayed locPlus is overridden here. Overall uses
+    # the per-GROUP anchors per pitch (not the old pitcher-population
+    # standardization — that scale made overall Loc+ jump when site filters
+    # engaged the atoms).
+    _grade_memo = {}
+
+    def _pitch_grade(p):
+        """Full-precision per-pitch grade (same anchors as the dump)."""
+        pid = id(p)
+        if pid in _grade_memo:
+            return _grade_memo[pid]
+        g = None
+        if _is_scorable(p):
+            anc = group_anchors.get(group_of(p))
+            if anc and anc[1] is not None and anc[1] > 1e-12:
+                v = score_pitch(p, S)
+                if v is not None:
+                    g = 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
+        _grade_memo[pid] = g
+        return g
+
+    def _atom_override(results, groups_by_key):
+        for key, plist in groups_by_key.items():
+            if key not in results:
+                continue
+            atoms = [int(round(g)) for g in map(_pitch_grade, plist)
+                     if g is not None]
+            if atoms:
+                results[key]['locPlus'] = round(sum(atoms) / len(atoms), 1)
+
+    _atom_override(pitcher_results, pitches_by_pitcher)
+    _atom_override(pitch_results, pitches_by_pitch_type)
+
     # ── Per-pitch grade dump for the Sheets write-back (2026-07-18, per
     # Wally). Scale (i), unregressed: each pitch's raw ExpRV graded with the
     # SAME group anchors as the leaderboard Loc+ (no n_prior shrink — a pitch
@@ -634,16 +673,12 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
         grades = {}
         for p in all_pitches:
             tab, rownum = p.get('_sheet_tab'), p.get('_sheet_row')
-            if tab is None or rownum is None or not _is_scorable(p):
-                continue
-            anc = group_anchors.get(group_of(p))
-            if not anc or anc[1] <= 1e-12:
-                continue
-            v = score_pitch(p, S)
-            if v is None:
+            if tab is None or rownum is None:
                 continue
             # UNCLIPPED full precision: clipping (if any) is display-only.
-            g = 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
+            g = _pitch_grade(p)
+            if g is None:
+                continue
             grades[f'{tab}\t{int(rownum)}'] = round(g, 2)
         with open(dump_pitch_grades_path, 'w') as f:
             _json.dump(grades, f, separators=(',', ':'))

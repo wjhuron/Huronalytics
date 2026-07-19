@@ -790,6 +790,110 @@ def main():
         print(f'  ROC (no-arm, vs MLB baseline): {len(roc_agg)} pitch-type rows, '
               f'{len(roc_overall)} pitchers')
 
+    # ── COHERENT CANON display aggregation (2026-07-18, per Wally) ──
+    # Every displayed Stuff+ — per-type unit AND pitcher overall — is the
+    # plain mean of the per-pitch INTEGER atoms, the same integers written
+    # to the Sheets Stuff+ column, so a sheet AVERAGEIF reproduces every
+    # leaderboard value to the digit. Anchors stay fit on training-row unit
+    # rawmeans (above); only the aggregation of displayed values changes.
+    # Target-less pitches (df_extra) get sheet grades, so they belong in the
+    # displayed averages too — scored here (OOF fold discipline) instead of
+    # inside the dump gate.
+    _fm = B['fold_models'] if B is not None else fold_models
+    _fp = B['fold_pitchers'] if B is not None else fold_pitchers
+    if len(df_extra):
+        Xe = design(df_extra).reindex(columns=X.columns, fill_value=0)
+        _fold_of = {pp: k for k, ps in enumerate(_fp) for pp in ps}
+        _pf = np.array([_fold_of.get(pp, 0) for pp in df_extra['pitcher']])
+        raw_e = np.full(len(df_extra), np.nan)
+        for k, mm in enumerate(_fm):
+            mask = _pf == k
+            if mask.any():
+                raw_e[mask] = -mm.predict(Xe[mask])
+        df_extra = df_extra.assign(stuff_raw=raw_e)
+
+    def _atom_series(frame, anchors, raw_col):
+        """Per-pitch integer atoms (float dtype; NaN where ungradeable)."""
+        out = pd.Series(np.nan, index=frame.index)
+        for pt, sc in anchors.items():
+            if (not isinstance(sc, dict)
+                    or not np.isfinite(sc.get('sd', np.nan)) or sc['sd'] <= 0):
+                continue
+            m = (frame['pitch_type'] == pt).values
+            if m.any():
+                out[m] = (100 + K_SCALE
+                          * (frame.loc[m, raw_col] - sc['mu']) / sc['sd']).round()
+        return out
+
+    _DISP_COLS = ['pitcher', 'team', 'throws', 'pitch_type',
+                  'sheet_tab', 'sheet_row']
+    _mlb_disp = pd.concat(
+        [df[_DISP_COLS + ['stuff_raw']]] +
+        ([df_extra[_DISP_COLS + ['stuff_raw']]] if len(df_extra) else []),
+        ignore_index=True)
+    _mlb_disp['_ai'] = _atom_series(_mlb_disp, league, 'stuff_raw')
+    _mlb_disp = _mlb_disp.dropna(subset=['_ai'])
+    _atom_frames = [_mlb_disp]
+    if len(roc_df):
+        _roc_disp = roc_df[_DISP_COLS + ['raw_na']].copy()
+        _roc_disp['_ai'] = _atom_series(_roc_disp, na_pt, 'raw_na')
+        _roc_disp = _roc_disp.dropna(subset=['_ai'])
+        _atom_frames.append(_roc_disp)
+
+    def _atom_stats(keys):
+        parts = [f.groupby(keys)['_ai'].agg(atom_sum='sum', atom_n='size')
+                 .reset_index() for f in _atom_frames]
+        s = pd.concat(parts, ignore_index=True)
+        s['atom_mean'] = (s['atom_sum'] / s['atom_n']).round(1)
+        return s
+
+    def _apply_atom_means(target, keys):
+        m = target.merge(_atom_stats(keys), on=keys, how='left')
+        has = m['atom_mean'].notna()
+        m.loc[has, 'stuff_mean'] = m.loc[has, 'atom_mean']
+        m['atom_sum'] = m['atom_sum'].fillna(0.0)
+        m['atom_n'] = m['atom_n'].fillna(0).astype(int)
+        return m.drop(columns=['atom_mean'])
+
+    agg = _apply_atom_means(agg, ['pitcher', 'team', 'pitch_type'])
+    overall = _apply_atom_means(overall, ['pitcher', 'team', 'throws'])
+    # re-save the CSV so it carries the displayed (atom-mean) values
+    agg.to_csv(os.path.join(HERE, 'pitcher_stuff_v11.csv'), index=False)
+
+    # Pitching+ atoms: pc = round(0.7·S + 0.3·L) of the two INTEGER atoms —
+    # identical to the sheet's Z cells — averaged per unit / per pitcher.
+    # Loc atoms come from process_data's dump (written earlier in the same
+    # pipeline run); if it's absent the maps stay empty and injection falls
+    # back to the blend of the two displayed components.
+    pc_maps = {'pt': {}, 'ov': {}, 'pool_pt': {}, 'pool_ov': {}}
+    _loc_path = os.path.join(DATA, 'pitch_loc_grades_rs.json')
+    if os.path.exists(_loc_path):
+        with open(_loc_path) as _f:
+            _locg = json.load(_f)
+        def _pc_add(mp, key, pc):
+            s, n = mp.get(key, (0.0, 0))
+            mp[key] = (s + pc, n + 1)
+        for frame in _atom_frames:
+            for tab, rownum, pitcher, team, throws, pt, sa in zip(
+                    frame['sheet_tab'], frame['sheet_row'], frame['pitcher'],
+                    frame['team'], frame['throws'], frame['pitch_type'],
+                    frame['_ai']):
+                if tab is None or rownum is None:
+                    continue
+                lg = _locg.get(f'{tab}\t{int(rownum)}')
+                if lg is None:
+                    continue
+                pc = int(round(PITCHING_W_STUFF * int(sa)
+                               + (1.0 - PITCHING_W_STUFF) * int(round(lg))))
+                _pc_add(pc_maps['pt'], (pitcher, team, pt), pc)
+                _pc_add(pc_maps['ov'], (pitcher, team), pc)
+                if team not in AAA_TEAMS:
+                    # pooled across MLB stints — serves combined 2TM/3TM rows
+                    _pc_add(pc_maps['pool_pt'], (pitcher, pt), pc)
+                    _pc_add(pc_maps['pool_ov'], (pitcher,), pc)
+        print(f"  Pitching+ atoms: {sum(n for _s, n in pc_maps['ov'].values())} "
+              f"pitches with both grades")
+
     # ── Per-pitch grade dump for the Sheets write-back ──
     # Scale (i), unregressed (2026-07-18, per Wally): each pitch graded with the
     # SAME per-type anchors as the leaderboard value, no K_SHRINK (a pitch grade
@@ -797,8 +901,6 @@ def main():
     # position ("tab\trow", attached by pipeline_fetch). Rows without sheet
     # coordinates (stale cache) or without a valid anchor are skipped -> blank.
     if args.dump_pitch_grades:
-        _fm = B['fold_models'] if B is not None else fold_models
-        _fp = B['fold_pitchers'] if B is not None else fold_pitchers
         def _grade(raw, sc):
             # UNCLIPPED full precision: clipping is display-only (write-back),
             # so window averages and the composite stay exact.
@@ -814,18 +916,9 @@ def main():
                 if g is not None:
                     grades[f'{tab}\t{int(rownum)}'] = round(g, 2)
         _emit(df, 'stuff_raw', league)
-        # target-less pitches (pre-supplement): score with the same OOF fold
-        # discipline — each pitcher's held-out fold model, new pitchers fold 0.
+        # target-less pitches (pre-supplement): scored upstream in the canon
+        # display-aggregation section with the same OOF fold discipline.
         if len(df_extra):
-            Xe = design(df_extra).reindex(columns=X.columns, fill_value=0)
-            fold_of = {pp: k for k, ps in enumerate(_fp) for pp in ps}
-            pf = np.array([fold_of.get(pp, 0) for pp in df_extra['pitcher']])
-            raw_e = np.full(len(df_extra), np.nan)
-            for k, mm in enumerate(_fm):
-                mask = pf == k
-                if mask.any():
-                    raw_e[mask] = -mm.predict(Xe[mask])
-            df_extra = df_extra.assign(stuff_raw=raw_e)
             _emit(df_extra, 'stuff_raw', league)
         if len(roc_df):
             _emit(roc_df, 'raw_na', na_pt)
@@ -898,7 +991,8 @@ def main():
 
     if args.inject:
         xrvoe_pt, xrvoe_ov = compute_xrvoe(df, pitches)
-        inject(agg, overall, league, xrvoe_pt=xrvoe_pt, xrvoe_ov=xrvoe_ov)
+        inject(agg, overall, league, xrvoe_pt=xrvoe_pt, xrvoe_ov=xrvoe_ov,
+               pc_maps=pc_maps)
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
@@ -906,20 +1000,18 @@ def _is_combined_team(t):
     return isinstance(t, str) and t.endswith('TM') and t[:-2].isdigit()
 
 
-def _combo_score(parts, mu, sd):
-    """Exact combined-arsenal Stuff+ for a 2TM/3TM row: pool the pitcher's MLB
-    stint RAW predictions (n-weighted mean), then re-standardize at the COMBINED n
-    against the league mu/sd — re-shrinking with the full-season sample rather than
-    averaging the already-shrunk stint scores (which over-shrinks). Replicates
-    _standardize's math exactly. `parts` is a list of (rawmean, n) per stint."""
-    if not parts or mu is None or sd is None or sd <= 0:
+def _combo_score(parts):
+    """Combined 2TM/3TM row = plain mean of the pitcher's per-pitch INTEGER
+    atoms pooled across his MLB stints — the same number a sheet AVERAGEIF
+    across his team tabs gives. Unclipped (coherent canon; the old version
+    clipped to [40, 180], which no other surface does). `parts` is a list of
+    (atom_sum, atom_n) per stint."""
+    if not parts:
         return None
-    tot_n = sum(n for _rm, n in parts)
+    tot_n = sum(n for _s, n in parts)
     if tot_n <= 0:
         return None
-    combined_rawmean = sum(rm * n for rm, n in parts) / tot_n
-    adj = combined_rawmean   # plain pitch-weighted average (coherent canon)
-    return round(min(180.0, max(40.0, 100 + K_SCALE * (adj - mu) / sd)), 1)
+    return round(sum(s for s, _n in parts) / tot_n, 1)
 
 
 def _pctl(sc, pool):
@@ -958,7 +1050,7 @@ def _ols_slope(xs, ys):
     return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / var
 
 
-def _inject_pitching(rows, key_of, qualifies):
+def _inject_pitching(rows, key_of, qualifies, pc_lookup=None):
     """Write pitchingScore + pitchingScore_pctl into leaderboard rows.
 
     Pool convention matches stuffScore percentiles: MLB rows with >=25
@@ -966,13 +1058,18 @@ def _inject_pitching(rows, key_of, qualifies):
     scores gets a score AND a rank (qualification is a render-time coloring
     gate). key_of(row) -> pool bucket (pitch type at pitch level, 'ALL' at
     pitcher level); qualifies(row) -> pool membership."""
-    # COHERENT CANON: Pitching+ is the transparent blend of the two displayed
-    # components — pitchingScore = 0.7*Stuff+ + 0.3*Loc+, no restandardization,
-    # no clip. Auditable from the component columns; averages of per-pitch
-    # Pitching+ atoms reconcile to it by linearity. (The old version
-    # restandardized the blend to SD=10 per pool, which broke that audit.)
+    # COHERENT CANON: pitchingScore = plain mean of the per-pitch Pitching+
+    # atoms (round(0.7·S + 0.3·L) of the two INTEGER atoms — the sheet's Z
+    # cells), supplied via pc_lookup. Rows the maps can't serve (loc dump
+    # absent) fall back to the blend of the two displayed components, which
+    # matches to within rounding since both are now atom means themselves.
     n = 0
     for row in rows:
+        pc = pc_lookup(row) if pc_lookup is not None else None
+        if pc is not None:
+            row['pitchingScore'] = pc
+            n += 1
+            continue
         st, lc = row.get('stuffScore'), row.get('locPlus')
         if st is None or lc is None:
             row['pitchingScore'] = None
@@ -1102,7 +1199,7 @@ def compute_xrvoe(df, pitches):
             _units(['pitcher', 'team'], XRVOE_MIN_OV))
 
 
-def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
+def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None, pc_maps=None):
     """Write stuffScore into BOTH leaderboards.
 
     Percentile convention (site standard, aligned 2026-07-02): the pool that
@@ -1126,7 +1223,8 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
     flag_pt = defaultdict(bool)
     for r in agg.itertuples():
         if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
-            pool_pt[(r.pitcher, r.pitch_type)].append((r.rawmean, r.n))
+            pool_pt[(r.pitcher, r.pitch_type)].append(
+                (getattr(r, 'atom_sum', 0.0), getattr(r, 'atom_n', 0)))
             flag_pt[(r.pitcher, r.pitch_type)] |= bool(getattr(r, 'low_support', False))
     for row in pl:
         key = (row['pitcher'], row['team'], row['pitchType'])
@@ -1134,10 +1232,8 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
             row['stuffScore'] = look[key]
             row['stuffScore_lowSupport'] = flag_look.get(key, False)
         elif _is_combined_team(row['team']):
-            sc = league.get(row['pitchType'])
             row['stuffScore'] = _combo_score(
-                pool_pt.get((row['pitcher'], row['pitchType'])),
-                sc['mu'] if sc else None, sc['sd'] if sc else None)
+                pool_pt.get((row['pitcher'], row['pitchType'])))
             row['stuffScore_lowSupport'] = (flag_pt.get((row['pitcher'], row['pitchType']), False)
                                             if row['stuffScore'] is not None else False)
         else:
@@ -1159,11 +1255,23 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
             row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt])
         else:
             row['stuffScore_pctl'] = None
+    def _pc_mean(rec):
+        return round(rec[0] / rec[1], 1) if rec and rec[1] > 0 else None
+
+    def _pc_pt_lookup(row):
+        if pc_maps is None:
+            return None
+        rec = pc_maps['pt'].get((row['pitcher'], row['team'], row['pitchType']))
+        if rec is None and _is_combined_team(row['team']):
+            rec = pc_maps['pool_pt'].get((row['pitcher'], row['pitchType']))
+        return _pc_mean(rec)
+
     n_ps_pl = _inject_pitching(
         pl, key_of=lambda r: r['pitchType'],
         qualifies=lambda r: ((r.get('count') or 0) >= 25
                              and r.get('team') not in AAA_TEAMS
-                             and not _is_combined_team(r['team'])))
+                             and not _is_combined_team(r['team'])),
+        pc_lookup=_pc_pt_lookup)
     # ── xRVOE -> pitch rows (MLB only; ROC lacks non-BIP RunExp for the
     # actual side, and combined rows stay None — stints carry the value) ──
     if xrvoe_pt:
@@ -1195,9 +1303,9 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
     flag_ov = defaultdict(bool)
     for r in overall.itertuples():
         if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
-            pool_ov[(r.pitcher, r.throws)].append((r.rawmean, r.n))
+            pool_ov[(r.pitcher, r.throws)].append(
+                (getattr(r, 'atom_sum', 0.0), getattr(r, 'atom_n', 0)))
             flag_ov[(r.pitcher, r.throws)] |= bool(getattr(r, 'low_support', False))
-    ov_scale = league.get('_overall')
     for row in pp:
         key = (row['pitcher'], row['team'], row.get('throws'))
         if key in olook:
@@ -1205,8 +1313,7 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
             row['stuffScore_lowSupport'] = oflag.get(key, False)
         elif _is_combined_team(row['team']):
             row['stuffScore'] = _combo_score(
-                pool_ov.get((row['pitcher'], row.get('throws'))),
-                ov_scale['mu'] if ov_scale else None, ov_scale['sd'] if ov_scale else None)
+                pool_ov.get((row['pitcher'], row.get('throws'))))
             row['stuffScore_lowSupport'] = (flag_ov.get((row['pitcher'], row.get('throws')), False)
                                             if row['stuffScore'] is not None else False)
         else:
@@ -1223,11 +1330,20 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None):
             row['stuffScore_pctl'] = _pctl(sc, qpool)
         else:
             row['stuffScore_pctl'] = None
+    def _pc_ov_lookup(row):
+        if pc_maps is None:
+            return None
+        rec = pc_maps['ov'].get((row['pitcher'], row['team']))
+        if rec is None and _is_combined_team(row['team']):
+            rec = pc_maps['pool_ov'].get((row['pitcher'],))
+        return _pc_mean(rec)
+
     n_ps_pp = _inject_pitching(
         pp, key_of=lambda r: 'ALL',
         qualifies=lambda r: ((r.get('count') or 0) >= 25
                              and r.get('team') not in AAA_TEAMS
-                             and not _is_combined_team(r['team'])))
+                             and not _is_combined_team(r['team'])),
+        pc_lookup=_pc_ov_lookup)
     n_x = 0
     if xrvoe_ov:
         pools_o = {f: [] for f in XRVOE_FIELDS}
