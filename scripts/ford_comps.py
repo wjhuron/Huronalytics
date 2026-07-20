@@ -70,12 +70,43 @@ NICE_P = {'fbVelo': 'FBVelo', 'extension': 'Ext', 'armAngle': 'ArmAng',
 
 MIN_FEATS = 12
 # Pitch-mix component (pitchers): arsenals are compared TAG-BLIND — every
-# pitch is just (usage, velo, IVB, HB[arm-side]) and usage mass is matched to
-# the metrically nearest shapes in the other arsenal (greedy earth-mover).
-# A pitch tagged SL here can match a pitch tagged FC there; shape > tag.
+# pitch is just (usage, velo, IVB, HB[arm-side], spin tilt, spin rate) and
+# usage mass is matched to the metrically nearest shapes in the other arsenal
+# (greedy earth-mover). A pitch tagged SL here can match a pitch tagged FC
+# there; shape > tag. Tilt is the RELEASE (spin-axis) tilt, not OTilt —
+# OTilt is computed from IVB/HB so it would double-count movement; the
+# spin axis adds the seam-shifted-wake/gyro info movement can't see. Tilt
+# and spin get half weight since movement already encodes most of them.
 MIX_W = 1 / 3        # share of the pitcher distance that comes from the mix
-MIX_DIMS = ('velo', 'ivb', 'hb')
+MIX_CORE = ('velo', 'ivb', 'hb')                 # required dims, weight 1
+MIX_SOFT = (('tilt', 0.5), ('spin', 0.5))        # optional dims, half weight
 MIX_MIN_USAGE = 0.03                             # drop show-me pitches
+TILT_WRAP = 720                                  # tilt is minutes past 12:00
+
+
+def tilt_minutes(s):
+    """'10:52' -> 652; already-numeric minutes pass through."""
+    if s is None:
+        return None
+    try:
+        return float(s) % TILT_WRAP
+    except (TypeError, ValueError):
+        pass
+    try:
+        h, m = str(s).split(':')
+        return (int(h) % 12) * 60 + int(m)
+    except (TypeError, ValueError):
+        return None
+
+
+def mirror_tilt(t):
+    """Mirror LHP spin tilt across the 12:00-6:00 axis onto the RHP clock."""
+    return (TILT_WRAP - t) % TILT_WRAP
+
+
+def tilt_diff(a, b):
+    d = abs(a - b)
+    return min(d, TILT_WRAP - d)
 NL = {'hitter': 'PA', 'pitcher': 'TBF'}          # sample-count label
 SEASON_POOL_MIN = {'hitter': 250, 'pitcher': 150}
 WINDOW_POOL_MIN = {'hitter': 100, 'pitcher': 60}
@@ -94,13 +125,24 @@ def zstats(pool, feats):
 
 
 def mix_zstats(pool):
-    """Per-dimension mean/sd over every arsenal pitch of the pool."""
+    """Per-dimension scale over every arsenal pitch of the pool.
+
+    Linear dims get (mean, sd); tilt gets a circular sd in minutes (via the
+    mean resultant length) since the clock wraps at 12:00.
+    """
     out = {}
     entries = [p for r in pool for p in (r.get('arsenal') or [])]
-    for d in MIX_DIMS:
+    for d in MIX_CORE + tuple(k for k, _ in MIX_SOFT):
         vals = [e[d] for e in entries if e.get(d) is not None]
         if not vals:
             out[d] = (0.0, 1.0)
+            continue
+        if d == 'tilt':
+            sin_s = sum(math.sin(v / TILT_WRAP * 2 * math.pi) for v in vals)
+            cos_s = sum(math.cos(v / TILT_WRAP * 2 * math.pi) for v in vals)
+            r = min(max(math.hypot(sin_s, cos_s) / len(vals), 1e-9), 1 - 1e-9)
+            s = math.sqrt(-2 * math.log(r)) * TILT_WRAP / (2 * math.pi)
+            out[d] = (0.0, max(s, 1.0))
             continue
         m = sum(vals) / len(vals)
         s = math.sqrt(sum((v - m) ** 2 for v in vals) / len(vals))
@@ -111,17 +153,27 @@ def mix_zstats(pool):
 def arsenal_dist(A, B, mz):
     """Usage-weighted, tag-blind arsenal distance (greedy earth-mover).
 
-    Cost between two pitches = mean |z-diff| over velo/IVB/HB; each pitcher's
-    usage mass flows to the metrically nearest shapes in the other arsenal.
+    Cost between two pitches = weighted mean |z-diff| over the shape dims
+    (velo/IVB/HB required; tilt/spin half-weight when both sides have them);
+    each pitcher's usage mass flows to the metrically nearest shapes in the
+    other arsenal.
     """
     pairs = []
     for i, a in enumerate(A):
         for j, b in enumerate(B):
-            cs = [abs(a[d] - b[d]) / mz[d][1] for d in MIX_DIMS
+            cs = [abs(a[d] - b[d]) / mz[d][1] for d in MIX_CORE
                   if a.get(d) is not None and b.get(d) is not None]
-            if len(cs) < len(MIX_DIMS):
+            if len(cs) < len(MIX_CORE):
                 continue
-            pairs.append((sum(cs) / len(cs), i, j))
+            num, den = sum(cs), float(len(cs))
+            for d, w in MIX_SOFT:
+                va, vb = a.get(d), b.get(d)
+                if va is None or vb is None:
+                    continue
+                diff = tilt_diff(va, vb) if d == 'tilt' else abs(va - vb)
+                num += w * diff / mz[d][1]
+                den += w
+            pairs.append((num / den, i, j))
     if not pairs:
         return None
     pairs.sort()
@@ -256,8 +308,10 @@ def in_level(team, level):
 
 
 def _mk_arsenal(entries):
-    """entries: [(usage, velo, ivb, hb_armside)] -> cleaned, renormalized list."""
-    keep = [dict(usage=u, velo=v, ivb=iv, hb=hb) for u, v, iv, hb in entries
+    """entries: [(usage, velo, ivb, hb_armside, tilt_armside, spin)] ->
+    cleaned, renormalized list. Core dims required; tilt/spin optional."""
+    keep = [dict(usage=u, velo=v, ivb=iv, hb=hb, tilt=ti, spin=sp)
+            for u, v, iv, hb, ti, sp in entries
             if u and u >= MIX_MIN_USAGE and v is not None
             and iv is not None and hb is not None]
     tot = sum(p['usage'] for p in keep)
@@ -279,12 +333,16 @@ def load_arsenals():
     for r in rows:
         if (r.get('team') or '').endswith('TM'):
             continue
+        lefty = r.get('throws') == 'L'
         hb = sf(r.get('horzBrk'))
-        if hb is not None and r.get('throws') == 'L':
+        if hb is not None and lefty:
             hb = -hb
+        ti = tilt_minutes(r.get('releaseTiltMinutes'))
+        if ti is not None and lefty:
+            ti = mirror_tilt(ti)
         grouped[(r['pitcher'], r['team'])].append(
             (sf(r.get('usagePct')), sf(r.get('velocity')),
-             sf(r.get('indVertBrk')), hb))
+             sf(r.get('indVertBrk')), hb, ti, sf(r.get('spinRate'))))
     return {k: _mk_arsenal(v) for k, v in grouped.items()}
 
 
@@ -437,11 +495,17 @@ def window_pitchers(start, end=None):
             ptypes[(h, t)].add(pt)
             a[f'mix_{pt}_n'] += 1
             for fld, key in (('Velocity', 'v'), ('IndVertBrk', 'iv'),
-                             ('HorzBrk', 'hb')):
+                             ('HorzBrk', 'hb'), ('Spin Rate', 'sp')):
                 val = sf(p.get(fld))
                 if val is not None:
                     a[f'mix_{pt}_{key}_sum'] += val
                     a[f'mix_{pt}_{key}_n'] += 1
+            ti = tilt_minutes(p.get('RTilt'))
+            if ti is not None:
+                th = ti / TILT_WRAP * 2 * math.pi
+                a[f'mix_{pt}_ti_sin'] += math.sin(th)
+                a[f'mix_{pt}_ti_cos'] += math.cos(th)
+                a[f'mix_{pt}_ti_n'] += 1
         if pt in ('FF', 'SI'):
             v, va, ha = sf(p.get('Velocity')), sf(p.get('VAA')), sf(p.get('HAA'))
             a[f'{pt}_n'] += 1
@@ -504,15 +568,23 @@ def window_pitchers(start, end=None):
         fb = 'FF' if a['FF_n'] >= a['SI_n'] else 'SI'
         haa = (a[f'{fb}_haa_sum'] / a[f'{fb}_haa_n']) if a[f'{fb}_haa_n'] else None
         n_typed = sum(a[f'mix_{pt}_n'] for pt in ptypes[(h, t)])
+        lefty = throws.get((h, t)) == 'L'
         entries = []
         for pt in ptypes[(h, t)]:
             means = {k: a[f'mix_{pt}_{k}_sum'] / a[f'mix_{pt}_{k}_n']
-                     if a[f'mix_{pt}_{k}_n'] else None for k in ('v', 'iv', 'hb')}
+                     if a[f'mix_{pt}_{k}_n'] else None
+                     for k in ('v', 'iv', 'hb', 'sp')}
             hb = means['hb']
-            if hb is not None and throws.get((h, t)) == 'L':
+            if hb is not None and lefty:
                 hb = -hb
+            ti = None
+            if a[f'mix_{pt}_ti_n']:
+                th = math.atan2(a[f'mix_{pt}_ti_sin'], a[f'mix_{pt}_ti_cos'])
+                ti = (th / (2 * math.pi) * TILT_WRAP) % TILT_WRAP
+                if lefty:
+                    ti = mirror_tilt(ti)
             entries.append((a[f'mix_{pt}_n'] / n_typed if n_typed else 0,
-                            means['v'], means['iv'], hb))
+                            means['v'], means['iv'], hb, ti, means['sp']))
         out.append(dict(
             arsenal=_mk_arsenal(entries),
             # no outs-recorded field in the cache; IP estimated at 4.3 TBF/inning
