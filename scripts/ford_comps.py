@@ -12,10 +12,12 @@ angle, VAA, |HAA|; whiff/zone: SwStr%, CSW%, IZWhiff%, Chase%, IZ%;
 outcomes: K%, BB%; contact against: GB%, PU%, EV, HardHit%, Barrel%, xwOBAcon).
 HAA is hand-signed in the data, so the fingerprint uses its magnitude.
 
-Level filter ('mlb' / 'aaa' / 'both') restricts the CANDIDATE pool only;
-z-scales always come from the full pool so a tiny AAA pool can't distort them.
-AAA here means ROC (the only AAA club with full data; 'AAA' opponent rows
-count too in window mode).
+The comp pool is ALWAYS MLB-only — a ROC player is never comped to another
+ROC player, and z-scales come from the MLB pool. The level setting
+('mlb' / 'aaa' / 'both') picks which of the TARGET's stat lines to use: a
+player with time at both levels (e.g. House WSH + ROC) has one row per
+team, and 'aaa' comps his ROC (AAA-only) line against MLB players. 'both'
+runs every row he has. Batch mode ignores level (team picks the row).
 
 Date ranges are recomputed from the pitch cache (window pool floors are
 lower; hitters lose ev50 in window mode).
@@ -135,10 +137,6 @@ def report(target, pool, feats, stats, label, nice, topn=5, verbose=True,
         hand = f" ({r['throws']}HP)" if r.get('throws') else ''
         print(f"   {d:.3f}  {r['name']:24s} {r['team']:3s}  {nl} {r['pa']}{hand}")
     d0, b0, ds0 = scored[0]
-    if target['team'] in AAA_TEAMS and b0['team'] in AAA_TEAMS:
-        mlb = next(((d, r) for d, r, _ in scored if r['team'] not in AAA_TEAMS), None)
-        if mlb:
-            print(f"   best MLB: {mlb[0]:.3f}  {mlb[1]['name']} {mlb[1]['team']}")
     print(why_lines(target, b0, ds0, feats, stats, nice))
     if verbose:
         print(f"\n   feature detail vs {b0['name']} (z-units):")
@@ -176,7 +174,7 @@ def load_season(role):
             haa = r.get('haa')
             rec['haa'] = abs(haa) if haa is not None else None
             rec.update(name=r['pitcher'], team=r['team'], pa=r.get('tbf') or 0,
-                       throws=r.get('throws'))
+                       ip=sf(r.get('ip')), throws=r.get('throws'))
         season.append(rec)
     return season
 
@@ -365,7 +363,9 @@ def window_pitchers(start, end=None):
         fb = 'FF' if a['FF_n'] >= a['SI_n'] else 'SI'
         haa = (a[f'{fb}_haa_sum'] / a[f'{fb}_haa_n']) if a[f'{fb}_haa_n'] else None
         out.append(dict(
-            name=h, team=t, pa=int(tbf), throws=throws.get((h, t)),
+            # no outs-recorded field in the cache; IP estimated at 4.3 TBF/inning
+            name=h, team=t, pa=int(tbf), ip=round(tbf / 4.3, 1),
+            throws=throws.get((h, t)),
             fbVelo=a[f'{fb}_v_sum'] / a[f'{fb}_v_n'] if a[f'{fb}_v_n'] else None,
             vaa=a[f'{fb}_vaa_sum'] / a[f'{fb}_vaa_n'] if a[f'{fb}_vaa_n'] else None,
             haa=abs(haa) if haa is not None else None,
@@ -403,45 +403,59 @@ def range_label(start, end):
     return f"{start or 'season start'} -> {end or 'now'}"
 
 
+def big_enough(r, role, args):
+    """Batch target floor: min_pa (PA) for hitters, min_ip (IP) for pitchers."""
+    if role == 'hitter':
+        return r['pa'] >= args.min_pa
+    return r.get('ip') is not None and r['ip'] >= args.min_ip
+
+
 def run_role(role, args):
     """One role's worth of reports (single player or team batch)."""
     nice = NICE_H if role == 'hitter' else NICE_P
     nl, small = NL[role], SMALL_FLAG[role]
     rows, feats, windowed = get_rows(role, args.start, args.end)
     pool_min = (WINDOW_POOL_MIN if windowed else SEASON_POOL_MIN)[role]
-    pool_all = [r for r in rows if r['pa'] >= pool_min]
-    stats = zstats(pool_all, feats)          # z-scales from the FULL pool
+    # comp pool is ALWAYS MLB-only: never comp a ROC player to another ROC player
+    mlb_pool = [r for r in rows if r['pa'] >= pool_min
+                and r['team'] not in AAA_TEAMS]
+    stats = zstats(mlb_pool, feats)          # z-scales from the MLB pool
     rlab = range_label(args.start, args.end)
 
     def pool_for(t):
-        return [r for r in pool_all
-                if (r['name'], r['team']) != (t['name'], t['team'])
-                and in_level(r['team'], args.level)]
+        return [r for r in mlb_pool
+                if (r['name'], r['team']) != (t['name'], t['team'])]
 
     if args.team:
         excl = {n.strip() for n in args.exclude.split(';') if n.strip()}
         targets = [r for r in rows if r['team'] == args.team
-                   and r['name'] not in excl and r['pa'] >= args.min_pa]
+                   and r['name'] not in excl and big_enough(r, role, args)]
         targets.sort(key=lambda r: -r['pa'])
+        floor = (f"{args.min_pa} PA" if role == 'hitter' else f"{args.min_ip} IP")
         if not targets:
-            print(f"\n(no {args.team} {role}s over {args.min_pa} {nl} — {rlab})")
+            print(f"\n(no {args.team} {role}s over {floor} — {rlab})")
         for t in targets:
             report(t, pool_for(t), feats, stats,
                    f"{t['name']} ({t['team']}, {nl} {t['pa']}) — {rlab}",
                    nice, topn=3, verbose=False, nl=nl, small=small)
         return
 
+    # single player: level picks which of their stat lines to use as the target
     name = args.player
-    t = next((r for r in rows if r['name'] == name
-              and r['team'] == args.player_team), None)
-    if t is None:
-        print(f"\n({name} ({args.player_team}) not found as a {role} — {rlab}"
+    matches = [r for r in rows if r['name'] == name
+               and in_level(r['team'], args.level)]
+    if args.player_team:
+        matches = [r for r in matches if r['team'] == args.player_team]
+    if not matches:
+        print(f"\n({name} not found as a {role} at level '{args.level}' — {rlab}"
               f"{' (below window sample floors?)' if windowed else ''})")
         return
-    pool = pool_for(t)
-    report(t, pool, feats, stats,
-           f"{name} — {rlab.upper()} ({nl} {t['pa']}, pool {len(pool)})",
-           nice, nl=nl, small=small)
+    for t in matches:
+        pool = pool_for(t)
+        report(t, pool, feats, stats,
+               f"{name} ({t['team']}) — {rlab.upper()} ({nl} {t['pa']}, "
+               f"pool {len(pool)})",
+               nice, nl=nl, small=small)
 
 
 def main():
@@ -452,17 +466,19 @@ def main():
     ap.add_argument('--hitter', default=None, help='"Last, First" single-hitter mode')
     ap.add_argument('--pitcher', default=None, help='"Last, First" single-pitcher mode')
     ap.add_argument('--hitter-team', '--player-team', dest='player_team',
-                    default='ROC', help='team of --hitter/--pitcher (default ROC)')
+                    default=None, help='pin --hitter/--pitcher to one team row')
     ap.add_argument('--role', choices=['hitter', 'pitcher', 'both'],
                     default='hitter', help='batch mode roles (default hitter)')
     ap.add_argument('--level', choices=['mlb', 'aaa', 'both'], default='both',
-                    help='restrict the comp pool by level (default both)')
+                    help="which of the TARGET's stat lines to use (pool is always MLB)")
     ap.add_argument('--start', default=None, help='date window start (recomputed from cache)')
     ap.add_argument('--end', default=None, help='date window end (inclusive)')
     ap.add_argument('--team', default=None, help='batch mode: all players of this team')
     ap.add_argument('--exclude', default='', help='batch mode: semicolon-separated names to skip')
     ap.add_argument('--min-pa', type=int, default=100,
-                    help='batch mode: min PA/TBF to include a target')
+                    help='batch mode: min PA to include a hitter target')
+    ap.add_argument('--min-ip', type=float, default=25,
+                    help='batch mode: min IP to include a pitcher target')
     args = ap.parse_args()
 
     if args.team:
@@ -499,17 +515,19 @@ def interactive():
     # — Settings (edit these directly, or pass command-line flags instead) —
     role       = "both"     # "hitter", "pitcher", or "both"
     player     = ""         # "Last, First" for one player, or "" for whole team
-    team       = "ROC"      # player's team (single mode) / team to batch
-    level      = "both"     # comp pool level: "mlb", "aaa", or "both"
+    team       = "ROC"      # batch mode: team whose players get comped
+    level      = "both"     # which of the TARGET's stat lines to use: "mlb",
+                            #   "aaa", or "both" (comp pool is ALWAYS MLB-only)
     start_date = None       # "yyyy-mm-dd", or None for full season
     end_date   = None       # "yyyy-mm-dd", or None for through today
     exclude    = ""         # batch mode: semicolon-separated names to skip
-    min_pa     = 100        # batch mode: min PA/TBF to include a target
+    min_pa     = 100        # batch mode: min PA to include a hitter
+    min_ip     = 25         # batch mode: min IP to include a pitcher
 
-    args = argparse.Namespace(player=player or None, player_team=team,
+    args = argparse.Namespace(player=player or None, player_team=None,
                               team=None if player else team,
                               level=level, start=start_date, end=end_date,
-                              exclude=exclude, min_pa=min_pa)
+                              exclude=exclude, min_pa=min_pa, min_ip=min_ip)
     for r in (['hitter', 'pitcher'] if role == 'both' else [role]):
         run_role(r, args)
 
