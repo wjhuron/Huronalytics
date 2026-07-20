@@ -1,21 +1,33 @@
-"""ford_comps.py — closest offensive comparisons from the hitter fingerprint.
+"""ford_comps.py — closest player comparisons from a stat fingerprint.
 
-Similarity = mean |z-difference| across an 18-feature offensive fingerprint
-(contact quality, batted-ball profile, swing decisions, contact skill, bat
-tracking, outcomes), z-scored over the comparison pool (MLB + ROC hitters,
-season PA >= 250; ROC is measured against MLB baselines site-wide, so
-cross-level shape comps are legitimate). Distances under ~0.45 are snug.
-Shape comps, not talent equivalences.
+Similarity = mean |z-difference| across a stat fingerprint, z-scored over the
+full comparison pool (MLB + ROC, season sample floors; ROC is measured against
+MLB baselines site-wide, so cross-level shape comps are legitimate).
+Distances under ~0.45 are snug. Shape comps, not talent equivalences.
 
-Modes:
-  --hitter "Ford, Harry" [--hitter-team ROC]     one hitter, full season
-  --hitter ... --start 2026-06-01                add a date-window run
-                                                 (recomputed from the pitch
-                                                 cache; window pool PA >= 100)
-  --team ROC [--exclude "House, Brady;..."]      batch, full season only
+Hitters: 18-feature offensive fingerprint (contact quality, batted-ball
+profile, swing decisions, contact skill, bat tracking, outcomes).
+Pitchers: 18-feature fingerprint (release/approach: FB velo, extension, arm
+angle, VAA, |HAA|; whiff/zone: SwStr%, CSW%, IZWhiff%, Chase%, IZ%;
+outcomes: K%, BB%; contact against: GB%, PU%, EV, HardHit%, Barrel%, xwOBAcon).
+HAA is hand-signed in the data, so the fingerprint uses its magnitude.
+
+Level filter ('mlb' / 'aaa' / 'both') restricts the CANDIDATE pool only;
+z-scales always come from the full pool so a tiny AAA pool can't distort them.
+AAA here means ROC (the only AAA club with full data; 'AAA' opponent rows
+count too in window mode).
+
+Date ranges are recomputed from the pitch cache (window pool floors are
+lower; hitters lose ev50 in window mode).
+
+Run with NO arguments for interactive mode: prompts for role
+(hitter/pitcher/both), player or whole team, level, and date range.
 
 Usage examples:
+  python3 scripts/ford_comps.py                                  interactive
   python3 scripts/ford_comps.py --hitter "Ford, Harry" --start 2026-06-01
+  python3 scripts/ford_comps.py --pitcher "Kolek, Bryce" --level mlb
+  python3 scripts/ford_comps.py --team ROC --role both
   python3 scripts/ford_comps.py --team ROC --exclude "Jordan, Levi;Wallace, Cayden"
 """
 import os, sys, json, pickle, math, argparse
@@ -27,17 +39,35 @@ from pipeline_utils import (safe_float as sf, NON_PA_EVENTS, BB_EVENTS,
                             K_EVENTS, BUNT_BB_TYPES,
                             spray_angle, spray_direction, SWING_DESCRIPTIONS)
 
-FEATS = ['avgEVAll', 'ev50', 'hardHitPct', 'barrelPct', 'xwOBAcon',
-         'gbPct', 'puPct', 'pullPct', 'airPullPct',
-         'swingPct', 'izSwingPct', 'chasePct', 'whiffPct',
-         'kPct', 'bbPct', 'batSpeed', 'swingLength', 'attackAngle']
-NICE = {'avgEVAll': 'EV', 'ev50': 'EV50', 'hardHitPct': 'HardHit%',
-        'barrelPct': 'Barrel%', 'xwOBAcon': 'xwOBAcon', 'gbPct': 'GB%',
-        'puPct': 'PU%', 'pullPct': 'Pull%', 'airPullPct': 'AirPull%',
-        'swingPct': 'Swing%', 'izSwingPct': 'IZSwing%', 'chasePct': 'Chase%',
-        'whiffPct': 'Whiff%', 'kPct': 'K%', 'bbPct': 'BB%',
-        'batSpeed': 'BatSpd', 'swingLength': 'SwLen', 'attackAngle': 'AttackAng'}
+FEATS_H = ['avgEVAll', 'ev50', 'hardHitPct', 'barrelPct', 'xwOBAcon',
+           'gbPct', 'puPct', 'pullPct', 'airPullPct',
+           'swingPct', 'izSwingPct', 'chasePct', 'whiffPct',
+           'kPct', 'bbPct', 'batSpeed', 'swingLength', 'attackAngle']
+NICE_H = {'avgEVAll': 'EV', 'ev50': 'EV50', 'hardHitPct': 'HardHit%',
+          'barrelPct': 'Barrel%', 'xwOBAcon': 'xwOBAcon', 'gbPct': 'GB%',
+          'puPct': 'PU%', 'pullPct': 'Pull%', 'airPullPct': 'AirPull%',
+          'swingPct': 'Swing%', 'izSwingPct': 'IZSwing%', 'chasePct': 'Chase%',
+          'whiffPct': 'Whiff%', 'kPct': 'K%', 'bbPct': 'BB%',
+          'batSpeed': 'BatSpd', 'swingLength': 'SwLen', 'attackAngle': 'AttackAng'}
+
+FEATS_P = ['fbVelo', 'extension', 'armAngle', 'vaa', 'haa',
+           'kPct', 'bbPct', 'swStrPct', 'cswPct', 'izWhiffPct',
+           'chasePct', 'izPct',
+           'gbPct', 'puPct', 'avgEVAgainst', 'hardHitPct',
+           'barrelPctAgainst', 'xwOBAcon']
+NICE_P = {'fbVelo': 'FBVelo', 'extension': 'Ext', 'armAngle': 'ArmAng',
+          'vaa': 'VAA', 'haa': '|HAA|', 'kPct': 'K%', 'bbPct': 'BB%',
+          'swStrPct': 'SwStr%', 'cswPct': 'CSW%', 'izWhiffPct': 'IZWhiff%',
+          'chasePct': 'Chase%', 'izPct': 'IZ%', 'gbPct': 'GB%', 'puPct': 'PU%',
+          'avgEVAgainst': 'EV', 'hardHitPct': 'HardHit%',
+          'barrelPctAgainst': 'Barrel%', 'xwOBAcon': 'xwOBAcon'}
+
 MIN_FEATS = 12
+NL = {'hitter': 'PA', 'pitcher': 'TBF'}          # sample-count label
+SEASON_POOL_MIN = {'hitter': 250, 'pitcher': 150}
+WINDOW_POOL_MIN = {'hitter': 100, 'pitcher': 60}
+SMALL_FLAG = {'hitter': 200, 'pitcher': 150}
+AAA_TEAMS = {'ROC', 'AAA'}
 
 
 def zstats(pool, feats):
@@ -63,7 +93,7 @@ def dist(a, b, feats, stats):
     return sum(d for d, _ in ds) / len(ds), ds
 
 
-def why_lines(t, best, ds, feats, stats):
+def why_lines(t, best, ds, feats, stats, nice):
     """Shared extremes (both |z|>=0.75 same sign) + the biggest gap."""
     def z(r, f):
         v = r.get(f)
@@ -79,31 +109,37 @@ def why_lines(t, best, ds, feats, stats):
         if abs(za) >= 0.75 and abs(zb) >= 0.75 and za * zb > 0:
             shared.append((min(abs(za), abs(zb)), f, za))
     shared.sort(reverse=True)
-    tr = ', '.join(f"{NICE[f]} {'high' if zz > 0 else 'low'}"
+    tr = ', '.join(f"{nice[f]} {'high' if zz > 0 else 'low'}"
                    for _, f, zz in shared[:4]) or 'league-average across the board'
     gap_d, gap_f = max(ds, key=lambda x: x[0])[0], max(ds, key=lambda x: x[0])[1]
+    fmt = lambda v: f'{v:.4g}' if isinstance(v, float) else v
     return (f"   shared: {tr}\n"
-            f"   biggest gap: {NICE[gap_f]} (Δz {gap_d:.1f}: "
-            f"{t.get(gap_f)} vs {best.get(gap_f)})")
+            f"   biggest gap: {nice[gap_f]} (Δz {gap_d:.1f}: "
+            f"{fmt(t.get(gap_f))} vs {fmt(best.get(gap_f))})")
 
 
-def report(target, pool, feats, stats, label, topn=5, verbose=True):
+def report(target, pool, feats, stats, label, nice, topn=5, verbose=True,
+           nl='PA', small=200):
     scored = []
     for r in pool:
         d, ds = dist(target, r, feats, stats)
         if d is not None:
             scored.append((d, r, ds))
     scored.sort(key=lambda x: x[0])
-    flag = ' [small sample]' if target['pa'] < 200 else ''
+    if not scored:
+        print(f"\n{label}\n   (no pool candidates with >= {MIN_FEATS} shared features)")
+        return []
+    flag = ' [small sample]' if target['pa'] < small else ''
     print(f"\n{label}{flag}")
     for d, r, _ in scored[:topn]:
-        print(f"   {d:.3f}  {r['name']:24s} {r['team']:3s}  PA {r['pa']}")
+        hand = f" ({r['throws']}HP)" if r.get('throws') else ''
+        print(f"   {d:.3f}  {r['name']:24s} {r['team']:3s}  {nl} {r['pa']}{hand}")
     d0, b0, ds0 = scored[0]
-    if b0['team'] == target['team'] == 'ROC':
-        mlb = next(((d, r) for d, r, _ in scored if r['team'] != 'ROC'), None)
+    if target['team'] in AAA_TEAMS and b0['team'] in AAA_TEAMS:
+        mlb = next(((d, r) for d, r, _ in scored if r['team'] not in AAA_TEAMS), None)
         if mlb:
             print(f"   best MLB: {mlb[0]:.3f}  {mlb[1]['name']} {mlb[1]['team']}")
-    print(why_lines(target, b0, ds0, feats, stats))
+    print(why_lines(target, b0, ds0, feats, stats, nice))
     if verbose:
         print(f"\n   feature detail vs {b0['name']} (z-units):")
         for f in feats:
@@ -111,31 +147,53 @@ def report(target, pool, feats, stats, label, topn=5, verbose=True):
             if vf is None or vb is None:
                 continue
             m, s = stats[f]
-            print(f"    {NICE[f]:10s} {target['name'].split(',')[0]:12s} {vf:8.3f} "
+            print(f"    {nice[f]:10s} {target['name'].split(',')[0]:12s} {vf:8.3f} "
                   f"(z{(vf-m)/s:+.2f})   {b0['name'].split(',')[0]:12s} {vb:8.3f} "
                   f"(z{(vb-m)/s:+.2f})")
     return scored[:topn]
 
 
-def load_season():
-    rows = json.load(open(os.path.join(ROOT, 'data', 'hitter_leaderboard_rs.json')))
+def in_level(team, level):
+    if level == 'mlb':
+        return team not in AAA_TEAMS
+    if level == 'aaa':
+        return team in AAA_TEAMS
+    return True
+
+
+def load_season(role):
+    fn = 'hitter_leaderboard_rs.json' if role == 'hitter' else 'pitcher_leaderboard_rs.json'
+    rows = json.load(open(os.path.join(ROOT, 'data', fn)))
     season = []
     for r in rows:
         if (r.get('team') or '').endswith('TM'):
             continue
-        rec = {f: r.get(f) for f in FEATS}
-        rec.update(name=r['hitter'], team=r['team'], pa=r.get('pa') or 0)
+        if role == 'hitter':
+            rec = {f: r.get(f) for f in FEATS_H}
+            rec.update(name=r['hitter'], team=r['team'], pa=r.get('pa') or 0)
+        else:
+            rec = {f: r.get(f) for f in FEATS_P}
+            haa = r.get('haa')
+            rec['haa'] = abs(haa) if haa is not None else None
+            rec.update(name=r['pitcher'], team=r['team'], pa=r.get('tbf') or 0,
+                       throws=r.get('throws'))
         season.append(rec)
     return season
 
 
-def window_rows(start):
-    """Recompute the fingerprint from the pitch cache for dates >= start."""
+def _load_cache(start, end):
     D = pickle.load(open(os.path.join(ROOT, 'data', 'all_pitches_rs_cache.pkl'), 'rb'))
-    agg = defaultdict(lambda: defaultdict(float))
     for p in D:
-        if (p.get('Game Date') or '') < start:
+        d = p.get('Game Date') or ''
+        if d < start or (end and d > end):
             continue
+        yield p
+
+
+def window_hitters(start, end=None):
+    """Recompute the hitter fingerprint from the pitch cache for the window."""
+    agg = defaultdict(lambda: defaultdict(float))
+    for p in _load_cache(start, end):
         h, t = p.get('Batter'), p.get('BTeam')
         if not h or not t:
             continue
@@ -222,49 +280,243 @@ def window_rows(start):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser(description='Closest offensive comps')
-    ap.add_argument('--hitter', default=None, help='"Last, First" for single-hitter mode')
-    ap.add_argument('--hitter-team', default='ROC', help='team of --hitter (default ROC)')
-    ap.add_argument('--start', default=None, help='also run a window from this date (single mode)')
-    ap.add_argument('--team', default=None, help='batch mode: all hitters of this team, full season')
-    ap.add_argument('--exclude', default='', help='batch mode: semicolon-separated names to skip')
-    ap.add_argument('--min-pa', type=int, default=100, help='batch mode: min PA to include a target')
-    args = ap.parse_args()
+def window_pitchers(start, end=None):
+    """Recompute the pitcher fingerprint from the pitch cache for the window.
 
-    season = load_season()
-    pool_all = [r for r in season if r['pa'] >= 250]
-    stats = zstats(pool_all, FEATS)
+    fbVelo / VAA / HAA come from the pitcher's primary fastball (the more-used
+    of FF/SI in the window), matching the season leaderboard's FB framing.
+    """
+    agg = defaultdict(lambda: defaultdict(float))
+    throws = {}
+    for p in _load_cache(start, end):
+        h, t = p.get('Pitcher'), p.get('PTeam')
+        if not h or not t:
+            continue
+        a = agg[(h, t)]
+        if p.get('Throws'):
+            throws[(h, t)] = p['Throws']
+        desc = p.get('Description')
+        a['pitches'] += 1
+        ext, ang = sf(p.get('Extension')), sf(p.get('ArmAngle'))
+        if ext is not None:
+            a['ext_sum'] += ext; a['ext_n'] += 1
+        if ang is not None:
+            a['ang_sum'] += ang; a['ang_n'] += 1
+        pt = p.get('Pitch Type')
+        if pt in ('FF', 'SI'):
+            v, va, ha = sf(p.get('Velocity')), sf(p.get('VAA')), sf(p.get('HAA'))
+            a[f'{pt}_n'] += 1
+            if v is not None:
+                a[f'{pt}_v_sum'] += v; a[f'{pt}_v_n'] += 1
+            if va is not None:
+                a[f'{pt}_vaa_sum'] += va; a[f'{pt}_vaa_n'] += 1
+            if ha is not None:
+                a[f'{pt}_haa_sum'] += ha; a[f'{pt}_haa_n'] += 1
+        in_z = p.get('InZone') == 'Yes'
+        if in_z:
+            a['iz'] += 1
+        else:
+            a['ooz'] += 1
+        is_swing = desc in SWING_DESCRIPTIONS and 'Bunt' not in (desc or '')
+        if is_swing:
+            a['sw'] += 1
+            if in_z:
+                a['izsw'] += 1
+            else:
+                a['oozsw'] += 1
+            if desc == 'Swinging Strike':
+                a['wh'] += 1
+                if in_z:
+                    a['izwh'] += 1
+        if desc == 'Called Strike':
+            a['cs'] += 1
+        ev = p.get('Event')
+        if ev and ev not in NON_PA_EVENTS and ev != 'Intent Walk':
+            a['tbf'] += 1
+            if ev in K_EVENTS:
+                a['k'] += 1
+            elif ev in BB_EVENTS:
+                a['bb'] += 1
+        bb_type = p.get('BBType')
+        if desc == 'In Play' and bb_type and bb_type not in BUNT_BB_TYPES:
+            a['bip'] += 1
+            if bb_type == 'ground_ball':
+                a['gb'] += 1
+            if bb_type == 'popup':
+                a['pu'] += 1
+            ev_f = sf(p.get('ExitVelo'))
+            if ev_f is not None:
+                a['ev_sum'] += ev_f; a['ev_n'] += 1
+                if ev_f >= 95:
+                    a['hh'] += 1
+            try:
+                if int(sf(p.get('Barrel')) or 0) == 6:   # lsa code 6 = barrel
+                    a['barrel'] += 1
+            except (TypeError, ValueError):
+                pass
+            xw = sf(p.get('xwOBA'))
+            if xw is not None:
+                a['xw_sum'] += xw; a['xw_n'] += 1
+    out = []
+    for (h, t), a in agg.items():
+        bip, sw, tbf = a['bip'], a['sw'], a['tbf']
+        if a['pitches'] < 200 or tbf < 50 or bip < 30:
+            continue
+        fb = 'FF' if a['FF_n'] >= a['SI_n'] else 'SI'
+        haa = (a[f'{fb}_haa_sum'] / a[f'{fb}_haa_n']) if a[f'{fb}_haa_n'] else None
+        out.append(dict(
+            name=h, team=t, pa=int(tbf), throws=throws.get((h, t)),
+            fbVelo=a[f'{fb}_v_sum'] / a[f'{fb}_v_n'] if a[f'{fb}_v_n'] else None,
+            vaa=a[f'{fb}_vaa_sum'] / a[f'{fb}_vaa_n'] if a[f'{fb}_vaa_n'] else None,
+            haa=abs(haa) if haa is not None else None,
+            extension=a['ext_sum'] / a['ext_n'] if a['ext_n'] else None,
+            armAngle=a['ang_sum'] / a['ang_n'] if a['ang_n'] else None,
+            kPct=a['k'] / tbf, bbPct=a['bb'] / tbf,
+            swStrPct=a['wh'] / a['pitches'],
+            cswPct=(a['wh'] + a['cs']) / a['pitches'],
+            izWhiffPct=a['izwh'] / a['izsw'] if a['izsw'] else None,
+            chasePct=a['oozsw'] / a['ooz'] if a['ooz'] else None,
+            izPct=a['iz'] / a['pitches'],
+            gbPct=a['gb'] / bip, puPct=a['pu'] / bip,
+            avgEVAgainst=a['ev_sum'] / a['ev_n'] if a['ev_n'] else None,
+            hardHitPct=a['hh'] / a['ev_n'] if a['ev_n'] else None,
+            barrelPctAgainst=a['barrel'] / bip,
+            xwOBAcon=a['xw_sum'] / a['xw_n'] if a['xw_n'] else None,
+        ))
+    return out
+
+
+def get_rows(role, start=None, end=None):
+    """Rows + feats + windowed flag for a role and optional date range."""
+    if start or end:
+        rows = (window_hitters(start or '2026-01-01', end) if role == 'hitter'
+                else window_pitchers(start or '2026-01-01', end))
+        feats = ([f for f in FEATS_H if f != 'ev50'] if role == 'hitter'
+                 else FEATS_P)
+        return rows, feats, True
+    return load_season(role), (FEATS_H if role == 'hitter' else FEATS_P), False
+
+
+def range_label(start, end):
+    if not start and not end:
+        return 'full season'
+    return f"{start or 'season start'} -> {end or 'now'}"
+
+
+def run_role(role, args):
+    """One role's worth of reports (single player or team batch)."""
+    nice = NICE_H if role == 'hitter' else NICE_P
+    nl, small = NL[role], SMALL_FLAG[role]
+    rows, feats, windowed = get_rows(role, args.start, args.end)
+    pool_min = (WINDOW_POOL_MIN if windowed else SEASON_POOL_MIN)[role]
+    pool_all = [r for r in rows if r['pa'] >= pool_min]
+    stats = zstats(pool_all, feats)          # z-scales from the FULL pool
+    rlab = range_label(args.start, args.end)
+
+    def pool_for(t):
+        return [r for r in pool_all
+                if (r['name'], r['team']) != (t['name'], t['team'])
+                and in_level(r['team'], args.level)]
 
     if args.team:
         excl = {n.strip() for n in args.exclude.split(';') if n.strip()}
-        targets = [r for r in season if r['team'] == args.team
+        targets = [r for r in rows if r['team'] == args.team
                    and r['name'] not in excl and r['pa'] >= args.min_pa]
         targets.sort(key=lambda r: -r['pa'])
+        if not targets:
+            print(f"\n(no {args.team} {role}s over {args.min_pa} {nl} — {rlab})")
         for t in targets:
-            pool = [r for r in pool_all if (r['name'], r['team']) != (t['name'], t['team'])]
-            report(t, pool, FEATS, stats,
-                   f"{t['name']} ({t['team']}, PA {t['pa']}) — full season",
-                   topn=3, verbose=False)
+            report(t, pool_for(t), feats, stats,
+                   f"{t['name']} ({t['team']}, {nl} {t['pa']}) — {rlab}",
+                   nice, topn=3, verbose=False, nl=nl, small=small)
         return
 
-    name = args.hitter or 'Ford, Harry'
-    t = next(r for r in season if r['name'] == name and r['team'] == args.hitter_team)
-    pool = [r for r in pool_all if (r['name'], r['team']) != (name, args.hitter_team)]
-    report(t, pool, FEATS, stats, f'{name} — FULL SEASON (PA {t["pa"]}, pool {len(pool)})')
+    name = args.player
+    t = next((r for r in rows if r['name'] == name
+              and r['team'] == args.player_team), None)
+    if t is None:
+        print(f"\n({name} ({args.player_team}) not found as a {role} — {rlab}"
+              f"{' (below window sample floors?)' if windowed else ''})")
+        return
+    pool = pool_for(t)
+    report(t, pool, feats, stats,
+           f"{name} — {rlab.upper()} ({nl} {t['pa']}, pool {len(pool)})",
+           nice, nl=nl, small=small)
 
-    if args.start:
-        win = window_rows(args.start)
-        feats_w = [f for f in FEATS if f != 'ev50']
-        tw = next((r for r in win if (r['name'], r['team']) == (name, args.hitter_team)), None)
-        if tw is None:
-            print(f'\n(window from {args.start}: {name} below sample floors — skipped)')
-            return
-        pool_w = [r for r in win if (r['name'], r['team']) != (name, args.hitter_team)
-                  and r['pa'] >= 100]
-        stats_w = zstats(pool_w + [tw], feats_w)
-        report(tw, pool_w, feats_w, stats_w,
-               f'{name} — {args.start} -> NOW (PA {tw["pa"]}, pool {len(pool_w)})')
+
+def interactive():
+    """Prompt-driven selection: role, player/team, level, date range."""
+    print('ford_comps — interactive (blank = default in brackets)')
+    role = (input('  role — hitter / pitcher / both [both]: ').strip().lower()
+            or 'both')
+    if role.startswith('h'):
+        role = 'hitter'
+    elif role.startswith('p'):
+        role = 'pitcher'
+    else:
+        role = 'both'
+    player = input('  player "Last, First" (blank = whole team): ').strip()
+    team = input(f"  {'player team' if player else 'team'} [ROC]: ").strip().upper() or 'ROC'
+    level = (input('  comp pool level — mlb / aaa / both [both]: ').strip().lower()
+             or 'both')
+    if level not in ('mlb', 'aaa', 'both'):
+        level = 'both'
+    start = input('  start date yyyy-mm-dd (blank = full season): ').strip() or None
+    end = input('  end date yyyy-mm-dd (blank = through today): ').strip() or None
+    args = argparse.Namespace(player=player or None, player_team=team,
+                              team=None if player else team,
+                              level=level, start=start, end=end,
+                              exclude='', min_pa=100)
+    for r in (['hitter', 'pitcher'] if role == 'both' else [role]):
+        run_role(r, args)
+
+
+def main():
+    if len(sys.argv) == 1:
+        interactive()
+        return
+    ap = argparse.ArgumentParser(description='Closest player comps')
+    ap.add_argument('--hitter', default=None, help='"Last, First" single-hitter mode')
+    ap.add_argument('--pitcher', default=None, help='"Last, First" single-pitcher mode')
+    ap.add_argument('--hitter-team', '--player-team', dest='player_team',
+                    default='ROC', help='team of --hitter/--pitcher (default ROC)')
+    ap.add_argument('--role', choices=['hitter', 'pitcher', 'both'],
+                    default='hitter', help='batch mode roles (default hitter)')
+    ap.add_argument('--level', choices=['mlb', 'aaa', 'both'], default='both',
+                    help='restrict the comp pool by level (default both)')
+    ap.add_argument('--start', default=None, help='date window start (recomputed from cache)')
+    ap.add_argument('--end', default=None, help='date window end (inclusive)')
+    ap.add_argument('--team', default=None, help='batch mode: all players of this team')
+    ap.add_argument('--exclude', default='', help='batch mode: semicolon-separated names to skip')
+    ap.add_argument('--min-pa', type=int, default=100,
+                    help='batch mode: min PA/TBF to include a target')
+    args = ap.parse_args()
+
+    if args.team:
+        args.player = None
+        for r in (['hitter', 'pitcher'] if args.role == 'both' else [args.role]):
+            run_role(r, args)
+        return
+
+    single = [('hitter', args.hitter), ('pitcher', args.pitcher)]
+    ran = False
+    for role, name in single:
+        if not name:
+            continue
+        args.player = name
+        # season report first, then the window if a range was given
+        s, e = args.start, args.end
+        args.start = args.end = None
+        run_role(role, args)
+        if s or e:
+            args.start, args.end = s, e
+            run_role(role, args)
+            args.start = args.end = None
+        args.start, args.end = s, e
+        ran = True
+    if not ran:
+        args.player = 'Ford, Harry'
+        run_role('hitter', args)
 
 
 if __name__ == '__main__':
