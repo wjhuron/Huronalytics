@@ -46,7 +46,7 @@
     "ST",
     "SV"
   ],
-  "generatedAt": "2026-07-20 13:53",
+  "generatedAt": "2026-07-20 19:36",
   "totalPitches": 438138,
   "totalPitchers": 749,
   "totalHitters": 633,
@@ -8920,7 +8920,7 @@
       "n": 6
     }
   },
-  "sieraConstant": 6.1507,
+  "sieraConstant": 6.1511,
   "gutsConstants": {
     "lgWOBA": 0.317,
     "wOBAScale": 1.2315,
