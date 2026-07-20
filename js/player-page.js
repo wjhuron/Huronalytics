@@ -50,7 +50,7 @@ var PlayerPage = {
     // Discipline — per-pitch process
     { key: 'chasePct',     label: 'Chase%',      format: function(v) { return Utils.formatPct(v); } },
     { key: 'whiffPct',     label: 'Whiff%',      format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izContactPct', label: 'Z-Contact%', format: function(v) { return Utils.formatPct(v); } },
     // Bat tracking
     { key: 'batSpeed',     label: 'Bat Speed',   format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true, batSpeedQual: true },
     { key: 'squaredUpPct', label: 'Squared-Up%', format: function(v) { return Utils.formatPct(v); }, rocHide: true, batSpeedQual: true },
@@ -111,16 +111,16 @@ var PlayerPage = {
     { key: 'nSwings', label: 'Swings', format: function(v) { return v != null ? v : '—'; }, noPctl: true },
     // Swing decisions
     { key: 'swingPct', label: 'Swing%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izSwingPct', label: 'IZ Swing%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izSwingPct', label: 'Z-Swing%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct', label: 'Chase%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izSwChase', label: 'IZ Sw-Chase%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izSwChase', label: 'Z-Sw-Ch%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'firstPitchSwingPct', label: 'FPSw%', format: function(v) { return Utils.formatPct(v); } },
     // Miss rates
     { key: 'whiffPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'twoStrikeWhiffPct', label: '2K Whiff%', format: function(v) { return Utils.formatPct(v); } },
     // Contact rates
     { key: 'contactPct', label: 'Contact%', format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izContactPct', label: 'IZ Contact%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'izContactPct', label: 'Z-Contact%', format: function(v) { return Utils.formatPct(v); } },
   ],
 
   HITTER_BAT_TRACKING_COLS: [
