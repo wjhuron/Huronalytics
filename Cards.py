@@ -715,7 +715,7 @@ BUBBLE_COLUMNS = [
     ('SWING & MISS', [
         ('Whiff%',     'swStrPct',          'swStrPct_pctl',          'pct1'),
         ('Chase%',     'chasePct',          'chasePct_pctl',          'pct1'),
-        ('IZ Whiff%',  'izWhiffPct',        'izWhiffPct_pctl',        'pct1'),
+        ('Z-Whiff%',  'izWhiffPct',        'izWhiffPct_pctl',        'pct1'),
         ('2K Whiff%',  'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl', 'pct1'),
     ]),
     ('CONTACT MGMT', [

@@ -801,7 +801,7 @@ BUBBLE_COLUMNS = [
         ('K%',          'kPct',         'kPct_pctl',         'pct1'),
         ('Chase%',      'chasePct',     'chasePct_pctl',     'pct1'),
         ('Whiff%',      'whiffPct',     'whiffPct_pctl',     'pct1'),
-        ('IZ Contact%', 'izContactPct', 'izContactPct_pctl', 'pct1'),
+        ('Z-Contact%', 'izContactPct', 'izContactPct_pctl', 'pct1'),
     ]),
     ('BAT TRACKING', [
         ('Bat Speed',   'batSpeed',     'batSpeed_pctl',     'mph'),
