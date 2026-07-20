@@ -6,9 +6,10 @@ MLB baselines site-wide, so cross-level shape comps are legitimate).
 Distances under ~0.45 are snug. Shape comps, not talent equivalences.
 
 Hitters: 18-feature offensive fingerprint (contact quality, batted-ball
-profile, swing decisions, contact skill, bat tracking, outcomes).
-Pitchers: 18-feature fingerprint (release/approach: FB velo, extension, arm
-angle, VAA, |HAA|; whiff/zone: SwStr%, CSW%, IZWhiff%, Chase%, IZ%;
+profile, swing decisions, contact skill incl. IZWhiff%, bat tracking,
+outcomes).
+Pitchers: 17-feature fingerprint (release/approach: FB velo, extension, arm
+angle, VAA, |HAA|; whiff/zone: SwStr%, IZWhiff%, Chase%, IZ%;
 outcomes: K%, BB%; contact against: GB%, PU%, EV, HardHit%, Barrel%, xwOBAcon)
 PLUS a pitch-mix component (weight MIX_W): arsenals compared TAG-BLIND as
 usage-weighted (velo, IVB, HB) shapes via a greedy earth-mover — an SL tag
@@ -23,8 +24,8 @@ player with time at both levels (e.g. House WSH + ROC) has one row per
 team, and 'aaa' comps his ROC (AAA-only) line against MLB players. 'both'
 runs every row he has. Batch mode ignores level (team picks the row).
 
-Date ranges are recomputed from the pitch cache (window pool floors are
-lower; hitters lose ev50 in window mode).
+Date ranges are recomputed from the pitch cache (same features, lower pool
+floors).
 
 Run with NO arguments to use the SELECTION block at the bottom of the file:
 edit role / player / team / level / date range there directly, then run.
@@ -45,25 +46,26 @@ from pipeline_utils import (safe_float as sf, NON_PA_EVENTS, BB_EVENTS,
                             K_EVENTS, BUNT_BB_TYPES,
                             spray_angle, spray_direction, SWING_DESCRIPTIONS)
 
-FEATS_H = ['avgEVAll', 'ev50', 'hardHitPct', 'barrelPct', 'xwOBAcon',
+FEATS_H = ['avgEVAll', 'hardHitPct', 'barrelPct', 'xwOBAcon',
            'gbPct', 'puPct', 'pullPct', 'airPullPct',
-           'swingPct', 'izSwingPct', 'chasePct', 'whiffPct',
+           'swingPct', 'izSwingPct', 'chasePct', 'whiffPct', 'izWhiffPct',
            'kPct', 'bbPct', 'batSpeed', 'swingLength', 'attackAngle']
-NICE_H = {'avgEVAll': 'EV', 'ev50': 'EV50', 'hardHitPct': 'HardHit%',
+NICE_H = {'avgEVAll': 'EV', 'hardHitPct': 'HardHit%',
           'barrelPct': 'Barrel%', 'xwOBAcon': 'xwOBAcon', 'gbPct': 'GB%',
           'puPct': 'PU%', 'pullPct': 'Pull%', 'airPullPct': 'AirPull%',
           'swingPct': 'Swing%', 'izSwingPct': 'IZSwing%', 'chasePct': 'Chase%',
-          'whiffPct': 'Whiff%', 'kPct': 'K%', 'bbPct': 'BB%',
+          'whiffPct': 'Whiff%', 'izWhiffPct': 'IZWhiff%',
+          'kPct': 'K%', 'bbPct': 'BB%',
           'batSpeed': 'BatSpd', 'swingLength': 'SwLen', 'attackAngle': 'AttackAng'}
 
 FEATS_P = ['fbVelo', 'extension', 'armAngle', 'vaa', 'haa',
-           'kPct', 'bbPct', 'swStrPct', 'cswPct', 'izWhiffPct',
+           'kPct', 'bbPct', 'swStrPct', 'izWhiffPct',
            'chasePct', 'izPct',
            'gbPct', 'puPct', 'avgEVAgainst', 'hardHitPct',
            'barrelPctAgainst', 'xwOBAcon']
 NICE_P = {'fbVelo': 'FBVelo', 'extension': 'Ext', 'armAngle': 'ArmAng',
           'vaa': 'VAA', 'haa': '|HAA|', 'kPct': 'K%', 'bbPct': 'BB%',
-          'swStrPct': 'SwStr%', 'cswPct': 'CSW%', 'izWhiffPct': 'IZWhiff%',
+          'swStrPct': 'SwStr%', 'izWhiffPct': 'IZWhiff%',
           'chasePct': 'Chase%', 'izPct': 'IZ%', 'gbPct': 'GB%', 'puPct': 'PU%',
           'avgEVAgainst': 'EV', 'hardHitPct': 'HardHit%',
           'barrelPctAgainst': 'Barrel%', 'xwOBAcon': 'xwOBAcon'}
@@ -436,6 +438,8 @@ def window_hitters(start, end=None):
                 a['oozsw'] += 1
             if desc == 'Swinging Strike':
                 a['wh'] += 1
+                if in_z:
+                    a['izwh'] += 1
             bs, sl = sf(p.get('BatSpeed')), sf(p.get('SwingLength'))
             aa = sf(p.get('AttackAngle'))
             if bs is not None and bs > 50:
@@ -496,6 +500,7 @@ def window_hitters(start, end=None):
             izSwingPct=a['izsw'] / a['iz'] if a['iz'] else None,
             chasePct=a['oozsw'] / a['ooz'] if a['ooz'] else None,
             whiffPct=a['wh'] / sw,
+            izWhiffPct=a['izwh'] / a['izsw'] if a['izsw'] else None,
             kPct=a['k'] / pa_n, bbPct=a['bb'] / pa_n,
             batSpeed=a['bs_sum'] / a['bs_n'] if a['bs_n'] >= 20 else None,
             swingLength=a['sl_sum'] / a['sl_n'] if a['sl_n'] >= 20 else None,
@@ -568,8 +573,6 @@ def window_pitchers(start, end=None):
                 a['wh'] += 1
                 if in_z:
                     a['izwh'] += 1
-        if desc == 'Called Strike':
-            a['cs'] += 1
         ev = p.get('Event')
         if ev and ev not in NON_PA_EVENTS and ev != 'Intent Walk':
             a['tbf'] += 1
@@ -634,7 +637,6 @@ def window_pitchers(start, end=None):
             armAngle=a['ang_sum'] / a['ang_n'] if a['ang_n'] else None,
             kPct=a['k'] / tbf, bbPct=a['bb'] / tbf,
             swStrPct=a['wh'] / a['pitches'],
-            cswPct=(a['wh'] + a['cs']) / a['pitches'],
             izWhiffPct=a['izwh'] / a['izsw'] if a['izsw'] else None,
             chasePct=a['oozsw'] / a['ooz'] if a['ooz'] else None,
             izPct=a['iz'] / a['pitches'],
@@ -649,13 +651,12 @@ def window_pitchers(start, end=None):
 
 def get_rows(role, start=None, end=None):
     """Rows + feats + windowed flag for a role and optional date range."""
+    feats = FEATS_H if role == 'hitter' else FEATS_P
     if start or end:
         rows = (window_hitters(start or '2026-01-01', end) if role == 'hitter'
                 else window_pitchers(start or '2026-01-01', end))
-        feats = ([f for f in FEATS_H if f != 'ev50'] if role == 'hitter'
-                 else FEATS_P)
         return rows, feats, True
-    return load_season(role), (FEATS_H if role == 'hitter' else FEATS_P), False
+    return load_season(role), feats, False
 
 
 def range_label(start, end):
