@@ -801,9 +801,13 @@
     };
   }
 
-  // Columns hidden when viewing ROC (AAA) team data
-  const ROC_HIDDEN_PITCHER = ['armAngle', 'xIVB', 'ivbOE', 'xHB', 'hbOE', 'xwOBAcon', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'xwOBA', 'xBA', 'xSLG'];
-  const ROC_HIDDEN_HITTER = ['xwOBA', 'xwOBAcon', 'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct', 'xBA', 'xSLG', 'xWRCplus', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'sprintSpeed'];
+  // Columns hidden when viewing ROC (AAA) team data. Audited 2026-07-20
+  // against actual ROC null-rates: xwOBA/xwOBAcon (3D-table fill), xRV
+  // family (no-arm model), and xWRC+ are POPULATED for ROC now and were
+  // unhidden; actual-RV (runValue/rv100 + the RVOE family), arm angle,
+  // sprint speed, bat tracking, and per-pitch xBA/xSLG remain blank.
+  const ROC_HIDDEN_PITCHER = ['armAngle', 'xIVB', 'ivbOE', 'xHB', 'hbOE', 'runValue', 'rv100', 'rvoe', 'xrvoe', 'rvoe100', 'xrvoe100', 'xBA', 'xSLG'];
+  const ROC_HIDDEN_HITTER = ['batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct', 'squaredUpPct', 'xBA', 'xSLG', 'runValue', 'rv100', 'sprintSpeed'];
   const ALL_ROC_HIDDEN = ROC_HIDDEN_PITCHER.concat(ROC_HIDDEN_HITTER);
 
   function refresh() {

@@ -16,7 +16,7 @@ const COLUMNS = {
     { key: 'relPosZ',     label: 'RelZ',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Vertical release point (feet)', group: 'metrics' },
     { key: 'relPosX',     label: 'RelX',     format: Utils.formatFeetInches, sortType: 'numeric', noPercentile: true, desc: 'Horizontal release point (feet, pitcher POV)', group: 'metrics' },
     { key: 'extension',   label: 'Ext',      format: Utils.formatFeetInches, sortType: 'numeric', desc: 'Extension toward home plate at release (feet)', group: 'metrics' },
-    { key: 'armAngle',    label: 'Arm Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Arm angle at release (degrees)', group: 'metrics' },
+    { key: 'armAngle', rocHide: true,    label: 'Arm Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Arm angle at release (degrees)', group: 'metrics' },
     { key: 'nVAA',        label: 'nVAA',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Normalized VAA — location-independent (VAA minus expected VAA at that plate height)', group: 'metrics' },
     { key: 'nHAA',        label: 'nHAA',     format: Utils.formatDecimal(2), sortType: 'numeric', noPercentile: true, desc: 'Normalized HAA — location-independent (HAA minus expected HAA at that plate location)', group: 'metrics' },
     { key: 'stuffScore',  label: 'Stuff+',   format: Utils.formatInt, sortType: 'numeric', desc: 'Stuff+ for this pitch type — pitch quality from physical characteristics only (velocity, movement, release, arm angle), independent of location or outcome. Standardized within the pitch-type group. 100 = group avg, +10 = 1 SD better.', group: 'outcomes' },
@@ -33,13 +33,13 @@ const COLUMNS = {
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast model, based on EV + LA)', group: 'outcomes' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected batting average (Statcast model, based on EV + LA)', group: 'outcomes' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected slugging (Statcast model, based on EV + LA)', group: 'outcomes' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
-    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'rv100', rocHide: true,       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'outcomes' },
+    { key: 'runValue', rocHide: true,    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Pitch-level run value — runs saved vs league avg (positive = better for pitcher)', group: 'outcomes' },
     { key: 'xRunValue',   label: 'xRV',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'outcomes' },
-    { key: 'rvoe',        label: 'RVOE',     format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation — total actual runs (luck included) better (+) or worse (-) than this pitch\'s Stuff+ and location predict. Raw accounting, unregressed. RVOE minus xRVOE = contact luck. Min 150 pitches.', group: 'outcomes' },
-    { key: 'xrvoe',       label: 'xRVOE',    format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected runs above expectation — total luck-neutral runs (xwOBA on contact) better (+) or worse (-) than this pitch\'s Stuff+ and location predict. Raw accounting, unregressed. Min 150 pitches.', group: 'outcomes' },
-    { key: 'rvoe100',     label: 'RVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation per 100 pitches, actual results (luck included). Raw rate, unregressed — compare with xRVOE/100 (regressed, luck-neutral) to see how much is fortune. Min 150 pitches.', group: 'outcomes' },
-    { key: 'xrvoe100',    label: 'xRVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Outperformance vs expectation, runs per 100 pitches: how much better (+) or worse (-) this pitch performs than its Stuff+ and location predict. A durable trait (year-to-year r=.41) capturing deception, seam effects, tunneling — everything the models can\'t see. Regressed toward 0; min 150 pitches.', group: 'outcomes' },
+    { key: 'rvoe', rocHide: true,        label: 'RVOE',     format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation — total actual runs (luck included) better (+) or worse (-) than this pitch\'s Stuff+ and location predict. Raw accounting, unregressed. RVOE minus xRVOE = contact luck. Min 150 pitches.', group: 'outcomes' },
+    { key: 'xrvoe', rocHide: true,       label: 'xRVOE',    format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected runs above expectation — total luck-neutral runs (xwOBA on contact) better (+) or worse (-) than this pitch\'s Stuff+ and location predict. Raw accounting, unregressed. Min 150 pitches.', group: 'outcomes' },
+    { key: 'rvoe100', rocHide: true,     label: 'RVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation per 100 pitches, actual results (luck included). Raw rate, unregressed — compare with xRVOE/100 (regressed, luck-neutral) to see how much is fortune. Min 150 pitches.', group: 'outcomes' },
+    { key: 'xrvoe100', rocHide: true,    label: 'xRVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Outperformance vs expectation, runs per 100 pitches: how much better (+) or worse (-) this pitch performs than its Stuff+ and location predict. A durable trait (year-to-year r=.41) capturing deception, seam effects, tunneling — everything the models can\'t see. Regressed toward 0; min 150 pitches.', group: 'outcomes' },
   ],
   pitcherStats: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -58,9 +58,9 @@ const COLUMNS = {
     { key: 'kPct',        label: 'K%',       format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Strikeout rate (K / TBF)', group: 'stats' },
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (BB / TBF)', group: 'stats' },
     { key: 'kbbPct',      label: 'K-BB%',    format: Utils.formatPct, sortType: 'numeric', desc: 'K% minus BB%', group: 'stats' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'run_value' },
+    { key: 'rv100', rocHide: true,       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches (positive = better for pitcher)', group: 'run_value' },
     { key: 'xRv100',      label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches', group: 'run_value' },
-    { key: 'xrvoe100',    label: 'xRVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Outperformance vs expectation, runs per 100 pitches: how much better (+) or worse (-) results are than Stuff+ and location predict, across the arsenal. A durable trait (year-to-year r=.41): deception, seam effects, tunneling. Regressed toward 0; min 300 pitches.', group: 'run_value' },
+    { key: 'xrvoe100', rocHide: true,    label: 'xRVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Outperformance vs expectation, runs per 100 pitches: how much better (+) or worse (-) results are than Stuff+ and location predict, across the arsenal. A durable trait (year-to-year r=.41): deception, seam effects, tunneling. Regressed toward 0; min 300 pitches.', group: 'run_value' },
     { key: 'w',           label: 'W',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'l',           label: 'L',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
     { key: 'sv',          label: 'SV',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'counting' },
@@ -68,11 +68,11 @@ const COLUMNS = {
     { key: 'tbf',         label: 'TBF',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, desc: 'Total batters faced', group: 'counting' },
     { key: 'fip',         label: 'FIP',      format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Fielding Independent Pitching — ERA estimator using K, BB, HBP, HR', group: 'advanced' },
     { key: 'xFIP',        label: 'xFIP',     format: Utils.formatDecimal(2), sortType: 'numeric', desc: 'Expected FIP — FIP with league-avg HR/FB rate', group: 'advanced' },
-    { key: 'runValue',    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value — runs saved vs league average (positive = better for pitcher)', group: 'run_value' },
+    { key: 'runValue', rocHide: true,    label: 'RV',       format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value — runs saved vs league average (positive = better for pitcher)', group: 'run_value' },
     { key: 'xRunValue',   label: 'xRV',      format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value — uses Statcast expected outcomes on BIP (positive = better for pitcher)', group: 'run_value' },
-    { key: 'rvoe',        label: 'RVOE',     format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation — total actual runs (luck included) better (+) or worse (-) than Stuff+ and location predict, across the arsenal. Raw accounting, unregressed. RVOE minus xRVOE = contact luck. Min 300 pitches.', group: 'run_value' },
-    { key: 'xrvoe',       label: 'xRVOE',    format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected runs above expectation — total luck-neutral runs (xwOBA on contact) better (+) or worse (-) than Stuff+ and location predict, across the arsenal. Raw accounting, unregressed. Min 300 pitches.', group: 'run_value' },
-    { key: 'rvoe100',     label: 'RVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation per 100 pitches, actual results (luck included). Raw rate, unregressed — compare with xRVOE/100 (regressed, luck-neutral) to see how much is fortune. Min 300 pitches.', group: 'run_value' },
+    { key: 'rvoe', rocHide: true,        label: 'RVOE',     format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation — total actual runs (luck included) better (+) or worse (-) than Stuff+ and location predict, across the arsenal. Raw accounting, unregressed. RVOE minus xRVOE = contact luck. Min 300 pitches.', group: 'run_value' },
+    { key: 'xrvoe', rocHide: true,       label: 'xRVOE',    format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected runs above expectation — total luck-neutral runs (xwOBA on contact) better (+) or worse (-) than Stuff+ and location predict, across the arsenal. Raw accounting, unregressed. Min 300 pitches.', group: 'run_value' },
+    { key: 'rvoe100', rocHide: true,     label: 'RVOE/100', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Runs above expectation per 100 pitches, actual results (luck included). Raw rate, unregressed — compare with xRVOE/100 (regressed, luck-neutral) to see how much is fortune. Min 300 pitches.', group: 'run_value' },
   ],
   pitcherBattedBall: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -133,7 +133,7 @@ const COLUMNS = {
     { key: 'bbPct',       label: 'BB%',      format: Utils.formatPct, sortType: 'numeric', desc: 'Walk rate (uBB / PA, excludes IBB)', group: 'stats' },
     { key: 'hr',          label: 'HR',       format: Utils.formatInt, sortType: 'numeric', group: 'counting' },
     { key: 'sb',          label: 'SB',       format: Utils.formatInt, sortType: 'numeric', sectionStart: true, group: 'baserunning' },
-    { key: 'sprintSpeed', label: 'Sprint Speed', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Sprint speed (ft/s) — avg of top running efforts', group: 'baserunning' },
+    { key: 'sprintSpeed', rocHide: true, label: 'Sprint Speed', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Sprint speed (ft/s) — avg of top running efforts', group: 'baserunning' },
     { key: 'g',           label: 'G',        format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'ab',          label: 'AB',       format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'ops',         label: 'OPS',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'OBP + SLG', group: 'stats' },
@@ -209,15 +209,15 @@ const COLUMNS = {
     { key: 'hitter',      label: 'Hitter',   format: function(v){ return v || '--'; }, sortType: 'string', align: 'left', sticky: true, cls: 'col-pitcher', noPercentile: true, noToggle: true, group: 'info' },
     { key: 'team',        label: 'Team',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info', isTeam: true, sticky: true, stickyIdx: 1 },
     { key: 'stands',      label: 'Bats',     format: function(v){ return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true, group: 'info' },
-    { key: 'nCompSwings', label: 'Comp. Swings', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'batSpeed',    label: 'Bat Speed', format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Avg bat speed on competitive swings (mph)', group: 'bat_tracking' },
-    { key: 'swingLength', label: 'Swing Length', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Avg swing length — total bat-head distance from start to contact (feet)', group: 'bat_tracking' },
-    { key: 'attackAngle', label: 'Attack Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack angle — bat direction at contact (degrees, positive = upward)', group: 'bat_tracking' },
-    { key: 'squaredUpPct', label: 'Squared-Up%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings where exit velo ≥80% of theoretical max given bat speed and pitch velo — energy-transfer efficiency, no swing-speed gate', group: 'bat_tracking' },
-    { key: 'blastPct', label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — squared-up contact on a fast swing', group: 'bat_tracking' },
-    { key: 'idealAAPct', label: 'IdealAtkAngle%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
-    { key: 'attackDirection', label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack direction at contact (degrees, positive = pull side)', group: 'bat_tracking' },
-    { key: 'swingPathTilt', label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg swing path tilt — bat path angle over 40ms before contact (degrees)', group: 'bat_tracking' },
+    { key: 'nCompSwings', rocHide: true, label: 'Comp. Swings', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
+    { key: 'batSpeed', rocHide: true,    label: 'Bat Speed', format: Utils.formatDecimal(1), sortType: 'numeric', sectionStart: true, desc: 'Avg bat speed on competitive swings (mph)', group: 'bat_tracking' },
+    { key: 'swingLength', rocHide: true, label: 'Swing Length', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Avg swing length — total bat-head distance from start to contact (feet)', group: 'bat_tracking' },
+    { key: 'attackAngle', rocHide: true, label: 'Attack Angle', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack angle — bat direction at contact (degrees, positive = upward)', group: 'bat_tracking' },
+    { key: 'squaredUpPct', rocHide: true, label: 'Squared-Up%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings where exit velo ≥80% of theoretical max given bat speed and pitch velo — energy-transfer efficiency, no swing-speed gate', group: 'bat_tracking' },
+    { key: 'blastPct', rocHide: true, label: 'Blast%', format: Utils.formatPct, sortType: 'numeric', desc: 'Bat speed ≥75 mph AND exit velo ≥80% of theoretical max — squared-up contact on a fast swing', group: 'bat_tracking' },
+    { key: 'idealAAPct', rocHide: true, label: 'IdealAtkAngle%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of competitive swings with attack angle in the 5–20° ideal range', group: 'bat_tracking' },
+    { key: 'attackDirection', rocHide: true, label: 'Attack Dir', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg attack direction at contact (degrees, positive = pull side)', group: 'bat_tracking' },
+    { key: 'swingPathTilt', rocHide: true, label: 'Path Tilt', format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, showAvg: true, desc: 'Avg swing path tilt — bat path angle over 40ms before contact (degrees)', group: 'bat_tracking' },
   ],
   hitterPitch: [
     { key: '_rank',       label: '#',        format: function(v){ return v; }, sortType: null, align: 'center', noPercentile: true, noToggle: true, group: 'info', width: '36px' },
@@ -229,7 +229,7 @@ const COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nSwings',     label: 'Swings',   format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
-    { key: 'rv100',       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches of this type', group: 'info' },
+    { key: 'rv100', rocHide: true,       label: 'RV/100',   format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Run value per 100 pitches of this type', group: 'info' },
     { key: 'xRv100',     label: 'xRV/100',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected run value per 100 pitches of this type', group: 'info' },
     { key: 'wOBA',        label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average vs this pitch type', group: 'stats' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA vs this pitch type (Statcast, EV + LA)', group: 'stats' },
@@ -238,7 +238,7 @@ const COLUMNS = {
     { key: 'hardHitPct',  label: 'Hard-Hit%', format: Utils.formatPct, sortType: 'numeric', desc: 'Pct of BIP with EV ≥ 95 mph vs this pitch type (denominator = BIP with valid EV)', group: 'batted_ball' },
     { key: 'barrelPct',   label: 'Barrel%',  format: Utils.formatPct, sortType: 'numeric', desc: 'Barrel rate (denominator = BIP with valid EV)', group: 'batted_ball' },
     { key: 'gbPct',       label: 'GB%',      format: Utils.formatPct, sortType: 'numeric', sectionStart: true, desc: 'Ground ball rate', group: 'batted_ball' },
-    { key: 'runValue',    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
+    { key: 'runValue', rocHide: true,    label: 'PitchRV',  format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
     { key: 'xRunValue',  label: 'xPitchRV', format: Utils.formatDecimal(1), sortType: 'numeric', desc: 'Expected pitch-level run value vs this pitch type (positive = better for hitter)', group: 'info' },
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average vs this pitch type', group: 'stats' },
     { key: 'slg',         label: 'SLG',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Slugging vs this pitch type', group: 'stats' },
@@ -529,6 +529,22 @@ const Leaderboard = {
     const tbody = document.getElementById('table-body');
     const pinnedBody = document.getElementById('table-pinned-body');
     const noResults = document.getElementById('no-results');
+
+    // ROC-filtered view where every stat column is rocHide'd (bat tracking:
+    // no AAA measurement exists) — show an honest empty state instead of a
+    // names-only table.
+    const statCols = visCols.filter(function (c) { return c.group !== 'info' && !c.noToggle; });
+    if (data.length > 0 && statCols.length === 0) {
+      if (noResults) {
+        noResults.style.display = '';
+        noResults.textContent = 'Not tracked for AAA — bat tracking data exists only for MLB.';
+      }
+      if (tbody) tbody.innerHTML = '';
+      if (pinnedBody) pinnedBody.innerHTML = '';
+      if (headerRow) headerRow.innerHTML = '';
+      return;
+    }
+    if (noResults && data.length > 0) noResults.style.display = 'none';
 
     this._lastRenderOpts = opts;
 
