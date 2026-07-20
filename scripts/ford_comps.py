@@ -792,7 +792,7 @@ def interactive():
     exclude    = ""         # batch mode: semicolon-separated names to skip
     min_pa     = 100        # batch mode: min PA to include a hitter
     min_ip     = 25         # batch mode: min IP to include a pitcher
-    csv_path   = ""         # e.g. "~/Downloads/roc_comps.csv"; "" = no CSV
+    csv_path   = "~/Downloads/roc_comps.csv"   # "" = no CSV
 
     args = argparse.Namespace(player=player or None, player_team=None,
                               team=None if player else team,
