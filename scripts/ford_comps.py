@@ -241,7 +241,7 @@ def why_lines(t, best, ds, feats, stats, nice):
 
 CSV_ROWS = []
 CSV_FIELDS = ['role', 'window', 'player', 'player_team', 'sample_type', 'sample',
-              'rank', 'distance', 'mix', 'comp', 'comp_team', 'comp_throws',
+              'rank', 'distance', 'mix', 'comp', 'comp_team', 'comp_side',
               'comp_sample', 'shared', 'biggest_gap']
 
 
@@ -270,8 +270,9 @@ def report(target, pool, feats, stats, label, nice, topn=5, verbose=True,
         return []
     flag = ' [small sample]' if target['pa'] < small else ''
     print(f"\n{label}{flag}")
+    htag = 'HP' if nl == 'TBF' else 'HB'         # RHP/LHP vs RHB/LHB/SHB
     for d, r, _, md in scored[:topn]:
-        hand = f" ({r['throws']}HP)" if r.get('throws') else ''
+        hand = f" ({r['side']}{htag})" if r.get('side') else ''
         mixs = f"  mix {md:.3f}" if md is not None else ''
         print(f"   {d:.3f}  {r['name']:24s} {r['team']:3s}  {nl} {r['pa']}{hand}{mixs}")
     for rank, (d, r, ds, md) in enumerate(scored[:3], 1):
@@ -282,7 +283,7 @@ def report(target, pool, feats, stats, label, nice, topn=5, verbose=True,
                              distance=f'{d:.3f}',
                              mix=f'{md:.3f}' if md is not None else '',
                              comp=r['name'], comp_team=r['team'],
-                             comp_throws=r.get('throws') or '',
+                             comp_side=r.get('side') or '',
                              comp_sample=r['pa'], shared=tr, biggest_gap=gap))
     d0, b0, ds0 = scored[0][0], scored[0][1], scored[0][2]
     print(why_lines(target, b0, ds0, feats, stats, nice))
@@ -346,23 +347,55 @@ def load_arsenals():
     return {k: _mk_arsenal(v) for k, v in grouped.items()}
 
 
+BATS_CACHE = os.path.join(ROOT, 'data', 'hitter_bats_cache.json')
+
+
+def _side_from_counts(c):
+    """Per-pitch actual-side counts -> L / R / S (>=10% minority = switch)."""
+    tot = sum(c.values())
+    if len(c) > 1 and min(c.values()) / tot >= 0.10:
+        return 'S'
+    return max(c, key=c.get)
+
+
+def hitter_sides():
+    """Batter name -> L/R/S, derived from per-pitch Bats (actual side).
+
+    Cached to data/hitter_bats_cache.json since the season leaderboard has no
+    bats field; delete that file to rebuild it for new call-ups.
+    """
+    if os.path.exists(BATS_CACHE):
+        return json.load(open(BATS_CACHE))
+    counts = defaultdict(lambda: defaultdict(int))
+    D = pickle.load(open(os.path.join(ROOT, 'data', 'all_pitches_rs_cache.pkl'), 'rb'))
+    for p in D:
+        b, s = p.get('Batter'), p.get('Bats')
+        if b and s in ('L', 'R'):
+            counts[b][s] += 1
+    out = {b: _side_from_counts(c) for b, c in counts.items()}
+    json.dump(out, open(BATS_CACHE, 'w'))
+    return out
+
+
 def load_season(role):
     fn = 'hitter_leaderboard_rs.json' if role == 'hitter' else 'pitcher_leaderboard_rs.json'
     rows = json.load(open(os.path.join(ROOT, 'data', fn)))
     arsenals = load_arsenals() if role == 'pitcher' else {}
+    sides = hitter_sides() if role == 'hitter' else {}
     season = []
     for r in rows:
         if (r.get('team') or '').endswith('TM'):
             continue
         if role == 'hitter':
             rec = {f: r.get(f) for f in FEATS_H}
-            rec.update(name=r['hitter'], team=r['team'], pa=r.get('pa') or 0)
+            rec.update(name=r['hitter'], team=r['team'], pa=r.get('pa') or 0,
+                       side=sides.get(r['hitter']))
         else:
             rec = {f: r.get(f) for f in FEATS_P}
             haa = r.get('haa')
             rec['haa'] = abs(haa) if haa is not None else None
             rec.update(name=r['pitcher'], team=r['team'], pa=r.get('tbf') or 0,
-                       ip=sf(r.get('ip')), throws=r.get('throws'),
+                       ip=sf(r.get('ip')), side=r.get('throws'),
                        arsenal=arsenals.get((r['pitcher'], r['team'])))
         season.append(rec)
     return season
@@ -380,11 +413,14 @@ def _load_cache(start, end):
 def window_hitters(start, end=None):
     """Recompute the hitter fingerprint from the pitch cache for the window."""
     agg = defaultdict(lambda: defaultdict(float))
+    bsides = defaultdict(lambda: defaultdict(int))
     for p in _load_cache(start, end):
         h, t = p.get('Batter'), p.get('BTeam')
         if not h or not t:
             continue
         a = agg[(h, t)]
+        if p.get('Bats') in ('L', 'R'):
+            bsides[(h, t)][p['Bats']] += 1
         desc = p.get('Description')
         ev_field = sf(p.get('ExitVelo'))
         a['pitches'] += 1
@@ -449,6 +485,7 @@ def window_hitters(start, end=None):
             continue
         out.append(dict(
             name=h, team=t, pa=int(pa_n),
+            side=_side_from_counts(bsides[(h, t)]) if bsides[(h, t)] else None,
             avgEVAll=a['ev_sum'] / a['ev_n'] if a['ev_n'] else None,
             hardHitPct=a['hh'] / a['ev_n'] if a['ev_n'] else None,
             barrelPct=a['barrel'] / bip,
@@ -589,7 +626,7 @@ def window_pitchers(start, end=None):
             arsenal=_mk_arsenal(entries),
             # no outs-recorded field in the cache; IP estimated at 4.3 TBF/inning
             name=h, team=t, pa=int(tbf), ip=round(tbf / 4.3, 1),
-            throws=throws.get((h, t)),
+            side=throws.get((h, t)),
             fbVelo=a[f'{fb}_v_sum'] / a[f'{fb}_v_n'] if a[f'{fb}_v_n'] else None,
             vaa=a[f'{fb}_vaa_sum'] / a[f'{fb}_vaa_n'] if a[f'{fb}_vaa_n'] else None,
             haa=abs(haa) if haa is not None else None,
