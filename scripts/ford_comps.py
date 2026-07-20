@@ -32,7 +32,7 @@ Usage examples:
   python3 scripts/ford_comps.py --team ROC --role both
   python3 scripts/ford_comps.py --team ROC --exclude "Jordan, Levi;Wallace, Cayden"
 """
-import os, sys, json, pickle, math, argparse
+import os, sys, csv, json, pickle, math, argparse
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -95,8 +95,8 @@ def dist(a, b, feats, stats):
     return sum(d for d, _ in ds) / len(ds), ds
 
 
-def why_lines(t, best, ds, feats, stats, nice):
-    """Shared extremes (both |z|>=0.75 same sign) + the biggest gap."""
+def why_parts(t, comp, ds, feats, stats, nice):
+    """Shared extremes (both |z|>=0.75 same sign) + the biggest gap, as strings."""
     def z(r, f):
         v = r.get(f)
         if v is None:
@@ -105,7 +105,7 @@ def why_lines(t, best, ds, feats, stats, nice):
         return (v - m) / s
     shared = []
     for f in feats:
-        za, zb = z(t, f), z(best, f)
+        za, zb = z(t, f), z(comp, f)
         if za is None or zb is None:
             continue
         if abs(za) >= 0.75 and abs(zb) >= 0.75 and za * zb > 0:
@@ -115,13 +115,36 @@ def why_lines(t, best, ds, feats, stats, nice):
                    for _, f, zz in shared[:4]) or 'league-average across the board'
     gap_d, gap_f = max(ds, key=lambda x: x[0])[0], max(ds, key=lambda x: x[0])[1]
     fmt = lambda v: f'{v:.4g}' if isinstance(v, float) else v
-    return (f"   shared: {tr}\n"
-            f"   biggest gap: {nice[gap_f]} (Δz {gap_d:.1f}: "
-            f"{fmt(t.get(gap_f))} vs {fmt(best.get(gap_f))})")
+    gap = (f"{nice[gap_f]} (Δz {gap_d:.1f}: "
+           f"{fmt(t.get(gap_f))} vs {fmt(comp.get(gap_f))})")
+    return tr, gap
+
+
+def why_lines(t, best, ds, feats, stats, nice):
+    tr, gap = why_parts(t, best, ds, feats, stats, nice)
+    return f"   shared: {tr}\n   biggest gap: {gap}"
+
+
+CSV_ROWS = []
+CSV_FIELDS = ['role', 'window', 'player', 'player_team', 'sample_type', 'sample',
+              'rank', 'distance', 'comp', 'comp_team', 'comp_throws',
+              'comp_sample', 'shared', 'biggest_gap']
+
+
+def write_csv(path):
+    if not CSV_ROWS:
+        print('\n(no comp rows to write — CSV skipped)')
+        return
+    path = os.path.expanduser(path)
+    with open(path, 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
+        w.writeheader()
+        w.writerows(CSV_ROWS)
+    print(f"\nCSV written: {path} ({len(CSV_ROWS)} rows)")
 
 
 def report(target, pool, feats, stats, label, nice, topn=5, verbose=True,
-           nl='PA', small=200):
+           nl='PA', small=200, csvmeta=None):
     scored = []
     for r in pool:
         d, ds = dist(target, r, feats, stats)
@@ -136,6 +159,15 @@ def report(target, pool, feats, stats, label, nice, topn=5, verbose=True,
     for d, r, _ in scored[:topn]:
         hand = f" ({r['throws']}HP)" if r.get('throws') else ''
         print(f"   {d:.3f}  {r['name']:24s} {r['team']:3s}  {nl} {r['pa']}{hand}")
+    for rank, (d, r, ds) in enumerate(scored[:3], 1):
+        tr, gap = why_parts(target, r, ds, feats, stats, nice)
+        CSV_ROWS.append(dict(csvmeta or {}, player=target['name'],
+                             player_team=target['team'], sample_type=nl,
+                             sample=target['pa'], rank=rank,
+                             distance=f'{d:.3f}', comp=r['name'],
+                             comp_team=r['team'],
+                             comp_throws=r.get('throws') or '',
+                             comp_sample=r['pa'], shared=tr, biggest_gap=gap))
     d0, b0, ds0 = scored[0]
     print(why_lines(target, b0, ds0, feats, stats, nice))
     if verbose:
@@ -414,6 +446,7 @@ def run_role(role, args):
     """One role's worth of reports (single player or team batch)."""
     nice = NICE_H if role == 'hitter' else NICE_P
     nl, small = NL[role], SMALL_FLAG[role]
+    args.level = (args.level or 'both').lower()
     rows, feats, windowed = get_rows(role, args.start, args.end)
     pool_min = (WINDOW_POOL_MIN if windowed else SEASON_POOL_MIN)[role]
     # comp pool is ALWAYS MLB-only: never comp a ROC player to another ROC player
@@ -421,6 +454,7 @@ def run_role(role, args):
                 and r['team'] not in AAA_TEAMS]
     stats = zstats(mlb_pool, feats)          # z-scales from the MLB pool
     rlab = range_label(args.start, args.end)
+    meta = dict(role=role, window=rlab)
 
     def pool_for(t):
         return [r for r in mlb_pool
@@ -437,7 +471,8 @@ def run_role(role, args):
         for t in targets:
             report(t, pool_for(t), feats, stats,
                    f"{t['name']} ({t['team']}, {nl} {t['pa']}) — {rlab}",
-                   nice, topn=3, verbose=False, nl=nl, small=small)
+                   nice, topn=3, verbose=False, nl=nl, small=small,
+                   csvmeta=meta)
         return
 
     # single player: level picks which of their stat lines to use as the target
@@ -455,7 +490,7 @@ def run_role(role, args):
         report(t, pool, feats, stats,
                f"{name} ({t['team']}) — {rlab.upper()} ({nl} {t['pa']}, "
                f"pool {len(pool)})",
-               nice, nl=nl, small=small)
+               nice, nl=nl, small=small, csvmeta=meta)
 
 
 def main():
@@ -479,33 +514,36 @@ def main():
                     help='batch mode: min PA to include a hitter target')
     ap.add_argument('--min-ip', type=float, default=25,
                     help='batch mode: min IP to include a pitcher target')
+    ap.add_argument('--csv', default=None,
+                    help='write top-3 comps + reasons to this CSV path')
     args = ap.parse_args()
 
     if args.team:
         args.player = None
         for r in (['hitter', 'pitcher'] if args.role == 'both' else [args.role]):
             run_role(r, args)
-        return
-
-    single = [('hitter', args.hitter), ('pitcher', args.pitcher)]
-    ran = False
-    for role, name in single:
-        if not name:
-            continue
-        args.player = name
-        # season report first, then the window if a range was given
-        s, e = args.start, args.end
-        args.start = args.end = None
-        run_role(role, args)
-        if s or e:
-            args.start, args.end = s, e
-            run_role(role, args)
+    else:
+        single = [('hitter', args.hitter), ('pitcher', args.pitcher)]
+        ran = False
+        for role, name in single:
+            if not name:
+                continue
+            args.player = name
+            # season report first, then the window if a range was given
+            s, e = args.start, args.end
             args.start = args.end = None
-        args.start, args.end = s, e
-        ran = True
-    if not ran:
-        args.player = 'Ford, Harry'
-        run_role('hitter', args)
+            run_role(role, args)
+            if s or e:
+                args.start, args.end = s, e
+                run_role(role, args)
+                args.start = args.end = None
+            args.start, args.end = s, e
+            ran = True
+        if not ran:
+            args.player = 'Ford, Harry'
+            run_role('hitter', args)
+    if args.csv:
+        write_csv(args.csv)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -516,13 +554,14 @@ def interactive():
     role       = "both"     # "hitter", "pitcher", or "both"
     player     = ""         # "Last, First" for one player, or "" for whole team
     team       = "ROC"      # batch mode: team whose players get comped
-    level      = "both"     # which of the TARGET's stat lines to use: "mlb",
+    level      = "both"    # which of the TARGET's stat lines to use: "mlb",
                             #   "aaa", or "both" (comp pool is ALWAYS MLB-only)
     start_date = None       # "yyyy-mm-dd", or None for full season
     end_date   = None       # "yyyy-mm-dd", or None for through today
     exclude    = ""         # batch mode: semicolon-separated names to skip
     min_pa     = 100        # batch mode: min PA to include a hitter
     min_ip     = 25         # batch mode: min IP to include a pitcher
+    csv_path   = ""         # e.g. "~/Downloads/roc_comps.csv"; "" = no CSV
 
     args = argparse.Namespace(player=player or None, player_team=None,
                               team=None if player else team,
@@ -530,6 +569,8 @@ def interactive():
                               exclude=exclude, min_pa=min_pa, min_ip=min_ip)
     for r in (['hitter', 'pitcher'] if role == 'both' else [role]):
         run_role(r, args)
+    if csv_path:
+        write_csv(csv_path)
 
 
 if __name__ == '__main__':
