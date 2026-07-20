@@ -444,33 +444,6 @@ def run_role(role, args):
            nice, nl=nl, small=small)
 
 
-def interactive():
-    """Prompt-driven selection: role, player/team, level, date range."""
-    print('ford_comps — interactive (blank = default in brackets)')
-    role = (input('  role — hitter / pitcher / both [both]: ').strip().lower()
-            or 'both')
-    if role.startswith('h'):
-        role = 'hitter'
-    elif role.startswith('p'):
-        role = 'pitcher'
-    else:
-        role = 'both'
-    player = input('  player "Last, First" (blank = whole team): ').strip()
-    team = input(f"  {'player team' if player else 'team'} [ROC]: ").strip().upper() or 'ROC'
-    level = (input('  comp pool level — mlb / aaa / both [both]: ').strip().lower()
-             or 'both')
-    if level not in ('mlb', 'aaa', 'both'):
-        level = 'both'
-    start = input('  start date yyyy-mm-dd (blank = full season): ').strip() or None
-    end = input('  end date yyyy-mm-dd (blank = through today): ').strip() or None
-    args = argparse.Namespace(player=player or None, player_team=team,
-                              team=None if player else team,
-                              level=level, start=start, end=end,
-                              exclude='', min_pa=100)
-    for r in (['hitter', 'pitcher'] if role == 'both' else [role]):
-        run_role(r, args)
-
-
 def main():
     if len(sys.argv) == 1:
         interactive()
@@ -517,6 +490,37 @@ def main():
     if not ran:
         args.player = 'Ford, Harry'
         run_role('hitter', args)
+
+
+# ---------------------------------------------------------------------------
+# Selection feature: interactive picker (runs when the script gets no args).
+# Choose role (hitter/pitcher/both), a player or a whole team, comp pool
+# level (mlb/aaa/both), and a date range. Blank answers take the defaults.
+# ---------------------------------------------------------------------------
+def interactive():
+    print('ford_comps — interactive (blank = default in brackets)')
+    role = (input('  role — hitter / pitcher / both [both]: ').strip().lower()
+            or 'both')
+    if role.startswith('h'):
+        role = 'hitter'
+    elif role.startswith('p'):
+        role = 'pitcher'
+    else:
+        role = 'both'
+    player = input('  player "Last, First" (blank = whole team): ').strip()
+    team = input(f"  {'player team' if player else 'team'} [ROC]: ").strip().upper() or 'ROC'
+    level = (input('  comp pool level — mlb / aaa / both [both]: ').strip().lower()
+             or 'both')
+    if level not in ('mlb', 'aaa', 'both'):
+        level = 'both'
+    start = input('  start date yyyy-mm-dd (blank = full season): ').strip() or None
+    end = input('  end date yyyy-mm-dd (blank = through today): ').strip() or None
+    args = argparse.Namespace(player=player or None, player_team=team,
+                              team=None if player else team,
+                              level=level, start=start, end=end,
+                              exclude='', min_pa=100)
+    for r in (['hitter', 'pitcher'] if role == 'both' else [role]):
+        run_role(r, args)
 
 
 if __name__ == '__main__':
