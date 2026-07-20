@@ -787,9 +787,12 @@ BUBBLE_COLUMNS = [
         ('Contact+',          'ctPlus',           'ctPlus_pctl',       'int'),
         ('Batted Ball+',      'bbPlus',           'bbPlus_pctl',       'int'),
     ]),
+    # 2026-07-20 (page-card parity, battery-backed): EV50 replaces Avg EV
+    # (rel .93 vs .87, same predictive power); Whiff% bubble dropped
+    # (contact axis covered by Z-Contact% + K%). Both stay in page tables.
     ('QUALITY OF CONTACT', [
         ('xwOBAcon',    'xwOBAcon',     'xwOBAcon_pctl',     '3dec'),
-        ('Avg EV',      'avgEVAll',     'avgEVAll_pctl',     'mph'),
+        ('EV50',        'ev50',         'ev50_pctl',         'mph'),
         ('Max EV',      'maxEV',        'maxEV_pctl',        'mph'),
         ('Hard-Hit%',   'hardHitPct',   'hardHitPct_pctl',   'pct1'),
         ('Barrel%',     'barrelPct',    'barrelPct_pctl',    'pct1'),
@@ -800,7 +803,6 @@ BUBBLE_COLUMNS = [
         ('BB%',         'bbPct',        'bbPct_pctl',        'pct1'),
         ('K%',          'kPct',         'kPct_pctl',         'pct1'),
         ('Chase%',      'chasePct',     'chasePct_pctl',     'pct1'),
-        ('Whiff%',      'whiffPct',     'whiffPct_pctl',     'pct1'),
         ('Z-Contact%', 'izContactPct', 'izContactPct_pctl', 'pct1'),
     ]),
     ('BAT TRACKING', [

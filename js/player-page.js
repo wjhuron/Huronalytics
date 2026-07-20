@@ -7,20 +7,23 @@ var PlayerPage = {
   PITCHING_STATS: [
     // Stuff foundation: velocity (dynamic — expands to FF and/or SI velo when present).
     { key: '_veloPlaceholder',  label: '',                  format: function() { return ''; }, _dynamic: true },
+    // The grades trio (2026-07-20: bubbles for the flagship composites —
+    // Loc+ had one since v2; Stuff+/Pitching+ were missing since launch).
+    { key: 'stuffScore',        label: 'Stuff+',           format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'locPlus',           label: 'Loc+',             format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'pitchingScore',     label: 'Pitching+',        format: function(v) { return v != null ? Math.round(v) : '—'; } },
     // Rate stats and their composite estimator.
     { key: 'kPct',              label: 'K%',               format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbPct',             label: 'BB%',              format: function(v) { return Utils.formatPct(v); } },
     { key: 'kbbPct',            label: 'K-BB%',            format: function(v) { return Utils.formatPct(v, true); } },
     { key: 'siera',             label: 'SIERA',            format: function(v) { return v != null ? v.toFixed(2) : '—'; }, rocHide: true },
-    // Command then bat-missing process.
-    { key: 'izPct',             label: 'Zone%',            format: function(v) { return Utils.formatPct(v); } },
-    { key: 'locPlus',           label: 'Loc+',             format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    // Bat-missing process. (Zone% and Z-Whiff% live in the tables below —
+    // battery 2026-07-20: Zone% pred ~0, Z-Whiff% r=.83 with Whiff%.)
     { key: 'swStrPct',          label: 'Whiff%',           format: function(v) { return Utils.formatPct(v); } },
-    { key: 'izWhiffPct',        label: 'Z-Whiff%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'chasePct',          label: 'Chase%',           format: function(v) { return Utils.formatPct(v); } },
-    // Contact allowed: expected outcomes, then quality, then composition.
+    // Contact allowed. (xwOBAcon stays in the batted-ball table — pitcher-side
+    // split-half reliability .26; a percentile bubble overstates it.)
     { key: 'xwOBA',             label: 'xwOBA',            format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
-    { key: 'xwOBAcon',          label: 'xwOBAcon',         format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
     { key: 'hardHitPct',        label: 'Hard-Hit%',        format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst',  label: 'Barrel%',          format: function(v) { return Utils.formatPct(v); } },
     { key: 'gbPct',             label: 'GB%',              format: function(v) { return Utils.formatPct(v); } },
@@ -38,8 +41,9 @@ var PlayerPage = {
     { key: 'xwOBA',        label: 'xwOBA',       format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
     { key: 'xwOBAcon',     label: 'xwOBAcon',    format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
     { key: 'xwOBAsp',      label: 'xwOBAsp',     format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, rocHide: true },
-    // Contact quality (EV)
-    { key: 'avgEVAll',     label: 'Avg EV',      format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
+    // Contact quality (EV). EV50 over Avg EV (battery 2026-07-20: rel .93
+    // vs .87, same predictive power — mirrors the leaderboard call).
+    { key: 'ev50',         label: 'EV50',        format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     { key: 'maxEV',        label: 'Max EV',      format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; } },
     // Contact quality (rate)
     { key: 'hardHitPct',   label: 'Hard-Hit%',   format: function(v) { return Utils.formatPct(v); } },
@@ -47,9 +51,9 @@ var PlayerPage = {
     // Discipline — PA-level rates
     { key: 'bbPct',        label: 'BB%',         format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct',         label: 'K%',          format: function(v) { return Utils.formatPct(v); } },
-    // Discipline — per-pitch process
+    // Discipline — per-pitch process. (Whiff% bubble dropped 2026-07-20:
+    // contact axis covered by Z-Contact% + K%; it stays in the tables.)
     { key: 'chasePct',     label: 'Chase%',      format: function(v) { return Utils.formatPct(v); } },
-    { key: 'whiffPct',     label: 'Whiff%',      format: function(v) { return Utils.formatPct(v); } },
     { key: 'izContactPct', label: 'Z-Contact%', format: function(v) { return Utils.formatPct(v); } },
     // Bat tracking
     { key: 'batSpeed',     label: 'Bat Speed',   format: function(v) { return v != null ? v.toFixed(1) + ' mph' : '—'; }, rocHide: true, batSpeedQual: true },

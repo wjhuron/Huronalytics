@@ -712,14 +712,14 @@ BUBBLE_COLUMNS = [
         ('BB%',           'bbPct',     'bbPct_pctl',    'pct1'),
         ('K-BB%',         'kbbPct',    'kbbPct_pctl',   'pct1'),
     ]),
+    # 2026-07-20 bubble prune (page-card parity, battery-backed): dropped
+    # Z-Whiff% (r=.83 w/ Whiff%), 2K Whiff% (r=.86), xwOBAcon (pitcher-side
+    # rel .26), Zone% (pred ~0), FPS% (pred ~0) — all still in page tables.
     ('SWING & MISS', [
         ('Whiff%',     'swStrPct',          'swStrPct_pctl',          'pct1'),
         ('Chase%',     'chasePct',          'chasePct_pctl',          'pct1'),
-        ('Z-Whiff%',  'izWhiffPct',        'izWhiffPct_pctl',        'pct1'),
-        ('2K Whiff%',  'twoStrikeWhiffPct', 'twoStrikeWhiffPct_pctl', 'pct1'),
     ]),
     ('CONTACT MGMT', [
-        ('xwOBAcon',   'xwOBAcon',         'xwOBAcon_pctl',         '3dec'),
         ('Hard-Hit%',  'hardHitPct',       'hardHitPct_pctl',       'pct1'),
         ('Barrel%',    'barrelPctAgainst', 'barrelPctAgainst_pctl', 'pct1'),
         ('GB%',        'gbPct',            'gbPct_pctl',            'pct1'),
@@ -729,8 +729,6 @@ BUBBLE_COLUMNS = [
         ('Stuff+',     'stuffScore', 'stuffScore_pctl', 'int'),
         ('Loc+',       'locPlus',   'locPlus_pctl',   'int'),
         ('Pitching+',  'pitchingScore', 'pitchingScore_pctl', 'int'),
-        ('Zone%',      'izPct',     'izPct_pctl',     'pct1'),
-        ('FPS%',       'fpsPct',    'fpsPct_pctl',    'pct1'),
     ]),
 ]
 
@@ -2105,7 +2103,7 @@ def render_card(config, pitches, output_file):
         _sp_cell = table.get_celld()[(0, col_headers.index('Stuff+'))]
         _sp_x = _sp_cell.get_window_extent(renderer).x0 / fig_bbox.width
         _sp_note = ('Per-pitch Stuff+ graded vs same pitch type (100 = average for that type)\n'
-                    'Overall Stuff+ = full-arsenal pitch value, mix included')
+                    'Overall Stuff+ = pitch-weighted average of per-pitch grades')
         if any(stuff_lowsup_by_pt.get(_pt) and stuff_by_pt.get(_pt) is not None
                for _pt, _ in pitch_stats):
             _sp_note += '\n† = low model support (unusual pitch profile, score less certain)'
