@@ -20,11 +20,11 @@ count too in window mode).
 Date ranges are recomputed from the pitch cache (window pool floors are
 lower; hitters lose ev50 in window mode).
 
-Run with NO arguments for interactive mode: prompts for role
-(hitter/pitcher/both), player or whole team, level, and date range.
+Run with NO arguments to use the SELECTION block at the bottom of the file:
+edit role / player / team / level / date range there directly, then run.
 
 Usage examples:
-  python3 scripts/ford_comps.py                                  interactive
+  python3 scripts/ford_comps.py                                  selection block
   python3 scripts/ford_comps.py --hitter "Ford, Harry" --start 2026-06-01
   python3 scripts/ford_comps.py --pitcher "Kolek, Bryce" --level mlb
   python3 scripts/ford_comps.py --team ROC --role both
@@ -492,33 +492,24 @@ def main():
         run_role('hitter', args)
 
 
-# ---------------------------------------------------------------------------
-# Selection feature: interactive picker (runs when the script gets no args).
-# Choose role (hitter/pitcher/both), a player or a whole team, comp pool
-# level (mlb/aaa/both), and a date range. Blank answers take the defaults.
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
+# SELECTION
+# ═══════════════════════════════════════════════════════════════════════════
 def interactive():
-    print('ford_comps — interactive (blank = default in brackets)')
-    role = (input('  role — hitter / pitcher / both [both]: ').strip().lower()
-            or 'both')
-    if role.startswith('h'):
-        role = 'hitter'
-    elif role.startswith('p'):
-        role = 'pitcher'
-    else:
-        role = 'both'
-    player = input('  player "Last, First" (blank = whole team): ').strip()
-    team = input(f"  {'player team' if player else 'team'} [ROC]: ").strip().upper() or 'ROC'
-    level = (input('  comp pool level — mlb / aaa / both [both]: ').strip().lower()
-             or 'both')
-    if level not in ('mlb', 'aaa', 'both'):
-        level = 'both'
-    start = input('  start date yyyy-mm-dd (blank = full season): ').strip() or None
-    end = input('  end date yyyy-mm-dd (blank = through today): ').strip() or None
+    # — Settings (edit these directly, or pass command-line flags instead) —
+    role       = "both"     # "hitter", "pitcher", or "both"
+    player     = ""         # "Last, First" for one player, or "" for whole team
+    team       = "ROC"      # player's team (single mode) / team to batch
+    level      = "both"     # comp pool level: "mlb", "aaa", or "both"
+    start_date = None       # "yyyy-mm-dd", or None for full season
+    end_date   = None       # "yyyy-mm-dd", or None for through today
+    exclude    = ""         # batch mode: semicolon-separated names to skip
+    min_pa     = 100        # batch mode: min PA/TBF to include a target
+
     args = argparse.Namespace(player=player or None, player_team=team,
                               team=None if player else team,
-                              level=level, start=start, end=end,
-                              exclude='', min_pa=100)
+                              level=level, start=start_date, end=end_date,
+                              exclude=exclude, min_pa=min_pa)
     for r in (['hitter', 'pitcher'] if role == 'both' else [role]):
         run_role(r, args)
 
