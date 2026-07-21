@@ -138,6 +138,13 @@ def main():
         for r in rows:
             w.writerow([r[0], r[1]] + [round(x, 2) for x in r[2:]])
     print(f"wrote {path}\n")
+    # committed JSON for the live site (Downloads CSV is not deployable)
+    jpath = os.path.join(REPO_ROOT, "data", "abs_backtest_2026.json")
+    with open(jpath, "w") as f:
+        json.dump({"teams": [{"team": r[0], "games": r[1],
+                              "actW": round(r[3], 2), "optW": round(r[5], 2),
+                              "gapW": round(r[6], 2)} for r in rows]}, f)
+    print(f"wrote {jpath}")
 
     tg = sum(n_games.values())
     a = sum(actual_lev.values()) * g_avg

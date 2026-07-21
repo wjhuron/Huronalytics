@@ -60,6 +60,7 @@
       <button class="section-tab" data-section="home" title="Home" role="tab" aria-selected="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
       <button class="section-tab active" data-section="pitchers" role="tab" aria-selected="true">Pitchers</button>
       <button class="section-tab" data-section="hitters" role="tab" aria-selected="false">Hitters</button>
+      <button class="section-tab" data-section="abs" role="tab" aria-selected="false">ABS</button>
     </div>
     <div class="nav-subtabs" id="pitcher-subtabs" role="tablist" aria-label="Pitcher views">
       <button class="tab active" data-tab="pitcherStats" role="tab" aria-selected="true">Stats</button>
@@ -75,7 +76,14 @@
       <span class="tab-divider"></span>
       <button class="tab" data-tab="hitterPitch" role="tab" aria-selected="false">vs Pitches</button>
     </div>
+    <div class="nav-subtabs" id="abs-subtabs" style="display:none;" role="tablist" aria-label="ABS views">
+      <button class="tab abs-tab active" data-absview="leaders" role="tab" aria-selected="true">Leaderboards</button>
+      <button class="tab abs-tab" data-absview="matrix" role="tab" aria-selected="false">Matrix</button>
+      <button class="tab abs-tab" data-absview="film" role="tab" aria-selected="false">Film Room</button>
+    </div>
   </nav>
+
+  <section id="abs-page" style="display:none;"></section>
 
   <section class="controls">
     <div class="filter-group" id="view-mode-group">
@@ -539,6 +547,7 @@
   <script src="js/leaderboard.js?v=20260721125903"></script>
   <script src="js/scatter.js?v=20260721125903"></script>
   <script src="js/player-page.js?v=20260721125903"></script>
+  <script src="js/abs.js?v=20260721125903"></script>
   <script src="js/app.js?v=20260721125903"></script>
 </body>
 </html>

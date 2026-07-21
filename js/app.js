@@ -179,6 +179,11 @@
     let routePart = parts[0];
     if (routePart === 'pitchers/swing-decisions') routePart = 'pitchers/plate-discipline';
     if (routePart === 'hitters/swing-decisions') routePart = 'hitters/plate-discipline';
+    if (routePart === 'abs' || routePart.indexOf('abs/') === 0) {
+      const av = routePart.split('/')[1] || 'leaders';
+      showAbs(['leaders', 'matrix', 'film'].indexOf(av) >= 0 ? av : 'leaders', true);
+      return;
+    }
     const tab = ROUTE_TAB[routePart];
     if (tab) {
       if (parts[1]) {
@@ -231,10 +236,44 @@
 
     document.getElementById('pitcher-subtabs').style.display = 'none';
     document.getElementById('hitter-subtabs').style.display = 'none';
+    hideAbs();
+  }
+
+  function hideAbs() {
+    const ap = document.getElementById('abs-page');
+    if (ap) ap.style.display = 'none';
+    const as = document.getElementById('abs-subtabs');
+    if (as) as.style.display = 'none';
+  }
+
+  function showAbs(view, skipHash) {
+    currentSection = 'abs';
+    if (!skipHash) window.location.hash = 'abs/' + (view || 'leaders');
+    // hide the pitch-data leaderboard UI and home
+    document.getElementById('home-page').style.display = 'none';
+    document.querySelector('.controls').style.display = 'none';
+    document.querySelector('.toolbar').style.display = 'none';
+    document.querySelector('.table-wrapper').style.display = 'none';
+    document.getElementById('pagination').style.display = 'none';
+    const banner = document.getElementById('tab-banner'); if (banner) banner.style.display = 'none';
+    const pctlLeg = document.getElementById('pctl-legend'); if (pctlLeg) pctlLeg.style.display = 'none';
+    document.getElementById('pitcher-subtabs').style.display = 'none';
+    document.getElementById('hitter-subtabs').style.display = 'none';
+    document.getElementById('abs-page').style.display = '';
+    document.getElementById('abs-subtabs').style.display = '';
+    document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+    const sb = document.querySelector('.section-tab[data-section="abs"]');
+    if (sb) { sb.classList.add('active'); sb.setAttribute('aria-selected', 'true'); }
+    document.querySelectorAll('.abs-tab').forEach(function (t) {
+      const on = t.getAttribute('data-absview') === (view || 'leaders');
+      t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (window.ABS) { ABS.setView(view || 'leaders'); ABS.render(); }
   }
 
   function showLeaderboard() {
     document.getElementById('home-page').style.display = 'none';
+    hideAbs();
     document.querySelector('.controls').style.display = '';
     document.querySelector('.toolbar').style.display = '';
     document.querySelector('.table-wrapper').style.display = '';
@@ -674,14 +713,18 @@
           navigateToTab('pitcherStats');
         } else if (section === 'hitters') {
           navigateToTab('hitterStats');
+        } else if (section === 'abs') {
+          showAbs('leaders');
         }
       });
     });
 
     document.querySelectorAll('.nav-subtabs .tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
+        const av = tab.getAttribute('data-absview');
+        if (av) { showAbs(av); return; }
         const tabKey = tab.getAttribute('data-tab');
-        navigateToTab(tabKey);
+        if (tabKey) navigateToTab(tabKey);
       });
     });
   }

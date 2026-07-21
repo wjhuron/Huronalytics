@@ -51,6 +51,23 @@ def main():
             print(f"FAILED at {name} ({dt:.0f}s), stopping")
             sys.exit(r.returncode)
         print(f"--- {name} done in {dt:.0f}s")
+
+    # publish the regenerated data so the live ABS section stays current
+    data = ["data/abs_player_grades_2026.json", "data/abs_challenge_events_2026.json",
+            "data/abs_hitter_zones_2026.json", "data/abs_backtest_2026.json",
+            "data/abs_value_tables_2026.json", "data/abs_option_model_2026.json"]
+    subprocess.run(["git", "add"] + data)
+    diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
+    if diff.returncode != 0:
+        subprocess.run(["git", "commit", "-m",
+                        f"ABS daily data refresh {datetime.now():%Y-%m-%d}"])
+        push = subprocess.run(["git", "push"])
+        if push.returncode != 0:
+            print("push failed (non-fatal); data committed locally")
+        else:
+            print("--- data pushed")
+    else:
+        print("--- no data changes to publish")
     print("=== all steps complete ===")
 
 
