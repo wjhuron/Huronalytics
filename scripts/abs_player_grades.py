@@ -4,16 +4,30 @@ Consumes the challenge dataset, value tables, and option model. Grades every
 challenge and every unchallenged wrong call (truth-based, per Wally: rulings
 are deterministic).
 
-Per challenge, realized value in leveraged runs:
-    overturned  -> +g  (the flip's leveraged-run gain; challenge is retained)
-    upheld      -> -C(k, T)  (the option value of the challenge that was lost)
+Grading is DECISION-based, not outcome-based (Wally, 2026-07-20: "losing a
+challenge that is deemed worth challenging due to proximity and leverage
+should not be negative"). Every challenge is scored at its expected value at
+the moment of the decision, using the confidence an attentive decider could
+have at the pitch's TRUE location:
 
-Missed opportunity: an unchallenged take where the call was actually wrong
-(m > 0), the wronged team still held a challenge, and the decision clears the
-matrix even through the perception model: posterior confidence at the TRUE
-margin, p_side(m), >= break-even p* = C / (g + C). Missing those is a process
-error by an attentive decider; near-boundary wrong calls that even perfect
-attention couldn't confidently identify are NOT counted as misses.
+    decisionEV = p(m) * g  -  (1 - p(m)) * C(k, T)
+
+where p(m) is selection-conditioned for challenges actually made (pSel: the
+decider saw enough to go, so their conditional confidence is above a blind
+look - self-checked to reproduce observed success rates) and attentive-look
+(pLook) for unchallenged pitches.
+
+A matrix-approved challenge (p >= p* = C/(g+C), i.e. EV >= 0) earns that
+positive EV whether it wins or loses; only matrix-disapproved challenges
+(too far, too little leverage) grade negative. Realized outcome columns
+(success rate, realized CVA) are kept for reference but do not drive the
+ranking.
+
+Missed opportunity: an unchallenged take with a challenge in hand where the
+same decisionEV was positive - declining a gamble the matrix approves. It is
+charged at that EV (what the decision was worth when made), not at the full
+gain. Wrong calls too close to the edge for anyone to identify are NOT
+counted as misses.
 
 Attribution: batting-side to the batter, fielding-side to the tracked catcher
 (challenges themselves credit whoever actually challenged, incl. pitchers).
@@ -58,8 +72,9 @@ def half_innings_left(inning, half):
 
 
 def new_ledger():
-    return {"chalN": 0, "chalWon": 0, "cva": 0.0, "chalMarginSum": 0.0,
-            "missN": 0, "missValue": 0.0, "oppN": 0, "teams": defaultdict(int)}
+    return {"chalN": 0, "chalWon": 0, "cva": 0.0, "procVal": 0.0, "badChalN": 0,
+            "chalMarginSum": 0.0, "missN": 0, "missValue": 0.0, "oppN": 0,
+            "teams": defaultdict(int)}
 
 
 def main():
@@ -70,7 +85,8 @@ def main():
     tables = ve.tables_from_json(TABLES)
     thr = opt["meta"]["rulingThrIn"]
     C = {1: opt["C"]["1"], 2: opt["C"]["2"]}
-    posts = {s: opt["posterior"][s] for s in ("bat", "fld")}
+    p_sel = {s: opt["pSel"][s] for s in ("bat", "fld")}
+    p_look = {s: opt["pLook"][s] for s in ("bat", "fld")}
     game_teams = {g["gamePk"]: (g["away"], g["home"]) for g in data["games"]}
 
     catchers = defaultdict(new_ledger)   # id -> ledger (fielding side)
@@ -112,7 +128,9 @@ def main():
         if chal is not None and chal.get("side") == wronged:
             k = max(1, min(2, chal.get("remainingBefore") or rem or 1))
             cost = C[k][T]
-            value = g if chal["overturned"] else -cost
+            value = g if chal["overturned"] else -cost      # realized (reference)
+            p_conf = posterior_at(p_sel["bat" if chal["role"] == "batter" else "fld"], m)
+            ev = p_conf * g - (1.0 - p_conf) * cost          # decision grade
             pid = chal.get("playerId")
             pname = chal.get("playerName")
             if chal["role"] == "batter":
@@ -126,21 +144,26 @@ def main():
             led_c["chalN"] += 1
             led_c["chalWon"] += chal["overturned"]
             led_c["cva"] += value
+            led_c["procVal"] += ev
+            led_c["badChalN"] += ev < 0
             led_c["chalMarginSum"] += m
             led_c["teams"][team_abbr] += 1
             teams[team_abbr]["chalN"] += 1
             teams[team_abbr]["chalWon"] += chal["overturned"]
             teams[team_abbr]["cva"] += value
-        elif chal is None and m > 0 and rem > 0 and g > 0:
+            teams[team_abbr]["procVal"] += ev
+            teams[team_abbr]["badChalN"] += ev < 0
+        elif chal is None and rem > 0 and g > 0:
             k = max(1, min(2, rem))
             cost = C[k][T]
-            p_star = cost / (g + cost)
-            if posterior_at(posts[side], m) >= p_star:
+            p_conf = posterior_at(p_look[side], m)
+            ev = p_conf * g - (1.0 - p_conf) * cost
+            if ev > 0:                                       # matrix-approved gamble declined
                 if owner_id is not None:
                     led["missN"] += 1
-                    led["missValue"] += g
+                    led["missValue"] += ev
                 teams[team_abbr]["missN"] += 1
-                teams[team_abbr]["missValue"] += g
+                teams[team_abbr]["missValue"] += ev
 
     def rows(book, min_opp=0):
         out = []
@@ -154,10 +177,11 @@ def main():
                 "playerId": pid, "player": names.get(pid, str(pid)), "team": team,
                 "challenges": led["chalN"], "won": led["chalWon"],
                 "successPct": (100.0 * led["chalWon"] / led["chalN"]) if led["chalN"] else None,
-                "cva": led["cva"],
+                "procVal": led["procVal"], "badChal": led["badChalN"],
+                "cvaRealized": led["cva"],
                 "avgChalMargin": (led["chalMarginSum"] / led["chalN"]) if led["chalN"] else None,
                 "oppN": led["oppN"], "missN": led["missN"], "missValue": led["missValue"],
-                "netValue": led["cva"] - led["missValue"],
+                "netValue": led["procVal"] - led["missValue"],
             })
         out.sort(key=lambda r: r["netValue"], reverse=True)
         return out
@@ -181,14 +205,16 @@ def main():
         with open(path, "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["Player" if key != "teams" else "Team", "Tm", "Challenges",
-                        "Won", "Success%", "CVA", "AvgChalMargin", "Opportunities",
-                        "Missed", "MissedValue", "NetValue"])
+                        "Won", "Success%", "DecisionValue", "BadChallenges",
+                        "RealizedCVA", "AvgChalMargin", "Opportunities",
+                        "Missed", "MissedEV", "NetValue"])
             for r in result[key]:
                 w.writerow([
                     r["player"] if key != "teams" else r["team"], r["team"],
                     r["challenges"], r["won"],
                     "" if r["successPct"] is None else round(r["successPct"]),
-                    round(r["cva"], 2),
+                    round(r["procVal"], 2), r["badChal"],
+                    round(r["cvaRealized"], 2),
                     "" if r["avgChalMargin"] is None else round(r["avgChalMargin"], 2),
                     r["oppN"], r["missN"], round(r["missValue"], 2),
                     round(r["netValue"], 2)])
@@ -199,8 +225,8 @@ def main():
         for r in rs[:n]:
             sp = "" if r["successPct"] is None else f"{r['successPct']:.0f}%"
             print(f"  {r['player']:<24} {r['team']:<4} chal {r['challenges']:>2} "
-                  f"({sp:>4}) CVA {r['cva']:6.2f} | miss {r['missN']:>3} "
-                  f"({r['missValue']:5.2f}) | net {r['netValue']:6.2f}")
+                  f"({sp:>4}) DV {r['procVal']:6.2f} bad {r['badChal']:>2} | "
+                  f"miss {r['missN']:>3} ({r['missValue']:5.2f}) | net {r['netValue']:6.2f}")
 
     show("TOP CATCHERS (net leveraged runs):", result["catchers"])
     show("BOTTOM CATCHERS:", sorted(result["catchers"], key=lambda r: r["netValue"])[:8])
@@ -208,7 +234,7 @@ def main():
     show("BOTTOM HITTERS:", sorted(result["hitters"], key=lambda r: r["netValue"])[:8])
     n_miss = sum(r["missN"] for r in result["teams"])
     v_miss = sum(r["missValue"] for r in result["teams"])
-    print(f"\nleague missed opportunities: {n_miss} worth {v_miss:.1f} leveraged runs")
+    print(f"\nleague missed opportunities: {n_miss} worth {v_miss:.1f} leveraged runs of decision EV")
 
 
 if __name__ == "__main__":

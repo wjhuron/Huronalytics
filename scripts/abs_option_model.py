@@ -168,6 +168,49 @@ def posterior_grid(prior, sigma):
     return grid
 
 
+def interp_grid(grid, x):
+    """Linear interpolation on a [[x, p], ...] grid with uniform steps."""
+    if x <= grid[0][0]:
+        return grid[0][1]
+    if x >= grid[-1][0]:
+        return grid[-1][1]
+    step = grid[1][0] - grid[0][0]
+    i = int((x - grid[0][0]) / step)
+    x0, p0 = grid[i]
+    x1, p1 = grid[min(i + 1, len(grid) - 1)]
+    return p0 + (p1 - p0) * (x - x0) / max(x1 - x0, 1e-9)
+
+
+def look_grids(post, sigma, x_star):
+    """Expected-confidence curves vs the TRUE margin m.
+
+    pLook(m) = E[p(x) | x ~ N(m, sigma)]: what an attentive decider's
+    confidence averages out to when the pitch is truly at m (used for grading
+    unchallenged pitches - can this wrong call be identified at all?).
+
+    pSel(m) = E[p(x) | x ~ N(m, sigma), x >= x*]: the same conditioned on the
+    decider having seen enough to pull the trigger (league threshold x*). This
+    is the right confidence for grading challenges that were actually made -
+    evaluating the raw posterior at x = m ignores that selection and grades
+    real challenges far too harshly.
+    """
+    p_at_xstar = interp_grid(post, x_star)
+    ms = [round(-M_RANGE + 0.1 * i, 2) for i in range(int(2 * M_RANGE / 0.1) + 1)]
+    p_look, p_sel = [], []
+    for m in ms:
+        num = den = num_s = den_s = 0.0
+        for x, p in post:
+            w = norm_pdf((x - m) / sigma)
+            num += w * p
+            den += w
+            if x >= x_star:
+                num_s += w * p
+                den_s += w
+        p_look.append([m, num / den if den > 0 else p_at_xstar])
+        p_sel.append([m, num_s / den_s if den_s > 1e-12 else p_at_xstar])
+    return p_look, p_sel
+
+
 def x_threshold(post, c_over_g):
     """Smallest perceived x with p/(1-p) >= C/g; None if unreachable."""
     if c_over_g <= 0:
@@ -245,6 +288,16 @@ def main():
         p = perception[side]
         print(f"perception[{side}]: sigma={p['sigma']:.2f}in threshold x*={p['xStar']:.2f}in")
 
+    looks, sels = {}, {}
+    for side in ("fld", "bat"):
+        looks[side], sels[side] = look_grids(posts[side], perception[side]["sigma"],
+                                             perception[side]["xStar"])
+        chal = [o for o in opps if o["side"] == side and o["challenged"]]
+        pred = sum(interp_grid(sels[side], o["m"]) for o in chal) / len(chal)
+        actual = sum(1 for o in chal if o["m"] > 0) / len(chal)
+        print(f"self-check [{side}]: mean selection-conditioned confidence on "
+              f"actual challenges {pred:.3f} vs observed success {actual:.3f}")
+
     V, C, stats = build_dp(opps, halves, perception, posts)
 
     out = {
@@ -255,6 +308,8 @@ def main():
         "marginPrior": {s: {f"{b:.1f}": round(w, 6) for b, w in sorted(priors[s].items())}
                         for s in priors},
         "posterior": {s: [[x, round(p, 5)] for x, p in posts[s]] for s in posts},
+        "pLook": {s: [[m, round(p, 5)] for m, p in looks[s]] for s in looks},
+        "pSel": {s: [[m, round(p, 5)] for m, p in sels[s]] for s in sels},
         "V": {str(k): [round(v, 5) for v in V[k]] for k in V},
         "C": {str(k): [round(c, 5) for c in C[k]] for k in C},
     }
