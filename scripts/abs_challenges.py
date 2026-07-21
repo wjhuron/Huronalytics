@@ -148,6 +148,20 @@ def apply_movements(bases, entries):
     return runs
 
 
+def starting_catchers(live):
+    """Starting catcher id per side: non-substitute whose allPositions has '2'."""
+    out = {}
+    for side in ("away", "home"):
+        cid = None
+        for p in live["boxscore"]["teams"][side]["players"].values():
+            if (not p.get("gameStatus", {}).get("isSubstitute")
+                    and any(ap.get("code") == "2" for ap in p.get("allPositions", []))):
+                cid = p["person"]["id"]
+                break
+        out[side] = cid
+    return out
+
+
 def find_player_team(live, player_id):
     """Which side ('away'/'home') a player is on, via the boxscore rosters."""
     key = "ID" + str(player_id)
@@ -167,6 +181,9 @@ def parse_game(feed):
     players_by_name = {norm_name(p["fullName"]): p["id"]
                        for p in gd.get("players", {}).values()}
     players_by_name_nodots = {k.replace(".", ""): v for k, v in players_by_name.items()}
+    players_by_id = {p["id"]: p["fullName"] for p in gd.get("players", {}).values()}
+    catchers = starting_catchers(live)
+    fielder_chal = {"n": 0, "catcherMatch": 0}
 
     records = []
     detected = {"away": {"ok": 0, "fail": 0}, "home": {"ok": 0, "fail": 0}}
@@ -205,6 +222,11 @@ def parse_game(feed):
                 mv_pos = j
 
             if not ev.get("isPitch"):
+                det = ev.get("details", {})
+                if (det.get("eventType") in ("defensive_substitution", "defensive_switch")
+                        and ev.get("position", {}).get("code") == "2"
+                        and ev.get("player")):
+                    catchers["home" if bat_side == "away" else "away"] = ev["player"]["id"]
                 continue
             det = ev["details"]
             code = det.get("code")
@@ -264,6 +286,11 @@ def parse_game(feed):
                 challenge["remainingBefore"] = remaining.get(challenge["side"])
 
             band_dist = dist_mid if dist_mid is not None else dist
+            fld_side = "home" if bat_side == "away" else "away"
+            if challenge and challenge["role"] == "fielder":
+                fielder_chal["n"] += 1
+                fielder_chal["catcherMatch"] += challenge["playerId"] == catchers[fld_side]
+
             keep = challenge is not None or abs(band_dist) <= KEEP_BAND_IN
             if keep:
                 records.append({
@@ -283,6 +310,8 @@ def parse_game(feed):
                     "batter": play["matchup"]["batter"]["fullName"],
                     "pitcherId": play["matchup"]["pitcher"]["id"],
                     "pitcher": play["matchup"]["pitcher"]["fullName"],
+                    "catcherId": catchers[fld_side],
+                    "catcher": players_by_id.get(catchers[fld_side]),
                     "batHand": play["matchup"]["batSide"]["code"],
                     "pitchHand": play["matchup"]["pitchHand"]["code"],
                     "pitchType": (det.get("type") or {}).get("code"),
@@ -316,7 +345,8 @@ def parse_game(feed):
             score[bat_side] += apply_movements(bases, movements[mv_pos:j])
             mv_pos = j
 
-    audit = {"ok": True, "detected": detected, "official": {}}
+    audit = {"ok": True, "detected": detected, "official": {},
+             "fielderChal": fielder_chal}
     for side in ("away", "home"):
         off = abs_info.get(side) or {}
         audit["official"][side] = off
@@ -341,7 +371,13 @@ def get_final_game_pks(session, start, end):
     pks = []
     for d in r.json().get("dates", []):
         for g in d["games"]:
-            if g["status"]["abstractGameState"] == "Final" and g["gameType"] == "R":
+            # codedGameState 'F' = actually played to completion; postponed
+            # games also report abstractGameState 'Final' but must NOT be
+            # ingested, or their gamePk would be skipped when the makeup date
+            # actually gets played
+            if (g["status"]["abstractGameState"] == "Final"
+                    and g["status"].get("codedGameState") == "F"
+                    and g["gameType"] == "R"):
                 pks.append(g["gamePk"])
     return sorted(set(pks))
 
