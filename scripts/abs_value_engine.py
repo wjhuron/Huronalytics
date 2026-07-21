@@ -150,9 +150,19 @@ def build_state_tables(games):
     return re24, dists, dict(re_n)
 
 
+RV288_SHRINK_K = 200
+
+
 def build_count_values(games, re24):
-    """RV(b,s) = mean whole-PA run impact (dRE24 + runs) over PAs through (b,s)."""
+    """RV(b,s) = mean whole-PA run impact (dRE24 + runs) over PAs through (b,s).
+
+    Also returns RV288: the same value conditioned on (count, bases, outs),
+    shrunk toward the league count value with k=200 pseudo-observations. This
+    matters most for 3-ball / 2-strike counts with runners on, where the
+    looming walk/strikeout makes the count worth more than league average.
+    """
     rv_sum, rv_n = defaultdict(float), defaultdict(int)
+    rv288_sum, rv288_n = defaultdict(float), defaultdict(int)
     for g in games:
         for (inning, _half), plist in group_halves(g).items():
             if inning > 8 or plist[-1]["outsAfter"] != 3:
@@ -170,7 +180,19 @@ def build_count_values(games, re24):
                 for b, s in p["counts"]:
                     rv_sum[(b, s)] += rv
                     rv_n[(b, s)] += 1
-    return {c: rv_sum[c] / rv_n[c] for c in rv_n}, dict(rv_n)
+                    key288 = (b, s, p["bases"], p["outs"])
+                    rv288_sum[key288] += rv
+                    rv288_n[key288] += 1
+    rv = {c: rv_sum[c] / rv_n[c] for c in rv_n}
+    rv288 = {}
+    for (b, s) in rv:
+        for bases in ("000", "100", "010", "001", "110", "101", "011", "111"):
+            for out in range(3):
+                key = (b, s, bases, out)
+                n = rv288_n.get(key, 0)
+                mean = rv288_sum.get(key, 0.0) / n if n else 0.0
+                rv288[key] = (n * mean + RV288_SHRINK_K * rv[(b, s)]) / (n + RV288_SHRINK_K)
+    return rv, dict(rv_n), rv288
 
 
 def walk_bases(bases):
@@ -279,30 +301,83 @@ def g_average(games, G):
 
 # ---------------------------------------------------------------- assembly
 
+def cont_bat(inning, half, d, tables):
+    """Batting team's win prob once the current half ends at home-away diff d."""
+    W = tables["W"]
+    d = clamp(d)
+    if half == "top":
+        if inning >= 9:
+            home = 1.0 if d > 0 else W[(min(inning, EXTRA_INNING), "bottom")][d]
+        else:
+            home = W[(inning, "bottom")][d]
+        return 1.0 - home
+    if inning >= 9:
+        return 1.0 if d > 0 else (0.0 if d < 0 else tables["wExtraTie"])
+    return W[(inning + 1, "top")][d]
+
+
+def wp_mid_batting(inning, half, diff, bases, out, tables):
+    """Batting team's win prob mid-half, from the empirical distribution of
+    runs scored in the remainder of the half from (bases, out). Walk-off
+    truncation is handled by cont_bat (any winning total counts as a win)."""
+    if out >= 3:
+        return cont_bat(inning, half, diff, tables)
+    total = 0.0
+    for k, p in tables["runDist"][(bases, out)].items():
+        d2 = diff - k if half == "top" else diff + k
+        total += p * cont_bat(inning, half, d2, tables)
+    return total
+
+
 def value_of_flip(b, s, bases, out, inning, half, diff, tables):
     """Price a called-strike vs called-ball flip at a given state.
 
-    Returns dict with dRE (batting-team run gain if the call is a BALL rather
-    than a STRIKE; always >= 0), li, and leveragedRuns = dRE * li.
+    Continuation branches use base-out-conditioned count values (RV288) times
+    the run-leverage factor G. Terminal branches (ball four / strike three)
+    are priced as EXACT win-probability transitions, so walk-off states no
+    longer overpay for runs beyond the winning one. Both branches are measured
+    against the count-agnostic PA-start baseline, and the result is expressed
+    in leveraged runs (delta-WP / gAvg) for currency consistency.
+
+    Returns dict with leveragedRuns (batting-team gain if the call is a BALL;
+    >= 0), li, and dRE (= leveragedRuns / li, the run-equivalent).
     diff is home minus away score at the time of the pitch.
     """
-    rv = tables["countRV"]
-    ball_val = tables["bbValue"][(bases, out)] if b == 3 else rv[(b + 1, s)]
-    strike_val = tables["kValue"][(bases, out)] if s == 2 else rv[(b, s + 1)]
-    d_re = ball_val - strike_val
-    li = tables["G"][(min(inning, EXTRA_INNING), half, clamp(diff))] / tables["gAvg"]
-    return {"dRE": d_re, "li": li, "leveragedRuns": d_re * li}
+    rv288 = tables["countRV288"]
+    g_run = tables["G"][(min(inning, EXTRA_INNING), half, clamp(diff))]
+    wp_base = None
+
+    if b == 3:   # ball four: exact WP after the forced walk
+        wp_base = wp_mid_batting(inning, half, diff, bases, out, tables)
+        nb, runs = walk_bases(bases)
+        d2 = diff - runs if half == "top" else diff + runs
+        ball_wp = wp_mid_batting(inning, half, d2, nb, out, tables) - wp_base
+    else:
+        ball_wp = rv288[(b + 1, s, bases, out)] * g_run
+
+    if s == 2:   # strike three: exact WP after the out
+        if wp_base is None:
+            wp_base = wp_mid_batting(inning, half, diff, bases, out, tables)
+        strike_wp = wp_mid_batting(inning, half, diff, bases, out + 1, tables) - wp_base
+    else:
+        strike_wp = rv288[(b, s + 1, bases, out)] * g_run
+
+    li = g_run / tables["gAvg"]
+    leveraged = (ball_wp - strike_wp) / tables["gAvg"]
+    return {"dRE": leveraged / li if li > 1e-9 else 0.0, "li": li,
+            "leveragedRuns": leveraged}
 
 
 def build_all(games):
     re24, dists, re_n = build_state_tables(games)
-    count_rv, rv_n = build_count_values(games, re24)
+    count_rv, rv_n, rv288 = build_count_values(games, re24)
     bb, k = terminal_values(re24)
     W, w_extra_tie = build_wp(dists[("000", 0)], dists[("010", 0)])
     G = build_g(W, w_extra_tie)
     g_avg = g_average(games, G)
     return {"re24": re24, "re24N": re_n, "countRV": count_rv, "countRVN": rv_n,
-            "bbValue": bb, "kValue": k, "W": W, "G": G, "gAvg": g_avg}
+            "countRV288": rv288, "runDist": dists, "bbValue": bb, "kValue": k,
+            "W": W, "wExtraTie": w_extra_tie, "G": G, "gAvg": g_avg}
 
 
 def tables_to_json(t):
@@ -316,6 +391,13 @@ def tables_to_json(t):
         "bbValue": {f"{b}|{o}": round(v, 4) for (b, o), v in t["bbValue"].items()},
         "kValue": {f"{b}|{o}": round(v, 4) for (b, o), v in t["kValue"].items()},
         "G": {f"{i}|{h}|{d}": round(v, 6) for (i, h, d), v in t["G"].items()},
+        "countRV288": {f"{b}-{s}|{ba}|{o}": round(v, 4)
+                       for (b, s, ba, o), v in t["countRV288"].items()},
+        "runDist": {f"{ba}|{o}": {str(k): round(p, 6) for k, p in d.items()}
+                    for (ba, o), d in t["runDist"].items()},
+        "W": {f"{i}|{h}|{d}": round(v, 6)
+              for (i, h), row in t["W"].items() for d, v in row.items()},
+        "wExtraTie": t["wExtraTie"],
     }
 
 
@@ -332,6 +414,21 @@ def tables_from_json(path):
     for k, v in j["G"].items():
         i, h, d = k.split("|")
         t["G"][(int(i), h, int(d))] = v
+    t["countRV288"] = {}
+    for k, v in j["countRV288"].items():
+        cnt, ba, o = k.split("|")
+        b, s = cnt.split("-")
+        t["countRV288"][(int(b), int(s), ba, int(o))] = v
+    t["runDist"] = {}
+    for k, d in j["runDist"].items():
+        ba, o = k.split("|")
+        t["runDist"][(ba, int(o))] = {int(r): p for r, p in d.items()}
+    t["W"] = defaultdict(dict)
+    for k, v in j["W"].items():
+        i, h, d = k.split("|")
+        t["W"][(int(i), h)][int(d)] = v
+    t["W"] = dict(t["W"])
+    t["wExtraTie"] = j["wExtraTie"]
     return t
 
 

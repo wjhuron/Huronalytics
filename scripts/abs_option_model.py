@@ -96,7 +96,7 @@ def load_opportunities(dataset_path, tables):
                              tables)
         inning = min(r["inning"], 9)
         T = 2 * (9 - inning) + (2 if r["half"] == "top" else 1)
-        opps.append({"side": side, "m": m, "g": v["leveragedRuns"],
+        opps.append({"side": side, "m": m, "g": v["leveragedRuns"], "dre": v["dRE"],
                      "challenged": challenged, "hadChallenge": rem > 0,
                      "T": T, "playId": r["playId"]})
     if side_mismatch:
@@ -228,7 +228,117 @@ def x_threshold(post, c_over_g):
     return post[lo][0]
 
 
-# ----------------------------------------------------------------- DP for C
+# ------------------------------------------------- score-conditioned DP for C
+
+DIFF_RANGE = 12
+
+
+def clamp_d(d):
+    return max(-DIFF_RANGE, min(DIFF_RANGE, d))
+
+
+def inning_from_T(T):
+    return 9 - (T - (2 if T % 2 == 0 else 1)) // 2
+
+
+def leverage_at(tables, T, d):
+    """Average run-leverage multiplier for a team at score diff d (their runs
+    minus opponent's) with T regulation half-innings left. Averages top/bottom
+    and home/away orientations - the DP doesn't track which team bats when."""
+    i = inning_from_T(T)
+    g = (tables["G"][(i, "top", clamp_d(-d))] + tables["G"][(i, "bottom", clamp_d(d))]) / 2.0
+    return g / tables["gAvg"]
+
+
+def stream_curves(opps, halves_total, perception, posts):
+    """One-dimensional reductions of the opportunity stream.
+
+    Gains factor as dre x L (unleveraged value x state leverage), so the
+    optimal policy at challenge cost C depends only on u = C / L. Returns
+    per-team-half curves on a log-u grid: gainTilde(u) (unleveraged expected
+    gain), failP(u), attempts(u). The DP then re-leverages: A = L x gainTilde.
+    """
+    us = [10.0 ** (-4.0 + 6.0 * i / 79.0) for i in range(80)]
+    # cache x_threshold per side on a log-q grid (q = u / dre)
+    qs = [10.0 ** (-5.0 + 9.0 * i / 199.0) for i in range(200)]
+    xc_cache = {side: [x_threshold(posts[side], q) for q in qs] for side in posts}
+
+    def xc_for(side, q):
+        import math as _m
+        idx = int(round((_m.log10(max(q, 1e-5)) + 5.0) / 9.0 * 199.0))
+        return xc_cache[side][max(0, min(199, idx))]
+
+    per_half = 1.0 / (2.0 * halves_total)
+    gain = [0.0] * 80
+    fail = [0.0] * 80
+    att = [0.0] * 80
+    for o in opps:
+        dre = o["dre"]
+        if dre <= 1e-6:
+            continue
+        sig = perception[o["side"]]["sigma"]
+        m = o["m"]
+        win = m > 0
+        for j, u in enumerate(us):
+            xc = xc_for(o["side"], u / dre)
+            if xc is None:
+                continue
+            r = phi((m - xc) / sig)
+            att[j] += r
+            if win:
+                gain[j] += r * dre
+            else:
+                fail[j] += r
+    return {"us": us,
+            "gain": [v * per_half for v in gain],
+            "fail": [v * per_half for v in fail],
+            "att": [v * per_half for v in att]}
+
+
+def curve_at(curve, key, u):
+    """Log-linear interpolation of a stream curve at cost/leverage ratio u."""
+    import math as _m
+    us = curve["us"]
+    lo, hi = us[0], us[-1]
+    u = max(lo, min(hi, u))
+    pos = (_m.log10(u) - _m.log10(lo)) / (_m.log10(hi) - _m.log10(lo)) * 79.0
+    i = min(int(pos), 78)
+    f = pos - i
+    ys = curve[key]
+    return ys[i] + (ys[i + 1] - ys[i]) * f
+
+
+def build_dp_scored(curves, tables):
+    """V(k, T, d) and C(k, T, d) over score diff d, with d evolving by the
+    empirical fresh-half run distribution (random batting side)."""
+    F = tables["runDist"][("000", 0)]
+    diffs = list(range(-DIFF_RANGE, DIFF_RANGE + 1))
+    V = {k: {0: {d: 0.0 for d in diffs}} for k in (0, 1, 2)}
+    stats0 = {}
+    for T in range(1, REG_HALVES + 1):
+        for k in (0, 1, 2):
+            V[k][T] = {}
+        for d in diffs:
+            V[0][T][d] = 0.0
+            L = max(leverage_at(tables, T, d), 1e-6)
+            for k in (1, 2):
+                cost = max(V[k][T - 1][d] - V[k - 1][T - 1][d], EPS_COST)
+                u = cost / L
+                a = L * curve_at(curves, "gain", u)
+                pf = curve_at(curves, "fail", u)
+                nk = nk1 = 0.0
+                for r, p in F.items():
+                    for sgn in (1, -1):
+                        d2 = clamp_d(d + sgn * r)
+                        nk += 0.5 * p * V[k][T - 1][d2]
+                        nk1 += 0.5 * p * V[k - 1][T - 1][d2]
+                V[k][T][d] = a + (1.0 - pf) * nk + pf * nk1
+                if d == 0:
+                    stats0[(k, T)] = {"attempts": curve_at(curves, "att", u), "failP": pf}
+    C = {k: {T: {d: V[k][T][d] - V[k - 1][T][d] for d in diffs}
+             for T in range(REG_HALVES + 1)} for k in (1, 2)}
+    return V, C, stats0
+
 
 def build_dp(opps, halves_total, perception, posts):
     """V(k, T) and C(k, T) = V(k,T) - V(k-1,T), k in {1,2}, T in 0..18."""
@@ -298,7 +408,9 @@ def main():
         print(f"self-check [{side}]: mean selection-conditioned confidence on "
               f"actual challenges {pred:.3f} vs observed success {actual:.3f}")
 
-    V, C, stats = build_dp(opps, halves, perception, posts)
+    curves = stream_curves(opps, halves, perception, posts)
+    V, Cg, stats0 = build_dp_scored(curves, tables)
+    C = {k: [Cg[k][T][0] for T in range(REG_HALVES + 1)] for k in (1, 2)}
 
     out = {
         "meta": {"generated": date.today().isoformat(), "games": n_games,
@@ -310,40 +422,48 @@ def main():
         "posterior": {s: [[x, round(p, 5)] for x, p in posts[s]] for s in posts},
         "pLook": {s: [[m, round(p, 5)] for m, p in looks[s]] for s in looks},
         "pSel": {s: [[m, round(p, 5)] for m, p in sels[s]] for s in sels},
-        "V": {str(k): [round(v, 5) for v in V[k]] for k in V},
         "C": {str(k): [round(c, 5) for c in C[k]] for k in C},
+        "Cgrid": {f"{k}|{T}|{d}": round(Cg[k][T][d], 5)
+                  for k in (1, 2) for T in range(REG_HALVES + 1)
+                  for d in range(-DIFF_RANGE, DIFF_RANGE + 1)},
     }
     with open(args.out, "w") as f:
         json.dump(out, f, indent=1)
     print(f"wrote {args.out}")
 
     # ------------------------------------------------------------ validation
-    print("\nC(k, T) leveraged runs (T = regulation half-innings remaining):")
+    print("\nC(k, T, d=0) leveraged runs (T = regulation half-innings remaining):")
     print("  T:      " + " ".join(f"{T:5d}" for T in (18, 14, 10, 6, 4, 2, 1)))
     for k in (1, 2):
         row = " ".join(f"{C[k][T]:.3f}" for T in (18, 14, 10, 6, 4, 2, 1))
         print(f"  C(k={k}): {row}")
-    # forward-simulate the k chain for honest usage numbers
+    print("\nC(1, T, d) across score margins (blowout conditioning):")
+    print("  d:      " + " ".join(f"{d:5d}" for d in (0, 2, 4, 6, 8, -4, -8)))
+    for T in (14, 6):
+        row = " ".join(f"{Cg[1][T][d]:.3f}" for d in (0, 2, 4, 6, 8, -4, -8))
+        print(f"  T={T:2d}:   {row}")
+    # forward-simulate the k chain at d=0 for honest usage numbers
     pk = {2: 1.0, 1: 0.0, 0: 0.0}
     att_game = fail_game = 0.0
     for T in range(REG_HALVES, 0, -1):
         nxt = {2: 0.0, 1: 0.0, 0: pk[0]}
         for k in (1, 2):
-            s = stats[(k, T)]
+            s = stats0[(k, T)]
             att_game += pk[k] * s["attempts"]
             fail_game += pk[k] * s["failP"]
             nxt[k] += pk[k] * (1.0 - s["failP"])
             nxt[k - 1] += pk[k] * s["failP"]
         pk = nxt
     succ = att_game - fail_game
-    print(f"\noptimal-policy usage/team-game: {att_game:.2f} attempts, "
+    print(f"\noptimal-policy usage/team-game (close game): {att_game:.2f} attempts, "
           f"{100 * succ / att_game:.0f}% success (league: ~2.1 attempts, ~61%)")
 
     print("\nbreak-even confidence p* = C/(g+C):")
     demos = [("0-0 pitch, neutral, game start (k=2)", 0.078, C[2][18]),
              ("0-0 pitch, neutral, game start (k=1)", 0.078, C[1][18]),
-             ("3-2 loaded, bottom 9 tie (k=1)", 8.17, C[1][1]),
-             ("2-2 pitch, neutral, 8th inning (k=1)", 0.140, C[1][4])]
+             ("3-2 loaded, bottom 9 tie (k=1)", 5.02, Cg[1][1][0]),
+             ("2-2 pitch, tie 8th inning (k=1)", 0.140, Cg[1][4][0]),
+             ("2-2 pitch, 8th inning down 8 (k=1)", 0.011, Cg[1][4][-8])]
     for label, g, c in demos:
         print(f"  {label}: p* = {c / (g + c):.2f}")
 

@@ -39,11 +39,17 @@ Usage: python3 scripts/abs_player_grades.py
 
 import csv
 import json
+import math
 import os
 from collections import defaultdict
 from datetime import date
 
 import abs_value_engine as ve
+from abs_option_model import look_grids, phi, posterior_grid
+
+SHRINK_N0 = 40      # pseudo-challenges pulling a player's sigma to league
+SIGMA_GRID = [0.4 + 0.2 * i for i in range(24)]
+OBS_BIN = 0.25      # inches, per-player observation binning
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET = os.path.join(REPO_ROOT, "data", "abs_challenges_2026.json")
@@ -71,6 +77,52 @@ def half_innings_left(inning, half):
     return 2 * (9 - inning) + (2 if half == "top" else 1)
 
 
+def solve_xstar(bins, n_chal, sigma):
+    """x* such that the probit policy reproduces the player's challenge count."""
+    lo, hi = -6.0, 10.0
+    for _ in range(40):
+        mid = (lo + hi) / 2.0
+        pred = sum(n * phi((m - mid) / sigma) for m, (_c, n) in bins.items())
+        if pred > n_chal:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def fit_player_curves(obs_by_player, league, prior):
+    """Per-player perception sigma (probit MLE, shrunk toward league with
+    SHRINK_N0 pseudo-challenges) and the matching pLook/pSel curves.
+
+    This is what makes proximity matter in the grades: a decider whose
+    challenges track the zone tightly earns sharp confidence curves, so their
+    deep-in-zone challenges grade high and their way-off ones grade low; a
+    scattershot decider gets flat curves and little proximity credit.
+    """
+    out = {}
+    for pid, ob in obs_by_player.items():
+        bins, n_chal = ob["bins"], ob["nChal"]
+        if n_chal >= 1 and bins:
+            best = None
+            for sigma in SIGMA_GRID:
+                xs = solve_xstar(bins, n_chal, sigma)
+                ll = 0.0
+                for m, (c, n) in bins.items():
+                    p = min(max(phi((m - xs) / sigma), 1e-9), 1 - 1e-9)
+                    ll += c * math.log(p) + (n - c) * math.log(1.0 - p)
+                if best is None or ll > best[0]:
+                    best = (ll, sigma)
+            sig_hat = best[1]
+        else:
+            sig_hat = league["sigma"]
+        sigma_p = (n_chal * sig_hat + SHRINK_N0 * league["sigma"]) / (n_chal + SHRINK_N0)
+        xs_p = solve_xstar(bins, n_chal, sigma_p) if (n_chal >= 1 and bins) else league["xStar"]
+        post_p = posterior_grid(prior, sigma_p)
+        p_look, p_sel = look_grids(post_p, sigma_p, xs_p)
+        out[pid] = {"sigma": sigma_p, "pLook": p_look, "pSel": p_sel}
+    return out
+
+
 def new_ledger():
     return {"chalN": 0, "chalWon": 0, "cva": 0.0, "procVal": 0.0, "badChalN": 0,
             "chalMarginSum": 0.0, "missN": 0, "missValue": 0.0, "oppN": 0,
@@ -84,17 +136,25 @@ def main():
         opt = json.load(f)
     tables = ve.tables_from_json(TABLES)
     thr = opt["meta"]["rulingThrIn"]
-    C = {1: opt["C"]["1"], 2: opt["C"]["2"]}
-    p_sel = {s: opt["pSel"][s] for s in ("bat", "fld")}
-    p_look = {s: opt["pLook"][s] for s in ("bat", "fld")}
+    Cg = {}
+    for key, v in opt["Cgrid"].items():
+        k, T, d = key.split("|")
+        Cg[(int(k), int(T), int(d))] = v
+    league = {s: {"sigma": opt["perception"][s]["sigma"],
+                  "xStar": opt["perception"][s]["xStar"],
+                  "pLook": opt["pLook"][s], "pSel": opt["pSel"][s]}
+              for s in ("bat", "fld")}
+    priors = {s: {float(b): w for b, w in opt["marginPrior"][s].items()}
+              for s in ("bat", "fld")}
     game_teams = {g["gamePk"]: (g["away"], g["home"]) for g in data["games"]}
 
-    catchers = defaultdict(new_ledger)   # id -> ledger (fielding side)
-    hitters = defaultdict(new_ledger)    # id -> ledger (batting side)
-    pitchers = defaultdict(new_ledger)   # pitcher-initiated challenges only
-    teams = defaultdict(new_ledger)
-    names = {}
+    def cost_at(k, T, d):
+        return Cg[(max(1, min(2, k)), T, max(-12, min(12, d)))]
 
+    # ---- pass 1: parse records, collect per-player perception observations
+    parsed = []
+    obs = {"fld": defaultdict(lambda: {"bins": defaultdict(lambda: [0, 0]), "nChal": 0}),
+           "bat": defaultdict(lambda: {"bins": defaultdict(lambda: [0, 0]), "nChal": 0})}
     for r in data["records"]:
         if r["distMidIn"] is None:
             continue
@@ -106,39 +166,78 @@ def main():
             wronged = "home" if r["batSide"] == "away" else "away"
         rem = r["remAway"] if wronged == "away" else r["remHome"]
         team_abbr = game_teams[r["gamePk"]][0 if wronged == "away" else 1]
+        if wronged == "away":
+            d_team = r["awayScore"] - r["homeScore"]
+        else:
+            d_team = r["homeScore"] - r["awayScore"]
         v = ve.value_of_flip(r["balls"], r["strikes"], r["bases"], r["outs"],
                              r["inning"], r["half"], r["homeScore"] - r["awayScore"],
                              tables)
         g = v["leveragedRuns"]
         T = half_innings_left(r["inning"], r["half"])
         chal = r["challenge"]
-
         if side == "bat":
             owner_id, owner_name = r["batterId"], r["batter"]
-            book = hitters
         else:
             owner_id, owner_name = r["catcherId"], r["catcher"]
+        parsed.append((side, m, wronged, rem, team_abbr, d_team, g, T, chal,
+                       owner_id, owner_name))
+        if rem > 0 and owner_id is not None:
+            o = obs[side][owner_id]
+            b = round(max(-6.0, min(6.0, m)) / OBS_BIN) * OBS_BIN
+            o["bins"][b][1] += 1
+            owner_challenged = (chal is not None and chal.get("side") == wronged
+                                and ((side == "bat" and chal["role"] == "batter")
+                                     or (side == "fld" and chal["role"] == "fielder")))
+            if owner_challenged:
+                o["bins"][b][0] += 1
+                o["nChal"] += 1
+
+    curves = {s: fit_player_curves(obs[s], league[s], priors[s]) for s in ("bat", "fld")}
+    n_fit = sum(1 for s in curves for p in curves[s].values())
+    print(f"fit perception curves for {n_fit} deciders "
+          f"(shrunk toward league sigma with n0={SHRINK_N0})")
+
+    def curve_for(side_key, pid):
+        return curves[side_key].get(pid, league[side_key])
+
+    catchers = defaultdict(new_ledger)   # id -> ledger (fielding side)
+    hitters = defaultdict(new_ledger)    # id -> ledger (batting side)
+    pitchers = defaultdict(new_ledger)   # pitcher-initiated challenges only
+    teams = defaultdict(new_ledger)
+    names = {}
+    sigmas = {}
+
+    # ---- pass 2: grade
+    for (side, m, wronged, rem, team_abbr, d_team, g, T, chal,
+         owner_id, owner_name) in parsed:
+        if side == "bat":
+            book = hitters
+        else:
             book = catchers
         if owner_id is not None:
             led = book[owner_id]
             names[owner_id] = owner_name
             led["teams"][team_abbr] += 1
             led["oppN"] += 1
+            cv = curve_for(side, owner_id)
+            if "sigma" in cv:
+                sigmas[owner_id] = cv["sigma"]
 
         if chal is not None and chal.get("side") == wronged:
-            k = max(1, min(2, chal.get("remainingBefore") or rem or 1))
-            cost = C[k][T]
+            k = chal.get("remainingBefore") or rem or 1
+            cost = cost_at(k, T, d_team)
             value = g if chal["overturned"] else -cost      # realized (reference)
-            p_conf = posterior_at(p_sel["bat" if chal["role"] == "batter" else "fld"], m)
-            ev = p_conf * g - (1.0 - p_conf) * cost          # decision grade
             pid = chal.get("playerId")
             pname = chal.get("playerName")
             if chal["role"] == "batter":
-                led_c = hitters[pid]
+                led_c, chal_curve = hitters[pid], curve_for("bat", pid)
             elif chal["role"] == "pitcher":
-                led_c = pitchers[pid]
+                led_c, chal_curve = pitchers[pid], league["fld"]
             else:
-                led_c = catchers[pid]
+                led_c, chal_curve = catchers[pid], curve_for("fld", pid)
+            p_conf = posterior_at(chal_curve["pSel"], m)
+            ev = p_conf * g - (1.0 - p_conf) * cost          # decision grade
             if pid is not None:
                 names[pid] = pname
             led_c["chalN"] += 1
@@ -154,9 +253,8 @@ def main():
             teams[team_abbr]["procVal"] += ev
             teams[team_abbr]["badChalN"] += ev < 0
         elif chal is None and rem > 0 and g > 0:
-            k = max(1, min(2, rem))
-            cost = C[k][T]
-            p_conf = posterior_at(p_look[side], m)
+            cost = cost_at(rem, T, d_team)
+            p_conf = posterior_at(curve_for(side, owner_id)["pLook"], m)
             ev = p_conf * g - (1.0 - p_conf) * cost
             if ev > 0:                                       # matrix-approved gamble declined
                 if owner_id is not None:
@@ -182,6 +280,9 @@ def main():
                 "avgChalMargin": (led["chalMarginSum"] / led["chalN"]) if led["chalN"] else None,
                 "oppN": led["oppN"], "missN": led["missN"], "missValue": led["missValue"],
                 "netValue": led["procVal"] - led["missValue"],
+                "netRate": (100.0 * (led["procVal"] - led["missValue"]) / led["oppN"])
+                           if led["oppN"] else None,
+                "readSigma": sigmas.get(pid),
             })
         out.sort(key=lambda r: r["netValue"], reverse=True)
         return out
@@ -206,8 +307,8 @@ def main():
             w = csv.writer(f)
             w.writerow(["Player" if key != "teams" else "Team", "Tm", "Challenges",
                         "Won", "Success%", "DecisionValue", "BadChallenges",
-                        "RealizedCVA", "AvgChalMargin", "Opportunities",
-                        "Missed", "MissedEV", "NetValue"])
+                        "RealizedCVA", "AvgChalMargin", "ReadSigma", "Opportunities",
+                        "Missed", "MissedEV", "NetValue", "NetPer100Opp"])
             for r in result[key]:
                 w.writerow([
                     r["player"] if key != "teams" else r["team"], r["team"],
@@ -216,16 +317,19 @@ def main():
                     round(r["procVal"], 2), r["badChal"],
                     round(r["cvaRealized"], 2),
                     "" if r["avgChalMargin"] is None else round(r["avgChalMargin"], 2),
+                    "" if r.get("readSigma") is None else round(r["readSigma"], 2),
                     r["oppN"], r["missN"], round(r["missValue"], 2),
-                    round(r["netValue"], 2)])
+                    round(r["netValue"], 2),
+                    "" if r.get("netRate") is None else round(r["netRate"], 2)])
         print(f"wrote {path}")
 
     def show(title, rs, n=8):
         print(f"\n{title}")
         for r in rs[:n]:
             sp = "" if r["successPct"] is None else f"{r['successPct']:.0f}%"
+            sg = "" if r.get("readSigma") is None else f"{r['readSigma']:.1f}"
             print(f"  {r['player']:<24} {r['team']:<4} chal {r['challenges']:>2} "
-                  f"({sp:>4}) DV {r['procVal']:6.2f} bad {r['badChal']:>2} | "
+                  f"({sp:>4}) sig {sg:>3} DV {r['procVal']:6.2f} bad {r['badChal']:>2} | "
                   f"miss {r['missN']:>3} ({r['missValue']:5.2f}) | net {r['netValue']:6.2f}")
 
     show("TOP CATCHERS (net leveraged runs):", result["catchers"])
