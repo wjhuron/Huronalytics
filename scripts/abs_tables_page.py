@@ -28,20 +28,18 @@ def font_b64(name):
 def slim(rows):
     out = []
     for r in rows:
-        # qualified players show the shrunk skill estimate; everyone else shows
-        # the raw descriptive rate so the leaderboard never fakes precision
-        q = r.get("qualified")
+        # qualified (reliability>=0.40) players show the shrunk talent estimate;
+        # everyone else reads "provisional" so the board never fakes precision
+        sq, vq = r.get("skillQual"), r.get("valueQual")
         out.append({
             "player": r["player"], "team": r["team"],
-            "skill": None if (r.get("skillPer100") is None or not q) else round(r["skillPer100"], 2),
-            "ci": None if (r.get("ci95Per100") is None or not q) else round(r["ci95Per100"], 2),
-            "rel": None if r.get("reliability") is None else round(r["reliability"], 2),
-            "cons": r.get("consN", 0),
-            "qual": "yes" if q else "no",
-            "chal": r["challenges"],
-            "won": r["won"], "succ": None if r["successPct"] is None else round(r["successPct"]),
-            "sig": None if r.get("readSigma") is None else round(r["readSigma"], 2),
-            "miss": r["missN"], "net": round(r["netValue"], 2),
+            "skill": None if (r.get("skill") is None or not sq) else round(r["skill"]),
+            "skci": None if (r.get("skillCI") is None or not sq) else round(r["skillCI"]),
+            "value": None if (r.get("value") is None or not vq) else round(r["value"], 2),
+            "vci": None if (r.get("valueCI") is None or not vq) else round(r["valueCI"], 2),
+            "cons": r.get("consN", 0), "chal": r["challenges"],
+            "succ": None if r["successPct"] is None else round(r["successPct"]),
+            "net": round(r["netValue"], 2),
         })
     return out
 
@@ -105,9 +103,11 @@ tr:last-child td{border-bottom:0}
 <div class="wrap">
 <p class="eyebrow">Huronalytics &middot; 2026 ABS Challenge System</p>
 <h1>Challenge Grades &amp; Backtest</h1>
-<p class="sub">Decision-based grading in leveraged runs: every challenge scored at its expected value when taken
-(justified gambles stay positive even when they lose), every clearly-catchable wrong call left unchallenged
-charged at its expected value. <b>Net = DecisionValue &minus; MissedEV.</b> Click any column to sort.</p>
+<p class="sub">Two orthogonal talent metrics, decision-based (a justified challenge grades positive even when it loses).
+<b>Skill+</b> is leverage-blind decision quality indexed to 100, independent of the stakes a catcher faced.
+<b>Value/100</b> is leveraged runs added per 100 real decisions (skill times leverage times volume). Both are
+empirical-Bayes shrunk with 95% CIs and shown only where reliable. Sort by either; they rank differently on
+purpose. Click any column.</p>
 <div class="bar">
   <div class="tabs" id="tabs">
     <button data-t="catchers" aria-pressed="true">Catchers</button>
@@ -125,14 +125,14 @@ charged at its expected value. <b>Net = DecisionValue &minus; MissedEV.</b> Clic
 <script>
 const D=__DATA__;
 const COLS={
- player:[["player","Player","l"],["team","Tm","l"],["skill","Skill/100"],["ci","95% CI"],
-  ["rel","Rel"],["cons","Dec"],["chal","Chal"],["succ","Succ%"],["sig","ReadSig"],["net","NetVal"]],
+ player:[["player","Player","l"],["team","Tm","l"],["skill","Skill+"],["skci","95% CI"],
+  ["value","Value/100"],["vci","95% CI"],["cons","Dec"],["chal","Chal"],["succ","Succ%"],["net","NetVal"]],
  backtest:[["team","Team","l"],["games","G"],["actW","ActualWins"],["optW","OptimalWins"],["gapW","LeftOnTable"]],
  film:[["date","Date","l"],["player","Player","l"],["team","Tm","l"],["type","Type","l"],["result","Result","l"],
   ["count","Cnt"],["inning","Inn"],["half","Half","l"],["marginIn","Margin"],["ev","EV"],["playId","Video","l"]]
 };
 const NOTES={
- catchers:"Skill/100 = empirical-Bayes shrunk leveraged runs added per 100 consequential decisions, the talent estimate, shown only for QUALIFIED catchers (reliability >= 0.40, ~7 clear the bar). Its 95% CI is real: rows whose CI crosses 0 are not distinguishable from average. Unqualified catchers show NetVal (descriptive: what happened) and are ranked below. ReadSig = fitted zone-perception noise in inches (lower = sharper).",
+ catchers:"TWO orthogonal metrics. SKILL+ = leverage-blind decision quality indexed to 100 (league average), 15 points per talent SD, independent of the stakes a catcher happened to face. VALUE/100 = leveraged runs added per 100 consequential decisions (skill x leverage x volume). They are nearly uncorrelated by design, and revealingly, the highest-VALUE catchers are NOT the highest-SKILL ones: raw value is mostly driven by leverage and volume, not per-decision judgment. Both shown only for QUALIFIED catchers (reliability >= 0.40); the wide Skill+ CIs (about +-20) mean most catchers are statistically indistinguishable in pure skill with half a season. Sort by Skill+ or Value/100 for the two leaderboards.",
  hitters:"DESCRIPTIVE ONLY. Half a season of hitter challenges shows no detectable talent spread (reliability ~0), so no hitter is a reliable talent estimate yet. These are records of what happened, ranked by NetVal, not a skill ranking. Expect this to firm up over 2-3 seasons.",
  teams:"Team totals across all deciders, including pitcher-initiated challenges. Ranked by NetVal (descriptive).",
  backtest:"Season replay: value captured by actual challenge usage vs the matrix policy executed with league-average perception (no hindsight). Wins = leveraged runs times the league run-to-win factor. Negative LeftOnTable means the team already beats the league-perceiver benchmark.",
@@ -140,16 +140,17 @@ const NOTES={
 const DEFSORT={catchers:"skill",hitters:"net",teams:"net",backtest:"gapW",film:"ev"};
 let cur={t:"catchers", sort:"skill", dir:-1, q:""};
 function fmt(v,k){
- if(v===null||v===undefined)return k==="skill"?"provisional":(k==="ci"?"":"");
- if(k==="skill"||k==="net"||k==="gapW")return (v>0?"":"")+v.toFixed(2);
- if(k==="ci")return "&plusmn;"+v.toFixed(2);
+ if(v===null||v===undefined)return k==="skill"?"provisional":"";
+ if(k==="skci"||k==="vci")return "&plusmn;"+v;
+ if(k==="value"||k==="net"||k==="gapW")return v.toFixed(2);
  if(typeof v==="number"&&!Number.isInteger(v))return v.toFixed(2);
  return v;
 }
 function cls(v,k){
- if(("net"===k||"skill"===k||"gapW"===k)&&typeof v==="number") return v>0.005?"pos":(v<-0.005?"neg":"");
+ if(("net"===k||"value"===k||"gapW"===k)&&typeof v==="number") return v>0.005?"pos":(v<-0.005?"neg":"");
+ if(k==="skill"&&typeof v==="number") return v>100.5?"pos":(v<99.5?"neg":"");
  if(k==="skill"&&(v===null||v===undefined))return "dim";
- return ["player","team"].includes(k)?"l":( ["ci","rel","cons","sig","succ","won","games","chal"].includes(k)?"dim":"");
+ return ["player","team"].includes(k)?"l":( ["skci","vci","cons","succ","chal"].includes(k)?"dim":"");
 }
 function render(){
  const cols=COLS[cur.t]||COLS.player;
