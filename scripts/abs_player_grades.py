@@ -56,7 +56,9 @@ DATASET = os.path.join(REPO_ROOT, "data", "abs_challenges_2026.json")
 TABLES = os.path.join(REPO_ROOT, "data", "abs_value_tables_2026.json")
 OPTION = os.path.join(REPO_ROOT, "data", "abs_option_model_2026.json")
 OUT_JSON = os.path.join(REPO_ROOT, "data", "abs_player_grades_2026.json")
+EVENTS_JSON = os.path.join(REPO_ROOT, "data", "abs_challenge_events_2026.json")
 DOWNLOADS = os.path.expanduser("~/Downloads")
+VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={pid}"
 
 
 def posterior_at(grid, x):
@@ -177,8 +179,10 @@ def main():
             owner_id, owner_name = r["batterId"], r["batter"]
         else:
             owner_id, owner_name = r["catcherId"], r["catcher"]
+        extra = (r["playId"], r["date"], r["balls"], r["strikes"],
+                 r["inning"], r["half"])
         parsed.append((side, m, wronged, rem, team_abbr, d_team, g, T, chal,
-                       owner_id, owner_name, reg, cls))
+                       owner_id, owner_name, reg, cls, extra))
         if rem > 0 and owner_id is not None:
             o = obs[side][owner_id]
             b = round(max(-6.0, min(6.0, m)) / OBS_BIN) * OBS_BIN
@@ -208,8 +212,10 @@ def main():
     sigmas = {}
 
     # ---- pass 2: grade
+    events = []   # every challenge + every counted miss, with Savant video ids
     for (side, m, wronged, rem, team_abbr, d_team, g, T, chal,
-         owner_id, owner_name, reg, cls) in parsed:
+         owner_id, owner_name, reg, cls, extra) in parsed:
+        play_id, ev_date, balls, strikes, inning, half = extra
         if side == "bat":
             book = hitters
         else:
@@ -252,6 +258,13 @@ def main():
             teams[team_abbr]["cva"] += value
             teams[team_abbr]["procVal"] += ev
             teams[team_abbr]["badChalN"] += ev < 0
+            events.append({"type": "challenge", "player": pname, "team": team_abbr,
+                           "date": ev_date, "role": chal["role"],
+                           "count": f"{balls}-{strikes}", "inning": inning,
+                           "half": half, "marginIn": round(m, 2),
+                           "gain": round(g, 3), "ev": round(ev, 3),
+                           "result": "won" if chal["overturned"] else "lost",
+                           "playId": play_id})
         elif chal is None and rem > 0 and g > 0:
             cost = cost_at(rem, T, d_team)
             p_conf = posterior_at(p_look_L[f"{side}|{reg}"],
@@ -263,6 +276,14 @@ def main():
                     led["missValue"] += ev
                 teams[team_abbr]["missN"] += 1
                 teams[team_abbr]["missValue"] += ev
+                events.append({"type": "miss", "player": owner_name,
+                               "team": team_abbr, "date": ev_date,
+                               "role": "fielder" if side == "fld" else "batter",
+                               "count": f"{balls}-{strikes}", "inning": inning,
+                               "half": half, "marginIn": round(m, 2),
+                               "gain": round(g, 3), "ev": round(ev, 3),
+                               "result": "would-win" if m > 0 else "would-lose",
+                               "playId": play_id})
 
     def rows(book, min_opp=0):
         out = []
@@ -299,6 +320,26 @@ def main():
     with open(OUT_JSON, "w") as f:
         json.dump(result, f, indent=1)
     print(f"wrote {OUT_JSON}")
+
+    events.sort(key=lambda e: (e["date"], e["team"], e["inning"]))
+    with open(EVENTS_JSON, "w") as f:
+        json.dump({"meta": result["meta"], "events": events}, f, separators=(",", ":"))
+    print(f"wrote {EVENTS_JSON} ({len(events)} events)")
+    for etype, fname in (("challenge", "abs_challenge_log_2026.csv"),
+                         ("miss", "abs_missed_opps_2026.csv")):
+        path = os.path.join(DOWNLOADS, fname)
+        with open(path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["Date", "Player", "Tm", "Role", "Inning", "Half", "Count",
+                        "MarginIn", "Gain", "DecisionEV", "Result", "VideoURL"])
+            for e in events:
+                if e["type"] != etype:
+                    continue
+                w.writerow([e["date"], e["player"], e["team"], e["role"],
+                            e["inning"], e["half"], e["count"], e["marginIn"],
+                            round(e["gain"], 2), round(e["ev"], 2), e["result"],
+                            VIDEO_URL.format(pid=e["playId"])])
+        print(f"wrote {path}")
 
     for key, fname in (("catchers", "abs_catcher_grades_2026.csv"),
                        ("hitters", "abs_hitter_grades_2026.csv"),
