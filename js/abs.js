@@ -25,7 +25,7 @@ window.ABS = (function () {
 #abs-page .abs-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 #abs-page input[type=search],#abs-page .abs-inp{border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-primary);font:14px 'IBM Plex Sans';padding:7px 11px}
 #abs-page .abs-count{color:var(--text-muted);font-size:12px;margin-left:auto}
-#abs-page .abs-tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--bg-card)}
+#abs-page .abs-tblwrap{overflow:auto;max-height:72vh;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);-webkit-overflow-scrolling:touch}
 #abs-page table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;min-width:760px}
 #abs-page th{position:sticky;top:0;background:var(--bg-th);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-th);text-align:right;padding:9px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap}
 #abs-page th.l{text-align:left}
