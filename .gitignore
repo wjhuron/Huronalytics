@@ -59,3 +59,4 @@ stuff_plus_v10/model_summary_v10.txt
 *.pkl.enc
 scripts/_feed_platexz_cache.pkl
 scripts/_feed_meta_cache.pkl
+artifacts/
