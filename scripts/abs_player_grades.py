@@ -45,7 +45,7 @@ from collections import defaultdict
 from datetime import date
 
 import abs_value_engine as ve
-from abs_option_model import look_grids, phi, posterior_grid
+from abs_option_model import count_class, edge_region, phi
 
 SHRINK_N0 = 40      # pseudo-challenges pulling a player's sigma to league
 SIGMA_GRID = [0.4 + 0.2 * i for i in range(24)]
@@ -90,14 +90,15 @@ def solve_xstar(bins, n_chal, sigma):
     return (lo + hi) / 2.0
 
 
-def fit_player_curves(obs_by_player, league, prior):
-    """Per-player perception sigma (probit MLE, shrunk toward league with
-    SHRINK_N0 pseudo-challenges) and the matching pLook/pSel curves.
+def fit_player_sigmas(obs_by_player, league_sigma):
+    """Per-player perception sigma: probit MLE on the player's own pooled
+    (margin, challenged) record, shrunk toward league with SHRINK_N0
+    pseudo-challenges.
 
-    This is what makes proximity matter in the grades: a decider whose
-    challenges track the zone tightly earns sharp confidence curves, so their
-    deep-in-zone challenges grade high and their way-off ones grade low; a
-    scattershot decider gets flat curves and little proximity credit.
+    This is what makes proximity matter in the grades: sharp-eyed deciders get
+    a skill scale > 1, which stretches their margins when evaluated on the
+    league confidence curves - deep-in-zone challenges grade higher, way-off
+    ones grade lower. Scattershot deciders compress toward flat.
     """
     out = {}
     for pid, ob in obs_by_player.items():
@@ -114,12 +115,8 @@ def fit_player_curves(obs_by_player, league, prior):
                     best = (ll, sigma)
             sig_hat = best[1]
         else:
-            sig_hat = league["sigma"]
-        sigma_p = (n_chal * sig_hat + SHRINK_N0 * league["sigma"]) / (n_chal + SHRINK_N0)
-        xs_p = solve_xstar(bins, n_chal, sigma_p) if (n_chal >= 1 and bins) else league["xStar"]
-        post_p = posterior_grid(prior, sigma_p)
-        p_look, p_sel = look_grids(post_p, sigma_p, xs_p)
-        out[pid] = {"sigma": sigma_p, "pLook": p_look, "pSel": p_sel}
+            sig_hat = league_sigma
+        out[pid] = (n_chal * sig_hat + SHRINK_N0 * league_sigma) / (n_chal + SHRINK_N0)
     return out
 
 
@@ -140,12 +137,9 @@ def main():
     for key, v in opt["Cgrid"].items():
         k, T, d = key.split("|")
         Cg[(int(k), int(T), int(d))] = v
-    league = {s: {"sigma": opt["perception"][s]["sigma"],
-                  "xStar": opt["perception"][s]["xStar"],
-                  "pLook": opt["pLook"][s], "pSel": opt["pSel"][s]}
-              for s in ("bat", "fld")}
-    priors = {s: {float(b): w for b, w in opt["marginPrior"][s].items()}
-              for s in ("bat", "fld")}
+    pooled_sigma = {s: opt["perceptionPooled"][s]["sigma"] for s in ("bat", "fld")}
+    p_look_L = {k: v for k, v in opt["pLook"].items()}      # "side|reg"
+    p_sel_L = {k: v for k, v in opt["pSel"].items()}        # "side|reg|cls"
     game_teams = {g["gamePk"]: (g["away"], g["home"]) for g in data["games"]}
 
     def cost_at(k, T, d):
@@ -176,12 +170,15 @@ def main():
         g = v["leveragedRuns"]
         T = half_innings_left(r["inning"], r["half"])
         chal = r["challenge"]
+        reg = (edge_region(r["pXmid"], r["pZmid"], r["szTop"], r["szBot"])
+               if r.get("pXmid") is not None else "side")
+        cls = count_class(r["balls"], r["strikes"])
         if side == "bat":
             owner_id, owner_name = r["batterId"], r["batter"]
         else:
             owner_id, owner_name = r["catcherId"], r["catcher"]
         parsed.append((side, m, wronged, rem, team_abbr, d_team, g, T, chal,
-                       owner_id, owner_name))
+                       owner_id, owner_name, reg, cls))
         if rem > 0 and owner_id is not None:
             o = obs[side][owner_id]
             b = round(max(-6.0, min(6.0, m)) / OBS_BIN) * OBS_BIN
@@ -193,13 +190,15 @@ def main():
                 o["bins"][b][0] += 1
                 o["nChal"] += 1
 
-    curves = {s: fit_player_curves(obs[s], league[s], priors[s]) for s in ("bat", "fld")}
-    n_fit = sum(1 for s in curves for p in curves[s].values())
-    print(f"fit perception curves for {n_fit} deciders "
-          f"(shrunk toward league sigma with n0={SHRINK_N0})")
+    psig = {s: fit_player_sigmas(obs[s], pooled_sigma[s]) for s in ("bat", "fld")}
+    n_fit = sum(len(psig[s]) for s in psig)
+    print(f"fit perception sigma for {n_fit} deciders "
+          f"(shrunk toward league with n0={SHRINK_N0})")
 
-    def curve_for(side_key, pid):
-        return curves[side_key].get(pid, league[side_key])
+    def skill_scale(side_key, pid):
+        """>1 = sharper than league; margins stretch by this on league curves."""
+        sp = psig[side_key].get(pid)
+        return pooled_sigma[side_key] / sp if sp else 1.0
 
     catchers = defaultdict(new_ledger)   # id -> ledger (fielding side)
     hitters = defaultdict(new_ledger)    # id -> ledger (batting side)
@@ -210,7 +209,7 @@ def main():
 
     # ---- pass 2: grade
     for (side, m, wronged, rem, team_abbr, d_team, g, T, chal,
-         owner_id, owner_name) in parsed:
+         owner_id, owner_name, reg, cls) in parsed:
         if side == "bat":
             book = hitters
         else:
@@ -220,9 +219,9 @@ def main():
             names[owner_id] = owner_name
             led["teams"][team_abbr] += 1
             led["oppN"] += 1
-            cv = curve_for(side, owner_id)
-            if "sigma" in cv:
-                sigmas[owner_id] = cv["sigma"]
+            sp = psig[side].get(owner_id)
+            if sp is not None:
+                sigmas[owner_id] = sp
 
         if chal is not None and chal.get("side") == wronged:
             k = chal.get("remainingBefore") or rem or 1
@@ -231,12 +230,13 @@ def main():
             pid = chal.get("playerId")
             pname = chal.get("playerName")
             if chal["role"] == "batter":
-                led_c, chal_curve = hitters[pid], curve_for("bat", pid)
+                led_c, c_side = hitters[pid], "bat"
             elif chal["role"] == "pitcher":
-                led_c, chal_curve = pitchers[pid], league["fld"]
+                led_c, c_side = pitchers[pid], "fld"
             else:
-                led_c, chal_curve = catchers[pid], curve_for("fld", pid)
-            p_conf = posterior_at(chal_curve["pSel"], m)
+                led_c, c_side = catchers[pid], "fld"
+            scale = 1.0 if chal["role"] == "pitcher" else skill_scale(c_side, pid)
+            p_conf = posterior_at(p_sel_L[f"{c_side}|{reg}|{cls}"], m * scale)
             ev = p_conf * g - (1.0 - p_conf) * cost          # decision grade
             if pid is not None:
                 names[pid] = pname
@@ -254,7 +254,8 @@ def main():
             teams[team_abbr]["badChalN"] += ev < 0
         elif chal is None and rem > 0 and g > 0:
             cost = cost_at(rem, T, d_team)
-            p_conf = posterior_at(curve_for(side, owner_id)["pLook"], m)
+            p_conf = posterior_at(p_look_L[f"{side}|{reg}"],
+                                  m * skill_scale(side, owner_id))
             ev = p_conf * g - (1.0 - p_conf) * cost
             if ev > 0:                                       # matrix-approved gamble declined
                 if owner_id is not None:

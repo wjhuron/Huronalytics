@@ -96,9 +96,12 @@ def load_opportunities(dataset_path, tables):
                              tables)
         inning = min(r["inning"], 9)
         T = 2 * (9 - inning) + (2 if r["half"] == "top" else 1)
+        reg = (edge_region(r["pXmid"], r["pZmid"], r["szTop"], r["szBot"])
+               if r.get("pXmid") is not None else "side")
         opps.append({"side": side, "m": m, "g": v["leveragedRuns"], "dre": v["dRE"],
                      "challenged": challenged, "hadChallenge": rem > 0,
-                     "T": T, "playId": r["playId"]})
+                     "T": T, "playId": r["playId"],
+                     "reg": reg, "cls": count_class(r["balls"], r["strikes"])})
     if side_mismatch:
         print(f"note: {side_mismatch} challenges by non-wronged side ignored in fit")
     return opps, data["meta"]["games"]
@@ -111,6 +114,75 @@ def count_half_innings(games):
 
 
 # ---------------------------------------------------------- perception model
+
+REGIONS = ("side", "top", "bottom")
+CLASSES = ("full", "b3", "s2", "other")
+
+
+def count_class(balls, strikes):
+    """Stakes class of the count: full, 3-ball, 2-strike, other. Challenge
+    thresholds differ sharply by class (terminal calls get challenged far more
+    readily), so pooling them biases the perception fit."""
+    if balls == 3 and strikes == 2:
+        return "full"
+    if balls == 3:
+        return "b3"
+    if strikes == 2:
+        return "s2"
+    return "other"
+
+
+def edge_region(px_mid, pz_mid, sz_top, sz_bot):
+    """Which zone edge governs this pitch: side, top, or bottom. The binding
+    edge is the one with the smallest clearance (works inside and outside).
+    Low pitches are the hardest to judge; side pitches the easiest."""
+    x = abs(px_mid) * 12.0
+    z = pz_mid * 12.0
+    dx = 8.5 - x
+    dt = sz_top * 12.0 - z
+    db = z - sz_bot * 12.0
+    m = min(dx, dt, db)
+    if m == dx:
+        return "side"
+    return "top" if m == dt else "bottom"
+
+
+def fit_probit_rc(opps, side):
+    """Per zone region: shared sigma, challenge threshold x* per count class.
+
+    P(challenge | m, region, class) = Phi((m - x*[region,class]) / sigma[region])
+    Classes partition the data within a region, so each x* maximizes
+    independently given sigma.
+    """
+    out = {}
+    for reg in REGIONS:
+        hist = {c: defaultdict(lambda: [0, 0]) for c in CLASSES}
+        for o in opps:
+            if o["side"] != side or not o["hadChallenge"] or o["reg"] != reg:
+                continue
+            b = round(max(-M_RANGE, min(M_RANGE, o["m"])) / 0.05) * 0.05
+            h = hist[o["cls"]][b]
+            h[1] += 1
+            h[0] += o["challenged"]
+        best = None
+        for sigma in [0.2 + 0.1 * i for i in range(49)]:
+            ll_tot, xs = 0.0, {}
+            for c in CLASSES:
+                best_c = None
+                for x_star in [0.0 + 0.1 * j for j in range(80)]:
+                    ll = 0.0
+                    for m, (ch, n) in hist[c].items():
+                        p = min(max(phi((m - x_star) / sigma), 1e-9), 1 - 1e-9)
+                        ll += ch * math.log(p) + (n - ch) * math.log(1.0 - p)
+                    if best_c is None or ll > best_c[0]:
+                        best_c = (ll, x_star)
+                ll_tot += best_c[0]
+                xs[c] = best_c[1]
+            if best is None or ll_tot > best[0]:
+                best = (ll_tot, sigma, xs)
+        out[reg] = {"sigma": best[1], "xStar": best[2]}
+    return out
+
 
 def fit_probit(opps, side):
     """MLE grid fit of P(challenge | m) = Phi((m - x*) / sigma) for one side.
@@ -136,12 +208,13 @@ def fit_probit(opps, side):
     return {"sigma": best[1], "xStar": best[2], "logLik": best[0]}
 
 
-def margin_prior(opps, side):
-    """Empirical density of true margins for one side (0.1in bins)."""
+def margin_prior(opps, side, reg=None):
+    """Empirical density of true margins for one side (0.1in bins), optionally
+    restricted to one zone region."""
     hist = defaultdict(int)
     n = 0
     for o in opps:
-        if o["side"] != side:
+        if o["side"] != side or (reg is not None and o["reg"] != reg):
             continue
         b = round(max(-M_RANGE, min(M_RANGE, o["m"])) / M_BIN) * M_BIN
         hist[b] += 1
@@ -259,14 +332,15 @@ def stream_curves(opps, halves_total, perception, posts):
     gain), failP(u), attempts(u). The DP then re-leverages: A = L x gainTilde.
     """
     us = [10.0 ** (-4.0 + 6.0 * i / 79.0) for i in range(80)]
-    # cache x_threshold per side on a log-q grid (q = u / dre)
+    # cache x_threshold per (side, region) on a log-q grid (q = u / dre)
     qs = [10.0 ** (-5.0 + 9.0 * i / 199.0) for i in range(200)]
-    xc_cache = {side: [x_threshold(posts[side], q) for q in qs] for side in posts}
+    xc_cache = {(side, reg): [x_threshold(posts[side][reg], q) for q in qs]
+                for side in posts for reg in posts[side]}
 
-    def xc_for(side, q):
+    def xc_for(side, reg, q):
         import math as _m
         idx = int(round((_m.log10(max(q, 1e-5)) + 5.0) / 9.0 * 199.0))
-        return xc_cache[side][max(0, min(199, idx))]
+        return xc_cache[(side, reg)][max(0, min(199, idx))]
 
     per_half = 1.0 / (2.0 * halves_total)
     gain = [0.0] * 80
@@ -276,11 +350,11 @@ def stream_curves(opps, halves_total, perception, posts):
         dre = o["dre"]
         if dre <= 1e-6:
             continue
-        sig = perception[o["side"]]["sigma"]
+        sig = perception[o["side"]][o["reg"]]["sigma"]
         m = o["m"]
         win = m > 0
         for j, u in enumerate(us):
-            xc = xc_for(o["side"], u / dre)
+            xc = xc_for(o["side"], o["reg"], u / dre)
             if xc is None:
                 continue
             r = phi((m - xc) / sig)
@@ -391,19 +465,26 @@ def main():
     print(f"{len(opps)} opportunities from {n_games} games")
 
     perception, posts, priors = {}, {}, {}
-    for side in ("fld", "bat"):
-        perception[side] = fit_probit(opps, side)
-        priors[side] = margin_prior(opps, side)
-        posts[side] = posterior_grid(priors[side], perception[side]["sigma"])
-        p = perception[side]
-        print(f"perception[{side}]: sigma={p['sigma']:.2f}in threshold x*={p['xStar']:.2f}in")
-
+    pooled = {}
     looks, sels = {}, {}
     for side in ("fld", "bat"):
-        looks[side], sels[side] = look_grids(posts[side], perception[side]["sigma"],
-                                             perception[side]["xStar"])
+        pooled[side] = fit_probit(opps, side)
+        perception[side] = fit_probit_rc(opps, side)
+        priors[side], posts[side], looks[side], sels[side] = {}, {}, {}, {}
+        for reg in REGIONS:
+            pr = perception[side][reg]
+            priors[side][reg] = margin_prior(opps, side, reg)
+            posts[side][reg] = posterior_grid(priors[side][reg], pr["sigma"])
+            sels[side][reg] = {}
+            for cls in CLASSES:
+                lk, sl = look_grids(posts[side][reg], pr["sigma"], pr["xStar"][cls])
+                sels[side][reg][cls] = sl
+                if cls == "other":
+                    looks[side][reg] = lk
+            print(f"perception[{side}|{reg}]: sigma={pr['sigma']:.2f}in x* "
+                  + " ".join(f"{c}={pr['xStar'][c]:.1f}" for c in CLASSES))
         chal = [o for o in opps if o["side"] == side and o["challenged"]]
-        pred = sum(interp_grid(sels[side], o["m"]) for o in chal) / len(chal)
+        pred = sum(interp_grid(sels[side][o["reg"]][o["cls"]], o["m"]) for o in chal) / len(chal)
         actual = sum(1 for o in chal if o["m"] > 0) / len(chal)
         print(f"self-check [{side}]: mean selection-conditioned confidence on "
               f"actual challenges {pred:.3f} vs observed success {actual:.3f}")
@@ -417,11 +498,16 @@ def main():
                  "opportunities": len(opps), "rulingThrIn": RULING_THR_IN,
                  "regHalves": REG_HALVES},
         "perception": perception,
-        "marginPrior": {s: {f"{b:.1f}": round(w, 6) for b, w in sorted(priors[s].items())}
-                        for s in priors},
-        "posterior": {s: [[x, round(p, 5)] for x, p in posts[s]] for s in posts},
-        "pLook": {s: [[m, round(p, 5)] for m, p in looks[s]] for s in looks},
-        "pSel": {s: [[m, round(p, 5)] for m, p in sels[s]] for s in sels},
+        "perceptionPooled": pooled,
+        "marginPrior": {f"{s}|{r}": {f"{b:.1f}": round(w, 6)
+                                     for b, w in sorted(priors[s][r].items())}
+                        for s in priors for r in priors[s]},
+        "posterior": {f"{s}|{r}": [[x, round(p, 5)] for x, p in posts[s][r]]
+                      for s in posts for r in posts[s]},
+        "pLook": {f"{s}|{r}": [[m, round(p, 5)] for m, p in looks[s][r]]
+                  for s in looks for r in looks[s]},
+        "pSel": {f"{s}|{r}|{c}": [[m, round(p, 5)] for m, p in sels[s][r][c]]
+                 for s in sels for r in sels[s] for c in sels[s][r]},
         "C": {str(k): [round(c, 5) for c in C[k]] for k in C},
         "Cgrid": {f"{k}|{T}|{d}": round(Cg[k][T][d], 5)
                   for k in (1, 2) for T in range(REG_HALVES + 1)
