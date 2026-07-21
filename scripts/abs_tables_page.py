@@ -28,15 +28,20 @@ def font_b64(name):
 def slim(rows):
     out = []
     for r in rows:
+        # qualified players show the shrunk skill estimate; everyone else shows
+        # the raw descriptive rate so the leaderboard never fakes precision
+        q = r.get("qualified")
         out.append({
-            "player": r["player"], "team": r["team"], "chal": r["challenges"],
+            "player": r["player"], "team": r["team"],
+            "skill": None if (r.get("skillPer100") is None or not q) else round(r["skillPer100"], 2),
+            "ci": None if (r.get("ci95Per100") is None or not q) else round(r["ci95Per100"], 2),
+            "rel": None if r.get("reliability") is None else round(r["reliability"], 2),
+            "cons": r.get("consN", 0),
+            "qual": "yes" if q else "no",
+            "chal": r["challenges"],
             "won": r["won"], "succ": None if r["successPct"] is None else round(r["successPct"]),
-            "dv": round(r["procVal"], 2), "bad": r["badChal"],
-            "real": round(r["cvaRealized"], 2),
             "sig": None if r.get("readSigma") is None else round(r["readSigma"], 2),
-            "opp": r["oppN"], "miss": r["missN"], "missEV": round(r["missValue"], 2),
-            "net": round(r["netValue"], 2),
-            "rate": None if r.get("netRate") is None else round(r["netRate"], 2),
+            "miss": r["missN"], "net": round(r["netValue"], 2),
         })
     return out
 
@@ -120,29 +125,31 @@ charged at its expected value. <b>Net = DecisionValue &minus; MissedEV.</b> Clic
 <script>
 const D=__DATA__;
 const COLS={
- player:[["player","Player","l"],["team","Tm","l"],["chal","Chal"],["won","Won"],["succ","Succ%"],
-  ["dv","DecisionVal"],["bad","Bad"],["real","Realized"],["sig","ReadSig"],["opp","Opp"],
-  ["miss","Miss"],["missEV","MissEV"],["net","Net"],["rate","Net/100"]],
+ player:[["player","Player","l"],["team","Tm","l"],["skill","Skill/100"],["ci","95% CI"],
+  ["rel","Rel"],["cons","Dec"],["chal","Chal"],["succ","Succ%"],["sig","ReadSig"],["net","NetVal"]],
  backtest:[["team","Team","l"],["games","G"],["actW","ActualWins"],["optW","OptimalWins"],["gapW","LeftOnTable"]],
  film:[["date","Date","l"],["player","Player","l"],["team","Tm","l"],["type","Type","l"],["result","Result","l"],
   ["count","Cnt"],["inning","Inn"],["half","Half","l"],["marginIn","Margin"],["ev","EV"],["playId","Video","l"]]
 };
 const NOTES={
- catchers:"Catchers are graded on fielding-side decisions: challenges they made plus catchable wrong ball calls left unchallenged while they were behind the plate. ReadSig = fitted zone-perception noise in inches (lower = sharper).",
- hitters:"Hitters are graded on their own plate appearances: challenges of called strikes plus catchable wrong strike calls they let stand.",
- teams:"Team totals across all deciders, including pitcher-initiated challenges.",
+ catchers:"Skill/100 = empirical-Bayes shrunk leveraged runs added per 100 consequential decisions, the talent estimate, shown only for QUALIFIED catchers (reliability >= 0.40, ~7 clear the bar). Its 95% CI is real: rows whose CI crosses 0 are not distinguishable from average. Unqualified catchers show NetVal (descriptive: what happened) and are ranked below. ReadSig = fitted zone-perception noise in inches (lower = sharper).",
+ hitters:"DESCRIPTIVE ONLY. Half a season of hitter challenges shows no detectable talent spread (reliability ~0), so no hitter is a reliable talent estimate yet. These are records of what happened, ranked by NetVal, not a skill ranking. Expect this to firm up over 2-3 seasons.",
+ teams:"Team totals across all deciders, including pitcher-initiated challenges. Ranked by NetVal (descriptive).",
  backtest:"Season replay: value captured by actual challenge usage vs the matrix policy executed with league-average perception (no hindsight). Wins = leveraged runs times the league run-to-win factor. Negative LeftOnTable means the team already beats the league-perceiver benchmark.",
  film:"Every challenge and every counted miss, with the Savant clip. Margin = inches in the challenger's favor (negative = the call was right). Sorted by decision EV by default; search a player to pull their reel. Showing at most 500 rows - refine the search to narrow."};
-let cur={t:"catchers", sort:"net", dir:-1, q:""};
+const DEFSORT={catchers:"skill",hitters:"net",teams:"net",backtest:"gapW",film:"ev"};
+let cur={t:"catchers", sort:"skill", dir:-1, q:""};
 function fmt(v,k){
- if(v===null||v===undefined)return "";
- if(k==="net"||k==="dv"||k==="gapW")return v.toFixed(2);
+ if(v===null||v===undefined)return k==="skill"?"provisional":(k==="ci"?"":"");
+ if(k==="skill"||k==="net"||k==="gapW")return (v>0?"":"")+v.toFixed(2);
+ if(k==="ci")return "&plusmn;"+v.toFixed(2);
  if(typeof v==="number"&&!Number.isInteger(v))return v.toFixed(2);
  return v;
 }
 function cls(v,k){
- if(("net"===k||"dv"===k||"gapW"===k)&&typeof v==="number") return v>0.005?"pos":(v<-0.005?"neg":"");
- return ["player","team"].includes(k)?"l":( ["real","sig","opp","won","games"].includes(k)?"dim":"");
+ if(("net"===k||"skill"===k||"gapW"===k)&&typeof v==="number") return v>0.005?"pos":(v<-0.005?"neg":"");
+ if(k==="skill"&&(v===null||v===undefined))return "dim";
+ return ["player","team"].includes(k)?"l":( ["ci","rel","cons","sig","succ","won","games","chal"].includes(k)?"dim":"");
 }
 function render(){
  const cols=COLS[cur.t]||COLS.player;
@@ -175,7 +182,7 @@ function render(){
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{
  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-pressed","false"));
  b.setAttribute("aria-pressed","true");
- cur.t=b.dataset.t; cur.sort=cur.t==="backtest"?"gapW":(cur.t==="film"?"ev":"net"); cur.dir=-1;
+ cur.t=b.dataset.t; cur.sort=DEFSORT[cur.t]; cur.dir=-1;
  render();
 }));
 document.getElementById("q").addEventListener("input",e=>{cur.q=e.target.value;render();});

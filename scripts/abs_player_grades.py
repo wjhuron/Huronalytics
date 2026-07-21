@@ -50,6 +50,9 @@ from abs_option_model import count_class, edge_region, phi
 SHRINK_N0 = 40      # pseudo-challenges pulling a player's sigma to league
 SIGMA_GRID = [0.4 + 0.2 * i for i in range(24)]
 OBS_BIN = 0.25      # inches, per-player observation binning
+CONS_G_MIN = 0.05   # leveraged runs: below this a pitch isn't a real decision
+CONS_M_MAX = 2.5    # inches: beyond this the call isn't plausibly challengeable
+QUAL_REL = 0.40     # reliability floor to rank a player as a talent estimate
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET = os.path.join(REPO_ROOT, "data", "abs_challenges_2026.json")
@@ -125,7 +128,42 @@ def fit_player_sigmas(obs_by_player, league_sigma):
 def new_ledger():
     return {"chalN": 0, "chalWon": 0, "cva": 0.0, "procVal": 0.0, "badChalN": 0,
             "chalMarginSum": 0.0, "missN": 0, "missValue": 0.0, "oppN": 0,
-            "teams": defaultdict(int)}
+            "consN": 0, "consSum": 0.0, "consSq": 0.0, "teams": defaultdict(int)}
+
+
+def shrinkage(ledgers):
+    """Empirical-Bayes shrinkage of value-per-consequential-decision.
+
+    A one-way random-effects (ANOVA) variance decomposition: pooled
+    within-player variance (MSW) is binomial-style noise, between-player
+    variance is talent. Their ratio gives the stabilization point n0 (decisions
+    for 0.5 reliability). Each player's rate is shrunk toward the league mean by
+    its reliability, and gets a 95% CI from the normal-normal posterior
+    variance MSW / (n + n0). Returns ({pid: {...}}, population summary).
+    """
+    pts = [(pid, l["consN"], l["consSum"], l["consSq"])
+           for pid, l in ledgers.items() if l["consN"] >= 1]
+    N = sum(n for _, n, _, _ in pts)
+    k = len(pts)
+    if N == 0 or k < 2:
+        return {}, {"grand": 0.0, "n0": float("inf"), "sigmaW2": 0.0, "players": k}
+    grand = sum(s for _, _, s, _ in pts) / N
+    wss = sum(sq - s * s / n for _, n, s, sq in pts if n >= 2)
+    dfw = sum(n - 1 for _, n, _, _ in pts if n >= 2)
+    msw = wss / dfw if dfw > 0 else 0.0
+    msb = sum(n * (s / n - grand) ** 2 for _, n, s, _ in pts) / (k - 1)
+    n0bar = (N - sum(n * n for _, n, _, _ in pts) / N) / (k - 1)
+    sigb2 = max((msb - msw) / n0bar, 1e-12) if n0bar > 0 else 1e-12
+    n0 = msw / sigb2 if sigb2 > 0 else float("inf")
+    out = {}
+    for pid, n, s, sq in pts:
+        xbar = s / n
+        rel = n / (n + n0) if n0 != float("inf") else 0.0
+        shrunk = grand + (xbar - grand) * rel
+        postvar = msw / (n + n0) if n0 != float("inf") else msw / n
+        out[pid] = {"consN": n, "rawRate": xbar, "shrunkRate": shrunk,
+                    "reliability": rel, "ci95": 1.96 * postvar ** 0.5}
+    return out, {"grand": grand, "n0": n0, "sigmaW2": msw, "players": k}
 
 
 def main():
@@ -228,6 +266,23 @@ def main():
             sp = psig[side].get(owner_id)
             if sp is not None:
                 sigmas[owner_id] = sp
+            # consequential-decision talent metric: LEAGUE curves (no player
+            # skill scale), so this is a clean input for shrinkage/reliability
+            if rem > 0 and g >= CONS_G_MIN and abs(m) <= CONS_M_MAX:
+                oc = (chal is not None and chal.get("side") == wronged
+                      and ((side == "bat" and chal["role"] == "batter")
+                           or (side == "fld" and chal["role"] == "fielder")))
+                cc = cost_at(rem, T, d_team)
+                if oc:
+                    pc = posterior_at(p_sel_L[f"{side}|{reg}|{cls}"], m)
+                    contrib = pc * g - (1.0 - pc) * cc
+                else:
+                    pc = posterior_at(p_look_L[f"{side}|{reg}"], m)
+                    evl = pc * g - (1.0 - pc) * cc
+                    contrib = -evl if evl > 0 else 0.0
+                led["consN"] += 1
+                led["consSum"] += contrib
+                led["consSq"] += contrib * contrib
 
         if chal is not None and chal.get("side") == wronged:
             k = chal.get("remainingBefore") or rem or 1
@@ -285,7 +340,14 @@ def main():
                                "result": "would-win" if m > 0 else "would-lose",
                                "playId": play_id})
 
-    def rows(book, min_opp=0):
+    cat_shr, cat_pop = shrinkage(catchers)
+    hit_shr, hit_pop = shrinkage(hitters)
+    def n0str(p):
+        return "inf (no detectable talent spread)" if p["n0"] > 1e5 else f"{p['n0']:.0f} decisions"
+    print(f"catcher skill metric: n0={n0str(cat_pop)}, league "
+          f"{100*cat_pop['grand']:.3f} lev.runs/100; hitter n0={n0str(hit_pop)}")
+
+    def rows(book, shr, min_opp=0):
         out = []
         for pid, led in book.items():
             if led["chalN"] == 0 and led["missN"] == 0:
@@ -293,6 +355,8 @@ def main():
             if led["oppN"] < min_opp and led["chalN"] == 0:
                 continue
             team = max(led["teams"], key=led["teams"].get) if led["teams"] else ""
+            sh = shr.get(pid)
+            rel = sh["reliability"] if sh else None
             out.append({
                 "playerId": pid, "player": names.get(pid, str(pid)), "team": team,
                 "challenges": led["chalN"], "won": led["chalWon"],
@@ -305,17 +369,31 @@ def main():
                 "netRate": (100.0 * (led["procVal"] - led["missValue"]) / led["oppN"])
                            if led["oppN"] else None,
                 "readSigma": sigmas.get(pid),
+                # shrunk talent metric: leveraged runs added per 100 real decisions
+                "consN": sh["consN"] if sh else 0,
+                "skillPer100": (100.0 * sh["shrunkRate"]) if sh else None,
+                "rawPer100": (100.0 * sh["rawRate"]) if sh else None,
+                "ci95Per100": (100.0 * sh["ci95"]) if sh else None,
+                "reliability": rel,
+                "qualified": bool(rel is not None and rel >= QUAL_REL),
             })
-        out.sort(key=lambda r: r["netValue"], reverse=True)
+        # rank qualified players by shrunk talent, everyone else by net value
+        out.sort(key=lambda r: (r["qualified"],
+                                r["skillPer100"] if r["qualified"] else r["netValue"]),
+                 reverse=True)
         return out
 
     result = {
         "meta": {"generated": date.today().isoformat(),
                  "games": data["meta"]["games"], "rulingThrIn": thr,
-                 "note": "values in leveraged runs; miss = policy-approved wrong "
-                         "call left unchallenged with a challenge in hand"},
-        "catchers": rows(catchers), "hitters": rows(hitters),
-        "pitchers": rows(pitchers), "teams": rows(teams),
+                 "catcherN0": round(cat_pop["n0"], 1), "hitterN0": round(hit_pop["n0"], 1),
+                 "qualRel": QUAL_REL,
+                 "note": "skillPer100 = empirical-Bayes shrunk leveraged runs added "
+                         "per 100 consequential decisions, with 95% CI (ci95Per100); "
+                         "qualified=reliability>=0.40. netValue/successPct are "
+                         "descriptive (what happened), not talent estimates."},
+        "catchers": rows(catchers, cat_shr), "hitters": rows(hitters, hit_shr),
+        "pitchers": rows(pitchers, {}), "teams": rows(teams, {}),
     }
     with open(OUT_JSON, "w") as f:
         json.dump(result, f, indent=1)
@@ -347,37 +425,40 @@ def main():
         path = os.path.join(DOWNLOADS, fname)
         with open(path, "w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["Player" if key != "teams" else "Team", "Tm", "Challenges",
-                        "Won", "Success%", "DecisionValue", "BadChallenges",
-                        "RealizedCVA", "AvgChalMargin", "ReadSigma", "Opportunities",
-                        "Missed", "MissedEV", "NetValue", "NetPer100Opp"])
+            w.writerow(["Player" if key != "teams" else "Team", "Tm",
+                        "SkillPer100", "CI95", "Reliability", "Qualified",
+                        "ConsDecisions", "Challenges", "Won", "Success%",
+                        "AvgChalMargin", "ReadSigma", "NetValue"])
             for r in result[key]:
                 w.writerow([
                     r["player"] if key != "teams" else r["team"], r["team"],
-                    r["challenges"], r["won"],
+                    "" if r["skillPer100"] is None else round(r["skillPer100"], 2),
+                    "" if r["ci95Per100"] is None else round(r["ci95Per100"], 2),
+                    "" if r["reliability"] is None else round(r["reliability"], 2),
+                    "Y" if r["qualified"] else "",
+                    r["consN"], r["challenges"], r["won"],
                     "" if r["successPct"] is None else round(r["successPct"]),
-                    round(r["procVal"], 2), r["badChal"],
-                    round(r["cvaRealized"], 2),
                     "" if r["avgChalMargin"] is None else round(r["avgChalMargin"], 2),
                     "" if r.get("readSigma") is None else round(r["readSigma"], 2),
-                    r["oppN"], r["missN"], round(r["missValue"], 2),
-                    round(r["netValue"], 2),
-                    "" if r.get("netRate") is None else round(r["netRate"], 2)])
+                    round(r["netValue"], 2)])
         print(f"wrote {path}")
 
     def show(title, rs, n=8):
         print(f"\n{title}")
         for r in rs[:n]:
-            sp = "" if r["successPct"] is None else f"{r['successPct']:.0f}%"
-            sg = "" if r.get("readSigma") is None else f"{r['readSigma']:.1f}"
-            print(f"  {r['player']:<24} {r['team']:<4} chal {r['challenges']:>2} "
-                  f"({sp:>4}) sig {sg:>3} DV {r['procVal']:6.2f} bad {r['badChal']:>2} | "
-                  f"miss {r['missN']:>3} ({r['missValue']:5.2f}) | net {r['netValue']:6.2f}")
+            sk = "  n/a" if r["skillPer100"] is None else f"{r['skillPer100']:+5.2f}"
+            ci = "" if r["ci95Per100"] is None else f"+-{r['ci95Per100']:.2f}"
+            rl = "" if r["reliability"] is None else f"r{r['reliability']:.2f}"
+            q = "Q" if r["qualified"] else " "
+            print(f"  {q} {r['player']:<22} {r['team']:<4} skill/100 {sk} {ci:>7} "
+                  f"{rl:>6} | cons {r['consN']:>3} chal {r['challenges']:>3} | "
+                  f"net {r['netValue']:6.2f}")
 
-    show("TOP CATCHERS (net leveraged runs):", result["catchers"])
-    show("BOTTOM CATCHERS:", sorted(result["catchers"], key=lambda r: r["netValue"])[:8])
-    show("TOP HITTERS:", result["hitters"])
-    show("BOTTOM HITTERS:", sorted(result["hitters"], key=lambda r: r["netValue"])[:8])
+    qual_cat = [r for r in result["catchers"] if r["qualified"]]
+    print(f"\nqualified catchers (reliability>={QUAL_REL}): {len(qual_cat)} of {len(result['catchers'])}")
+    show("TOP QUALIFIED CATCHERS (shrunk skill/100 decisions):", qual_cat)
+    show("BOTTOM QUALIFIED CATCHERS:", sorted(qual_cat, key=lambda r: r["skillPer100"])[:6])
+    show("TOP HITTERS (DESCRIPTIVE ONLY — none reliable):", result["hitters"], 6)
     n_miss = sum(r["missN"] for r in result["teams"])
     v_miss = sum(r["missValue"] for r in result["teams"])
     print(f"\nleague missed opportunities: {n_miss} worth {v_miss:.1f} leveraged runs of decision EV")
