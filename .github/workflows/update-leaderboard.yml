@@ -209,7 +209,10 @@ jobs:
                 break
               fi
               echo "Push attempt $attempt rejected, rebasing on origin/main and retrying..."
-              git pull --rebase origin main
+              # --autostash: the pipeline leaves unstaged changes in tracked
+              # files outside the committed set; without it the rebase refuses
+              # to run ("You have unstaged changes") and the retry dies
+              git pull --rebase --autostash origin main
               if [ $attempt -eq 5 ]; then
                 echo "Push still failing after 5 attempts."
                 exit 1
