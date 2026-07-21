@@ -156,7 +156,10 @@ window.ABS = (function () {
        <div class="abs-tblwrap"><table id="abs-tbl"></table></div>`;
     bindViewTabs();
     p.querySelectorAll('#abs-ltabs button').forEach(b => b.addEventListener('click', () => {
-      state.tab = b.dataset.ltab; state.sort = DEFSORT[state.tab]; state.dir = -1; drawTable();
+      state.tab = b.dataset.ltab; state.sort = DEFSORT[state.tab]; state.dir = -1;
+      p.querySelectorAll('#abs-ltabs button').forEach(x =>
+        x.setAttribute('aria-pressed', String(x.dataset.ltab === state.tab)));
+      drawTable();
     }));
     p.querySelector('#abs-q').addEventListener('input', e => { state.q = e.target.value; drawTable(); });
     if (!COLS[state.tab] && state.tab !== 'backtest') state.tab = 'catchers';
