@@ -360,11 +360,22 @@ window.ABS = (function () {
       const ball = p.querySelector('#zBall'); ball.setAttribute('cx', 112 + state.px * PXIN); ball.setAttribute('cy', 288 - (state.pz - PLOT_Z0) * PXIN); ball.setAttribute('r', THR * PXIN);
       const need = neededInches(state.side + '|' + reg, pstar), roleName = state.side === 'fld' ? 'catcher' : 'hitter';
       const needTxt = need == null ? null : (need < 0.05 ? (state.side === 'fld' ? 'that grazes the zone' : 'that slips off the edge') : (state.side === 'fld' ? `${need.toFixed(1)} in or more into the zone` : `${need.toFixed(1)} in or more off the zone`));
+      const cp = Math.round(conf * 100), pp = Math.round(pstar * 100);
       const truth = wouldWin ? `ABS would overturn this (true ${ruling})` : `ABS would uphold the call (true ${ruling})`;
       const v = p.querySelector('#mVerd');
-      if (conf >= pstar) { v.className = 'verdict go'; v.innerHTML = `<span class="word">Challenge</span><span class="why">${truth}, and it's identifiable: ${Math.round(conf * 100)}% clears the ${Math.round(pstar * 100)}% bar. Rule of thumb: challenge any pitch ${needTxt}.</span>`; }
-      else if (need == null) { v.className = 'verdict hold'; v.innerHTML = `<span class="word">Hold</span><span class="why">${truth}, but no ${roleName} can reach ${Math.round(pstar * 100)}% certainty by eye here, so it isn't worth a challenge in the moment. Save it.</span>`; }
-      else { v.className = 'verdict hold'; v.innerHTML = `<span class="word">Hold</span><span class="why">${truth}. A ${roleName} could only be ${Math.round(conf * 100)}% sure, under the ${Math.round(pstar * 100)}% bar. It becomes a good challenge for a pitch ${needTxt}.</span>`; }
+      if (conf >= pstar && wouldWin) {
+        v.className = 'verdict go';
+        v.innerHTML = `<span class="word">Challenge</span><span class="why">${truth}. At ${cp}% confidence you clear the ${pp}% bar. Rule of thumb: challenge any pitch ${needTxt}.</span>`;
+      } else if (conf >= pstar) {
+        v.className = 'verdict go';
+        v.innerHTML = `<span class="word">Challenge</span><span class="why">Worth the gamble: the bar is only ${pp}% in a spot this leveraged. This exact pitch is a ${ruling} and would lose, but a ${roleName} can't know that live, and challenging pitches that look like this still pays off on average.</span>`;
+      } else if (need == null) {
+        v.className = 'verdict hold';
+        v.innerHTML = `<span class="word">Hold</span><span class="why">${truth}, but no ${roleName} can reach ${pp}% certainty by eye here, so it isn't worth a challenge in the moment. Save it.</span>`;
+      } else {
+        v.className = 'verdict hold';
+        v.innerHTML = `<span class="word">Hold</span><span class="why">${truth}. A ${roleName} could only be ${cp}% sure, under the ${pp}% bar. It becomes a good challenge for a pitch ${needTxt}.</span>`;
+      }
     }
   }
 
