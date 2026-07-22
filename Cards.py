@@ -2610,7 +2610,7 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
 # ═══════════════════════════════════════════════════════════════
 # MAIN BATCH LOGIC
 # ═══════════════════════════════════════════════════════════════
-def _resolve_pitcher_teams(names):
+def _resolve_pitcher_teams(names, include_non_mlb=False):
     """Auto whole-season team resolution for --pitchers-without-a---team.
 
     Looks each requested pitcher up in the season pitcher leaderboard and returns
@@ -2621,7 +2621,13 @@ def _resolve_pitcher_teams(names):
     so a traded arm's full season is stitched together automatically. A pitcher
     with a single MLB stint resolves to that team; an arm with no MLB rows (e.g.
     AAA-only) resolves to its non-MLB tab(s). Aggregate 2TM/3TM pseudo-teams are
-    never read directly (they are not real worksheets)."""
+    never read directly (they are not real worksheets).
+
+    include_non_mlb=True (the --all-levels flag) also folds a pitcher's AAA (and
+    any other non-MLB) stints into the combine, so an arm that split the year
+    between MLB and AAA gets ONE cross-level card. Such an arm is labeled
+    'MLB+AAA'; because no combined leaderboard row exists for it, the caller
+    computes its grades/bubbles from the combined pitches instead."""
     MLB = AL_TEAMS | NL_TEAMS
     lb_path = os.path.join(os.path.dirname(METADATA_PATH), 'pitcher_leaderboard_rs.json')
     by_name = defaultdict(set)
@@ -2637,12 +2643,18 @@ def _resolve_pitcher_teams(names):
     for nm in names:
         real = {t for t in by_name.get(nm, set()) if t not in ('2TM', '3TM')}
         mlb_stints = {t for t in real if t in MLB}
-        used = sorted(mlb_stints) if mlb_stints else sorted(real)
+        if include_non_mlb:
+            used = sorted(real)
+        else:
+            used = sorted(mlb_stints) if mlb_stints else sorted(real)
         if not used:
             print(f"  WARNING: no leaderboard team found for '{nm}' — cannot auto-resolve")
             continue
         union.update(used)
-        labels[nm] = f"{len(used)}TM" if len(used) > 1 else used[0]
+        if mlb_stints and set(used) - MLB:
+            labels[nm] = 'MLB+AAA'   # cross-level combine → grades from pitches
+        else:
+            labels[nm] = f"{len(used)}TM" if len(used) > 1 else used[0]
     return sorted(union), labels
 
 
@@ -2674,6 +2686,16 @@ def main():
                              'workbook (e.g. Sheet2) instead of a team tab. '
                              'Scratch data never touches the leaderboards; cards '
                              'render MiLB-style (no percentile bubbles).')
+    parser.add_argument('--all-levels', action='store_true',
+                        help='Auto whole-season mode only (no --team): also fold in '
+                             'a pitcher\'s AAA/non-MLB stints so an arm split between '
+                             'MLB and AAA gets ONE combined card. No combined '
+                             'leaderboard row exists for a cross-level arm, so its '
+                             'grades and percentile bubbles are computed from the '
+                             'combined pitches vs the MLB pool; the card is labeled '
+                             'MLB+AAA. Shape grades (Stuff+/Loc+/velo/movement) are '
+                             'competition-agnostic; outcome bubbles (K%%, xwOBA, '
+                             'Whiff%%...) blend AAA and MLB hitters.')
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -2702,6 +2724,9 @@ def main():
     # their full season automatically (see _resolve_pitcher_teams). Per-pitcher
     # lookups then use each arm's own leaderboard label via pitcher_team_label.
     auto_team = (args.team is None and not scratch_tab and bool(filter_pitchers))
+    # Cross-level combine (--all-levels): grades/bubbles must be computed from the
+    # combined pitches (no leaderboard row spans MLB+AAA), via the scratch context.
+    compute_from_pitches = bool(auto_team and args.all_levels)
     pitcher_team_label = {}   # pitcher_name -> leaderboard team label for per-pitcher lookups
     if scratch_tab:
         # Scratch-tab mode: pitch data comes from a non-team tab (never read
@@ -2710,7 +2735,8 @@ def main():
         team = scratch_tab
         league = 'MiLB'
     elif auto_team:
-        teams, pitcher_team_label = _resolve_pitcher_teams(filter_pitchers)
+        teams, pitcher_team_label = _resolve_pitcher_teams(
+            filter_pitchers, include_non_mlb=args.all_levels)
         if not teams:
             print("Error: could not resolve any team for: " + ', '.join(filter_pitchers))
             sys.exit(1)
@@ -2893,13 +2919,15 @@ def main():
         except Exception as _e:
             import traceback; traceback.print_exc()
             print(f"  WARNING: scratch context failed ({_e}) — rendering MiLB-style")
-    elif start_date is not None:
+    elif start_date is not None or compute_from_pitches:
         # WINDOW cards — single game OR partial date range (2026-07-18, per
         # Wally): Stuff+/Loc+/Pitching+ are computed from JUST the window's
         # pitches as the plain average of per-pitch grades (no shrink), scored
         # against the season league anchors. Full-season cards (start_date
-        # None) keep the season leaderboard values.
-        print("\nStep 1b: Computing window Stuff+/Loc+ context...")
+        # None) keep the season leaderboard values — EXCEPT --all-levels
+        # cross-level cards (compute_from_pitches), which have no combined
+        # leaderboard row and so are graded from their combined pitches too.
+        print("\nStep 1b: Computing Stuff+/Loc+ context from pitches...")
         try:
             _norm = {nm: [_normalize_scratch_pitch(r) for r in pl]
                      for nm, pl in pitches_by_pitcher.items()}
