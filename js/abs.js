@@ -6,7 +6,7 @@ window.ABS = (function () {
   const state = {
     view: 'leaders', tab: 'catchers', sort: 'skill', dir: -1, q: '',
     // matrix state
-    k: 2, half: 'top', outs: 0, bases: [false, false, false], lead: 0,
+    k: 2, half: 'top', outs: 0, bases: [false, false, false], away: 0, home: 0,
     sel: { b: 1, s: 1, inning: 7 }, side: 'fld', px: 8.95, pz: 29.4,
     ztop: 39.6, zbot: 19.2
   };
@@ -209,7 +209,7 @@ window.ABS = (function () {
   }
   function gainFor(b, s, inning) {
     const bases = state.bases.map(x => x ? '1' : '0').join(''), outs = state.outs;
-    const diff = state.half === 'top' ? -state.lead : state.lead;
+    const diff = state.home - state.away;
     const g = core.G[Math.min(inning, 10) + '|' + state.half + '|' + clamp(diff)];
     let wpBase = null, ballWP, strikeWP;
     if (b === 3) { wpBase = wpMid(inning, state.half, diff, bases, outs); const [nb, runs] = walkBases(bases); const d2 = state.half === 'top' ? diff - runs : diff + runs; ballWP = wpMid(inning, state.half, d2, nb, outs) - wpBase; }
@@ -219,7 +219,8 @@ window.ABS = (function () {
     return (ballWP - strikeWP) / core.gAvg;
   }
   const Tfor = inning => 2 * (9 - Math.min(inning, 9)) + (state.half === 'top' ? 2 : 1);
-  function costFor(inning) { const dTeam = state.side === 'bat' ? state.lead : -state.lead; return core.Cgrid[state.k + '|' + Tfor(inning) + '|' + clamp(dTeam)]; }
+  function battingLead() { return state.half === 'top' ? state.away - state.home : state.home - state.away; }
+  function costFor(inning) { const dTeam = state.side === 'bat' ? battingLead() : -battingLead(); return core.Cgrid[state.k + '|' + Tfor(inning) + '|' + clamp(dTeam)]; }
   function pstarFor(b, s, inning) { const g = Math.max(gainFor(b, s, inning), 1e-4), c = costFor(inning); return c / (g + c); }
   const RAMP = [[240, 228, 216], [236, 206, 168], [214, 143, 96], [166, 59, 34], [120, 34, 22]];
   function heat(p) {
@@ -257,7 +258,12 @@ window.ABS = (function () {
         <div class="mx-ctl"><label>Half</label><span class="seg" id="mHalf"><button data-v="top" aria-pressed="true">Top</button><button data-v="bottom">Bottom</button></span></div>
         <div class="mx-ctl"><label>Outs</label><span class="seg" id="mOuts"><button data-v="0" aria-pressed="true">0</button><button data-v="1">1</button><button data-v="2">2</button></span></div>
         <div class="mx-ctl"><label>Runners</label><span id="mBases">${[0, 1, 2].map(i => `<button class="chip" data-b="${i}">${['1B', '2B', '3B'][i]}</button>`).join(' ')}</span></div>
-        <div class="mx-ctl"><label>Score</label><span class="step"><button id="mDown">&minus;</button><span class="val" id="mScore">Tie game</span><button id="mUp">+</button></span></div>
+        <div class="mx-ctl"><label>Score (Away &ndash; Home)</label>
+          <span style="display:inline-flex;gap:5px;align-items:center">
+            <input id="mAway" class="abs-inp" type="number" min="0" max="30" value="0" style="width:52px" aria-label="Away score">
+            <span style="color:var(--text-muted)">&ndash;</span>
+            <input id="mHome" class="abs-inp" type="number" min="0" max="30" value="0" style="width:52px" aria-label="Home score"></span>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px" id="mScoreNote">tie game</div></div>
         <div class="mx-ctl"><label>Deciding side</label><span class="seg" id="mSide"><button data-v="fld" aria-pressed="true">Catcher</button><button data-v="bat">Hitter</button></span></div>
        </div>
        <div class="mx-scroll"><table class="mx-grid" id="mGrid"></table></div>
@@ -271,6 +277,12 @@ window.ABS = (function () {
           <div class="fact"><div class="k">Challenge value</div><div class="v" id="fC">-</div></div>
           <div class="fact"><div class="k">Break-even</div><div class="v" id="fP">-</div></div>
           <div class="fact"><div class="k">Identifiable as</div><div class="v" id="fConf">-</div></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px">
+          <div class="mx-ctl"><label>Count</label>
+            <select id="mCount" class="abs-inp">${COUNTS.map(([b, s]) => `<option value="${b}-${s}">${b}-${s}</option>`).join('')}</select></div>
+          <div class="mx-ctl"><label>Inning</label>
+            <select id="mInning" class="abs-inp">${INN.map(i => `<option value="${i}">${i === 10 ? '10+ (extras)' : i}</option>`).join('')}</select></div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-bottom:10px">
           <div class="mx-ctl"><label>Hitter (exact zone)</label>
@@ -299,9 +311,17 @@ window.ABS = (function () {
     p.querySelectorAll('#mBases .chip').forEach(ch => ch.addEventListener('click', () => {
       const i = +ch.dataset.b; state.bases[i] = !state.bases[i]; ch.setAttribute('aria-pressed', String(state.bases[i])); drawGrid(); drawPanel();
     }));
-    const scoreTxt = () => state.lead === 0 ? 'Tie game' : (state.lead > 0 ? 'Batting up ' + state.lead : 'Batting down ' + (-state.lead));
-    p.querySelector('#mUp').addEventListener('click', () => { state.lead = Math.min(6, state.lead + 1); p.querySelector('#mScore').textContent = scoreTxt(); drawGrid(); drawPanel(); });
-    p.querySelector('#mDown').addEventListener('click', () => { state.lead = Math.max(-6, state.lead - 1); p.querySelector('#mScore').textContent = scoreTxt(); drawGrid(); drawPanel(); });
+    const mAway = p.querySelector('#mAway'), mHome = p.querySelector('#mHome');
+    function onScore() {
+      state.away = Math.max(0, Math.min(30, parseInt(mAway.value) || 0));
+      state.home = Math.max(0, Math.min(30, parseInt(mHome.value) || 0));
+      drawGrid(); drawPanel();
+    }
+    mAway.addEventListener('input', onScore); mHome.addEventListener('input', onScore);
+    p.querySelector('#mCount').addEventListener('change', e => {
+      const [b, s] = e.target.value.split('-').map(Number); state.sel.b = b; state.sel.s = s; drawGrid(); drawPanel();
+    });
+    p.querySelector('#mInning').addEventListener('change', e => { state.sel.inning = +e.target.value; drawGrid(); drawPanel(); });
     // zone plot + hitter + coords
     const zr = p.querySelector('#zRect'), ze = p.querySelector('#zEdge');
     function drawZone() {
@@ -351,7 +371,12 @@ window.ABS = (function () {
       const { b, s, inning } = state.sel, g = gainFor(b, s, inning), c = costFor(inning), pstar = c / (Math.max(g, 1e-4) + c);
       const { loc, reg } = pitchGeom(), m = state.side === 'fld' ? loc : -loc, conf = posterior(state.side + '|' + reg, m);
       const wouldWin = state.side === 'fld' ? loc >= 0 : loc < 0, ruling = loc >= 0 ? 'strike' : 'ball';
-      const lead = state.lead === 0 ? 'tie game' : (state.lead > 0 ? `batting up ${state.lead}` : `batting down ${-state.lead}`);
+      const bl = battingLead();
+      const lead = bl === 0 ? 'tie game' : (bl > 0 ? `batting up ${bl}` : `batting down ${-bl}`);
+      // keep the situation inputs in sync with the selected cell / state
+      const cSel = p.querySelector('#mCount'); if (cSel) cSel.value = b + '-' + s;
+      const iSel = p.querySelector('#mInning'); if (iSel) iSel.value = inning;
+      const sNote = p.querySelector('#mScoreNote'); if (sNote) sNote.textContent = lead;
       const on = ['1B', '2B', '3B'].filter((_, i) => state.bases[i]);
       p.querySelector('#mState').innerHTML = `<b>${b}–${s}</b> · <b>${inning === 10 ? 'extras' : ordinal(inning)}, ${state.half}</b> · ${state.outs} out · ${on.length ? on.join(' & ') + ' on' : 'bases empty'} · ${lead} · <b>${state.k}</b> challenge${state.k > 1 ? 's' : ''} left`;
       p.querySelector('#fG').textContent = g.toFixed(2); p.querySelector('#fC').textContent = c.toFixed(2);
