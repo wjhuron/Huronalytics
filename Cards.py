@@ -2610,6 +2610,42 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
 # ═══════════════════════════════════════════════════════════════
 # MAIN BATCH LOGIC
 # ═══════════════════════════════════════════════════════════════
+def _resolve_pitcher_teams(names):
+    """Auto whole-season team resolution for --pitchers-without-a---team.
+
+    Looks each requested pitcher up in the season pitcher leaderboard and returns
+    (union_of_team_tabs_to_read, {pitcher_name: leaderboard_team_label}).
+
+    A pitcher with MLB stints on more than one team resolves to all of those
+    tabs with a 2TM/3TM label (matching the pipeline's combined leaderboard row),
+    so a traded arm's full season is stitched together automatically. A pitcher
+    with a single MLB stint resolves to that team; an arm with no MLB rows (e.g.
+    AAA-only) resolves to its non-MLB tab(s). Aggregate 2TM/3TM pseudo-teams are
+    never read directly (they are not real worksheets)."""
+    MLB = AL_TEAMS | NL_TEAMS
+    lb_path = os.path.join(os.path.dirname(METADATA_PATH), 'pitcher_leaderboard_rs.json')
+    by_name = defaultdict(set)
+    try:
+        with open(lb_path) as f:
+            for r in json.load(f):
+                nm, tm = r.get('pitcher'), r.get('team')
+                if nm and tm:
+                    by_name[nm].add(tm)
+    except Exception as e:
+        print(f"  WARNING: could not load leaderboard for team auto-resolve: {e}")
+    union, labels = set(), {}
+    for nm in names:
+        real = {t for t in by_name.get(nm, set()) if t not in ('2TM', '3TM')}
+        mlb_stints = {t for t in real if t in MLB}
+        used = sorted(mlb_stints) if mlb_stints else sorted(real)
+        if not used:
+            print(f"  WARNING: no leaderboard team found for '{nm}' — cannot auto-resolve")
+            continue
+        union.update(used)
+        labels[nm] = f"{len(used)}TM" if len(used) > 1 else used[0]
+    return sorted(union), labels
+
+
 def main():
     # ── Settings (edit these directly or override via command line) ──
     team            = "ROC"
@@ -2661,30 +2697,42 @@ def main():
     # workbook (never read by the pipeline, so it cannot reach the site);
     # --tab overrides for other scratch tab names.
     scratch_tab = args.tab or ('NEW' if str(team).strip().upper() == 'NEW' else None)
+    # Auto whole-season mode: --pitchers given but no --team. Resolve each
+    # pitcher's stint team(s) from the leaderboard so multi-team arms combine
+    # their full season automatically (see _resolve_pitcher_teams). Per-pitcher
+    # lookups then use each arm's own leaderboard label via pitcher_team_label.
+    auto_team = (args.team is None and not scratch_tab and bool(filter_pitchers))
+    pitcher_team_label = {}   # pitcher_name -> leaderboard team label for per-pitcher lookups
     if scratch_tab:
         # Scratch-tab mode: pitch data comes from a non-team tab (never read
         # by the pipeline, so it can't leak to the site). MiLB-style render.
         teams = [scratch_tab]
         team = scratch_tab
         league = 'MiLB'
-    teams = [t.strip() for t in str(team).split(',') if t.strip()]
-    if not teams:
-        print("Error: no team specified")
-        sys.exit(1)
-    for t in teams:
-        if scratch_tab:
-            continue
-        if t not in AL_TEAMS and t not in NL_TEAMS and t not in MILB_TEAMS:
-            print(f"Error: Unknown team '{t}'")
+    elif auto_team:
+        teams, pitcher_team_label = _resolve_pitcher_teams(filter_pitchers)
+        if not teams:
+            print("Error: could not resolve any team for: " + ', '.join(filter_pitchers))
             sys.exit(1)
-    if scratch_tab:
-        pass  # league/team already set for scratch-tab mode
-    elif len(teams) > 1:
+        team = 'Season'    # display placeholder; each card uses its own team label
         league = 'MLB'
-        team = f"{len(teams)}TM"   # combined label = leaderboard 2TM/3TM key
+        print("Auto whole-season teams: " + ", ".join(teams) + "  "
+              + " ".join(f"[{n} -> {lbl}]" for n, lbl in pitcher_team_label.items()))
     else:
-        team = teams[0]
-        league = 'AL' if team in AL_TEAMS else ('NL' if team in NL_TEAMS else 'MiLB')
+        teams = [t.strip() for t in str(team).split(',') if t.strip()]
+        if not teams:
+            print("Error: no team specified")
+            sys.exit(1)
+        for t in teams:
+            if t not in AL_TEAMS and t not in NL_TEAMS and t not in MILB_TEAMS:
+                print(f"Error: Unknown team '{t}'")
+                sys.exit(1)
+        if len(teams) > 1:
+            league = 'MLB'
+            team = f"{len(teams)}TM"   # combined label = leaderboard 2TM/3TM key
+        else:
+            team = teams[0]
+            league = 'AL' if team in AL_TEAMS else ('NL' if team in NL_TEAMS else 'MiLB')
     # A same-day range (--start X --end X) is one game, not a multi-game span:
     # collapse it to a single date so it renders the daily card format.
     if end_date is not None and end_date == start_date:
@@ -2915,6 +2963,11 @@ def main():
         pitches = pitches_by_pitcher[pitcher_name]
         print(f"\n  --- {pitcher_name} ({len(pitches)} pitches) ---")
 
+        # Per-pitcher leaderboard key. In explicit / scratch mode this is the
+        # single global team label (unchanged behavior); in auto whole-season
+        # mode it is this arm's own resolved label (e.g. 2TM for a traded arm).
+        eff_team = pitcher_team_label.get(pitcher_name, team)
+
         # Get hand from pitch data
         hand = pitches[0].get('Throws', 'R') if pitches else 'R'
 
@@ -3020,17 +3073,17 @@ def main():
             print(f"  Window context: Stuff+ {pctl_row.get('stuffScore')} | "
                   f"Loc+ {pctl_row.get('locPlus')}")
         elif is_multi_game:
-            if len(teams) > 1:
-                pctl_row = pctl_by_name.get((pitcher_name, team))   # 2TM/3TM combined row
-            else:
-                pctl_row = pctl_by_name.get((pitcher_name, team)) \
-                           or (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None)
+            # (name, eff_team) wins over mlbId: a traded/called-up arm shares one
+            # mlbId across team rows, so the by-name key targets the right row
+            # (the combined 2TM/3TM row in auto whole-season mode).
+            pctl_row = pctl_by_name.get((pitcher_name, eff_team)) \
+                       or (pctl_by_id.get(str(int(mlb_id))) if mlb_id is not None else None)
 
         # Build config
         config = {
             'display_name': display_name,
             'hand': hand,
-            'team': team,
+            'team': eff_team,
             'age': age,
             'game_date': display_date,
             'stat_headers': stat_headers,
@@ -3046,9 +3099,9 @@ def main():
             'mvn_models': mvn_models if is_multi_game else {},
             'pctl_row': pctl_row,
             'pitch_locplus': (scratch_locplus if scratch_ctx is not None
-                              else locplus_by_pitcher.get((pitcher_name, team), {})),
+                              else locplus_by_pitcher.get((pitcher_name, eff_team), {})),
             'pitch_lb': (scratch_pitch_lb if scratch_ctx is not None
-                         else pitch_lb_by_pitcher.get((pitcher_name, team), {})),
+                         else pitch_lb_by_pitcher.get((pitcher_name, eff_team), {})),
             'rv_mode': rv_mode,
             'pitch_qual': pitch_qual,
         }
