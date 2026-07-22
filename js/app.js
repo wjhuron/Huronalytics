@@ -106,13 +106,25 @@
       const pitcherCount = document.getElementById('home-pitcher-count');
       const hitterCount = document.getElementById('home-hitter-count');
       const rocTeamsInit = (DataStore.metadata.rocTeams || []);
+      // Homepage counts = distinct players with at least one MLB appearance.
+      // ROC/AAA-only players are excluded; a player with both MLB and AAA
+      // stints counts once, and a traded player's per-team + 2TM/3TM aggregate
+      // rows collapse to a single mlbId (no double counting).
+      function countDistinctMlbPlayers(rows, nameKey) {
+        const seen = Object.create(null);
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (rocTeamsInit.indexOf(r.team) !== -1) continue;   // skip AAA rows
+          const key = (r.mlbId != null) ? ('id:' + r.mlbId) : ('nm:' + (r[nameKey] || i));
+          seen[key] = true;
+        }
+        return Object.keys(seen).length;
+      }
       if (pitcherCount && DataStore.pitcherData) {
-        const mlbPitchers = DataStore.pitcherData.filter(function(r) { return rocTeamsInit.indexOf(r.team) === -1; });
-        pitcherCount.textContent = mlbPitchers.length + ' pitchers';
+        pitcherCount.textContent = countDistinctMlbPlayers(DataStore.pitcherData, 'pitcher') + ' pitchers';
       }
       if (hitterCount && DataStore.hitterData) {
-        const mlbHitters = DataStore.hitterData.filter(function(r) { return rocTeamsInit.indexOf(r.team) === -1; });
-        hitterCount.textContent = mlbHitters.length + ' hitters';
+        hitterCount.textContent = countDistinctMlbPlayers(DataStore.hitterData, 'hitter') + ' hitters';
       }
 
       document.getElementById('player-back').addEventListener('click', function () {
