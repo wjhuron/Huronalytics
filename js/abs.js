@@ -248,6 +248,54 @@ window.ABS = (function () {
   const COUNTS = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2], [3, 0], [3, 1], [3, 2]];
   const INN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+  // Parse a Gameday feed into per-pitch situations (JS port of abs_pull_pitch.py):
+  // pre-pitch count, outs, base state, running score, and plate_x/plate_z.
+  function parseFeedPitches(feed) {
+    const gd = feed.gameData, live = feed.liveData;
+    const away = gd.teams.away.abbreviation || gd.teams.away.name;
+    const home = gd.teams.home.abbreviation || gd.teams.home.name;
+    const score = { away: 0, home: 0 };
+    let prevHalf = null, bases = {};
+    const out = [];
+    for (const play of live.plays.allPlays) {
+      const ab = play.about, half = ab.halfInning === 'top' ? 'top' : 'bottom';
+      const hk = ab.inning + '|' + half;
+      if (hk !== prevHalf) { bases = {}; prevHalf = hk; }
+      const batSide = half === 'top' ? 'away' : 'home';
+      let b = 0, s = 0;
+      for (const ev of (play.playEvents || [])) {
+        if (!ev.isPitch) continue;
+        const c = (ev.pitchData || {}).coordinates || {};
+        if (c.pX != null && c.pZ != null) {
+          const det = ev.details;
+          out.push({
+            batterId: play.matchup.batter.id, batter: play.matchup.batter.fullName,
+            pitcher: play.matchup.pitcher.fullName, inning: ab.inning, half: half,
+            balls: b, strikes: s, outs: (ev.count || {}).outs || 0,
+            bases: ['1B', '2B', '3B'].map(x => bases[x] ? '1' : '0').join(''),
+            away: score.away, home: score.home,
+            px: c.pX, pz: c.pZ, ptype: (det.type || {}).description || 'pitch',
+            call: det.call ? det.call.description : '', playId: ev.playId
+          });
+        }
+        const cnt = ev.count || {};
+        if (cnt.balls != null) b = cnt.balls;
+        if (cnt.strikes != null) s = cnt.strikes;
+      }
+      const runners = (play.runners || []).filter(e => e.movement);
+      score[batSide] += new Set(runners.filter(e => e.movement.end === 'score')
+        .map(e => e.details.runner.id)).size;
+      runners.sort((a, b) => (a.details.playIndex || 0) - (b.details.playIndex || 0));
+      for (const e of runners) {
+        const rid = e.details.runner.id;
+        for (const bb in bases) if (bases[bb] === rid) delete bases[bb];
+        const end = e.movement.end;
+        if (['1B', '2B', '3B'].includes(end) && !e.movement.isOut) bases[end] = rid;
+      }
+    }
+    return out;
+  }
+
   function renderMatrix() {
     const p = el();
     p.innerHTML = viewTabs() +
@@ -271,6 +319,16 @@ window.ABS = (function () {
        <h2 style="margin-top:26px">Price a specific pitch</h2>
        <p class="abs-sub">Click a cell to load that situation, then set where the ball was. Pick a hitter for their exact zone, or type Gameday plate_x / plate_z.</p>
        <div class="panel">
+        <div class="mx-live" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;background:var(--bg-primary)">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Load from a live game</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <input id="mvDate" type="date" class="abs-inp">
+            <select id="mvGame" class="abs-inp" style="min-width:220px"><option value="">Pick a date first</option></select>
+            <select id="mvBatter" class="abs-inp" style="min-width:170px" disabled><option>Pick a game first</option></select>
+            <span id="mvStatus" style="font-size:12px;color:var(--text-muted)"></span>
+          </div>
+          <div id="mvPitches" style="margin-top:10px;max-height:200px;overflow:auto"></div>
+        </div>
         <p id="mState" class="abs-sub" style="margin-bottom:10px"></p>
         <div class="facts">
           <div class="fact"><div class="k">Flip worth</div><div class="v" id="fG">-</div></div>
@@ -345,6 +403,70 @@ window.ABS = (function () {
     });
     const ex = () => { const x = parseFloat(p.querySelector('#mX').value), z = parseFloat(p.querySelector('#mZ').value); if (!isNaN(x)) state.px = x * 12; if (!isNaN(z)) state.pz = z * 12; drawPanel(); };
     p.querySelector('#mX').addEventListener('input', ex); p.querySelector('#mZ').addEventListener('input', ex);
+
+    // ---- load from a live game ----
+    let livePitches = [];
+    const mvDate = p.querySelector('#mvDate'), mvGame = p.querySelector('#mvGame');
+    const mvBatter = p.querySelector('#mvBatter'), mvPitches = p.querySelector('#mvPitches');
+    const mvStatus = p.querySelector('#mvStatus');
+    const now = new Date();
+    mvDate.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    function syncControls() {
+      const setSeg = (id, val) => p.querySelectorAll('#' + id + ' button')
+        .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(val))));
+      setSeg('mK', state.k); setSeg('mHalf', state.half); setSeg('mOuts', state.outs); setSeg('mSide', state.side);
+      p.querySelectorAll('#mBases .chip').forEach(ch => ch.setAttribute('aria-pressed', String(state.bases[+ch.dataset.b])));
+      p.querySelector('#mAway').value = state.away; p.querySelector('#mHome').value = state.home;
+      p.querySelector('#mX').value = (state.px / 12).toFixed(2); p.querySelector('#mZ').value = (state.pz / 12).toFixed(2);
+    }
+    function loadPitch(pt) {
+      state.sel = { b: pt.balls, s: pt.strikes, inning: Math.min(pt.inning, 10) };
+      state.half = pt.half; state.outs = Math.min(pt.outs, 2);
+      state.bases = [pt.bases[0] === '1', pt.bases[1] === '1', pt.bases[2] === '1'];
+      state.away = pt.away; state.home = pt.home; state.side = 'bat';
+      state.px = pt.px * 12; state.pz = pt.pz * 12;
+      const z = core.zones.find(x => x.n === pt.batter);
+      if (z) { state.ztop = z.t * 12; state.zbot = z.b * 12; p.querySelector('#mZone').textContent = `zone ${z.t.toFixed(2)} / ${z.b.toFixed(2)} ft (${pt.batter})`; }
+      else { state.ztop = 39.6; state.zbot = 19.2; p.querySelector('#mZone').textContent = 'zone 3.30 / 1.60 ft (league average)'; }
+      p.querySelector('#mHit').value = z ? pt.batter : '';
+      syncControls(); drawZone(); drawGrid(); drawPanel();
+    }
+    function showPitches(bid) {
+      const list = livePitches.filter(x => String(x.batterId) === String(bid));
+      mvPitches.innerHTML = list.length ? list.map((x, i) =>
+        `<button class="mv-pitch" data-i="${i}" style="display:block;width:100%;text-align:left;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text-primary);font:13px 'IBM Plex Sans';padding:6px 10px;margin-bottom:4px;cursor:pointer">${x.half === 'top' ? 'Top' : 'Bot'} ${x.inning}, <b>${x.balls}-${x.strikes}</b> &middot; ${x.ptype} &middot; ${x.call}</button>`).join('')
+        : `<span style="font-size:12px;color:var(--text-muted)">no tracked pitches for this batter</span>`;
+      mvPitches.querySelectorAll('.mv-pitch').forEach(btn => btn.addEventListener('click', () => loadPitch(list[+btn.dataset.i])));
+    }
+    async function loadSchedule(d) {
+      mvStatus.textContent = 'loading games...'; mvGame.innerHTML = '<option value="">...</option>';
+      mvBatter.innerHTML = '<option>Pick a game first</option>'; mvBatter.disabled = true; mvPitches.innerHTML = '';
+      try {
+        const j = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${d}`).then(r => r.json());
+        const games = (j.dates && j.dates[0]) ? j.dates[0].games : [];
+        mvGame.innerHTML = '<option value="">Pick a game...</option>' + games.map(g =>
+          `<option value="${g.gamePk}">${g.teams.away.team.name} @ ${g.teams.home.team.name}${g.status && g.status.abstractGameState ? ' (' + g.status.abstractGameState + ')' : ''}</option>`).join('');
+        mvStatus.textContent = games.length ? `${games.length} games` : 'no games that day';
+      } catch (e) { mvStatus.textContent = 'could not load schedule'; }
+    }
+    async function loadGame(pk) {
+      mvStatus.textContent = 'loading pitches...'; mvBatter.disabled = true; mvPitches.innerHTML = '';
+      try {
+        const feed = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${pk}/feed/live`).then(r => r.json());
+        livePitches = parseFeedPitches(feed);
+        const seen = new Set(), bats = [];
+        for (const x of livePitches) if (!seen.has(x.batterId)) { seen.add(x.batterId); bats.push(x); }
+        mvBatter.innerHTML = '<option value="">Pick a batter...</option>' + bats.map(x =>
+          `<option value="${x.batterId}">${esc(x.batter)}</option>`).join('');
+        mvBatter.disabled = false;
+        mvStatus.textContent = `${livePitches.length} tracked pitches`;
+      } catch (e) { mvStatus.textContent = 'could not load game'; }
+    }
+    mvDate.addEventListener('change', () => loadSchedule(mvDate.value));
+    mvGame.addEventListener('change', () => { if (mvGame.value) loadGame(mvGame.value); });
+    mvBatter.addEventListener('change', () => { if (mvBatter.value) showPitches(mvBatter.value); });
+    loadSchedule(mvDate.value);
+
     drawGrid(); drawPanel();
 
     function drawGrid() {
