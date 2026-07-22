@@ -29,7 +29,7 @@ from pipeline_fetch import (
     fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
     fetch_hitter_positions,
     read_pitches_from_sheet, read_all_pitches_from_sheets,
-    lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache,
+    lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache, fetch_canonical_last_first,
     fetch_and_aggregate_boxscores, fetch_and_aggregate_milb_boxscores,
     SPREADSHEET_IDS, SERVICE_ACCOUNT_FILE,
     WOBA_WEIGHTS_FALLBACK, FIP_CONSTANT_FALLBACK,
@@ -1454,6 +1454,57 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path):
     # Save cache incrementally
     save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
     print(f"  MLB ID cache: {len(mlb_id_cache)} entries ({new_lookups} new lookups)")
+
+    # --- Canonicalize name-variant splits (same MLB ID, different spelling) ---
+    # The feed occasionally emits two "Last, First" spellings for one player
+    # (e.g. "Cauley, Cam" vs "Cauley, Cameron", "Thornton, Zac" vs "Zach").
+    # Because every downstream aggregation groups on the raw Batter/Pitcher
+    # string, the variants split into two half-populated rows instead of one.
+    # Collapse them here — before any grouping — to the MLB Stats API's official
+    # "Last, First" (lastFirstName), falling back to the most-seen spelling if
+    # the API is unreachable. Self-healing: any future variant is caught the
+    # same way with no per-player configuration.
+    names_by_id = {}   # mlbId -> set of distinct observed "Last, First" names
+    for cache_key, mid in mlb_id_cache.items():
+        if not mid or '|' not in cache_key:
+            continue
+        names_by_id.setdefault(mid, set()).add(cache_key.rsplit('|', 1)[0])
+    rename_map = {}    # variant name -> canonical name
+    for mid, names in names_by_id.items():
+        if len(names) < 2:
+            continue
+        canonical = fetch_canonical_last_first(mid)
+        if canonical not in names:
+            # API name not among the observed spellings (or lookup failed):
+            # keep the variant carrying the most pitches so nothing is dropped.
+            counts = {n: 0 for n in names}
+            for p in all_pitches:
+                b = p.get('Batter')
+                if b in counts:
+                    counts[b] += 1
+                pit = p.get('Pitcher')
+                if pit in counts:
+                    counts[pit] += 1
+            canonical = max(counts, key=counts.get)
+        for n in names:
+            if n != canonical:
+                rename_map[n] = canonical
+        print(f"  Name-variant merge (id {mid}): "
+              f"{sorted(names)} -> '{canonical}'")
+    if rename_map:
+        for p in all_pitches:
+            if p.get('Batter') in rename_map:
+                p['Batter'] = rename_map[p['Batter']]
+            if p.get('Pitcher') in rename_map:
+                p['Pitcher'] = rename_map[p['Pitcher']]
+        # Backfill cache so canonical-name lookups resolve for every stint team.
+        for cache_key, mid in list(mlb_id_cache.items()):
+            if '|' not in cache_key:
+                continue
+            nm, tm = cache_key.rsplit('|', 1)
+            if nm in rename_map:
+                mlb_id_cache[f"{rename_map[nm]}|{tm}"] = mid
+        save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
 
     # --- Exclude position players (anyone who threw EP/Eephus) ---
     # PRIMARY guard (2026-07-13): EP pitches are no longer dropped globally —

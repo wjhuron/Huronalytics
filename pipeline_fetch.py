@@ -542,6 +542,33 @@ def fetch_hitter_positions(hitters, season=2026):
     return {int(k): (v.get('position') if v else None) for k, v in cache.items()}
 
 
+_CANONICAL_NAME_MEMO = {}
+
+
+def fetch_canonical_last_first(mlb_id):
+    """Return the MLB Stats API canonical "Last, First" name for a player ID.
+
+    Uses the person record's `lastFirstName` field, which already matches the
+    leaderboard's "Last, First" display format (e.g. 695508 -> "Cauley, Cam").
+    Result is memoized per process run. Returns None on any lookup failure so
+    callers can fall back to a locally-observed spelling.
+    """
+    if mlb_id in _CANONICAL_NAME_MEMO:
+        return _CANONICAL_NAME_MEMO[mlb_id]
+    name = None
+    try:
+        url = f"https://statsapi.mlb.com/api/v1/people/{int(mlb_id)}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            people = json.loads(resp.read().decode()).get('people', [])
+        if people:
+            name = people[0].get('lastFirstName') or None
+    except Exception as e:
+        print(f"  Warning: canonical-name lookup failed for id {mlb_id}: {e}")
+    _CANONICAL_NAME_MEMO[mlb_id] = name
+    return name
+
+
 def lookup_mlb_id(player_name, team_abbrev, mlb_id_cache):
     """Look up MLB player ID using the MLB Stats API, matching by name and team."""
     cache_key = f"{player_name}|{team_abbrev}"
