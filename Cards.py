@@ -1516,7 +1516,11 @@ def render_card(config, pitches, output_file):
                 ax.text(_px0 + 0.0615, _cy, _pt, transform=ax.transAxes,
                         ha='center', va='center', fontsize=8, fontweight='bold',
                         color=badge_text_color(_col), zorder=10, fontfamily='IBM Plex Sans')
-                ax.text(_px0 + 0.135, _cy, f'{_cnt / _tot * 100:.0f}%',
+                # A pitch that is in this legend was thrown at least once vs this
+                # hand, so a sub-1% share reads "< 1%" rather than a misleading
+                # "0%" (matches the metrics table + usage-list convention).
+                ax.text(_px0 + 0.135, _cy,
+                        ("< 1%" if 0 < _cnt / _tot * 100 < 1 else f'{_cnt / _tot * 100:.0f}%'),
                         transform=ax.transAxes, ha='left', va='center',
                         fontsize=9.5, fontweight='bold', color=TEXT_PRIMARY,
                         zorder=10, fontfamily='IBM Plex Sans')
