@@ -2044,8 +2044,8 @@
     "fetched": "2026-07-02"
   },
   "650559": {
-    "position": null,
-    "fetched": "2026-07-02"
+    "position": "RF",
+    "fetched": "2026-07-23"
   },
   "691001": {
     "position": null,
@@ -2497,23 +2497,23 @@
   },
   "701852": {
     "position": "C",
-    "fetched": "2026-07-15"
+    "fetched": "2026-07-23"
   },
   "596146": {
     "position": "LF",
-    "fetched": "2026-07-15"
+    "fetched": "2026-07-23"
   },
   "815873": {
-    "position": "DH",
-    "fetched": "2026-07-15"
+    "position": "1B",
+    "fetched": "2026-07-23"
   },
   "694876": {
     "position": "LF",
-    "fetched": "2026-07-15"
+    "fetched": "2026-07-23"
   },
   "663853": {
     "position": "DH",
-    "fetched": "2026-07-15"
+    "fetched": "2026-07-23"
   },
   "811965": {
     "position": "3B",
@@ -2661,7 +2661,7 @@
   },
   "571912": {
     "position": "C",
-    "fetched": "2026-07-15"
+    "fetched": "2026-07-23"
   },
   "800325": {
     "position": "RF",
@@ -2714,5 +2714,9 @@
   "690469": {
     "position": null,
     "fetched": "2026-07-22"
+  },
+  "623205": {
+    "position": "SS",
+    "fetched": "2026-07-23"
   }
 }
