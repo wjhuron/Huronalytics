@@ -836,6 +836,7 @@
 "Gilbert, Tyler": 75.0,
 "Gilbreath, Lucas": 73.0,
 "Giles, Ken": 75.0,
+"Gill Hill, Gary": 74.0,
 "Gillaspie, Logan": 74.0,
 "Gillispie, Connor": 71.0,
 "Gim\u00e9nez, Andr\u00e9s": 71.0,
@@ -1040,6 +1041,7 @@
 "Hinds, Rece": 75.0,
 "Hiraldo, Yaramil": 73.0,
 "Hjelle, Sean": 83.0,
+"Hjerpe, Cooper": 75.0,
 "Hodge, Porter": 76.0,
 "Hoeing, Bryan": 78.0,
 "Hoerner, Nico": 71.0,
@@ -1131,6 +1133,7 @@
 "Johnson, Pierce": 74.0,
 "Johnson, Ryan": 78.0,
 "Johnson, Seth": 73.0,
+"Johnson, Ty": 78.0,
 "Johnston, Troy": 71.0,
 "Jones, Damon": 77.0,
 "Jones, Greg": 72.0,
@@ -5154,6 +5157,9 @@
 "Giles, Ken": [
 571704
 ],
+"Gill Hill, Gary": [
+804541
+],
 "Gillaspie, Logan": [
 670810
 ],
@@ -5767,6 +5773,9 @@
 "Hjelle, Sean": [
 663546
 ],
+"Hjerpe, Cooper": [
+687309
+],
 "Hodge, Porter": [
 687863
 ],
@@ -6039,6 +6048,9 @@
 ],
 "Johnson, Seth": [
 686751
+],
+"Johnson, Ty": [
+694494
 ],
 "Johnston, Troy": [
 687859
@@ -10578,5 +10590,5 @@
 ]
 },
 "league_mean": 73.73,
-"n": 2642
+"n": 2645
 }
