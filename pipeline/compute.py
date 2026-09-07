@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from pipeline.hwar import gdp_extra_cost
 from pipeline.utils import (
-    safe_float, median, percentile, is_barrel, is_swing,
+    safe_float, median, percentile, is_barrel, barrel_flag, is_swing,
     spray_angle, spray_direction,
     SWING_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
@@ -409,9 +409,9 @@ def compute_pitcher_batted_ball(pitches):
     hard_hit = sum(1 for v in ev_valid if v >= 95)
     hard_hit_pct = hard_hit / len(ev_valid) if ev_valid else None
 
-    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
+    has_barrel_col = any(barrel_flag(p.get('Barrel')) is not None for p in bip)
     if has_barrel_col:
-        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
+        barrels = sum(1 for p in bip if barrel_flag(p.get('Barrel')))
     else:
         ev_la_pairs = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
                        for p in bip
@@ -540,9 +540,9 @@ def compute_hitter_stats(pitches):
         # recompute in js/aggregator.js agree exactly.
         ev95 = round(percentile(all_evs, 95), 1)
 
-    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
+    has_barrel_col = any(barrel_flag(p.get('Barrel')) is not None for p in bip)
     if has_barrel_col:
-        barrels = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
+        barrels = sum(1 for p in bip if barrel_flag(p.get('Barrel')))
     else:
         ev_la_all = [(safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle')))
                      for p in bip

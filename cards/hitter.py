@@ -61,7 +61,7 @@ from cards.pitcher import (
     pct_cell_color as _default_pct_cell_color,
     raw_cell_color as _default_raw_cell_color,
     OUTPUT_DIR, METADATA_PATH, _load_guts,
-    is_barrel, compute_iz, _compute_pitch_xrv,
+    is_barrel, barrel_flag, compute_iz, _compute_pitch_xrv,
     GUTS_LG_WOBA, GUTS_WOBA_SCALE,
     SWING_DESC, STRIKE_DESC,
 )
@@ -609,9 +609,9 @@ def compute_group_stats(group_pitches, sacq_lookups, bats):
     # Barrels — prefer Statcast `Barrel` column code '6' (matches the canonical
     # leaderboard); fall back to is_barrel(ev, la) heuristic only when the
     # column is empty for the whole group. See pipeline_compute.py ~L329-338.
-    has_barrel_col = any(str(p.get('Barrel', '')).strip() != '' for p in bip)
+    has_barrel_col = any(barrel_flag(p.get('Barrel')) is not None for p in bip)
     if has_barrel_col:
-        n_brl = sum(1 for p in bip if str(p.get('Barrel', '')).strip() == '6')
+        n_brl = sum(1 for p in bip if barrel_flag(p.get('Barrel')))
     else:
         n_brl = sum(1 for v, p in evs_valid if is_barrel(v, sf(p.get('LaunchAngle'))))
 
@@ -1851,8 +1851,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ev = sf(p.get('ExitVelo'))
         if la is None or ang is None: continue
         event = p.get('Event', '') or ''
-        _bcol = str(p.get('Barrel', '')).strip()
-        _brl = (_bcol == '6') if _bcol else bool(is_barrel(ev, la))
+        _bcol = barrel_flag(p.get('Barrel'))
+        _brl = _bcol if _bcol is not None else bool(is_barrel(ev, la))
         _pside = p.get('Bats') if p.get('Bats') in ('L', 'R') else None
         bip_pts.append((ang, max(-20, min(60, la)), ev, la, event, _brl, _pside))
 

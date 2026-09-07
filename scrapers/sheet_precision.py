@@ -306,6 +306,10 @@ def domain_problem(col, value):
     """
     if value in (None, ''):
         return None
+    # Barrel also takes a hand-entered Yes/No on the IDK tab (research.mlb.com
+    # reports a flag, not the 1-6 code); see pipeline.utils.barrel_flag.
+    if col == 'Barrel' and str(value).strip().lower() in ('yes', 'no', 'y', 'n'):
+        return None
     if col in VOCABULARY:
         if str(value).strip() not in VOCABULARY[col]:
             return (f'{value!r} is not one of the {len(VOCABULARY[col])} values '

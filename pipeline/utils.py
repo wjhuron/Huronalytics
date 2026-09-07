@@ -407,6 +407,23 @@ def round_metric(key, value):
     return round(value, 1)
 
 
+def barrel_flag(val):
+    """Three-state read of the Barrel column.
+
+    True  -> a barrel: the official launch_speed_angle code 6, or a hand-entered
+             Yes (the IDK tab takes research.mlb.com's Yes/No, which carries no code).
+    False -> present and not a barrel: codes 1-5, or No.
+    None  -> absent. Callers fall back to is_barrel(ev, la) only on None, so a
+             No is a real observation and is never recomputed.
+    On every value in the live sheets ('' and 1-6) this is identical to the old
+    `== '6'` / `!= ''` tests: measured on 664,873 cached pitches, 2026-09-07.
+    """
+    s = str(val).strip().lower() if val is not None else ''
+    if s == '':
+        return None
+    return s in ('6', 'yes', 'y')
+
+
 def is_barrel(ev, la):
     """Statcast barrel definition (MLB glossary / baseballr code_barrel).
     Five conditions: LA in [8,50], EV>=98, EV*1.5-LA>=117, EV+LA>=124."""

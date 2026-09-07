@@ -17,7 +17,7 @@ from collections import defaultdict
 # ── Pipeline modules ─────────────────────────────────────────────────────
 from pipeline.utils import (
     safe_float, normalize_date, _today_et, avg, median, round_metric,
-    is_barrel, spray_angle, spray_direction, duplicate_pa_events,
+    is_barrel, barrel_flag, spray_angle, spray_direction, duplicate_pa_events,
     break_tilt_to_minutes, circular_mean_minutes, minutes_to_tilt_display,
     compute_in_zone, outs_to_ip_str, outs_to_ip_float, ip_str_to_float,
     DATA_DIR,
@@ -552,7 +552,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             round(hc_x, 2) if hc_x is not None else None,
             round(hc_y, 2) if hc_y is not None else None,
             batter_hand,
-            1 if str(p.get('Barrel', '')).strip() == '6' else 0,  # official barrel (launch_speed_angle==6)
+            1 if barrel_flag(p.get('Barrel')) else 0,  # official barrel (launch_speed_angle==6, or a hand-entered Yes)
         ])
     print(f"  Pitcher BIP records: {len(pitcher_bip_rows)}")
 
@@ -668,8 +668,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             # Barrel, hard-hit, HR on BIP
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
-            barrel_val = str(p.get('Barrel', '')).strip()
-            if barrel_val == '6' or (barrel_val == '' and is_barrel(ev, la)):
+            barrel_val = barrel_flag(p.get('Barrel'))
+            if barrel_val or (barrel_val is None and is_barrel(ev, la)):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
@@ -785,8 +785,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # Official barrel (launch_speed_angle==6) with is_barrel(ev, la) fallback
         # when the Barrel column is absent — identical to the hitter barrelPct
         # logic and the card's damage view, so the site's Damage tiers match.
-        _barrel_raw = str(p.get('Barrel', '')).strip()
-        brl_enc = 1 if (_barrel_raw == '6' or (_barrel_raw == '' and is_barrel(ev, la))) else 0
+        _barrel_raw = barrel_flag(p.get('Barrel'))
+        brl_enc = 1 if (_barrel_raw or (_barrel_raw is None and is_barrel(ev, la))) else 0
         hitter_bip_rows.append([
             hi_idx[batter],
             tm_idx[team],
@@ -888,8 +888,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
 
             ev = safe_float(p.get('ExitVelo'))
             la = safe_float(p.get('LaunchAngle'))
-            barrel_val = str(p.get('Barrel', '')).strip()
-            if barrel_val == '6' or (barrel_val == '' and is_barrel(ev, la)):
+            barrel_val = barrel_flag(p.get('Barrel'))
+            if barrel_val or (barrel_val is None and is_barrel(ev, la)):
                 c[26] += 1
             if ev is not None and ev >= 95:
                 c[32] += 1  # hardHit
