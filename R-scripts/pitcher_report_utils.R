@@ -624,12 +624,20 @@ create_pitch_plot_shared <- function(pitch_data_filtered, pitcher_name,
       summarise(avg_arm_angle = mean(ArmAngle, na.rm = TRUE), .groups = "drop") %>%
       filter(!is.na(avg_arm_angle))
 
-    # Determine if pitcher is RHP or LHP based on average arm side release
-    avg_arm_side <- mean(pitch_data_filtered$RelPosX, na.rm = TRUE)
-    # isTRUE guards the all-NA case: mean(NA, na.rm=TRUE) is NaN and `NaN < 0` is
-    # NA, which would crash `if (is_rhp)` below (arm angle can be populated while
-    # RelPosX awaits backfill). Default to non-RHP when release side is unknown.
-    is_rhp <- isTRUE(avg_arm_side < 0)  # RHP have negative RelPosX
+    # Handedness comes from the Throws column, which every tab carries on every
+    # row. The sign of RelPosX is only a fallback for a frame with no Throws at
+    # all: on the 2026 cache it disagreed with Throws for 5 of 922 pitchers
+    # (crossfire releases, and one exact-zero mean that fails `< 0`), and it is
+    # blank on hand-entered rows, where the old NA default sent a right-hander's
+    # rays into the LHP quadrant (Susana, 2026-09-07).
+    throws <- pitch_data_filtered$Throws
+    throws <- throws[!is.na(throws) & throws %in% c("L", "R")]
+    if (length(throws) > 0) {
+      is_rhp <- names(which.max(table(throws))) == "R"
+    } else {
+      avg_arm_side <- mean(pitch_data_filtered$RelPosX, na.rm = TRUE)
+      is_rhp <- isTRUE(avg_arm_side < 0)  # RHP release to the catcher's left
+    }
 
     line_length <- 30  # Adjust this value to change line length
 
