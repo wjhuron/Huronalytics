@@ -259,6 +259,48 @@ def fetch_aaa_hitters(year=2026):
     return out
 
 
+def _ip_to_float(ip):
+    """FanGraphs IP is baseball notation: 7.2 means 7 and two thirds."""
+    ip = float(ip); whole = int(ip)
+    return whole + round((ip - whole) * 10) / 3.0
+
+
+def fetch_milb_pitcher_line(mlb_id, year=2026, levels=(1, 2, 3, 4, 5, 6)):
+    """ERA / FIP / xFIP for one minor-league arm, IP-weighted across every level
+    he pitched at, from the same endpoint fetch_aaa_pitchers uses (level=1 is
+    AAA; 2 AA; 3 A+; higher codes lower levels). Returns None when no level has
+    a row for this xMLBAMID.
+
+    Why IP-weighting: FanGraphs' combined MiLB row IS the IP-weighted mean of
+    the per-level rows — Susana 2026 (7.2 IP AA + 6.1 IP A+) reproduces its
+    5.14 / 2.68 / 2.43 to the second decimal. Why not the pipeline formula: the
+    failure log measures the MLB FIP constant +0.43 low at AAA, and A+/AA are
+    unmeasured. NO SIERA: FanGraphs does not publish it for the minors.
+    """
+    rows_found = []
+    for lvl in levels:
+        params = (f'pos=all&level={lvl}&lg=&stats=pit&qual=0&type=1'
+                  f'&season={year}&seasonEnd={year}&org=&ind=0&splitTeam=false'
+                  f'&pageitems=5000&pagenum=1')
+        rows = _http_get_json(f'{FG_MILB_API}?{params}', timeout=30)
+        if not isinstance(rows, list):
+            continue
+        for r in rows:
+            if r.get('xMLBAMID') is None or int(r['xMLBAMID']) != int(mlb_id):
+                continue
+            ip = _ip_to_float(r.get('IP') or 0)
+            if ip <= 0 or r.get('FIP') is None or r.get('xFIP') is None or r.get('ERA') is None:
+                continue
+            rows_found.append({'level': lvl, 'ip': ip, 'era': float(r['ERA']),
+                               'fip': float(r['FIP']), 'xfip': float(r['xFIP'])})
+    if not rows_found:
+        return None
+    ip = sum(x['ip'] for x in rows_found)
+    w = lambda k: sum(x[k] * x['ip'] for x in rows_found) / ip
+    return {'ip': ip, 'era': w('era'), 'fip': w('fip'), 'xfip': w('xfip'),
+            'levels': [x['level'] for x in rows_found]}
+
+
 def build_cache(year=2026, verbose=False):
     """Fetch all three groups and shape the cache."""
     if verbose:

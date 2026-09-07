@@ -483,6 +483,7 @@ STAT_LINE_COLOR = {
     'ERA':    ('era',      'raw', False, 1.5),
     'FIP':    ('fip',      'raw', False, 1.5),
     'SIERA':  ('siera',    'raw', False, 1.5),
+    'xFIP':   ('xFIP',     'raw', False, 1.5),   # FG minors stand-in for SIERA on scratch MiLB cards; anchor from _league_xfip_anchor
     # hdERA/hpERA tint scales match ERA's visual intensity per SD: their
     # spreads are compressed (SD ~0.95 and ~0.75 runs vs ERA ~1.4), so the
     # full-color distance shrinks proportionally. Convention, not a fit.
@@ -1531,7 +1532,7 @@ def _velo_pctl_vs_ff(velo, config):
     return max(0.0, min(100.0, 100 * 0.5 * (1 + math.erf(z))))
 
 
-def _bubble_columns_for(config, p_row):
+def _bubble_columns_base(config, p_row):
     """Split the single 'Velocity' bubble into Fastball/Sinker velo bubbles
     (graded vs MLB same-pitch-type velo). A pitcher with neither falls back to a
     Cutter velo bubble graded vs league FF velo. Applies to MLB and ROC."""
@@ -1581,6 +1582,45 @@ def _bubble_columns_for(config, p_row):
                 new_metrics.append(m)
         new_cols.append((name, new_metrics))
     return new_cols
+
+
+def _bubble_columns_for(config, p_row):
+    """Bubble columns for this card. Scratch-tab cards drop any bubble with no
+    value instead of drawing a dash (per Wally, 2026-09-07); team cards keep the
+    fixed layout, where every value is present anyway."""
+    cols = _bubble_columns_base(config, p_row)
+    if config.get('drop_empty_bubbles'):
+        # A bubble needs BOTH a value and a rank here: HR/FB% and PU% carry
+        # real values below their ranking floors (10 FB, 25 BIP) and would
+        # otherwise draw a dash where the rank belongs (per Wally, 2026-09-07).
+        cols = [(name, [m for m in metrics
+                        if p_row.get(m[1]) is not None and p_row.get(m[2]) is not None])
+                for name, metrics in cols]
+        cols = [(name, metrics) for name, metrics in cols if metrics]
+    return cols
+
+
+_LEAGUE_XFIP_ANCHOR = {}
+def _league_xfip_anchor():
+    """League xFIP for the strip tint: count-weighted mean over MLB leaderboard
+    rows, the same rule process_data uses for pitcherLeagueAverages['fip'].
+    Cached per process. None when the leaderboard is unreadable."""
+    if 'v' in _LEAGUE_XFIP_ANCHOR:
+        return _LEAGUE_XFIP_ANCHOR['v']
+    val = None
+    lb = os.path.join(os.path.dirname(METADATA_PATH), 'pitcher_leaderboard_rs.json')
+    try:
+        with open(lb) as f:
+            rows = json.load(f)
+        pairs = [(r['xFIP'], r.get('count', 0)) for r in rows
+                 if r.get('xFIP') is not None and r.get('count', 0) > 0
+                 and r.get('team') in (AL_TEAMS | NL_TEAMS)]
+        if pairs:
+            val = round(sum(v * w for v, w in pairs) / sum(w for _, w in pairs), 4)
+    except (OSError, ValueError, KeyError) as e:
+        print(f"  WARNING: league xFIP anchor unavailable ({e}); xFIP tile untinted")
+    _LEAGUE_XFIP_ANCHOR['v'] = val
+    return val
 
 
 def _render_percentile_bubbles(fig, p_row, grid_left, grid_right, grid_top, grid_bot, columns=None):
@@ -2729,6 +2769,15 @@ def render_card(config, pitches, output_file):
     val_fs = 14 if is_season_strip else 13
     stat_y_header = photo_bottom - 0.5; stat_y_value = stat_y_header - cell_h
     pitcher_la = config.get('pitcher_league_avgs', {})
+    # The pipeline publishes league averages for fip and siera but not xFIP, so
+    # the xFIP tile had no anchor and drew untinted next to a red FIP. Build the
+    # anchor the pipeline's own way — count-weighted over MLB leaderboard rows —
+    # so both tiles sit on the same ruler.
+    if pitcher_la and pitcher_la.get('xFIP') is None:
+        _xa = _league_xfip_anchor()
+        if _xa is not None:
+            pitcher_la = dict(pitcher_la)
+            pitcher_la['xFIP'] = _xa
     # Per-cell widths: uniform except PITCHING+, which takes 1.25x so its
     # header isn't cramped (per Wally 2026-08-28).
     _cell_ws = [col_w * (1.25 if h == 'PITCHING+' else 1.0)
@@ -3701,8 +3750,10 @@ def render_card(config, pitches, output_file):
 
     # Divider sits at the boundary between physical traits (left) and outcomes
     # (right). Stuff+ leads the outcomes block (Stuff+, Loc+, Zone%, ...).
-    divider_col = col_headers.index('Stuff+') if 'Stuff+' in col_headers else (
-        col_headers.index('Zone%') if 'Zone%' in col_headers else None)
+    # When Stuff+ is absent (scratch MiLB cards) the block still starts at
+    # Loc+, so the break stays after Arm Angle; Zone% is the last resort.
+    divider_col = next((col_headers.index(h) for h in ('Stuff+', 'Loc+', 'Zone%')
+                        if h in col_headers), None)
 
     # Column autosizing happens after styling (bold text measures wider):
     # start from equal widths, then shrink each column to its widest rendered
@@ -4599,6 +4650,19 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
                       bip_count_means=ctx.get('bip_count_means'))['xRunValue']
     row['xRunValue'] = xrv
     row['xRv100'] = xrv / n * 100 if xrv is not None else None
+    # xRV needs a run-value source on each pitch: xwOBA on balls in play,
+    # RunExp on everything else. With NEITHER, compute_xrv falls through to the
+    # league-mean BIP value by count, so the total is a handful of league
+    # averages over N pitches and says nothing about this arm (Susana scratch
+    # card, 2026-09-07: -1.0 total, -0.4/100, from 24 BIP over 259 pitches).
+    # Gate on the data and null the stat rather than draw a fiction.
+    _has_rv_src = (any(sf(p.get('RunExp')) is not None for p in pitches)
+                   or any(sf(p.get('xwOBA')) is not None for p in pitches
+                          if p.get('Description') == 'In Play'))
+    if not _has_rv_src:
+        row['xRunValue'] = None
+        row['xRv100'] = None
+        print("  xRV: no RunExp or xwOBA on any pitch -> not scoreable, nulled")
 
     # fbVelo — mean velo over ALL fastballs (FF/FA/SI pooled), the same
     # count-weighted definition the season bubble (_build_bubble_columns) and
@@ -4650,6 +4714,11 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
     if ctx.get('pitcher_plus_base'):
         from pipeline.pitcherplus import score_row as _pp_score_row
         row['pitcherPlus'] = _pp_score_row(row, ctx['pitcher_plus_base'])
+        # score_row scores whatever channels exist. A composite missing Stuff+,
+        # or resting on a nulled xRv100, is not Pitcher+; null it.
+        if row.get('stuffScore') is None or row.get('xRv100') is None:
+            row['pitcherPlus'] = None
+            print("  Pitcher+: Stuff+ or xRV missing -> not scoreable, nulled")
         row['pitcherPlus_pctl'] = _rank_in_mlb_pool(
             row.get('pitcherPlus'), ctx.get('pitcher_plus_pool') or [])
 
@@ -4694,6 +4763,7 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
                              bip_count_means=ctx.get('bip_count_means'))['xRunValue']
         d['xRunValue'] = xrv_pt
         d['xRv100'] = xrv_pt / npt * 100 if xrv_pt is not None else None
+        if not _has_rv_src: d['xRv100'] = None   # see gate above
 
         _Spt, _Lpt = [], []
         for _p2 in pp:
@@ -5317,6 +5387,33 @@ def main():
                 f"{fip_val:.2f}" if fip_val is not None else '—',
                 f"{siera_val:.2f}" if siera_val is not None else '—',
             ]
+
+            # Scratch-tab MiLB arms: the FIP/SIERA above used the MLB constants,
+            # which the failure log measures +0.43 FIP low at AAA and does not
+            # know for A+/AA, and FanGraphs publishes no minor-league SIERA at
+            # all. Same rule as ROC rows: FIP and xFIP come from the FanGraphs
+            # minors endpoint, IP-weighted across the levels he pitched at, and
+            # xFIP takes SIERA's slot. Gated on the DATA: an MLB arm on a scratch
+            # tab has no FG minors row and keeps the box trio. Every fallback
+            # announces itself.
+            if scratch_tab and mlb_id is not None:
+                from pipeline.fg_overrides import fetch_milb_pitcher_line
+                _yrs = [int(str(p.get('Game Date'))[:4]) for p in pitches
+                        if str(p.get('Game Date', ''))[:4].isdigit()]
+                _fgl = None
+                try:
+                    _fgl = fetch_milb_pitcher_line(int(mlb_id), max(_yrs) if _yrs else 2026)
+                except (RuntimeError, OSError, ValueError, KeyError) as _e:
+                    print(f"  FG minors line unavailable ({_e}); keeping box FIP/SIERA")
+                if _fgl:
+                    print(f"  FG minors line: {_fgl['ip']:.1f} IP across levels {_fgl['levels']}: "
+                          f"ERA {_fgl['era']:.2f} FIP {_fgl['fip']:.2f} xFIP {_fgl['xfip']:.2f}"
+                          + (f"  (box ERA {era_val:.2f})" if era_val is not None else ''))
+                    stat_headers = ['G', 'GS', 'IP', 'ERA', 'FIP', 'xFIP']
+                    stat_values[4] = f"{_fgl['fip']:.2f}"
+                    stat_values[5] = f"{_fgl['xfip']:.2f}"
+                else:
+                    print("  FG minors: no row for this arm; keeping box FIP/SIERA")
         else:
             # Single-game stat line — xRV is now shown per-pitch-type as
             # PitchRV/xPitchRV in the metrics table; no need to duplicate it
@@ -5461,6 +5558,7 @@ def main():
             'age': age,
             'game_date': display_date,
             'stat_headers': stat_headers,
+        'drop_empty_bubbles': bool(scratch_tab),
             'stat_values': stat_values,
             # The social daily line reads H/ER/K/BB straight from the box.
             'social_box': dict(box) if box else {},
