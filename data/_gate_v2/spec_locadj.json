@@ -1,0 +1,4 @@
+{
+  "SHIPPED": {"seeds": [0, 1, 2]},
+  "LOCADJ":  {"label": "loc_adj", "seeds": [0, 1, 2]}
+}

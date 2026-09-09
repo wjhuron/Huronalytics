@@ -77,14 +77,16 @@ Spec (JSON, --spec):
     "HARMONIZE": {"frames": {"2025": "2025H"}},
     "IDENTITY":  {"identity": 5},
     "RAW_VAA":   {"vaa": "raw"},
-    "ANCHOR_ANY": {"anchor": "any"}      # most-thrown of FF/SI/FC
+    "ANCHOR_ANY": {"anchor": "any"},     # most-thrown of FF/SI/FC
+    "LOCADJ":    {"label": "loc_adj"}    # train on target_xrv - l_loc (2026-09-08)
   }
   keys: add, drop, replace, mask {feat: [types]}, add_typed {feat: [types]},
         params, vaa, anchor ('true' default | 'any'), frames, identity,
-        subsample_rows, seeds
+        subsample_rows, seeds, label ('loc_adj')
 
 Usage:
   python3 scripts/research/stuff/stuff_gate_v2.py build
+  python3 scripts/research/stuff/stuff_gate_v2.py build-loc   # 2026-09-08: frames with the location term (moves v14 frames/aggs to pre_0908_v14/)
   python3 scripts/research/stuff/stuff_gate_v2.py build-harm
   python3 scripts/research/stuff/stuff_gate_v2.py run --spec spec.json [--pairs 2021,2024] [--seeds 0,1] [--names A,B]
   python3 scripts/research/stuff/stuff_gate_v2.py summary [--names A,B]
@@ -106,6 +108,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
 sys.path.insert(0, ROOT)
 import stuff_plus.train_stuff as T                      # noqa: E402
+from pipeline import locplus as LOC                     # noqa: E402
+from pipeline.utils import get_count                    # noqa: E402
 
 SEASONS = (2021, 2022, 2023, 2024, 2025, 2026)
 PAIRS = [(y, y + 1) for y in (2021, 2022, 2023, 2024, 2025)]
@@ -124,7 +128,7 @@ SLOPE_MIN = 2000
 ANCHOR_MIN = T.QUAL_N          # 50: unit pitches to enter the (mu, sd) pool
 K_SCALE = T.K_SCALE            # 10 points per anchor SD
 BOOT_B = 2000
-SEED_REFS = ('SHIPPED', 'DEPTH5')   # configs whose extra seeds estimate seed SD
+SEED_REFS = ('SHIPPED', 'DEPTH5', 'LOCADJ')   # configs whose extra seeds estimate seed SD
 NEEDMORE_Z = 1.5               # |mean d| < NEEDMORE_Z * combined SE -> 2 more seeds
 
 KEEP = ['pitcher', 'team', 'throws', 'date', 'pitch_type', 'platoon_same',
@@ -132,8 +136,15 @@ KEEP = ['pitcher', 'team', 'throws', 'date', 'pitch_type', 'platoon_same',
         'extension', 'arm_angle', 'rel_x', 'rel_z', 'cross', 'cross_abs',
         'kin_eff', 'kin_eff__ff', 'vaa_raw', 'plate_x', 'plate_z', 'ax_sin',
         'ax_cos', 'spin_eff', 'axis_dev', 'axis_dev_abs', 'haa_meas',
-        'kin_dev', 'kin_cd']
-F64 = ('target_xrv', 'rv_raw')     # kept at full precision
+        'kin_dev', 'kin_cd', 'l_loc']
+F64 = ('target_xrv', 'rv_raw', 'l_loc')     # kept at full precision
+# grades scored on every metric: (name, grade column, Y+1 target column).
+# 't' is the raw luck-neutral target (the adoption objective), 'tadj' the
+# location-adjusted one (secondary, 2026-09-08).
+GRADES = (('raw', 's', 't'), ('rend', 's_r', 't'),
+          ('adj', 's', 'tadj'), ('adj_rend', 's_r', 'tadj'))
+GRADE_KEY = {'raw': 'nxt_r', 'rend': 'nxt_r_rend',
+             'adj': 'nxt_adj_r', 'adj_rend': 'nxt_adj_r_rend'}
 
 
 def pear(a, b):
@@ -167,7 +178,209 @@ def load_2026():
     return p26
 
 
-def _frame_from_pitches(pk, guts, y):
+# ── location term (2026-09-08) ───────────────────────────────────────────
+# Tom Kim's Berkson claim (memory/project_stuff_location_leak_probe_2026_09):
+# the label carries location value, and survival selects slow arms with good
+# locations, so E[target | physics] absorbs E[location value | physics].
+# l_loc = locplus.score_pitch on the season's OWN surfaces (the xRVOE
+# location term, same Guts as the season's target), centred within
+# (group, bats, throws, count) so the count and platoon levels stay in the
+# label and only the location deviation leaves. Spec key 'label': 'loc_adj'
+# trains on target_xrv - l_loc; the adoption objective (nxt_r on the RAW
+# Y+1 target) is unchanged, and nxt_adj_r scores the same grade against the
+# adjusted Y+1 target as a secondary.
+#
+# 2021-2024: the training pickle is the Statcast cache's rows in order
+# (velocity re-verified, raise on mismatch). 2025: greedy per-(date,
+# pitcher) fingerprint on velocity + plate coordinates, the join
+# build_2025_training_set used. 2026: the cache dicts carry everything.
+# Savant description -> sheet vocabulary, copied from
+# scrapers/backfill_supplement.SAVANT_TO_SHEET_DESCRIPTION (that module
+# has network side effects at import). An unmapped code leaves the row
+# unscorable, so it can neither shape the surfaces nor take a term.
+SAVANT_DESC = {
+    'ball': 'Ball', 'blocked_ball': 'Ball', 'called_strike': 'Called Strike',
+    'swinging_strike': 'Swinging Strike',
+    'swinging_strike_blocked': 'Swinging Strike', 'foul': 'Foul',
+    'foul_tip': 'Swinging Strike', 'bunt_foul_tip': 'Swinging Strike',
+    'foul_bunt': 'Foul Bunt', 'missed_bunt': 'Missed Bunt',
+    'hit_into_play': 'In Play', 'hit_by_pitch': 'Hit By Pitch',
+    'pitchout': 'Pitchout',
+}
+LOC_PRE_DIR = os.path.join(CACHE, 'pre_0908_v14')
+
+
+def _col(df, name):
+    """Plain float64 array with NaN: the caches carry pandas nullable
+    dtypes, and pd.NA in a boolean test raises."""
+    return pd.to_numeric(df[name], errors='coerce').to_numpy(dtype='float64', na_value=np.nan)
+
+
+def _str(v):
+    return v if isinstance(v, str) else None
+
+
+def _fl(v):
+    """Guarded float for pandas NA / None / ''."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if x != x else x
+
+
+def cache_path(y):
+    return os.path.join(ROOT, 'data', f'_statcast{y}_cache.pkl')
+
+
+def _loc_dicts_from_cache(df, y):
+    """One Loc+-shaped dict per cache row, PitchID '{y}_c{row index}'.
+    RunExp is NEGATED: Statcast is offense-perspective, the sheets (and the
+    training pickles) are pitcher-perspective."""
+    cols = ['pitch_type', 'stand', 'p_throws', 'plate_x', 'plate_z', 'sz_top',
+            'sz_bot', 'balls', 'strikes', 'description', 'delta_run_exp',
+            'estimated_woba_using_speedangle', 'events', 'bb_type']
+    out = []
+    for r in df[cols].itertuples(index=True):
+        b, s = _fl(r.balls), _fl(r.strikes)
+        cnt = (f'{int(b)}-{int(s)}' if b is not None and s is not None
+               and 0 <= b <= 3 and 0 <= s <= 2 else None)
+        re = _fl(r.delta_run_exp)
+        out.append({
+            'PitchID': f'{y}_c{r.Index}',
+            'Pitch Type': _str(r.pitch_type),
+            'Bats': _str(r.stand), 'Throws': _str(r.p_throws),
+            'PlateX': _fl(r.plate_x), 'PlateZ': _fl(r.plate_z),
+            'SzTop': _fl(r.sz_top), 'SzBot': _fl(r.sz_bot),
+            'Count': cnt, 'Description': SAVANT_DESC.get(_str(r.description)),
+            'RunExp': (None if re is None else -re),
+            'xwOBA': _fl(r.estimated_woba_using_speedangle),
+            'Event': ('Intent Walk' if _str(r.events) == 'intent_walk' else None),
+            'BBType': _str(r.bb_type),
+            '_source': 'MLB',
+        })
+    return out
+
+
+def _loc_terms(dicts, guts):
+    """PitchID -> l_loc (batter-positive, same currency as the target).
+    Surfaces from the eligible baseline; every scorable pitch scored;
+    centred within (group, bats, throws, count)."""
+    baseline = [p for p in dicts if LOC.is_eligible_baseline(p)]
+    S = LOC.build_surfaces(baseline, guts[0], guts[1])
+    recs = []
+    for p in dicts:
+        if not LOC._is_scorable(p):
+            continue
+        v = LOC.score_pitch(p, S)
+        if v is None:
+            continue
+        recs.append((p['PitchID'], v, LOC.group_of(p), p['Bats'],
+                     p['Throws'], get_count(p)))
+    L = pd.DataFrame(recs, columns=['pid', 'exprv', 'grp', 'bats', 'thr', 'count'])
+    L['l_loc'] = L['exprv'] - L.groupby(['grp', 'bats', 'thr', 'count'])['exprv'].transform('mean')
+    print(f'    Loc+ surfaces on {len(baseline)} baseline pitches; '
+          f'{len(L)} scored; l_loc SD {L["l_loc"].std() * 100:.2f} runs/100',
+          flush=True)
+    return dict(zip(L['pid'], L['l_loc']))
+
+
+def _rows_ordered(pk, df, y):
+    """2021-2024: cache rows with game_pk, in order == pickle rows. Velocity
+    re-verified on every row; a mismatch aborts (fail closed)."""
+    sub = df[df['game_pk'].notna()]
+    if len(sub) != len(pk):
+        sys.exit(f'{y}: cache rows {len(sub)} != pickle rows {len(pk)}')
+    vel = _col(sub, 'release_speed')
+    bad = 0
+    for i, p in enumerate(pk):
+        v = T.sf(p.get('Velocity'))
+        if v is not None and np.isfinite(vel[i]) and abs(v - vel[i]) > 1e-9:
+            bad += 1
+    if bad:
+        sys.exit(f'{y}: {bad} zip-join velocity mismatches; the pickle is '
+                 f'not the cache in order')
+    return list(sub.index)
+
+
+def _rows_fingerprint(pk, df):
+    """2025: greedy per-(date, pitcher) match on velocity (<= 0.25 mph) and
+    plate coordinates (weighted distance < 0.5), one cache row per pickle
+    row. Returns the cache row index or None per pickle row."""
+    dates = df['game_date'].astype(str).str.slice(0, 10).values
+    names = [_str(v) for v in df['player_name'].values]
+    vel = _col(df, 'release_speed')
+    px = _col(df, 'plate_x')
+    pz = _col(df, 'plate_z')
+    idx = df.index.values
+    pub = {}
+    for k in range(len(df)):
+        pub.setdefault((dates[k], names[k]), []).append(k)
+    groups = {}
+    for i, p in enumerate(pk):
+        groups.setdefault((str(p.get('Game Date'))[:10], p.get('Pitcher')), []).append(i)
+    rows = [None] * len(pk)
+    matched = unmatched = 0
+    for key, idxs in groups.items():
+        cands = pub.get(key, [])
+        used = set()
+        for i in idxs:
+            p = pk[i]
+            v = T.sf(p.get('Velocity'))
+            x, z = T.sf(p.get('PlateX')), T.sf(p.get('PlateZ'))
+            if v is None:
+                unmatched += 1
+                continue
+            best, best_d = None, 1e9
+            for k in cands:
+                if k in used or not np.isfinite(vel[k]) or abs(vel[k] - v) > 0.25:
+                    continue
+                d = abs(vel[k] - v) * 2.0
+                if x is not None and np.isfinite(px[k]):
+                    d += abs(px[k] - x)
+                if z is not None and np.isfinite(pz[k]):
+                    d += abs(pz[k] - z)
+                if d < best_d:
+                    best_d, best = d, k
+            if best is None or best_d > 0.5:
+                unmatched += 1
+                continue
+            used.add(best)
+            rows[i] = int(idx[best])
+            matched += 1
+    print(f'    2025 fingerprint join: {matched} matched, {unmatched} unmatched '
+          f'({matched / max(matched + unmatched, 1):.1%})', flush=True)
+    return rows
+
+
+def loc_map_for_season(y, pk, guts):
+    """PitchID -> l_loc for the pitches about to enter build_df. 2021-2025
+    pickles carry no PitchID, so each row gets '{y}_{i}' here and the term
+    comes from the matched cache row."""
+    t0 = time.time()
+    if y == 2026:
+        out = _loc_terms(pk, guts)
+    else:
+        df = pickle.load(open(cache_path(y), 'rb'))
+        rows = _rows_fingerprint(pk, df) if y == 2025 else _rows_ordered(pk, df, y)
+        terms = _loc_terms(_loc_dicts_from_cache(df, y), guts)
+        del df
+        gc.collect()
+        out = {}
+        for i, (p, j) in enumerate(zip(pk, rows)):
+            pid = f'{y}_{i}'
+            p['PitchID'] = pid
+            if j is not None:
+                v = terms.get(f'{y}_c{j}')
+                if v is not None:
+                    out[pid] = v
+        del terms
+    print(f'    {y}: location term for {len(out)} of {len(pk)} pitches '
+          f'[{time.time() - t0:.0f}s]', flush=True)
+    return out
+
+
+def _frame_from_pitches(pk, guts, y, lloc=None):
     saved = T.NVAA_SLOPES
     T.NVAA_SLOPES = {}            # raw VAA in the cache; adjusted per pair
     lg, sc = T.LG_WOBA, T.WOBA_SCALE
@@ -178,6 +391,12 @@ def _frame_from_pitches(pk, guts, y):
         T.LG_WOBA, T.WOBA_SCALE = lg, sc
         T.NVAA_SLOPES = saved
     d = d[d['target_xrv'].notna()].reset_index(drop=True)
+    if lloc is not None:
+        d['l_loc'] = d['pid'].map(lloc).astype(float)
+        print(f'  {y}: location term on {d["l_loc"].notna().mean():.1%} of '
+              f'target rows', flush=True)
+    else:
+        d['l_loc'] = np.nan
     d = d[[c for c in KEEP if c in d.columns]].copy()
     for c in d.columns:
         if c not in ('pitcher', 'team', 'throws', 'date', 'pitch_type'):
@@ -186,7 +405,7 @@ def _frame_from_pitches(pk, guts, y):
     return d
 
 
-def build():
+def build(with_loc=False):
     os.makedirs(CACHE, exist_ok=True)
     for y in SEASONS:
         if os.path.exists(season_path(y)):
@@ -200,13 +419,37 @@ def build():
             path = T.HIST_PKL.format(year=y) if y != 2025 else T.PRIOR_PKL
             pk = pickle.load(open(path, 'rb'))
             guts = GUTS[y]
-        d = _frame_from_pitches(pk, guts, y)
-        del pk
+        lloc = loc_map_for_season(y, pk, guts) if with_loc else None
+        d = _frame_from_pitches(pk, guts, y, lloc)
+        del pk, lloc
         gc.collect()
         d.to_pickle(season_path(y))
         print(f'  {y}: {len(d)} rows, {time.time()-t0:.0f}s', flush=True)
         del d
         gc.collect()
+
+
+def build_loc():
+    """Move the v14-era frames and aggregates aside (no location term, fit
+    on v14 features), then rebuild every season frame with l_loc. Nothing
+    is deleted; the old record lives in LOC_PRE_DIR."""
+    os.makedirs(LOC_PRE_DIR, exist_ok=True)
+    moved = 0
+    for fn in sorted(os.listdir(CACHE)):
+        if not (fn.startswith('season_') or fn.startswith('agg_')
+                or fn == 'results.json'):
+            continue
+        src = os.path.join(CACHE, fn)
+        if fn.startswith('season_'):
+            try:
+                if 'l_loc' in pd.read_pickle(src).columns:
+                    continue          # already a location-term frame
+            except (OSError, pickle.UnpicklingError, ValueError, EOFError) as e:
+                print(f'  {fn}: unreadable ({e}); moving aside')
+        os.replace(src, os.path.join(LOC_PRE_DIR, fn))
+        moved += 1
+    print(f'  moved {moved} v14-era files to {LOC_PRE_DIR}', flush=True)
+    build(with_loc=True)
 
 
 def build_harm():
@@ -462,7 +705,8 @@ def aggregates(dY, dY1):
     half = half_index(dY)
     anc = anchors_for(dY)
     dY = dY.assign(_h=half, _neg=-dY['target_xrv'], atom=atoms(dY, anc))
-    dY1 = dY1.assign(_neg=-dY1['target_xrv'], _rv=-dY1['rv_raw'])  # pitcher-positive
+    dY1 = dY1.assign(_neg=-dY1['target_xrv'], _rv=-dY1['rv_raw'],  # pitcher-positive
+                     _negadj=-(dY1['target_xrv'] - dY1['l_loc']))
     # within-Y halves
     gp = dY.groupby(['pitcher', '_h']).agg(s=('stuff', 'mean'),
                                             s_r=('atom', 'mean'),
@@ -475,6 +719,7 @@ def aggregates(dY, dY1):
     py = dY.groupby('pitcher').agg(s=('stuff', 'mean'), s_r=('atom', 'mean'),
                                    n=('stuff', 'size'))
     py1 = dY1.groupby('pitcher').agg(t=('_neg', 'mean'), rv=('_rv', 'mean'),
+                                     tadj=('_negadj', 'mean'),
                                      n=('_neg', 'size'))
     uy = dY.groupby(['pitcher', 'pitch_type']).agg(s=('stuff', 'mean'),
                                                    s_r=('atom', 'mean'),
@@ -502,6 +747,8 @@ def metrics_from(agg):
     out['nxt_r_rend'] = pear(j['s_r'], j['t'])
     out['nxt_rv_r'] = pear(j['s'], j['rv'])
     out['nxt_rv_r_rend'] = pear(j['s_r'], j['rv'])
+    out['nxt_adj_r'] = pear(j['s'], j['tadj'])
+    out['nxt_adj_r_rend'] = pear(j['s_r'], j['tadj'])
     out['n_nxt'] = int(len(j))
     ju = agg['uy'].join(agg['uy1'], lsuffix='_y', rsuffix='_y1', how='inner')
     ju = ju[(ju['n_y'] >= MIN_NXT_U) & (ju['n_y1'] >= MIN_NXT_U)]
@@ -516,7 +763,7 @@ def metrics_from(agg):
 def nxt_table(agg):
     j = agg['py'].join(agg['py1'], lsuffix='_y', rsuffix='_y1', how='inner')
     j = j[(j['n_y'] >= MIN_NXT) & (j['n_y1'] >= MIN_NXT)]
-    return j[['s', 's_r', 't', 'rv']]
+    return j[['s', 's_r', 't', 'rv', 'tadj']]
 
 
 # ── run ──────────────────────────────────────────────────────────────────
@@ -579,7 +826,22 @@ def run(spec_path, pairs, seeds, names_only=None):
                 feats = variant_feats(spec)
                 Xtr = pd.concat([design(P[y], spec, feats) for y in train_years],
                                 ignore_index=True)
-                ytr = np.concatenate([P[y]['target_xrv'].values for y in train_years])
+                label = spec.get('label')
+                if label == 'loc_adj':
+                    ys, n_unadj = [], 0
+                    for y in train_years:
+                        ll = P[y]['l_loc'].values.astype(float)
+                        miss = ~np.isfinite(ll)
+                        n_unadj += int(miss.sum())
+                        ys.append(P[y]['target_xrv'].values - np.where(miss, 0.0, ll))
+                    ytr = np.concatenate(ys)
+                    print(f'    label loc_adj: {n_unadj} of {len(ytr)} training '
+                          f'rows carry no location term (left unadjusted)',
+                          flush=True)
+                elif label:
+                    sys.exit(f'unknown label variant {label!r}')
+                else:
+                    ytr = np.concatenate([P[y]['target_xrv'].values for y in train_years])
                 ptr = np.concatenate([P[y]['pitcher'].values for y in train_years])
                 dY = P[Y]
                 XY = design(dY, spec, feats)
@@ -641,17 +903,19 @@ def boot_delta(a, b, B=BOOT_B, seed=0):
     same resamples."""
     j = a.join(b, lsuffix='_a', rsuffix='_b', how='inner')
     n = len(j)
-    t = j['t_a'].values
     rng = np.random.default_rng(seed)
-    idx = rng.integers(0, n, size=(B, n))
 
     def r(x, y):
         x = x - x.mean(1, keepdims=True)
         y = y - y.mean(1, keepdims=True)
         return (x * y).sum(1) / np.sqrt((x * x).sum(1) * (y * y).sum(1))
     out = {}
-    for g, col in (('raw', 's'), ('rend', 's_r')):
-        sa, sb = j[f'{col}_a'].values, j[f'{col}_b'].values
+    for g, col, tcol in GRADES:
+        jj = j if tcol == 't' else j[np.isfinite(j[f'{tcol}_a'].values.astype(float))]
+        m = len(jj)
+        t = jj[f'{tcol}_a'].values.astype(float)
+        idx = rng.integers(0, m, size=(B, m))
+        sa, sb = jj[f'{col}_a'].values.astype(float), jj[f'{col}_b'].values.astype(float)
         d = r(sa[idx], t[idx]) - r(sb[idx], t[idx])
         out[g] = (float(pear(sa, t) - pear(sb, t)), float(d.std()))
     return out, n
@@ -661,7 +925,7 @@ def seed_sd(results):
     """Per-pair SD (ddof=1) of the seed-paired delta vs SHIPPED, from every
     SEED_REFS config with >= 2 common seeds. Pooled as the RMS across pairs
     and configs. Returns (pooled {grade: sd}, per-pair detail)."""
-    var = {'raw': [], 'rend': []}
+    var = {g: [] for g in GRADE_KEY}
     detail = {}
     for name in SEED_REFS:
         if name not in results or name == 'SHIPPED':
@@ -672,7 +936,10 @@ def seed_sd(results):
             seeds = sorted(set(results[name][Y]) & set(results['SHIPPED'][Y]))
             if len(seeds) < 2:
                 continue
-            for g, k in (('raw', 'nxt_r'), ('rend', 'nxt_r_rend')):
+            for g, k in GRADE_KEY.items():
+                if any(k not in results[name][Y][s] or k not in results['SHIPPED'][Y][s]
+                       for s in seeds):
+                    continue
                 ds = [results[name][Y][s][k] - results['SHIPPED'][Y][s][k]
                       for s in seeds]
                 v = float(np.var(ds, ddof=1))
@@ -718,12 +985,12 @@ def summarize(names=None, quiet=False):
         ms = list(results['SHIPPED'][Y].values())
         P(f'  {Y}->{int(Y)+1}: ' + '  '.join(
             f'{k} {np.mean([m[k] for m in ms]):.4f}'
-            for k in ('nxt_r', 'nxt_r_rend', 'nxt_unit_r', 'nxt_rv_r',
+            for k in ('nxt_r', 'nxt_r_rend', 'nxt_adj_r', 'nxt_unit_r', 'nxt_rv_r',
                       'nxt_rv_r_rend', 'fut_r', 'rel'))
           + f'  n_nxt {ms[0]["n_nxt"]}  seeds {len(ms)}'
           + ('  [PARTIAL 2026 target]' if int(Y) == PARTIAL_Y else ''))
     P(f'\nseed SD of d_nxt (per pair, pooled RMS over {list(SEED_REFS)}): '
-      f'raw {sd_pool["raw"]:.4f}  rend {sd_pool["rend"]:.4f}')
+      + '  '.join(f'{g} {sd_pool[g]:.4f}' for g in GRADE_KEY))
     for name, byY in sd_detail.items():
         for Y, g in byY.items():
             P(f'    {name} {Y}: raw sd {g["raw"]["sd"]:.4f} d={["%+.4f" % x for x in g["raw"]["d"]]}'
@@ -740,8 +1007,8 @@ def summarize(names=None, quiet=False):
             dm = {k: float(np.mean([results[name][Y][s][k] - results['SHIPPED'][Y][s][k]
                                     for s in seeds]))
                   for k in ('nxt_r', 'nxt_r_rend', 'nxt_unit_r', 'nxt_unit_r_rend',
-                            'nxt_rv_r', 'nxt_rv_r_rend', 'fut_r', 'unit_r',
-                            'pitch_r', 'rel')}
+                            'nxt_rv_r', 'nxt_rv_r_rend', 'nxt_adj_r', 'nxt_adj_r_rend',
+                            'fut_r', 'unit_r', 'pitch_r', 'rel')}
             s0 = seeds[0]
             a = nxt_table(pd.read_pickle(agg_path(name, int(Y), int(s0))))
             b = nxt_table(pd.read_pickle(agg_path('SHIPPED', int(Y), int(s0))))
@@ -752,10 +1019,13 @@ def summarize(names=None, quiet=False):
                    'd_raw': dm['nxt_r'], 'd_rend': dm['nxt_r_rend'],
                    'd_raw_s0': bd['raw'][0], 'd_rend_s0': bd['rend'][0],
                    'se_boot_raw': bd['raw'][1], 'se_boot_rend': bd['rend'][1],
+                   'd_adj': dm['nxt_adj_r'], 'd_adj_rend': dm['nxt_adj_r_rend'],
+                   'd_adj_s0': bd['adj'][0], 'd_adj_rend_s0': bd['adj_rend'][0],
+                   'se_boot_adj': bd['adj'][1], 'se_boot_adj_rend': bd['adj_rend'][1],
                    'd_unit_raw': dm['nxt_unit_r'], 'd_unit_rend': dm['nxt_unit_r_rend'],
                    'd_rv_raw': dm['nxt_rv_r'], 'd_rv_rend': dm['nxt_rv_r_rend'],
                    'd_fut': dm['fut_r'], 'd_rel': dm['rel'], 'd_pitch': dm['pitch_r']}
-            for g in ('raw', 'rend'):
+            for g in GRADE_KEY:
                 ssd = sd_pool[g] if np.isfinite(sd_pool[g]) else 0.0
                 row[f'se_comb_{g}'] = float(np.sqrt(row[f'se_boot_{g}'] ** 2 + ssd ** 2 / m))
             rows.append(row)
@@ -764,7 +1034,8 @@ def summarize(names=None, quiet=False):
               f'(boot {row["se_boot_rend"]:.4f}, comb {row["se_comb_rend"]:.4f})  '
               f'n {n} seeds {m} | d_unit {row["d_unit_raw"]:+.4f}/{row["d_unit_rend"]:+.4f}  '
               f'd_rv {row["d_rv_raw"]:+.4f}/{row["d_rv_rend"]:+.4f}  d_fut {row["d_fut"]:+.4f}  '
-              f'd_rel {row["d_rel"]:+.4f}'
+              f'd_rel {row["d_rel"]:+.4f} | d_adj {row["d_adj"]:+.4f} (boot {row["se_boot_adj"]:.4f})'
+              f'/{row["d_adj_rend"]:+.4f}'
               + ('  [PARTIAL 2026 target; 2026 trains the other pairs]'
                  if row['partial'] else ''))
         if not rows:
@@ -772,19 +1043,19 @@ def summarize(names=None, quiet=False):
         rows4 = [r for r in rows if not r['partial']]
         block = {'pairs': rows}
         for tag, rs in (('all', rows), ('excl_2025_26', rows4)):
-            block[tag] = {g: pool(rs, sd_pool[g], g) for g in ('raw', 'rend')}
+            block[tag] = {g: pool(rs, sd_pool[g], g) for g in GRADE_KEY}
         out['variants'][name] = block
-        for tag, rs in (('ALL 5', rows), ('EXCL 2025-26', rows4)):
-            pr, pe = block['all' if tag == 'ALL 5' else 'excl_2025_26']['raw'], \
-                     block['all' if tag == 'ALL 5' else 'excl_2025_26']['rend']
-            if not pr:
-                continue
-            P(f'  {tag:<12} raw  mean {pr["mean_d"]:+.4f}  se_boot {pr["se_boot"]:.4f} '
-              f'se_comb {pr["se_comb"]:.4f}  z_boot {pr["z_boot"]:+.2f}  '
-              f'z_comb {pr["z_comb"]:+.2f}  wins {pr["wins"]}/{pr["k"]}')
-            P(f'  {"":<12} rend mean {pe["mean_d"]:+.4f}  se_boot {pe["se_boot"]:.4f} '
-              f'se_comb {pe["se_comb"]:.4f}  z_boot {pe["z_boot"]:+.2f}  '
-              f'z_comb {pe["z_comb"]:+.2f}  wins {pe["wins"]}/{pe["k"]}')
+        for tag, key in (('ALL 5', 'all'), ('EXCL 2025-26', 'excl_2025_26')):
+            first = True
+            for g in GRADE_KEY:
+                pg = block[key][g]
+                if not pg:
+                    continue
+                P(f'  {(tag if first else ""):<12} {g:<8} mean {pg["mean_d"]:+.4f}  '
+                  f'se_boot {pg["se_boot"]:.4f} se_comb {pg["se_comb"]:.4f}  '
+                  f'z_boot {pg["z_boot"]:+.2f}  z_comb {pg["z_comb"]:+.2f}  '
+                  f'wins {pg["wins"]}/{pg["k"]}')
+                first = False
     full = json.load(open(RESULTS))
     full['_summary'] = out
     tmp = RESULTS + '.tmp'
@@ -813,8 +1084,8 @@ def needmore(names=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['build', 'build-harm', 'run', 'summary',
-                                    'needmore'])
+    ap.add_argument('cmd', choices=['build', 'build-loc', 'build-harm', 'run',
+                                    'summary', 'needmore'])
     ap.add_argument('--spec')
     ap.add_argument('--pairs', default=None, help='comma list of Y')
     ap.add_argument('--seeds', default='0')
@@ -823,6 +1094,8 @@ def main():
     names = a.names.split(',') if a.names else None
     if a.cmd == 'build':
         build()
+    elif a.cmd == 'build-loc':
+        build_loc()
     elif a.cmd == 'build-harm':
         build_harm()
     elif a.cmd == 'run':
