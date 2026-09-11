@@ -712,15 +712,23 @@ NOARM_FEATS = [f for f in BASE_FEATS if f != 'arm_angle']
 # appended per-unit alongside the shared subsample. The worst
 # (100 - SUPPORT_FLAG_PCT)% of units flag as low-support; surfaced as
 # stuffScore_lowSupport on both leaderboards, a tooltip note on the site, and
-# a dagger on season cards. ROC units are NOT scored for support (never in the
-# training pool or the support manifold) — always False.
+# a dagger on season cards. ROC/AAA units (2026-09-11, per Wally) are scored
+# for support the same way, as EXTRA centroids against the same MLB manifold:
+# they never enter the pool, and they never enter the flag percentile (the
+# line is set on MLB units alone, so ROC cannot set its own line). Before
+# this they were hard-coded False, which read as "supported" when it meant
+# "not checked". Nicolas (the test case) sits at the 63rd pctl at worst.
 SUPPORT_K = 25
 SUPPORT_POOL_MAX = 60000
 SUPPORT_FLAG_PCT = 98.5
 SUPPORT_SEED = 20260704
 
-def compute_support(df, df_prior):
-    """Support score + low_support flag per MLB (pitcher, team, pitch_type).
+def compute_support(df, df_prior, extra_units=None):
+    """Support score + low_support flag per (pitcher, team, pitch_type).
+
+    `extra_units` (ROC/AAA build_df frame) adds centroids to SCORE without
+    joining the pool or the flag percentile; the returned frame carries them
+    alongside the MLB units.
 
     Features: BASE_FEATS only (platoon_same excluded — averaging a binary
     usage mix isn't a physical coordinate; height excluded — a pitcher
@@ -751,6 +759,12 @@ def compute_support(df, df_prior):
             own_prior[pit] = Zp[ix]
 
     cent = df.groupby(['pitcher', 'team', 'pitch_type'])[feats].mean().reset_index()
+    cent['_extra'] = False
+    if extra_units is not None and len(extra_units):
+        ce = (extra_units.groupby(['pitcher', 'team', 'pitch_type'])[feats]
+                         .mean().reset_index())
+        ce['_extra'] = True
+        cent = pd.concat([cent, ce], ignore_index=True)
     C = ((cent[feats].fillna(med) - mu) / sd).values.astype(np.float32)
     cent_pitcher = cent['pitcher'].values
 
@@ -773,9 +787,12 @@ def compute_support(df, df_prior):
                 row = np.concatenate([row, dop])
             near = np.partition(row, SUPPORT_K)[:SUPPORT_K]
             support[j] = float(np.sqrt(np.maximum(near, 0.0)).mean())
+    _extra = cent['_extra'].values
     cent = cent[['pitcher', 'team', 'pitch_type']].copy()
     cent['support'] = np.round(support, 4)
-    thr = float(np.percentile(support, SUPPORT_FLAG_PCT))
+    # the flag line is set on MLB units ALONE; extra (ROC/AAA) units are
+    # measured against it but never move it
+    thr = float(np.percentile(support[~_extra], SUPPORT_FLAG_PCT))
     cent['low_support'] = cent['support'] > thr
     # Height-tail rule (2026-08-23, the Schultz sweeper lesson): the kNN
     # manifold deliberately excludes height (a pitcher constant), so it can
@@ -795,9 +812,12 @@ def compute_support(df, df_prior):
         print(f'  height-tail flag: {int(tail.sum())} units from '
               f'{cent.loc[tail, "pitcher"].nunique()} pitchers outside '
               f'{HEIGHT_CLIP}')
-    n_flag = int(cent['low_support'].sum())
-    print(f'  model support: {len(cent)} units, flag threshold {thr:.3f} '
+    n_flag = int(cent.loc[~_extra, 'low_support'].sum())
+    print(f'  model support: {int((~_extra).sum())} MLB units, flag threshold {thr:.3f} '
           f'({SUPPORT_FLAG_PCT} pctl), {n_flag} low-support units')
+    if _extra.any():
+        print(f'  model support (ROC/AAA): {int(_extra.sum())} units measured against '
+              f'the MLB line, {int(cent.loc[_extra, "low_support"].sum())} low-support')
     return cent
 
 def main():
@@ -1058,6 +1078,11 @@ def main():
 
     agg, league = _standardize(['pitcher', 'team', 'pitch_type'], QUAL_N)
 
+    # ROC/AAA feature frame, built here so the retrain path below can score
+    # its units for support alongside MLB (target_xrv is None at ROC — we
+    # only score; the Stuff+ scoring itself happens further down).
+    roc_df = build_df(roc_pitches)
+
     # low-model-support flag per unit (see compute_support docstring)
     if B is not None:
         # Score-only: carry the flags forward from the last full retrain's CSV
@@ -1071,7 +1096,7 @@ def main():
         else:
             sup = pd.DataFrame(columns=['pitcher', 'team', 'pitch_type', 'support', 'low_support'])
     else:
-        sup = compute_support(df, df_prior)
+        sup = compute_support(df, df_prior, extra_units=roc_df)
     agg = agg.merge(sup, on=['pitcher', 'team', 'pitch_type'], how='left')
     agg['low_support'] = agg['low_support'].fillna(False).astype(bool)
     agg.to_csv(os.path.join(HERE, 'pitcher_stuff.csv'), index=False)
@@ -1141,7 +1166,6 @@ def main():
     na_pt = _na_scale(['pitcher', 'team', 'pitch_type'], QUAL_N)
     na_ov = _na_scale(['pitcher', 'team', 'throws'], 2 * QUAL_N)['ALL']
 
-    roc_df = build_df(roc_pitches)   # target_xrv is None at ROC — we only score
     if len(roc_df):
         # ── Per-pitcher arm branch (2026-07-25) ──
         # ROC/AAA now carries real arm angle, backfilled from Savant's
@@ -1204,10 +1228,17 @@ def main():
         roc_overall = (_scored.groupby(['pitcher', 'team', 'throws'])['_atom']
                               .agg(rawmean='mean', n='size').reset_index())
         roc_overall['stuff_mean'] = roc_overall['rawmean'].round(1)
-        # ROC never enters the training pool or the support manifold, so the
-        # low-support diagnostic still doesn't apply (see compute_support).
-        roc_agg['low_support'] = False
-        roc_overall['low_support'] = False
+        # Low-support for ROC units: measured against the MLB manifold and the
+        # MLB flag line on a retrain (compute_support extra_units), carried
+        # forward from the CSV on a score-only run, exactly like MLB. Units
+        # the CSV has never seen default to unflagged until the next retrain.
+        roc_agg = roc_agg.merge(sup, on=['pitcher', 'team', 'pitch_type'], how='left')
+        roc_agg['low_support'] = roc_agg['low_support'].fillna(False).astype(bool)
+        _rfs = roc_agg.assign(_fn=roc_agg['n'] * roc_agg['low_support']).groupby(
+            ['pitcher', 'team'])[['_fn', 'n']].sum()
+        _rfs = (_rfs['_fn'] / _rfs['n'] >= 0.5).rename('low_support').reset_index()
+        roc_overall = roc_overall.merge(_rfs, on=['pitcher', 'team'], how='left')
+        roc_overall['low_support'] = roc_overall['low_support'].fillna(False).astype(bool)
         agg = pd.concat([agg, roc_agg], ignore_index=True)
         overall = pd.concat([overall, roc_overall], ignore_index=True)
         _n_arm = int(_arm.sum())
