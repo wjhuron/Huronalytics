@@ -1528,6 +1528,7 @@
 "Mercado, Michael": 76.0,
 "Mercado, \u00d3scar": 73.0,
 "Mercedes, Yerm\u00edn": 71.0,
+"Merda, Hayden": 78.0,
 "Merrifield, Whit": 73.0,
 "Merrill, Jackson": 74.0,
 "Merryweather, Julian": 76.0,
@@ -7234,6 +7235,9 @@
 "Mercedes, Yerm\u00edn": [
 606213
 ],
+"Merda, Hayden": [
+675296
+],
 "Merrifield, Whit": [
 593160
 ],
@@ -10590,5 +10594,5 @@
 ]
 },
 "league_mean": 73.73,
-"n": 2645
+"n": 2646
 }
