@@ -376,6 +376,7 @@
 "Carlton, Drew": 73.0,
 "Carpenter, Kerry": 73.0,
 "Carpenter, Matt": 76.0,
+"Carr, Kyle": 73.0,
 "Carrasco, Carlos": 76.0,
 "Carrigg, Cole": 74.0,
 "Carrillo, Alex": 74.0,
@@ -1369,6 +1370,7 @@
 "L\u00f3pez, Pablo": 76.0,
 "L\u00f3pez, Reynaldo": 73.0,
 "L\u00f3pez, Yoan": 75.0,
+"MacGregor, Travis": 76.0,
 "MacIver, Willie": 74.0,
 "Machado, Andr\u00e9s": 73.0,
 "Machado, Manny": 74.0,
@@ -1941,6 +1943,7 @@
 "Ritchie, JR": 74.0,
 "Ritter, Ryan": 73.0,
 "Rivas, Leo": 67.0,
+"Rivas, Xavier": 76.0,
 "Rivera, Eduardo": 79.0,
 "Rivera, Emmanuel": 72.0,
 "Rivera, Josh": 72.0,
@@ -3776,6 +3779,9 @@
 ],
 "Carpenter, Matt": [
 572761
+],
+"Carr, Kyle": [
+694805
 ],
 "Carrasco, Carlos": [
 471911
@@ -6758,6 +6764,9 @@
 "L\u00f3pez, Yoan": [
 661255
 ],
+"MacGregor, Travis": [
+669740
+],
 "MacIver, Willie": [
 680862
 ],
@@ -8475,6 +8484,9 @@
 ],
 "Rivas, Leo": [
 660844
+],
+"Rivas, Xavier": [
+814392
 ],
 "Rivera, Eduardo": [
 700842
@@ -10594,5 +10606,5 @@
 ]
 },
 "league_mean": 73.73,
-"n": 2646
+"n": 2649
 }
