@@ -2552,10 +2552,12 @@ def render_social_card(config, pitches, output_file):
                 _cx = round((L + 0.010) * fig.get_figwidth() * fig.dpi) / (
                     fig.get_figwidth() * fig.dpi)
                 if is_total:
-                    # No disc: the total is not a pitch type. Label sits on
-                    # the name column so the numerals stay one grid.
-                    txt(L + 0.032, ry, 'TOTAL', fs, TEXT_PRIMARY, 'black',
-                        ha='left')
+                    # The outing line (2026-09-13, per Wally): no disc, no
+                    # word, no 100% usage, no grade chips (the tiles carry
+                    # Stuff+/Loc+). The pitch count sits where the discs
+                    # stack, in the numeral face, so the column reads
+                    # 31 / 27 / 26 / 10 / 8 / 102.
+                    txt(_cx, ry, str(r_['n']), fs, TEXT_PRIMARY, '500')
                 else:
                     ax.scatter([_cx], [_cy], s=215, color=col, edgecolors='none',
                                transform=ax.transAxes, zorder=4)
@@ -2567,6 +2569,8 @@ def render_social_card(config, pitches, output_file):
                     txt(L + 0.032, ry, PITCH_NAMES.get(r_['pt'], r_['pt']).upper(),
                         fs, TEXT_PRIMARY, 'bold', ha='left')
                 for lab, cx, al, k in cols:
+                    if is_total and k in ('usepct', 'stuff', 'loc'):
+                        continue
                     if k in ('stuff', 'loc'):
                         # Tinted grade chips — no sample-size gate (2026-08-28,
                         # per Wally): every cell colors from its value.
@@ -4836,6 +4840,35 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
     return ctx
 
 
+def _social_atom_maps(np_, ctx):
+    """PitchID -> integer Stuff+/Loc+ atoms for the social renderer: the
+    sheet's grade cell first, the scratch context's computed fallback for a
+    blank cell (a scratch tab carries no grade cells; a live-scraped game
+    not yet). Built for EVERY card that has a scratch context since
+    2026-09-13: before, only the single-game path built the maps, so a
+    season social card on a NEW-tab arm rendered blank chips (Hampton)
+    while the full card, which resolves the same atoms through
+    _compute_scratch_pitcher_context, scored him."""
+    atoms = ctx.get('stuff_atoms_by_pid') or {}
+    lfn = ctx.get('loc_atom_fn')
+    out = {'stuff': {}, 'loc': {}}
+    for q in np_:
+        pid = str(q.get('PitchID') or '')
+        if not pid:
+            continue
+        sv = sf(q.get('Stuff+'))
+        if sv is None:
+            sv = atoms.get(pid)
+        lv = sf(q.get('Loc+'))
+        if lv is None and lfn:
+            lv = lfn(q)
+        if sv is not None:
+            out['stuff'][pid] = int(round(sv))
+        if lv is not None:
+            out['loc'][pid] = int(round(lv))
+    return out
+
+
 def _compute_scratch_pitcher_context(pitcher_name, ctx):
     """One scratch pitcher's MLB-style card context, computed from his scratch
     pitches. Returns (pctl_row, pitch_lb, locplus_by_pt) shaped exactly like
@@ -5371,6 +5404,7 @@ def main():
     ibb_by_pitcher = defaultdict(int)   # no-pitch IBB markers: TBF, not pitches
     game_dates_seen = set()
     team_dates = defaultdict(set)   # source team -> game dates (per-team boxscores)
+    dates_by_pitcher = defaultdict(set)   # his own game dates, for the header stamp
     for row in all_rows:
         row_date = row.get('Game Date', '')
         if date_filter is not None:
@@ -5392,11 +5426,13 @@ def main():
                 if row_date:
                     game_dates_seen.add(row_date)
                     team_dates[row.get('_card_team', team)].add(row_date)
+                    dates_by_pitcher[pitcher_name].add(row_date)
                 continue
             pitches_by_pitcher[pitcher_name].append(row)
             if row_date:
                 game_dates_seen.add(row_date)
                 team_dates[row.get('_card_team', team)].add(row_date)
+                dates_by_pitcher[pitcher_name].add(row_date)
 
     pitcher_names = sorted(pitches_by_pitcher.keys())
     print(f"  Found {len(pitcher_names)} pitchers across {len(game_dates_seen)} game dates: {', '.join(pitcher_names)}")
@@ -5421,14 +5457,11 @@ def main():
             tot = sum(d[bh].values())
             d[bh] = ({pt: c / tot for pt, c in d[bh].items()} if tot else {})
 
-    # Season cards: stamp the latest game date for freshness (matches the
-    # hitter card's "Through May 31"). game_dates_seen hold 'YYYY-MM-DD'.
-    if start_date is None and end_date is None and game_dates_seen:
-        try:
-            _ld = datetime.strptime(max(game_dates_seen), '%Y-%m-%d')
-            display_date = f"{display_date}  ·  Through {_ld.strftime('%b %d').replace(' 0', ' ')}"
-        except Exception:
-            pass
+    # Season cards stamp "Through <date>" PER PITCHER, inside the card loop
+    # (2026-09-13, per Wally). The stamp used to be the tab's latest game
+    # date, so a NEW-tab arm whose data ends May 20 read "Through Sep 12"
+    # off another arm's rows, and the full and social cards disagreed
+    # whenever one run was filtered and the other was not.
 
     if not pitcher_names:
         print(f"  No pitch data found for {team} — {date_label}")
@@ -5526,6 +5559,19 @@ def main():
     generated = []
 
     for pitcher_name in pitcher_names:
+        # "Through <his last game>" on season cards: where HIS data ends,
+        # not the tab's (see the note above the loop). Matches the hitter
+        # card's "Through May 31". Dates are 'YYYY-MM-DD' strings.
+        card_date = display_date
+        if start_date is None and end_date is None and dates_by_pitcher.get(pitcher_name):
+            try:
+                _ld = datetime.strptime(max(dates_by_pitcher[pitcher_name]), '%Y-%m-%d')
+                card_date = (f"{display_date}  ·  Through "
+                             f"{_ld.strftime('%b %d').replace(' 0', ' ')}")
+            except ValueError as _e:
+                print(f"  [WARN] {pitcher_name}: unparseable Game Date "
+                      f"{max(dates_by_pitcher[pitcher_name])!r} ({_e}); "
+                      f"header carries no Through date")
         pitches = pitches_by_pitcher[pitcher_name]
         print(f"\n  --- {pitcher_name} ({len(pitches)} pitches) ---")
 
@@ -5565,6 +5611,11 @@ def main():
         pitch_count = len(pitches_by_pitcher[pitcher_name])
         outing_pp = (None, None)   # Pitching+ outing grade — single-game only
         social_atoms = None        # PitchID->atom fallbacks for the social card
+        if scratch_ctx is not None:
+            social_atoms = _social_atom_maps(
+                scratch_ctx['norm_by_pitcher'].get(pitcher_name) or [], scratch_ctx)
+            print(f"  Social atoms: {len(social_atoms['stuff'])} Stuff+, "
+                  f"{len(social_atoms['loc'])} Loc+ of {pitch_count} pitches")
 
         if is_multi_game:
             # Season/range stat line: G, IP, ERA, SIERA, K%, BB%, Zone%, Whiff%, GB%
@@ -5667,23 +5718,9 @@ def main():
                         return v
                     return _lfn(q) if _lfn else None
 
-                # Atom maps for the SOCIAL renderer (sheet cell first,
-                # computed fallback), keyed by PitchID so the raw window
-                # rows resolve — a live-scraped game has blank grade cells
-                # and previously rendered '—' tiles/chips on the social
-                # card while the full card scored fine (2026-08-28).
-                social_atoms = {'stuff': {}, 'loc': {}}
-                for _q in _np_:
-                    _pid2 = str(_q.get('PitchID') or '')
-                    if not _pid2:
-                        continue
-                    _sv = _stuff_of(_q)
-                    _lv = _loc_of(_q)
-                    if _sv is not None:
-                        social_atoms['stuff'][_pid2] = int(round(_sv))
-                    if _lv is not None:
-                        social_atoms['loc'][_pid2] = int(round(_lv))
-
+                # The social renderer's atom maps are built above for every
+                # scratch-context card (_social_atom_maps); _stuff_of/_loc_of
+                # here resolve the same atoms for the outing grade.
                 outing_pp = _outing_pitching_plus(
                     _np_, scratch_ctx['outing_pool'], _stuff_of, _loc_of)
                 if outing_pp[0] is not None:
@@ -5780,7 +5817,7 @@ def main():
             # above stays keyed on eff_team (the tab/leaderboard identity).
             'team': display_team or eff_team,
             'age': age,
-            'game_date': display_date,
+            'game_date': card_date,
             'stat_headers': stat_headers,
         'drop_empty_bubbles': bool(scratch_tab),
             'stat_values': stat_values,
