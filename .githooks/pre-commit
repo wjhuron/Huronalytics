@@ -11,6 +11,32 @@
 changed=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(js|css)/.*\.(js|css)$')
 [ -z "$changed" ] && exit 0
 
+# Refuse a commit whose STAGED .js does not parse. On 2026-09-14 a bare
+# apostrophe inside a single-quoted tooltip string in js/leaderboard.js
+# shipped, the script failed at load, and every leaderboard rendered EMPTY
+# for 90 minutes; scripts/ci/validate_output.py does not parse JS. The check
+# reads the index (git show :path), not the worktree, so it sees exactly what
+# the commit would ship. No node on the machine: announced, not enforced.
+js_changed=$(printf '%s\n' "$changed" | grep -E '\.js$')
+if [ -n "$js_changed" ]; then
+  if command -v node >/dev/null 2>&1; then
+    tmpdir=$(mktemp -d)
+    for f in $js_changed; do
+      git show ":$f" > "$tmpdir/$(basename "$f")" 2>/dev/null || continue
+      if ! node --check "$tmpdir/$(basename "$f")" 2>"$tmpdir/err"; then
+        echo "pre-commit: $f does not parse; commit REFUSED. Fix the syntax (a bare apostrophe inside a single-quoted string is the usual cause), then commit again. node said:" >&2
+        sed 's/^/  /' "$tmpdir/err" | head -8 >&2
+        rm -rf "$tmpdir"
+        exit 1
+      fi
+    done
+    rm -rf "$tmpdir"
+    echo "pre-commit: $(printf '%s\n' "$js_changed" | wc -l | tr -d ' ') staged js file(s) parse"
+  else
+    echo "pre-commit WARNING: node not found, staged js NOT syntax-checked; run node --check js/*.js by hand" >&2
+  fi
+fi
+
 # Pages must match bump_asset_version() in pipeline/process_data.py.
 # catch.html was absent here until 2026-08-17, so a local js/css commit left
 # it on a stale cache key (the same failure the pipeline hit on 2026-08-15).
