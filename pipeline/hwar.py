@@ -31,7 +31,23 @@ BASERUNNING (hBsrRuns) = Savant Baserunning Run Value (extra-base advancement + 
 FIELDING (hFldRuns) = Savant Fielding Run Value total (range, arm, double play, framing,
     blocking, throwing; fetch_fielding_runs with min=1, 635 fielders in 2026), 0 when unlisted.
 POSITIONAL (hPosRuns) = innings by position (MLB API, fetch_fielding_innings; a DH game counts
-    nine innings) x HWAR_POS_ADJ / 1458, the fWAR values per 162 games. A convention.
+    nine innings) x pos_adj / 1458, where pos_adj keeps fWAR's ORDER (HWAR_POS_ADJ, the values per
+    162 games) with its SPREAD compressed to HWAR_POS_SPREAD around the season's innings-weighted
+    center: pos_adj_X = center + HWAR_POS_SPREAD x (fWAR_X - center). The center is the mean of the
+    fWAR table over the league's innings by position, so the league positional sum, and with it
+    the replacement pin, does not move. Measured 2026-09-14 (hwar_positional.py, _sweep.py): fWAR's
+    values are Tango's 2000s position-switcher design plus judgment; two designs on 2016-2026 data
+    both read the spectrum compressed. The same-fielder design (Savant range runs at each position,
+    2023-2026) reads a slope of 0.11 on fWAR, flat across its innings gate (0.07-0.13 for 50-200
+    innings; 0.28 pre-ban) but a FLOOR, because players are placed where they can play; the bench-bat
+    design (batting runs of the non-regulars by primary position, 2021-2026) reads 0.57 with an
+    interior plateau 0.52-0.61 over its bench definition (top 15-35 per position) before the bench
+    thins, and Tango's 2026 primer reads the infield-outfield gap at about half its old size. The
+    per-position values of either design are not stable (SS 2.7-7.6 across the plateau), only the
+    slope is, so the order stays fWAR's and one parameter moves. A labeled convention: 0.57 is the
+    plateau mean, not an optimum. 2026: C 6.1, SS 3.3, 2B/3B/CF 0.5, LF/RF -5.2, 1B -8.0, DH -10.8;
+    a full-time DH gains about 0.6 WAR and a full-time catcher loses about 0.4 against the fWAR table
+    (framing, blocking and throwing stay in the fielding runs).
 REPLACEMENT (hReplRuns) = per PA, pinned so the club-row total of hWAR is exactly
     HWAR_REPL_SHARE x WAR_POOL x (league games / WAR_POOL_GAMES): the fWAR 57/43 split, single-homed
     in eraplus.py, where the pitcher side pins its starter bar to the other 43 since 2026-09-14.
@@ -309,7 +325,25 @@ def baserunning_fill(baserunning, club, combined):
 
 # ── positional and replacement conventions (fWAR) ──
 HWAR_POS_ADJ = {'C': 12.5, 'SS': 7.5, '2B': 2.5, '3B': 2.5, 'CF': 2.5, 'LF': -7.5, 'RF': -7.5, '1B': -12.5, 'DH': -17.5}
+                              # fWAR's table: the ORDER and the base of the spectrum (module docstring)
+HWAR_POS_SPREAD = 0.57        # share of fWAR's spread that ships: the bench-bat design's plateau mean
+                              # (0.52-0.61 over top 15-35 per position, 2021-2026), same side as the
+                              # same-fielder floor (0.11). Flat across the plateau, so a convention
+                              # inside a measured band, not an optimum. 1.0 = fWAR's full spread.
 HWAR_POS_INNINGS = 1458.0     # a full season of innings at a position (162 x 9)
+
+
+def positional_table(innings):
+    """{pos -> runs per 1458 innings}: fWAR's order with the spread compressed to HWAR_POS_SPREAD
+    around the innings-weighted center of the fWAR table over the season's innings by position
+    (every player in the feed; DH games x 9). With no innings the center is the unweighted mean."""
+    tot = {p: 0.0 for p in HWAR_POS_ADJ}
+    for rec in (innings or {}).values():
+        for p in tot:
+            tot[p] += (rec.get(p, 0.0) if p != 'DH' else 9.0 * rec.get('DH_games', 0))
+    den = sum(tot.values())
+    center = (sum(HWAR_POS_ADJ[p] * tot[p] for p in tot) / den) if den > 0 else (sum(HWAR_POS_ADJ.values()) / len(HWAR_POS_ADJ))
+    return {p: center + HWAR_POS_SPREAD * (v - center) for p, v in HWAR_POS_ADJ.items()}, center
 HWAR_REPL_SHARE = WAR_POOL_SHARE_HITTERS   # share of the WAR_POOL that is position players (fWAR: 570); single home in eraplus.py
 
 
@@ -340,6 +374,7 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
         if mid:
             pa_by_id[mid] = pa_by_id.get(mid, 0) + r['pa']
     bsr_fill, fill_const = baserunning_fill(baserunning, club, [r for r in live if is_combined_team(r.get('team'))])
+    pos_tab, pos_center = positional_table(innings)
     n_fld = n_bsr = n_pos = n_filled = 0
     for r in rows:
         if r.get('hBatRuns') is None:
@@ -357,7 +392,7 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
         wgdp = lg_gdp_rate * (r.get('gdpOpp') or 0) * lg_gdp_cost - (r.get('gdpCost') or 0.0)
         inn = innings.get(mid) or {}
         pos = sum((inn.get(p, 0.0) if p != 'DH' else 9.0 * inn.get('DH_games', 0)) * adj / HWAR_POS_INNINGS
-                  for p, adj in HWAR_POS_ADJ.items()); n_pos += 1 if inn else 0
+                  for p, adj in pos_tab.items()); n_pos += 1 if inn else 0
         r['hBsrRuns'] = round(bsr_sav * share + wgdp, 2)
         r['hFldRuns'] = round(fld * share, 2)
         r['hPosRuns'] = round(pos * share, 2)
@@ -377,12 +412,15 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
     tot = sum(r['hWAR'] for r in club)
     const = {'rpw': round(rpw, 4), 'replShare': HWAR_REPL_SHARE, 'replPerPa': round(repl_per_pa, 5),
              'lgGames': lg_games, 'lgPa': lg_pa, 'gdpRate': round(lg_gdp_rate, 4), 'gdpCost': round(lg_gdp_cost, 3),
-             'posAdj': HWAR_POS_ADJ, 'posInnings': HWAR_POS_INNINGS, 'nFld': n_fld, 'nBsr': n_bsr, 'nPos': n_pos,
+             'posAdj': {p: round(v, 2) for p, v in pos_tab.items()}, 'posAdjBase': HWAR_POS_ADJ, 'posSpread': HWAR_POS_SPREAD,
+             'posCenter': round(pos_center, 3), 'posInnings': HWAR_POS_INNINGS, 'nFld': n_fld, 'nBsr': n_bsr, 'nPos': n_pos,
              'nBsrFilledRows': n_filled, 'bsrFill': fill_const,
              'sumWar': round(tot, 1), 'sumFld': round(sum(r['hFldRuns'] for r in club), 1),
              'sumBsr': round(sum(r['hBsrRuns'] for r in club), 1), 'sumPos': round(sum(r['hPosRuns'] for r in club), 1)}
     print(f'  hWAR (hitters): {len(live)} rows, RPW {rpw:.2f}, replacement {repl_per_pa * 600:.1f} runs per 600 PA, '
           f'GIDP rate {lg_gdp_rate:.3f} at {lg_gdp_cost:.3f} runs each, fielding listed {n_fld}, baserunning listed {n_bsr} '
           f'(+{n_filled} rows filled), '
-          f'innings listed {n_pos}; club-row sums WAR {tot:.1f} fld {const["sumFld"]:+.1f} bsr {const["sumBsr"]:+.1f} pos {const["sumPos"]:+.1f}')
+          f'innings listed {n_pos}; positional spread {HWAR_POS_SPREAD} of fWAR around {pos_center:+.2f} '
+          f'(C {pos_tab["C"]:+.1f} SS {pos_tab["SS"]:+.1f} 1B {pos_tab["1B"]:+.1f} DH {pos_tab["DH"]:+.1f}); '
+          f'club-row sums WAR {tot:.1f} fld {const["sumFld"]:+.1f} bsr {const["sumBsr"]:+.1f} pos {const["sumPos"]:+.1f}')
     return const
