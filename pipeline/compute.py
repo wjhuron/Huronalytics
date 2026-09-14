@@ -482,6 +482,25 @@ def compute_hitter_stats(pitches):
         n_gdp_opp += 1
         if p['Event'] == 'Grounded Into DP':
             n_gdp += 1; gdp_cost += c
+    # bunts in play for hWAR (pipeline/hwar.py): a bunt at-bat is out of the xwOBA rate
+    # (Savant convention, compute_expected_stats) but inside PA, so the batting runs
+    # price it at its ACTUAL outcome (884 such PAs in MLB 2026, league wOBA .470 on them).
+    # A sacrifice bunt stays at the hitter's own rate: the manager's call, the line hWAR
+    # draws on leverage. Private counts, stripped before the dump; hwar.py applies the
+    # Guts weights so the linear weights stay single-homed with the wOBA column.
+    n_bunt_pa = n_bunt_1b = n_bunt_2b = n_bunt_3b = n_bunt_hr = 0
+    for p in pa_pitches:
+        if p.get('BBType') not in BUNT_BB_TYPES or p['Event'] in SH_EVENTS:
+            continue
+        n_bunt_pa += 1
+        if p['Event'] == 'Single':
+            n_bunt_1b += 1
+        elif p['Event'] == 'Double':
+            n_bunt_2b += 1
+        elif p['Event'] == 'Triple':
+            n_bunt_3b += 1
+        elif p['Event'] == 'Home Run':
+            n_bunt_hr += 1
     xbh = n_2b + n_3b + n_hr
     babip_denom = n_ab - n_k - n_hr + n_sf
     babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
@@ -652,6 +671,8 @@ def compute_hitter_stats(pitches):
     return {
         'pa': n_pa,
         'gdp': n_gdp, 'gdpOpp': n_gdp_opp, 'gdpCost': round(gdp_cost, 4),
+        '_buntPa': n_bunt_pa, '_bunt1B': n_bunt_1b, '_bunt2B': n_bunt_2b,
+        '_bunt3B': n_bunt_3b, '_buntHR': n_bunt_hr,
         'ab': n_ab,
         'nSwings': n_swings,
         'nBip': n_bip,

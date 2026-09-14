@@ -4225,7 +4225,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     hwar_const = apply_batting_runs(
         hitter_leaderboard, park=load_park_factors_savant(2026),
         lg_rpa=(GUTS_EXTRA or {}).get('lgRPA'), woba_scale=(GUTS_EXTRA or {}).get('wOBAScale'),
-        aaa_teams=AAA_TEAMS)
+        woba_weights=WOBA_WEIGHTS, aaa_teams=AAA_TEAMS)
 
     # FanGraphs override: replace our pipeline-computed wRC+ with canonical
     # FG values. FG has slightly different park-factor / wOBA-weight tuning

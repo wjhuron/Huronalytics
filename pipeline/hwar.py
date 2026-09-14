@@ -25,9 +25,26 @@ hWAR_se = batting sampling noise only: shrink x WAR_XW_PA_SD x sqrt(PA) / wOBAsc
     on the linear-weights scale the batting runs use. Fielding and baserunning noise is not
     in it, so it is a floor (Savant publishes no error on FRV or BRV).
 
-2026-09-05: batting runs first, the rest the same day.
+2026-09-05: batting runs first, the rest the same day. 2026-09-14: bunts in play at
+their actual outcome.
 
-    hBatRuns = (rate_adj - lgXW) x PA / wOBAscale        deserved batting runs above average
+    hBatRuns = [ rate_adj x (PA - B) + W - L x PA ] / wOBAscale     deserved batting runs above average
+
+    B, W      the hitter's bunt-in-play PAs (a bunt BBType whose Event is not a sacrifice) and
+              the sum of the Guts linear weights of their actual outcomes (a bunt single .89,
+              every out, force, fielder's choice, error and double play 0). The rate below
+              excludes bunt at-bats (Savant's convention) while PA includes them, so without
+              this term a bunt PA was priced at the hitter's own rate: Hamilton, Simpson and
+              Mullins each lost about 5 runs on 2026-09-14 (MLB 2026: 884 bunt-in-play PAs,
+              league wOBA .470 on them against a .314 rate). No expected model describes a
+              bunt, so the actual outcome is the value; it needs no shrink (an actual
+              outcome calibrates at 1 by construction). A sacrifice bunt, an IBB and a
+              catcher interference stay at the hitter's own rate: the manager's call, the
+              same job-versus-player line hWAR draws on leverage (and fWAR's rule).
+    L         the league anchor, [sum over MLB club rows of rate_adj x (PA - B) + sum of W]
+              / sum of PA, so club-row batting runs sum to zero (the shift above the raw
+              league mean is reported in metadata; the bunt term adds about .0009 to it, half
+              a run over 600 PA for a hitter who never bunts)
 
     rate      the hitter's PA-level xwOBA on the hitter basis, the same quantity the row's
               xwOBA column and xwRC+ stand on: Savant EV x LA per ball in play plus the
@@ -40,8 +57,6 @@ hWAR_se = batting sampling noise only: shrink x WAR_XW_PA_SD x sqrt(PA) / wOBAsc
               (data/park_factors.json, the pitcher side's file, eraplus._load_park); a
               combined 2TM.. row takes its MOST RECENT club (current_team_by_player, the
               same rule as pitcher hWAR); ROC rows get None
-    lgXW      PA-weighted mean of the adjusted rate over MLB club rows (the shift above the raw
-              league mean is reported), so batting runs above average sum to zero
     PA        official plate appearances, IBB included: an intentional walk is valued at the
               hitter's own rate (the fWAR convention) while the rate itself excludes it
     lgRPA, wOBAscale: FanGraphs Guts (metadata gutsConstants)
@@ -93,10 +108,18 @@ def hitter_park_map(rows, park, aaa_teams):
     return out
 
 
-def apply_batting_runs(rows, park, lg_rpa, woba_scale, aaa_teams=('ROC', 'AAA')):
+def apply_batting_runs(rows, park, lg_rpa, woba_scale, woba_weights=None, aaa_teams=('ROC', 'AAA')):
     """Writes hBatRuns on every row (None for ROC/AAA or no rate). Returns the constants
-    bundle for metadata, or None when the inputs are missing (announced)."""
+    bundle for metadata, or None when the inputs are missing (announced).
+    woba_weights: the Guts linear weights ({'1B', '2B', '3B', 'HR', ...}) that price a bunt
+    in play; without them every bunt PA falls back to the hitter's own rate (announced)."""
     aaa = set(aaa_teams)
+    bunt_w = None
+    if woba_weights and all(k in woba_weights for k in ('1B', '2B', '3B', 'HR')):
+        bunt_w = {k: float(woba_weights[k]) for k in ('1B', '2B', '3B', 'HR')}
+    else:
+        print('  hwar WARNING: no Guts linear weights; bunt-in-play PAs priced at the hitter\'s '
+              'own rate this run (the pre-2026-09-14 behaviour)')
     mlb = [r for r in rows if r.get('team') not in aaa and r.get('_xwOBAraw') is not None and (r.get('_xwOBAn') or 0) > 0]
     if not mlb or not lg_rpa or not woba_scale:
         print(f'  hwar WARNING: batting runs skipped (MLB rows with a rate {len(mlb)}, lgRPA {lg_rpa}, '
@@ -107,7 +130,8 @@ def apply_batting_runs(rows, park, lg_rpa, woba_scale, aaa_teams=('ROC', 'AAA'))
     den = sum(r['_xwOBAn'] for r in mlb)
     lg_xw = sum(r['_xwOBAraw'] * r['_xwOBAn'] for r in mlb) / den
     pmap = hitter_park_map(rows, park, aaa)
-    adj = {}
+    adj = {}     # id(row) -> shrunk, park-adjusted rate
+    bunt = {}    # id(row) -> (B, W): bunt-in-play PAs and the weight sum of their outcomes
     for r in rows:
         n = r.get('_xwOBAn') or 0
         if r.get('team') in aaa or r.get('_xwOBAraw') is None or n <= 0 or not r.get('pa'):
@@ -115,29 +139,45 @@ def apply_batting_runs(rows, park, lg_rpa, woba_scale, aaa_teams=('ROC', 'AAA'))
         sh = (r['_xwOBAraw'] * n + HWAR_N0_BAT * lg_xw) / (n + HWAR_N0_BAT)
         exposure = (pmap.get(id(r), 100.0) / 100.0 + 1.0) / 2.0
         adj[id(r)] = sh - HWAR_PARK_PASS_BAT * (exposure - 1.0) * lg_rpa * woba_scale
-    # Recenter on the PA-weighted mean of the adjusted rate over MLB CLUB rows (a combined
-    # 2TM.. row repeats its stints), so batting runs above average sum to zero, as pitcher
-    # hWAR's shift does. Without it the league summed to +377 runs (2026-09-05): the shrink
-    # pulls a low-PA hitter toward the mean hardest, and low-PA hitters are below average.
+        if bunt_w is None:
+            bunt[id(r)] = (0, 0.0)
+        else:
+            b = min(int(r.get('_buntPa') or 0), int(r['pa']))
+            w = sum(bunt_w[k] * (r.get(f'_bunt{k}') or 0) for k in bunt_w)
+            bunt[id(r)] = (b, w)
+    # Recenter on the league anchor L over MLB CLUB rows (a combined 2TM.. row repeats its
+    # stints): the PA-weighted mean of the adjusted rate on the non-bunt PAs plus the actual
+    # bunt outcomes, so batting runs above average sum to zero, as pitcher hWAR's shift
+    # does. Without it the league summed to +377 runs (2026-09-05): the shrink pulls a
+    # low-PA hitter toward the mean hardest, and low-PA hitters are below average.
     _num = _den = 0.0
     for r in rows:
         if id(r) in adj and not is_combined_team(r.get('team')):
-            _num += adj[id(r)] * r['pa']; _den += r['pa']
+            b, w = bunt[id(r)]
+            _num += adj[id(r)] * (r['pa'] - b) + w; _den += r['pa']
     lg_adj = _num / _den if _den > 0 else lg_xw
-    n_set = 0
+    n_set = 0; bunt_pa = 0; bunt_wsum = 0.0; bunt_runs = 0.0
     for r in rows:
         if id(r) not in adj:
             r['hBatRuns'] = None
             continue
-        r['hBatRuns'] = round((adj[id(r)] - lg_adj) * r['pa'] / woba_scale, 2)
+        b, w = bunt[id(r)]
+        r['hBatRuns'] = round((adj[id(r)] * (r['pa'] - b) + w - lg_adj * r['pa']) / woba_scale, 2)
         n_set += 1
+        if not is_combined_team(r.get('team')):
+            bunt_pa += b; bunt_wsum += w
+            bunt_runs += (w - adj[id(r)] * b) / woba_scale   # runs the actual outcome moves against the own-rate pricing
     club_sum = sum(r['hBatRuns'] for r in rows
                    if r.get('hBatRuns') is not None and not is_combined_team(r.get('team')))
     const = {'lgXW': round(lg_xw, 4), 'shift': round(lg_adj - lg_xw, 4), 'n0': HWAR_N0_BAT,
              'parkPass': HWAR_PARK_PASS_BAT, 'lgRPA': lg_rpa, 'wobaScale': woba_scale,
-             'nRows': n_set, 'clubSum': round(club_sum, 1)}
+             'nRows': n_set, 'clubSum': round(club_sum, 1),
+             'buntPa': bunt_pa, 'buntWoba': round(bunt_wsum / bunt_pa, 4) if bunt_pa else None,
+             'buntRuns': round(bunt_runs, 1), 'buntPriced': bunt_w is not None}
     print(f'  hWAR batting runs: {n_set} rows, league xwOBA {lg_xw:.4f}, shift {lg_adj - lg_xw:+.4f}, '
-          f'N0 {HWAR_N0_BAT} PA, park pass {HWAR_PARK_PASS_BAT}, club-row sum {club_sum:+.1f}')
+          f'N0 {HWAR_N0_BAT} PA, park pass {HWAR_PARK_PASS_BAT}, club-row sum {club_sum:+.1f}; '
+          f'bunts in play {bunt_pa} PA at wOBA {const["buntWoba"]} = {bunt_runs:+.1f} runs over own-rate pricing'
+          + ('' if bunt_w is not None else ' (NOT priced: no weights)'))
     return const
 
 
