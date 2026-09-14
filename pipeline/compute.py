@@ -673,6 +673,7 @@ def compute_hitter_stats(pitches):
         'gdp': n_gdp, 'gdpOpp': n_gdp_opp, 'gdpCost': round(gdp_cost, 4),
         '_buntPa': n_bunt_pa, '_bunt1B': n_bunt_1b, '_bunt2B': n_bunt_2b,
         '_bunt3B': n_bunt_3b, '_buntHR': n_bunt_hr,
+        '_tob': n_h + n_bb_all + n_hbp,   # times on base: the baserunning fill's scale (hwar.py)
         'ab': n_ab,
         'nSwings': n_swings,
         'nBip': n_bip,

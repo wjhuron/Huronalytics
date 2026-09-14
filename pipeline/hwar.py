@@ -4,21 +4,38 @@
     RPW  = 4 r / (2 r)^WAR_PYTH_EXP with r = lgRA9, the season constant pitcher hWAR uses
 
 BASERUNNING (hBsrRuns) = Savant Baserunning Run Value (extra-base advancement + steal
-    attempts, tracking-based, fetch_baserunning_runs; a runner under Savant's minimum scores
-    0 and is counted) + double-play runs: expected DP cost at the league rate over his
+    attempts, tracking-based, fetch_baserunning_runs) + double-play runs: expected DP cost at the league rate over his
     opportunities minus his actual DP cost, where an opportunity is a PA with a runner on
     first and fewer than two outs and the cost of a GIDP is what the SECOND out and the
     erased runner take beyond an ordinary out in that base-out state, from the published
     24-state run-expectancy table (RE24, Tango 2010-2015; a labeled convention, the state mix
     is measured). Savant's own delta_run_exp cannot price it: on 2021-2025 it reads a GIDP at
     -.33 against -.30 for a force out, one out's worth, so it is not used here.
+    A runner Savant does not list (2026-09-14: 239 listed of about 780 hitters; the listing
+    minimum is on N_runner_moved, which counts ADVANCES, so slow high-OBP hitters fall under
+    it and scored 0 until this date) is FILLED from his sprint speed and times on base:
+        fill = k x (a + b x sprint) x TOB
+    a, b: BRV per advance on sprint speed, fit each run on the listed runners (2026: -0.713 +
+    0.0258 x sprint, n 255, r .66; slope of actual on predicted .93); TOB = H + BB + HBP
+    (_tob, compute_hitter_stats); k: one scale solved so listed BRV + fills = 0 over the MLB
+    pool, because Savant's metric is zero-sum over ALL runners (listed +98 in 2026, so the
+    unlisted must carry about -98; three ways to turn a per-advance rate into a season
+    total disagreed on the total, -52 to -198, and the zero-sum property is the one outside
+    check). The shape is measured, the scale is a property; k = 0.298 advances per time on
+    base in 2026. A prior, not a measurement: it explains 44% of the variance among listed
+    runners, and the listed are faster (27.7 vs 27.1 ft/s) and play more than the unlisted.
+    Guards (HWAR_BSR_FIT_*): fewer than 100 listed runners with a sprint speed, a non-positive
+    slope, r under .4, or a k that is not positive freeze the last measured fit / scale and
+    say so. No sprint speed: 0, counted. No shrink: a regression prediction is already the
+    conditional mean.
 FIELDING (hFldRuns) = Savant Fielding Run Value total (range, arm, double play, framing,
     blocking, throwing; fetch_fielding_runs with min=1, 635 fielders in 2026), 0 when unlisted.
 POSITIONAL (hPosRuns) = innings by position (MLB API, fetch_fielding_innings; a DH game counts
     nine innings) x HWAR_POS_ADJ / 1458, the fWAR values per 162 games. A convention.
 REPLACEMENT (hReplRuns) = per PA, pinned so the club-row total of hWAR is exactly
-    HWAR_REPL_SHARE x 1000 x (league games / 2430): the fWAR 57/43 split the pitcher side's 0.12
-    wins per 9 is built on. About 19 runs per 600 PA in 2026 (fWAR: about 20).
+    HWAR_REPL_SHARE x WAR_POOL x (league games / WAR_POOL_GAMES): the fWAR 57/43 split, single-homed
+    in eraplus.py, where the pitcher side pins its starter bar to the other 43 since 2026-09-14.
+    About 19 runs per 600 PA in 2026 (fWAR: about 20).
 Season-level components (fielding, baserunning, positional) are split across a traded
 hitter's stint rows by PA share; his combined 2TM row carries the whole. ROC rows: None.
 hWAR_se = batting sampling noise only: shrink x WAR_XW_PA_SD x sqrt(PA) / wOBAscale / RPW,
@@ -79,7 +96,7 @@ quality and read -.18; do not re-measure it that way.
 """
 import math
 from pipeline.utils import current_team_by_player, player_key, is_combined_team
-from pipeline.eraplus import WAR_PYTH_EXP, WAR_XW_PA_SD
+from pipeline.eraplus import WAR_PYTH_EXP, WAR_XW_PA_SD, WAR_POOL, WAR_POOL_GAMES, WAR_POOL_SHARE_HITTERS
 
 HWAR_N0_BAT = 77            # PA; LOSO calibration slope of actual wOBA on the park-adjusted rate = 1.0
 HWAR_PARK_PASS_BAT = 0.35   # share of the published runs factor that reaches xwOBA, within batter
@@ -218,10 +235,82 @@ def gdp_extra_cost(runners, outs):
     return re_out - re_dp
 
 
+# ── baserunning fill for runners Savant does not list (module docstring) ──
+HWAR_BSR_FILL_FIT = (-0.7131, 0.0258)   # frozen fallback: BRV per advance = a + b x sprint, 2026-09-14 fit, n 255, r .66
+HWAR_BSR_FILL_K = 0.298                 # frozen fallback scale (advances per time on base), 2026-09-14
+HWAR_BSR_FIT_MIN_N = 100                # listed runners with a sprint speed the live fit needs
+HWAR_BSR_FIT_MIN_R = 0.4                # and the correlation it needs (2026: .66)
+
+
+def _ols(xs, ys):
+    """(intercept, slope, r) of ys on xs; None when degenerate."""
+    n = len(xs)
+    if n < 2:
+        return None
+    sx = sum(xs); sy = sum(ys); sxx = sum(x * x for x in xs); syy = sum(y * y for y in ys); sxy = sum(x * y for x, y in zip(xs, ys))
+    dx = n * sxx - sx * sx; dy = n * syy - sy * sy
+    if dx <= 0 or dy <= 0:
+        return None
+    b = (n * sxy - sx * sy) / dx
+    return (sy - b * sx) / n, b, (n * sxy - sx * sy) / math.sqrt(dx * dy)
+
+
+def baserunning_fill(baserunning, club, combined):
+    """{mlbId(str) -> filled Savant-scale baserunning runs} for MLB players Savant does not
+    list, plus the constants bundle. `club` = MLB club rows with batting runs, `combined` =
+    their 2TM.. rows (a sprint speed source when the club rows have none)."""
+    sprint, tob = {}, {}
+    for r in club:
+        mid = str(r.get('mlbId') or '')
+        if not mid:
+            continue
+        tob[mid] = tob.get(mid, 0) + int(r.get('_tob') or 0)
+        if r.get('sprintSpeed') is not None and mid not in sprint:
+            sprint[mid] = float(r['sprintSpeed'])
+    for r in combined:
+        mid = str(r.get('mlbId') or '')
+        if mid in tob and mid not in sprint and r.get('sprintSpeed') is not None:
+            sprint[mid] = float(r['sprintSpeed'])
+    xs, ys = [], []
+    listed_sum = 0.0
+    for mid in tob:
+        br = baserunning.get(mid)
+        if not br:
+            continue
+        listed_sum += br['tot']
+        if mid in sprint and (br.get('moved') or 0) > 0:
+            xs.append(sprint[mid]); ys.append(br['tot'] / br['moved'])
+    fit = _ols(xs, ys)
+    live_fit = fit is not None and len(xs) >= HWAR_BSR_FIT_MIN_N and fit[1] > 0 and fit[2] >= HWAR_BSR_FIT_MIN_R
+    if live_fit:
+        a, b, r_fit = fit
+    else:
+        a, b = HWAR_BSR_FILL_FIT; r_fit = None
+        print(f'  hwar WARNING: baserunning fill fit not usable (n {len(xs)}, fit {fit}); '
+              f'FROZEN fit {HWAR_BSR_FILL_FIT} used')
+    raw = {mid: (a + b * sprint[mid]) * tob[mid] for mid in tob
+           if mid not in baserunning and mid in sprint and tob[mid] > 0}
+    raw_sum = sum(raw.values())
+    k = -listed_sum / raw_sum if raw_sum and listed_sum and (-listed_sum / raw_sum) > 0 else None
+    if k is None:
+        k = HWAR_BSR_FILL_K
+        print(f'  hwar WARNING: baserunning fill scale cannot be pinned (listed sum {listed_sum:+.1f}, '
+              f'raw fill sum {raw_sum:+.1f}); FROZEN k {HWAR_BSR_FILL_K} used')
+    fills = {mid: k * v for mid, v in raw.items()}
+    n_zero = sum(1 for mid in tob if mid not in baserunning and mid not in fills)
+    const = {'liveFit': live_fit, 'a': round(a, 4), 'b': round(b, 4), 'r': round(r_fit, 3) if r_fit is not None else None,
+             'nFit': len(xs), 'k': round(k, 4), 'nFilled': len(fills), 'nZero': n_zero,
+             'listedSum': round(listed_sum, 1), 'fillSum': round(sum(fills.values()), 1)}
+    print(f'  hWAR baserunning fill: {len(fills)} unlisted runners filled from sprint speed '
+          f'(fit a {a:+.4f} b {b:.4f} on {len(xs)} listed, r {r_fit if r_fit is None else round(r_fit, 3)}, '
+          f'k {k:.3f}), {n_zero} with no sprint speed score 0; listed sum {listed_sum:+.1f}, fill sum {const["fillSum"]:+.1f}')
+    return fills, const
+
+
 # ── positional and replacement conventions (fWAR) ──
 HWAR_POS_ADJ = {'C': 12.5, 'SS': 7.5, '2B': 2.5, '3B': 2.5, 'CF': 2.5, 'LF': -7.5, 'RF': -7.5, '1B': -12.5, 'DH': -17.5}
 HWAR_POS_INNINGS = 1458.0     # a full season of innings at a position (162 x 9)
-HWAR_REPL_SHARE = 0.57        # share of the 1000-WAR pool that is position players (fWAR: 570)
+HWAR_REPL_SHARE = WAR_POOL_SHARE_HITTERS   # share of the WAR_POOL that is position players (fWAR: 570); single home in eraplus.py
 
 
 def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, team_games, aaa_teams=('ROC', 'AAA')):
@@ -250,7 +339,8 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
         mid = r.get('mlbId')
         if mid:
             pa_by_id[mid] = pa_by_id.get(mid, 0) + r['pa']
-    n_fld = n_bsr = n_pos = 0
+    bsr_fill, fill_const = baserunning_fill(baserunning, club, [r for r in live if is_combined_team(r.get('team'))])
+    n_fld = n_bsr = n_pos = n_filled = 0
     for r in rows:
         if r.get('hBatRuns') is None:
             for k in ('hBsrRuns', 'hFldRuns', 'hPosRuns', 'hReplRuns', 'hWAR', 'hWAR_se'):
@@ -259,7 +349,11 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
         mid = str(r.get('mlbId') or '')
         share = 1.0 if is_combined_team(r.get('team')) else (r['pa'] / pa_by_id[r['mlbId']] if r.get('mlbId') and pa_by_id.get(r['mlbId']) else 1.0)
         fr = fielding.get(mid); fld = (fr.get('total') or 0.0) if fr else 0.0; n_fld += 1 if fr else 0
-        br = baserunning.get(mid); bsr_sav = br['tot'] if br else 0.0; n_bsr += 1 if br else 0
+        br = baserunning.get(mid)
+        if br:
+            bsr_sav = br['tot']; n_bsr += 1
+        else:
+            bsr_sav = bsr_fill.get(mid, 0.0); n_filled += 1 if mid in bsr_fill else 0
         wgdp = lg_gdp_rate * (r.get('gdpOpp') or 0) * lg_gdp_cost - (r.get('gdpCost') or 0.0)
         inn = innings.get(mid) or {}
         pos = sum((inn.get(p, 0.0) if p != 'DH' else 9.0 * inn.get('DH_games', 0)) * adj / HWAR_POS_INNINGS
@@ -270,7 +364,7 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
     # replacement runs per PA, pinned so the club-row total is exactly the share of the pool:
     # the fWAR positional values sum to about -17.5 runs per team-season (the DH), so a fixed
     # per-PA replacement would leave the league at 92% of its share (452 of 493 on 2026-09-05)
-    target = HWAR_REPL_SHARE * 1000.0 * rpw * (lg_games / 2430.0)
+    target = HWAR_REPL_SHARE * WAR_POOL * rpw * (lg_games / WAR_POOL_GAMES)
     above = sum(r['hBatRuns'] + r['hBsrRuns'] + r['hFldRuns'] + r['hPosRuns'] for r in club)
     repl_per_pa = (target - above) / lg_pa
     for r in rows:
@@ -284,9 +378,11 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
     const = {'rpw': round(rpw, 4), 'replShare': HWAR_REPL_SHARE, 'replPerPa': round(repl_per_pa, 5),
              'lgGames': lg_games, 'lgPa': lg_pa, 'gdpRate': round(lg_gdp_rate, 4), 'gdpCost': round(lg_gdp_cost, 3),
              'posAdj': HWAR_POS_ADJ, 'posInnings': HWAR_POS_INNINGS, 'nFld': n_fld, 'nBsr': n_bsr, 'nPos': n_pos,
+             'nBsrFilledRows': n_filled, 'bsrFill': fill_const,
              'sumWar': round(tot, 1), 'sumFld': round(sum(r['hFldRuns'] for r in club), 1),
              'sumBsr': round(sum(r['hBsrRuns'] for r in club), 1), 'sumPos': round(sum(r['hPosRuns'] for r in club), 1)}
     print(f'  hWAR (hitters): {len(live)} rows, RPW {rpw:.2f}, replacement {repl_per_pa * 600:.1f} runs per 600 PA, '
-          f'GIDP rate {lg_gdp_rate:.3f} at {lg_gdp_cost:.3f} runs each, fielding listed {n_fld}, baserunning listed {n_bsr}, '
+          f'GIDP rate {lg_gdp_rate:.3f} at {lg_gdp_cost:.3f} runs each, fielding listed {n_fld}, baserunning listed {n_bsr} '
+          f'(+{n_filled} rows filled), '
           f'innings listed {n_pos}; club-row sums WAR {tot:.1f} fld {const["sumFld"]:+.1f} bsr {const["sumBsr"]:+.1f} pos {const["sumPos"]:+.1f}')
     return const

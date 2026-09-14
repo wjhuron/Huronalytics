@@ -73,7 +73,18 @@ hWAR (2026-09-05): a deserved pitcher WAR on hdERA. One pitcher-season:
               on the runs scale hdERA itself uses (DH_B per pool SD of shrunk xwOBA, about 53
               runs/9 per xwOBA point; the linear-weights scale PA9/wOBAscale is 31 and reads 1.7x
               too narrow: war_error_bar.py, split-half variance ratio 1.09 on this scale)
-    REPL    = REPL_RP + (WAR_REPL_SP - REPL_RP) * GS/G,  REPL_RP = WAR_REPL_SP - WAR_ROLE_GAP / RPW
+    REPL    = REPL_RP + (REPL_SP - REPL_RP) * GS/G,  REPL_RP = REPL_SP - WAR_ROLE_GAP / RPW
+    REPL_SP = [ target + (WAR_ROLE_GAP / RPW) x sum over MLB club rows of (1 - GS/G) x IP/9 ] / sum of IP/9
+              target = (1 - WAR_POOL_SHARE_HITTERS) x WAR_POOL x lgGames / WAR_POOL_GAMES
+              (2026-09-14) the starter bar is SOLVED each run so the club-row total is exactly
+              the pitcher share of the pool, the rule the hitter side already used (hwar.py pins
+              its per-PA replacement to the 57 percent share). fWAR's published 0.12 wins per 9
+              is the OUTPUT of that pin in a normal season; borrowed as a fixed input it left the
+              pitcher pool 8 percent short (356.7 of 393.5 on 2026-09-14) for no measured reason.
+              The role gap stays fixed in runs, so the pin is one top-up per inning for every
+              pitcher (+0.0084 wins per 9 in 2026: +0.17 at 180 IP, +0.06 at 65). No lgGames in
+              metadata, or a solved bar outside WAR_REPL_SP_BAND, keeps the fixed WAR_REPL_SP
+              and says so.
 
 Improvement battery (2026-09-05, scripts/research/era/war_improve_battery.py + _battery2.py,
 war_calibration_slope.py; data/_war_improve_battery*.json). The rate is at a plateau: the
@@ -233,8 +244,17 @@ LHP_SHARE_FALLBACK = 0.278
 
 # ── hWAR (2026-09-05) ────────────────────────────────────────────────────
 WAR_PYTH_EXP = 0.287     # PythagenPat exponent; RPW = 4r/(2r)^0.287 = 9.4-9.9 at 2021-2026 run environments
-WAR_REPL_SP = 0.12       # wins per 9 IP a starter earns above replacement (fWAR's .380); the one
-                         # convention that sets the league total (~430 WAR with the measured gap)
+WAR_POOL = 1000.0        # wins above replacement in a full season of WAR_POOL_GAMES: the .294
+WAR_POOL_GAMES = 2430.0  # replacement winning percentage (FanGraphs/B-Ref unification, 2013). Convention.
+WAR_POOL_SHARE_HITTERS = 0.57  # fWAR's split ("the role we believe each plays"): position players 570,
+                         # pitchers the remainder. A judgment, not a measurement; single home for both
+                         # sides (hwar.py imports it). Candidate for the free-pool measurement.
+WAR_REPL_SP = 0.12       # wins per 9 IP a starter earns above replacement (fWAR's .380). Since
+                         # 2026-09-14 the FIXED FALLBACK only: the live bar is solved so the pitcher
+                         # pool is exactly its share (module docstring). Used when lgGames is missing
+                         # or the solved bar leaves WAR_REPL_SP_BAND, announced either way.
+WAR_REPL_SP_BAND = (0.08, 0.16)  # sanity band on the solved starter bar (2026: 0.128); a wrong games
+                         # count would otherwise move every pitcher silently
 WAR_ROLE_GAP = 0.85      # runs per 9 the reliever job is worth to the same pitcher, measured WITHIN
                          # SEASON on 281 swingman pitcher-seasons 2021-2025 (>= 50 PA in each role,
                          # side and starter reconstructed from pitch order; -0.53..-1.28 by season,
@@ -589,7 +609,6 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
     lg_era = (league_rates or {}).get('lgERA')
     if lg_ra9 and lg_era:
         rpw = 4.0 * lg_ra9 / (2.0 * lg_ra9) ** WAR_PYTH_EXP        # league environment: replacement split + fallback
-        repl_rp = WAR_REPL_SP - WAR_ROLE_GAP / rpw
         _xw_sd = mu_sd['xw'][1] if mu_sd.get('xw') else None   # pool SD of shrunk xwOBA against, hdERA's z unit
 
         def _rate_dp(r):
@@ -606,6 +625,29 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
             if v is not None and o > 0 and not is_combined_fn(r.get('team')):
                 _num += v * o; _den += o
         shift = (lg_ra9 - _num / _den) if _den > 0 else 0.0
+        # replacement pin (module docstring): the starter bar solved so the MLB club-row
+        # total equals the pitcher share of the pool; the role gap stays fixed in runs
+        lg_games = (league_rates or {}).get('lgGames')
+        _sum_ip9 = _sum_rp = 0.0
+        for r in mlb:
+            v = _rate_dp(r); o = _ip_outs(r.get('ip')); g = r.get('g') or 0
+            if v is None or o <= 0 or is_combined_fn(r.get('team')):
+                continue
+            _ip9 = o / 27.0; _s = (r.get('gs') or 0) / g if g else 0.0
+            _sum_ip9 += _ip9; _sum_rp += (1.0 - _s) * _ip9
+        repl_sp = WAR_REPL_SP; pinned = False; target = None
+        if lg_games and _sum_ip9 > 0:
+            target = (1.0 - WAR_POOL_SHARE_HITTERS) * WAR_POOL * (lg_games / WAR_POOL_GAMES)
+            _cand = (target + (WAR_ROLE_GAP / rpw) * _sum_rp) / _sum_ip9
+            if WAR_REPL_SP_BAND[0] <= _cand <= WAR_REPL_SP_BAND[1]:
+                repl_sp = _cand; pinned = True
+            else:
+                print(f'  eraplus WARNING: solved starter bar {_cand:.4f} wins per 9 is outside '
+                      f'{WAR_REPL_SP_BAND}; the FIXED {WAR_REPL_SP} is kept and the pitcher pool is not pinned')
+        else:
+            print(f'  eraplus WARNING: no lgGames in metadata pitcherLeagueAverages (run process_data first); '
+                  f'pitcher replacement NOT pinned, fixed starter bar {WAR_REPL_SP} kept')
+        repl_rp = repl_sp - WAR_ROLE_GAP / rpw
         n_war = 0
         for r in rows:
             if r.get('team') in aaa:
@@ -616,7 +658,7 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
                 r['hWAR'] = None; r['hWAR_se'] = None
                 continue
             ip9 = o / 27.0
-            repl = repl_rp + (WAR_REPL_SP - repl_rp) * ((r.get('gs') or 0) / g if g else 0.0)
+            repl = repl_rp + (repl_sp - repl_rp) * ((r.get('gs') or 0) / g if g else 0.0)
             rate_i = v + shift
             if WAR_DYNAMIC_RPW:
                 _env = max(0.5 * (rate_i + lg_ra9), 1.0)
@@ -630,11 +672,15 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
             n_war += 1
         war_const = {'lgRA9': round(lg_ra9, 4), 'lgERA': round(lg_era, 4), 'rpw': round(rpw, 4),
                      'dynamicRpw': WAR_DYNAMIC_RPW, 'xwPaSd': WAR_XW_PA_SD,
-                     'replSp': WAR_REPL_SP, 'replRp': round(repl_rp, 4), 'roleGap': WAR_ROLE_GAP,
+                     'replSp': round(repl_sp, 4), 'replRp': round(repl_rp, 4), 'roleGap': WAR_ROLE_GAP,
+                     'replPinned': pinned, 'replSpFixed': WAR_REPL_SP, 'replSpBand': WAR_REPL_SP_BAND,
+                     'pool': WAR_POOL, 'poolGames': WAR_POOL_GAMES, 'poolShareHitters': WAR_POOL_SHARE_HITTERS,
+                     'lgGames': lg_games, 'target': round(target, 2) if target is not None else None,
                      'parkPass': WAR_PARK_PASS, 'shift': round(shift, 4), 'pythExp': WAR_PYTH_EXP,
                      'nRows': n_war, 'sum': round(sum(r['hWAR'] for r in mlb if r.get('hWAR') is not None
                                                       and not is_combined_fn(r.get('team'))), 1)}
-        print(f"  hWAR: {n_war} rows, RPW {rpw:.2f}, repl SP {WAR_REPL_SP:.3f} / RP {repl_rp:.3f} wins per 9, "
+        print(f"  hWAR: {n_war} rows, RPW {rpw:.2f}, repl SP {repl_sp:.4f} / RP {repl_rp:.4f} wins per 9 "
+              f"({'PINNED to ' + format(target, '.1f') if pinned else 'FIXED, not pinned'}), "
               f"shift {shift:+.3f}, MLB club-row sum {war_const['sum']:.1f}")
     else:
         print('  eraplus WARNING: no lgRA9/lgERA in metadata pitcherLeagueAverages — hWAR '

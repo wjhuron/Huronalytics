@@ -4747,6 +4747,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         # without them hWAR is carried, never recomputed (fail closed).
         metadata['pitcherLeagueAverages']['lgRA9'] = round(total_r * 9 / total_ip, 4)
         metadata['pitcherLeagueAverages']['lgERA'] = round(total_er * 9 / total_ip, 4)
+        # league games played (30 MLB clubs, half of the club-games sum): the pitcher
+        # replacement pin's scale (eraplus WAR_POOL_GAMES). Without it the inject
+        # step keeps the fixed starter bar and says so.
+        _tgp = metadata.get('teamGamesPlayed') or {}
+        if _tgp:
+            metadata['pitcherLeagueAverages']['lgGames'] = sum(_tgp.values()) / 2.0
 
         # -- position-player hWAR assembly (pipeline/hwar.py): needs lgRA9 (RPW), the Guts
         # scale, the fielding / innings / baserunning feeds and the team games played.
