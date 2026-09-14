@@ -1063,6 +1063,7 @@
 "Holt, Brock": 70.0,
 "Holton, Tyler": 74.0,
 "Honeywell, Brent": 74.0,
+"Hopkins, Brody": 76.0,
 "Hoppe, Alex": 73.0,
 "Horn, Bailey": 74.0,
 "Horton, Cade": 73.0,
@@ -5843,6 +5844,9 @@
 "Honeywell, Brent": [
 641703
 ],
+"Hopkins, Brody": [
+811315
+],
 "Hoppe, Alex": [
 695380
 ],
@@ -10605,6 +10609,6 @@
 594798
 ]
 },
-"league_mean": 73.73,
-"n": 2649
+"league_mean": 73.74,
+"n": 2650
 }
