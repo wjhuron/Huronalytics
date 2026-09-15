@@ -941,7 +941,7 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
 
     Returns:
         pitcher_results: dict[(pitcher, team, throws)] ->
-            {locPlus, raw_loc_adj, n_pitches, zone_loc, heatmap, locRuns100}
+            {locPlus, raw_loc_adj, n_pitches, zone_loc, locRuns100} (heatmap only with want_heatmap)
         pitch_results:   dict[(pitcher, team, pitch_type, throws)] ->
             {locPlus, raw_loc_adj, n_pitches, locRuns100}  (std within group)
         weight_table_json: metadata dict
@@ -949,7 +949,9 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
     baseline = [p for p in all_pitches if is_eligible_baseline(p)]
     S = build_surfaces(baseline, lg_woba, woba_scale)
 
-    pitcher_raw = _aggregate(pitches_by_pitcher, S, want_zone=True, want_heatmap=True)
+    # want_heatmap off since 2026-09-15: the per-pitcher grid fed only the site's Loc+
+    # command map, which was removed; _aggregate keeps the option for research.
+    pitcher_raw = _aggregate(pitches_by_pitcher, S, want_zone=True, want_heatmap=False)
     pitcher_results, ov_anchors = _normalize(
         pitcher_raw, N_PRIOR_OVERALL, MIN_POOL_OVERALL,
         pool_filter=lambda k: k[1] not in AAA_TEAMS,
