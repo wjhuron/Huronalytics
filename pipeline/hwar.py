@@ -54,9 +54,20 @@ REPLACEMENT (hReplRuns) = per PA, pinned so the club-row total of hWAR is exactl
     About 19 runs per 600 PA in 2026 (fWAR: about 20).
 Season-level components (fielding, baserunning, positional) are split across a traded
 hitter's stint rows by PA share; his combined 2TM row carries the whole. ROC rows: None.
-hWAR_se = batting sampling noise only: shrink x WAR_XW_PA_SD x sqrt(PA) / wOBAscale / RPW,
-    on the linear-weights scale the batting runs use. Fielding and baserunning noise is not
-    in it, so it is a floor (Savant publishes no error on FRV or BRV).
+hWAR_se = sqrt(bat^2 + fld^2 + bsr^2) / RPW, one standard error in wins (2026-09-15; batting only
+    before that date, which read 27 percent too narrow at the median).
+      bat = shrink x WAR_XW_PA_SD x sqrt(PA) / wOBAscale, the per-PA xwOBA sampling noise on the
+            linear-weights scale the batting runs use
+      fld = HWAR_FLD_NOISE_SD x sqrt(outs / HWAR_FLD_NOISE_OUTS) x share, 0 for an unlisted fielder
+      bsr = HWAR_BSR_NOISE_SD x sqrt(PA / HWAR_BSR_NOISE_PA) x share, for a listed AND a filled runner
+            (the fill's model error is not separately measured; the listed-runner constant is used and
+            labeled; without the PA scaling a 30-PA hitter carried a regular's baserunning noise)
+    Savant publishes no error on FRV or BRV, so both constants come from year-to-year reliability,
+    sd x sqrt(1 - r) over players listed in both seasons (2023-2026, three pairs): FRV total
+    r .51-.62 among fielders with 1500+ outs, sd 6.5-6.7 runs, noise 4.0-4.7 at a median of about
+    3000 outs; BRV total r .61-.70, sd 2.6-3.0, noise 1.6-1.8. Year-to-year r also carries true
+    change, so both are CEILINGS on the noise, and the bar is an upper bound. Positional and
+    double-play noise are counts and are left out.
 
 2026-09-05: batting runs first, the rest the same day. 2026-09-14: bunts in play at
 their actual outcome.
@@ -115,6 +126,10 @@ from pipeline.utils import current_team_by_player, player_key, is_combined_team
 from pipeline.eraplus import WAR_PYTH_EXP, WAR_XW_PA_SD, WAR_POOL, WAR_POOL_GAMES, WAR_POOL_SHARE_HITTERS
 
 HWAR_N0_BAT = 77            # PA; LOSO calibration slope of actual wOBA on the park-adjusted rate = 1.0
+HWAR_FLD_NOISE_SD = 4.3     # runs; ceiling on Savant FRV noise at HWAR_FLD_NOISE_OUTS, sd x sqrt(1 - r) year to year
+HWAR_FLD_NOISE_OUTS = 3000  # (2023-2026 pairs: 4.03 / 4.33 / 4.67 at medians 2944 / 2953 / 3088 outs). Scaled by sqrt(outs).
+HWAR_BSR_NOISE_SD = 1.7     # runs; ceiling on Savant BRV noise, same design (1.77 / 1.59 / 1.65), measured on listed runners
+HWAR_BSR_NOISE_PA = 450     # at their mean exposure (2026 listed runners: mean 449 PA, median 467). Scaled by sqrt(PA).
 HWAR_PARK_PASS_BAT = 0.35   # share of the published runs factor that reaches xwOBA, within batter
 
 
@@ -408,12 +423,23 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
         r['hReplRuns'] = round(repl_per_pa * r['pa'], 2)
         r['hWAR'] = round((r['hBatRuns'] + r['hBsrRuns'] + r['hFldRuns'] + r['hPosRuns'] + r['hReplRuns']) / rpw, 2)
         n = r.get('_xwOBAn') or 0
-        r['hWAR_se'] = round((n / (n + HWAR_N0_BAT)) * WAR_XW_PA_SD * math.sqrt(r['pa']) / woba_scale / rpw, 2) if n > 0 else None
+        if n > 0:
+            mid = str(r.get('mlbId') or '')
+            share = 1.0 if is_combined_team(r.get('team')) else (r['pa'] / pa_by_id[r['mlbId']] if r.get('mlbId') and pa_by_id.get(r['mlbId']) else 1.0)
+            fr = fielding.get(mid)
+            outs = sum((fr.get('outs_by_pos') or {}).values()) if fr else 0
+            bat = (n / (n + HWAR_N0_BAT)) * WAR_XW_PA_SD * math.sqrt(r['pa']) / woba_scale
+            fld_se = HWAR_FLD_NOISE_SD * math.sqrt(outs * share / HWAR_FLD_NOISE_OUTS) if outs else 0.0
+            bsr_se = HWAR_BSR_NOISE_SD * math.sqrt(r['pa'] * share / HWAR_BSR_NOISE_PA)
+            r['hWAR_se'] = round(math.sqrt(bat * bat + fld_se * fld_se + bsr_se * bsr_se) / rpw, 2)
+        else:
+            r['hWAR_se'] = None
     tot = sum(r['hWAR'] for r in club)
     const = {'rpw': round(rpw, 4), 'replShare': HWAR_REPL_SHARE, 'replPerPa': round(repl_per_pa, 5),
              'lgGames': lg_games, 'lgPa': lg_pa, 'gdpRate': round(lg_gdp_rate, 4), 'gdpCost': round(lg_gdp_cost, 3),
              'posAdj': {p: round(v, 2) for p, v in pos_tab.items()}, 'posAdjBase': HWAR_POS_ADJ, 'posSpread': HWAR_POS_SPREAD,
-             'posCenter': round(pos_center, 3), 'posInnings': HWAR_POS_INNINGS, 'nFld': n_fld, 'nBsr': n_bsr, 'nPos': n_pos,
+             'posCenter': round(pos_center, 3), 'posInnings': HWAR_POS_INNINGS,
+             'seFldSd': HWAR_FLD_NOISE_SD, 'seFldOuts': HWAR_FLD_NOISE_OUTS, 'seBsrSd': HWAR_BSR_NOISE_SD, 'seBsrPa': HWAR_BSR_NOISE_PA, 'nFld': n_fld, 'nBsr': n_bsr, 'nPos': n_pos,
              'nBsrFilledRows': n_filled, 'bsrFill': fill_const,
              'sumWar': round(tot, 1), 'sumFld': round(sum(r['hFldRuns'] for r in club), 1),
              'sumBsr': round(sum(r['hBsrRuns'] for r in club), 1), 'sumPos': round(sum(r['hPosRuns'] for r in club), 1)}

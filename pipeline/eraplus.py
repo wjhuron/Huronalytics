@@ -93,7 +93,7 @@ xwOBA shrink N0 0-1000 moves nothing outside noise (250 stays), the linear-weigh
 reliability. Per-pitch channels: framing runs RECEIVED are half-stable (rel .43) and carry
 a NEGATIVE next-season weight, so neutralizing the catcher would remove pitcher signal
 (rejected); pulled-air excess predicts next season 5/5 at 60 IP but loses reliability 0/6
-(open: test it as a fixed per-BIP adjustment, not a fitted channel); running game and
+(the fixed per-BIP form was tested the same day in war_pullair_fixed.py and REJECTED: nxt60 up 5/5 at every C, rel and ros down 0-1/6, no exchange rate); running game and
 WP/BK lose everywhere; the pitcher's actual home-pitch share changes nothing. Calibration:
 the same-season slope of actual RA9 on the rate reads .86 because of selection on outcomes
 (low-IP arms 1.33, high-IP .76, the winner's-curse signature), not over-dispersion, so
