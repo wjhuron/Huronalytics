@@ -2449,7 +2449,6 @@ var PlayerPage = {
     if (!pitches || pitches.length === 0) { section.style.display = 'none'; return; }
 
     section.style.display = '';
-    this._renderLocCommandMap(data);
     var hand = this._heatMapHand || 'R';
 
     // Compute average strike zone across ALL pitches (not per-type)
@@ -2513,112 +2512,6 @@ var PlayerPage = {
     // Legend removed — blue-to-red heat scale is intuitive
   },
 
-  // Loc+ command map: the pitcher's own pitch locations colored by the league
-  // EXPECTED hitter-perspective run value of each spot (blue = good location
-  // for the pitcher, red = costly), opacity by how often he throws there.
-  // Season-level (not refiltered); reads the per-pitcher heatmap grid shipped
-  // by pipeline_locplus.py.
-  _renderLocCommandMap: function(data) {
-    var wrap = document.getElementById('player-command-map');
-    if (!wrap) return;
-    var hm = data && data.locPlusHeatmap;
-    if (!hm || !hm.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
-    wrap.style.display = '';
-    wrap.innerHTML = '';
-
-    var label = document.createElement('div');
-    label.className = 'heatmap-label';
-    var title = document.createElement('span');
-    title.textContent = 'Loc+ Command Map (season, all hitters)';
-    label.appendChild(title);
-    if (data.locPlus != null) {
-      var meta = document.createElement('span');
-      meta.className = 'heatmap-label-meta';
-      // No leading + on positive runs/100 (house number-format rule).
-      var rr = (data.locRuns100 != null) ? (' · ' + data.locRuns100.toFixed(2) + ' runs/100') : '';
-      meta.textContent = '· ' + Math.round(data.locPlus) + rr;
-      label.appendChild(meta);
-    }
-    wrap.appendChild(label);
-
-    var canvas = document.createElement('canvas');
-    canvas.width = 250;
-    canvas.height = 300;
-    wrap.appendChild(canvas);
-
-    var note = document.createElement('div');
-    note.className = 'command-map-note';
-    // Season-only by construction: pipeline_locplus.py ships one grid per
-    // pitcher, not one per batter hand, so the toggle above cannot move it.
-    note.textContent = 'blue = good location · red = costly · opacity = usage · does not follow the vs LHH/RHH toggle';
-    wrap.appendChild(note);
-
-    this._renderLocValueCanvas(canvas, hm);
-  },
-
-  _renderLocValueCanvas: function(canvas, hm) {
-    var ctx = canvas.getContext('2d');
-    var W = canvas.width, H = canvas.height;
-
-    // Grid mirrors pipeline_locplus.py: x in feet, z is zone-normalized.
-    // Grid geometry is single-homed in pipeline/locplus.py and SHIPPED in
-    // metadata.locPlusWeights.config — read it, never re-declare it. This
-    // used to be a hardcoded second copy with nothing marking it as paired,
-    // so any change to the Python grid would have silently drawn every cell
-    // of this map in the wrong place (found 2026-08-30). The literals below
-    // are a last-resort fallback for a stale cached metadata blob only.
-    var _lc = (typeof DataStore !== 'undefined' && DataStore.metadata
-               && DataStore.metadata.locPlusWeights
-               && DataStore.metadata.locPlusWeights.config) || {};
-    var X_MIN = (_lc.xMin != null) ? _lc.xMin : -1.5;
-    var Z_MIN = (_lc.zMin != null) ? _lc.zMin : -0.6;
-    var BIN_X = (_lc.binX_in != null) ? _lc.binX_in / 12 : 2 / 12;
-    var BIN_Z = (_lc.binZ_frac != null) ? _lc.binZ_frac : 0.10;
-    // Display bounds (a little padding beyond the zone).
-    var xMin = -1.7, xMax = 1.7, znMin = -0.5, znMax = 1.6;
-    function cx(px) { return ((px - xMin) / (xMax - xMin)) * W; }
-    function cy(zn) { return ((znMax - zn) / (znMax - znMin)) * H; } // flip: top = high z
-
-    ctx.fillStyle = '#e8dfcb';
-    ctx.fillRect(0, 0, W, H);
-
-    var nMax = 1;
-    for (var k = 0; k < hm.length; k++) { if (hm[k][3] > nMax) nMax = hm[k][3]; }
-    // Diverging domain on hitter-perspective xRV: low = good (blue), high = bad (red).
-    var LO = -0.06, HI = 0.06;
-    for (var k = 0; k < hm.length; k++) {
-      var i = hm[k][0], j = hm[k][1], val = hm[k][2], n = hm[k][3];
-      var pxc = X_MIN + (i + 0.5) * BIN_X;
-      var znc = Z_MIN + (j + 0.5) * BIN_Z;
-      var x0 = cx(pxc - BIN_X / 2), x1 = cx(pxc + BIN_X / 2);
-      var y0 = cy(znc + BIN_Z / 2), y1 = cy(znc - BIN_Z / 2);
-      var t = (val - LO) / (HI - LO);
-      if (t < 0) t = 0; else if (t > 1) t = 1;
-      ctx.globalAlpha = 0.2 + 0.8 * Math.sqrt(n / nMax);
-      ctx.fillStyle = this._heatColor(t);
-      ctx.fillRect(x0, y0, (x1 - x0) + 0.5, (y1 - y0) + 0.5);
-    }
-    ctx.globalAlpha = 1;
-
-    // Strike zone (zone-normalized 0..1; plate half-width ~0.83 ft)
-    var zl = cx(-0.83), zr = cx(0.83), zt = cy(1), zb = cy(0);
-    ctx.strokeStyle = 'rgba(58,48,38,0.65)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(zl, zt, zr - zl, zb - zt);
-    ctx.strokeStyle = 'rgba(58,48,38,0.28)';
-    ctx.lineWidth = 1;
-    var tw = (zr - zl) / 3, th = (zb - zt) / 3;
-    for (var ti = 1; ti < 3; ti++) {
-      ctx.beginPath(); ctx.moveTo(zl + ti * tw, zt); ctx.lineTo(zl + ti * tw, zb); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(zl, zt + ti * th); ctx.lineTo(zr, zt + ti * th); ctx.stroke();
-    }
-
-    var py = cy(-0.4), pcx = cx(0);
-    ctx.fillStyle = 'rgba(58,48,38,0.18)';
-    ctx.beginPath();
-    ctx.moveTo(pcx - 8, py); ctx.lineTo(pcx + 8, py); ctx.lineTo(pcx + 5, py + 5);
-    ctx.lineTo(pcx, py + 8); ctx.lineTo(pcx - 5, py + 5); ctx.closePath(); ctx.fill();
-  },
 
   _renderSingleHeatMap: function(canvas, pitches, szTop, szBot, hand) {
     var ctx = canvas.getContext('2d');
@@ -3139,7 +3032,7 @@ var PlayerPage = {
     var mainToggleId = type === 'pitcher' ? 'pitcher-platoon-toggle' : 'hitter-platoon-toggle';
     // All synced toggle IDs for pitchers
     var syncedIds = type === 'pitcher'
-      ? ['pitcher-platoon-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
+      ? ['pitcher-platoon-toggle', 'pitcher-arsenal-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
       // hitter-battracking-toggle is deliberately absent — bat tracking is
       // season-only in the embed, so that section carries no hand toggle.
       : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle',
@@ -3176,7 +3069,7 @@ var PlayerPage = {
   // carry ROC, so those stay put.
   _setPlatoonTogglesVisible: function(type, visible) {
     var ids = type === 'pitcher'
-      ? ['pitcher-platoon-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
+      ? ['pitcher-platoon-toggle', 'pitcher-arsenal-toggle', 'pitcher-platedisc-toggle', 'pitcher-battedball-toggle']
       : ['hitter-platoon-toggle', 'hitter-platedisc-toggle', 'hitter-battedball-toggle',
          'hitter-swingheat-toggle'];
     for (var i = 0; i < ids.length; i++) {
