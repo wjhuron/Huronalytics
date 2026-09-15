@@ -67,7 +67,7 @@ def _http_get_json(url, timeout=30):
 
 
 def fetch_mlb_hitters(year=2026):
-    """Returns dict keyed by xMLBAMID with wRC+, xwOBA, xBA, xSLG, PA, name.
+    """Returns dict keyed by xMLBAMID with wRC+, xwOBA, xBA, xSLG, WAR, PA, name.
 
     Override scope:
     - wRC+, xwOBA, xBA, xSLG — pulled because the pipeline's rounded
@@ -107,6 +107,8 @@ def fetch_mlb_hitters(year=2026):
             'xwOBA':   round(float(xwoba), 3) if xwoba is not None else None,
             'xBA':     round(float(xba),   3) if xba   is not None else None,
             'xSLG':    round(float(xslg),  3) if xslg  is not None else None,
+            # fWAR (2026-09-15): the results-based reference column beside hWAR
+            'war':     round(float(r['WAR']), 2) if r.get('WAR') is not None else None,
             'pa':      int(r.get('PA') or 0),
             'name':    r.get('PlayerName') or r.get('Name'),
         }
@@ -162,7 +164,7 @@ def fetch_mlb_hitters_range(start_date, end_date, year=2026):
 
 
 def fetch_mlb_pitchers(year=2026):
-    """Returns dict keyed by xMLBAMID with FIP, xFIP, SIERA, IP, name."""
+    """Returns dict keyed by xMLBAMID with FIP, xFIP, SIERA, WAR, IP, name."""
     params = (
         f'pos=all&stats=pit&lg=all&qual=0&type=1'
         f'&season={year}&seasonEnd={year}'
@@ -185,6 +187,7 @@ def fetch_mlb_pitchers(year=2026):
             'fip':   round(float(fip), 2) if fip is not None else None,
             'xfip':  round(float(xfip), 2) if xfip is not None else None,
             'siera': round(float(siera), 2) if siera is not None else None,
+            'war':   round(float(r['WAR']), 2) if r.get('WAR') is not None else None,   # fWAR beside hWAR (2026-09-15)
             'ip':    float(r.get('IP') or 0),
             'name':  r.get('PlayerName') or r.get('Name'),
         }

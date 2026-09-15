@@ -58,7 +58,7 @@ HITTER_STAT_KEYS = [
     'avgFbDist', 'avgHrDist',
     'sprintSpeed',
     'wRCplus', 'xWRCplus', 'hitterPlus',
-    'hWAR',
+    'hWAR', 'fWAR',
     'runValue', 'xRunValue', 'rv100', 'xRv100',
     'hr', 'sb',
 ]

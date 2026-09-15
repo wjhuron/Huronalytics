@@ -98,6 +98,7 @@ var PlayerPage = {
     { key: 'xwOBA', label: 'xwOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'hWAR', label: 'hWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'fWAR', label: 'fWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'hitterPlus', label: 'Hitter+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
@@ -253,6 +254,7 @@ var PlayerPage = {
     { key: 'hdERA', label: 'hdERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'hpERA', label: 'hpERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'hWAR', label: 'hWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'fWAR', label: 'fWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
   ],
 
   // Shown in place of STATS_COLS whenever a handedness is selected. The

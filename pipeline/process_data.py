@@ -3196,7 +3196,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                         'blastPct', 'squaredUpPct', 'idealAAPct'}
     # Counting stats that should NOT appear on the league-average row (meaningless
     # weighted means of counting totals).
-    hitter_no_lg_avg = {'hr', 'sb', 'hWAR'}
+    hitter_no_lg_avg = {'hr', 'sb', 'hWAR', 'fWAR'}
 
     def _compute_hitter_lg_avg(stat):
         if stat in hitter_no_lg_avg:
@@ -4253,7 +4253,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         _fg_aaa_h = _fg.get('aaaHitters', {})
         n_mlb_wrc = n_mlb = 0
         n_aaa_wrc = n_aaa = 0
+        # fWAR (2026-09-15): FanGraphs WAR beside hWAR as the results-based
+        # reference. FG publishes ONE season row per player, so a combined
+        # 2TM.. row carries it whole and a traded player's stint rows carry it
+        # prorated by PA share (the same split hwar.py applies to season-level
+        # components). A cache that predates the field yields 0 and says so.
+        n_mlb_war = 0
+        _fg_comb_h = {r.get('mlbId') for r in hitter_leaderboard if r.get('_isCombined')}
+        _fg_pa_h = {}
+        for r in hitter_leaderboard:
+            if r.get('mlbId') in _fg_comb_h and not r.get('_isCombined') and not r.get('_isROC'):
+                _fg_pa_h[r['mlbId']] = _fg_pa_h.get(r['mlbId'], 0) + (r.get('pa') or 0)
         for row in hitter_leaderboard:
+            row['fWAR'] = None
             mid = row.get('mlbId')
             if mid is None:
                 continue
@@ -4271,12 +4283,21 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                     if fg_player.get('wRCplus') is not None:
                         row['wRCplus'] = fg_player['wRCplus']
                         n_mlb_wrc += 1
+                    _war = fg_player.get('war')
+                    if _war is not None:
+                        if mid in _fg_comb_h and not row.get('_isCombined'):
+                            _tot = _fg_pa_h.get(mid) or 0
+                            row['fWAR'] = round(_war * (row.get('pa') or 0) / _tot, 2) if _tot > 0 else None
+                        else:
+                            row['fWAR'] = _war
+                        n_mlb_war += 1 if row['fWAR'] is not None else 0
                     # xBA/xSLG/xwOBA are NOT overridden with FanGraphs — keep the
                     # pipeline's Statcast-computed values so they stay consistent
                     # with xwOBAcon and with the website (which re-aggregates from
                     # the same Statcast micro). wRC+ has no pipeline equivalent, so
                     # it still comes from FanGraphs.
-        print(f"  FG hitter override: wRC+ {n_mlb_wrc}/{n_mlb} MLB + {n_aaa_wrc}/{n_aaa} AAA")
+        print(f"  FG hitter override: wRC+ {n_mlb_wrc}/{n_mlb} MLB + {n_aaa_wrc}/{n_aaa} AAA; fWAR {n_mlb_war}/{n_mlb} MLB rows"
+              + ("  WARNING: 0 fWAR values, the FG cache predates the field or the fetch fell back" if n_mlb and not n_mlb_war else ""))
     except _SkipSeasonOverride:
         pass
     except Exception as _e:
@@ -4834,6 +4855,32 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 n_pit_replaced += 1
         print(f"  FG FIP/xFIP/SIERA override: replaced "
               f"{n_pit_replaced}/{n_pit} MLB pitchers with FanGraphs values")
+        # fWAR (2026-09-15): FG's one season row per pitcher; the combined row
+        # carries it whole, a traded pitcher's stint rows prorate it by IP.
+        _fg_comb_p = {r.get('mlbId') for r in pitcher_leaderboard if r.get('_isCombined')}
+        _fg_ip_p = {}
+        for r in pitcher_leaderboard:
+            if r.get('mlbId') in _fg_comb_p and not r.get('_isCombined') and not r.get('_isROC'):
+                _fg_ip_p[r['mlbId']] = _fg_ip_p.get(r['mlbId'], 0.0) + (ip_str_to_float(r.get('ip')) if r.get('ip') is not None else 0.0)
+        n_pit_war = n_pit_rows = 0
+        for row in pitcher_leaderboard:
+            row['fWAR'] = None
+            if row.get('_isROC') or row.get('mlbId') is None:
+                continue
+            n_pit_rows += 1
+            fg_p = _fg_pit.get(str(int(row['mlbId'])))
+            _war = fg_p.get('war') if fg_p else None
+            if _war is None:
+                continue
+            if row['mlbId'] in _fg_comb_p and not row.get('_isCombined'):
+                _tot = _fg_ip_p.get(row['mlbId']) or 0.0
+                _ip = ip_str_to_float(row.get('ip')) if row.get('ip') is not None else 0.0
+                row['fWAR'] = round(_war * _ip / _tot, 2) if _tot > 0 else None
+            else:
+                row['fWAR'] = _war
+            n_pit_war += 1 if row['fWAR'] is not None else 0
+        print(f"  FG fWAR: {n_pit_war}/{n_pit_rows} MLB pitcher rows"
+              + ("  WARNING: 0 fWAR values, the FG cache predates the field or the fetch fell back" if n_pit_rows and not n_pit_war else ""))
 
         # AAA rows, from the minor-league endpoint. FIP and xFIP only —
         # FanGraphs publishes no SIERA for the minors, so ROC siera stays on
@@ -4943,7 +4990,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # FanGraphs/Savant — they percentile-rank against the broader pool and
     # only display percentile chips for players who clear sample minimums.
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
-                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera', 'locPlus', 'commandPlus'])
+                        + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera', 'locPlus', 'commandPlus', 'fWAR'])
     for stat in PITCHER_ALL_PCTL:
         compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 

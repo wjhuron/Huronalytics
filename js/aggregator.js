@@ -758,7 +758,7 @@ const Aggregator = {
                      'hdERA', 'hdERA_pctl', 'hpERA', 'hpERA_pctl',
                      'hdERAPlus', 'hdERAPlus_pctl',
                      'hpERAPlus', 'hpERAPlus_pctl',
-                     'hWAR', 'hWAR_pctl', 'hWAR_se',
+                     'hWAR', 'hWAR_pctl', 'hWAR_se', 'fWAR', 'fWAR_pctl',
                      // Command+ is season-level like Pitcher+: targets are
                      // fit on the full season, so filtered views preserve
                      // rather than recompute it.
@@ -986,7 +986,7 @@ const Aggregator = {
       let a = acc[p.team];
       if (!a) {
         a = acc[p.team] = { ipThirds: 0, er: null, hrA: null, w: 0, l: 0, sv: 0, hld: 0, gs: 0,
-                            tbf: 0, count: 0, runValue: null, xRunValue: null, hWAR: null, sums: {}, wts: {} };
+                            tbf: 0, count: 0, runValue: null, xRunValue: null, hWAR: null, fWAR: null, sums: {}, wts: {} };
       }
       const ipF = Utils.parseIP(p.ip);
       a.ipThirds += Math.round(ipF * 3);
@@ -999,6 +999,7 @@ const Aggregator = {
       if (p.xRunValue != null) a.xRunValue = (a.xRunValue || 0) + p.xRunValue;
       // hWAR is a counting stat: a team's value is the sum over its arms
       if (p.hWAR != null) a.hWAR = (a.hWAR || 0) + p.hWAR;
+      if (p.fWAR != null) a.fWAR = (a.fWAR || 0) + p.fWAR;
       for (let wi = 0; wi < IP_W.length; wi++) wadd(a, IP_W[wi], p[IP_W[wi]], ipF);
       for (let pi = 0; pi < PA_W.length; pi++) wadd(a, PA_W[pi], p[PA_W[pi]], p.pa || p.tbf);
       wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
@@ -1021,6 +1022,7 @@ const Aggregator = {
         runValue: a.runValue,
         xRunValue: a.xRunValue,
         hWAR: a.hWAR,
+        fWAR: a.fWAR != null ? a.fWAR : null,
         rv100: (a.runValue != null && a.count > 0) ? a.runValue / a.count * 100 : null,
         xRv100: (a.xRunValue != null && a.count > 0) ? a.xRunValue / a.count * 100 : null,
         locPlusN: a.wts.locPlus || 0,
@@ -2021,6 +2023,7 @@ const Aggregator = {
       if (h.wRC != null) a.wRC = (a.wRC || 0) + h.wRC;
       // hWAR is a season counting stat: team rows sum it, filters do not reshape it
       if (h.hWAR != null) a.hWAR = (a.hWAR || 0) + h.hWAR;
+      if (h.fWAR != null) a.fWAR = (a.fWAR || 0) + h.fWAR;
       // RV sums stay full precision; rounding happens only at display
       if (h.runValue != null) a.runValue = (a.runValue || 0) + h.runValue;
       wadd(a, 'wOBA', h.wOBA, h.pa);
@@ -2051,6 +2054,7 @@ const Aggregator = {
         sbPct: (a.sb + a.cs) > 0 ? a.sb / (a.sb + a.cs) * 100 : null,
         wRC: a.wRC,
         hWAR: a.hWAR != null ? a.hWAR : null,
+        fWAR: a.fWAR != null ? a.fWAR : null,
         runValue: a.runValue,
         nCompSwings: a.nCompSwings,
         nCompRuns: a.nCompRuns,
@@ -2186,7 +2190,7 @@ const Aggregator = {
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
       'sprintSpeed', 'runValue',
-      'wRCplus', 'xWRCplus', 'hitterPlus', 'hWAR',
+      'wRCplus', 'xWRCplus', 'hitterPlus', 'hWAR', 'fWAR',
       'hr', 'sb',
     ];
     const HITTER_INVERT = {
@@ -2592,7 +2596,7 @@ const Aggregator = {
                         'ctPlus', 'ctPlusN', 'ctPlusRaw',
                         'hitterPlus',
                         // hWAR and its components are season-level (pipeline/hwar.py)
-                        'hWAR', 'hWAR_se', 'hBatRuns', 'hBsrRuns', 'hFldRuns', 'hPosRuns', 'hReplRuns'];
+                        'hWAR', 'hWAR_se', 'hBatRuns', 'hBsrRuns', 'hFldRuns', 'hPosRuns', 'hReplRuns', 'fWAR', 'fWAR_pctl'];
     // Rate stats that micro data computes (skip when filtered)
     const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK',
                            'doubles', 'triples', 'hr', 'xbh'];
