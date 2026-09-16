@@ -2739,7 +2739,9 @@ def render_social_card(config, pitches, output_file):
                         _flag = '' if abs(_lb - r_['xrv100']) < 0.05 else '  <-- DIFFERS'
                         print(f"  xRV/100 parity {r_['pt']}: card {r_['xrv100']:.2f} "
                               f"vs leaderboard {_lb:.2f}{_flag}")
-        note_r = ('MLB gameday feed  ·  red = good, blue = bad  ·  '
+        # Footer (2026-09-16, per Wally): the disc-size key replaces the
+        # colour key, which the tinted chips carry on their own.
+        note_r = ('MLB gameday feed  ·  disc area = usage  ·  '
                   '100 = league average')
 
     # Footer height, tuned by measured clearance from the card's bottom edge
