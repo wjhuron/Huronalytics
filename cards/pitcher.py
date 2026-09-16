@@ -564,6 +564,25 @@ SOCIAL_XLABEL_STACK = 0.0695
 # Minimum clear gap between a centroid label and any chip or other label,
 # in points. A display convention, not a measured constant.
 SOCIAL_LABEL_GAP_PT = 4.0
+# Usage-sized centroid discs on the social movement plot (2026-09-16, per
+# Wally: the rule on every social card, daily and season, not an option).
+# Marker area (pt^2) = K x the type's share of the plotted pitches, ONE
+# scale on every card so a 30% pitch draws the same disc on every arm (a
+# per-card max anchor made every card its own ruler, the window-percentile
+# trap). Capped at S_CAP (a reliever's 60% fastball) and floored at S_MIN
+# (a one-pitch type stays a visible dot). No count inside: the table discs
+# carry it. Area, not diameter, carries the share.
+# K is a display convention informed by a diagnostic, not an optimum: the
+# disc-touch rate across 18,876 2026 MLB outings rises monotonically with
+# K (scripts/research/cards/bubble_overlap.py), so no interior optimum
+# exists. At 1667 it equals the retired fixed 320 pt^2 disc's (4.9% vs
+# 4.7%, and 7.9% vs 9.3% on starters); 2333 costs two more points for more
+# contrast and Wally chose 1667 as the cleaner card. The cap binds on 3%
+# of reliever types at 1667, the floor on 13% of starter types.
+SOCIAL_BUBBLE_K = 1667.0          # pt^2 per unit share: 30% -> 500
+SOCIAL_BUBBLE_S_CAP = 1200.0
+SOCIAL_BUBBLE_S_MIN = 90.0
+SOCIAL_BUBBLE_SIDE_GAP_PT = 6.0   # label offset past a usage disc's edge (R/L slots)
 # Stuff+ is shape-family: measured per-type k = 13 (seeds 12.9-13.8), so 15
 # colors only cells that are >=half signal without hiding real information.
 STUFF_COLOR_MIN_PITCHES = 15
@@ -2318,46 +2337,37 @@ def render_social_card(config, pitches, output_file):
         return (max(0.0, min(b[1], c[1]) - max(b[0], c[0]))
                 * max(0.0, min(b[3], c[3]) - max(b[2], c[2])))
 
-    # Marker area s is a squared diameter in points, so the radius is sqrt(s)/2.
-    _crx, _cry = _pts(0.5 * math.sqrt(320))
     _cents = [(pt_, sum(q[0] for q in pl) / len(pl),
                sum(q[1] for q in pl) / len(pl), len(pl))
               for pt_, pl in sorted(groups.items(), key=lambda kv: -len(kv[1]))]
-    _chip_boxes = [(mh - _crx, mh + _crx, mvv - _cry, mvv + _cry)
-                   for _p, mh, mvv, _n in _cents]
+    # Disc area = K x the type's share of the plotted pitches (see
+    # SOCIAL_BUBBLE_*), no count inside; the table discs carry the counts
+    # (2026-09-16, per Wally). Marker area s is a squared diameter in
+    # points, so the radius is sqrt(s)/2.
+    _nmax = max((n_ for _p, _h, _v, n_ in _cents), default=1)
+    _ntot = sum(n_ for _p, _h, _v, n_ in _cents) or 1
 
-    _drawn = []
+    def _disc_s(n_):
+        return min(SOCIAL_BUBBLE_S_CAP,
+                   max(SOCIAL_BUBBLE_S_MIN, SOCIAL_BUBBLE_K * n_ / _ntot))
+
+    _chip_boxes = []
+    for _p, mh, mvv, n_ in _cents:
+        _rx, _ry = _pts(0.5 * math.sqrt(_disc_s(n_)))
+        _chip_boxes.append((mh - _rx, mh + _rx, mvv - _ry, mvv + _ry))
+
     for pt_, mh, mvv, n_ in _cents:
         # Every thrown type gets a centroid + velo label (2026-08-28, per
         # Wally) — a 1-pitch type's centroid is the pitch itself.
         col = PITCH_COLORS.get(pt_, '#777')
-        # zorder rises with usage so a same-spot pair shows the
-        # HIGHER-usage pitch's dot (2026-08-28, per Wally: Lyon SI/CH).
-        mv.scatter([mh], [mvv], s=320, color=col,
-                   edgecolors=BG, linewidths=1.8, zorder=5 + n_ * 1e-4)
-        if not is_season:
-            # Pitch count inside the chip (2026-08-28, per Wally) —
-            # restores the volume signal the cloud used to carry. All-white
-            # ink (A/B'd against luminance ink; Wally chose white).
-            # Ink-centered glyph paths, same as the table chips. The centroid
-            # sits at the pitch's true mean movement, so this chip is NOT
-            # pixel-snapped the way a table row is: the disc and the numeral
-            # both render subpixel-accurate, which keeps them concentric
-            # wherever the data puts them.
-            # A chip that lands on top of an earlier one hides it, and drawing
-            # the second count as well only garbles the pair (Lyon 8/28: a
-            # sinker and a changeup half an inch apart printed '10' over '10').
-            # The chips keep their true positions, because two pitches with the
-            # same movement IS the finding. The occluded count drops instead —
-            # the per-hand table carries every count anyway.
-            _hidden = any((mh - x_) ** 2 / (_crx ** 2)
-                          + (mvv - y_) ** 2 / (_cry ** 2) < 1.0
-                          for x_, y_ in _drawn)
-            if not _hidden:
-                _cnt = sum(1 for q in pitches if q.get('Pitch Type') == pt_)
-                ink_txt(mh, mvv, str(_cnt), 7.5, '#ffffff',
-                        zorder=5.5 + n_ * 1e-4, ax_=mv)
-        _drawn.append((mh, mvv))
+        # The SMALLER disc stacks on top, so a same-spot pair still shows
+        # both: the small disc reads as a dot inside the big one (Lyon
+        # SI/CH 2026-08-28, Yean SI/CH 2026-09-15). The discs keep their
+        # true positions, because two pitches with the same movement IS
+        # the finding.
+        mv.scatter([mh], [mvv], s=_disc_s(n_), color=col,
+                   edgecolors=BG, linewidths=1.8,
+                   zorder=5 + (_nmax - n_) * 1e-4)
 
     _placed = []             # label boxes already committed, in data units
     for _ci, (pt_, mh, mvv, n_) in enumerate(_cents):
@@ -2372,8 +2382,11 @@ def render_social_card(config, pitches, output_file):
         # feeds the full card's dashed velo lines.
         _lw, _lh = _ink_size(_lab, 10.5)
         # U/D slots clear the chip by radius + gap + half the label block.
-        _offy_pt = 0.5 * math.sqrt(320) + 4.0 + 0.5 * (_lh / _pts(1.0)[1])
-        _offx, _offy = _pts(15)[0], _pts(_offy_pt)[1]
+        _r_pt = 0.5 * math.sqrt(_disc_s(n_))
+        _offy_pt = _r_pt + 4.0 + 0.5 * (_lh / _pts(1.0)[1])
+        # R/L slots offset from the disc's own edge.
+        _offx_pt = _r_pt + SOCIAL_BUBBLE_SIDE_GAP_PT
+        _offx, _offy = _pts(_offx_pt)[0], _pts(_offy_pt)[1]
         _others = ([b for _j, b in enumerate(_chip_boxes) if _j != _ci]
                    + _placed)
 
@@ -2409,7 +2422,7 @@ def render_social_card(config, pitches, output_file):
             pad = (box[0] - _gx, box[1] + _gx, box[2] - _gy, box[3] + _gy)
             return sum(_overlap(pad, c) for c in _others) + 1000.0 * out
 
-        _ANN = {'R': ((15, 0), 'left', 'center'), 'L': ((-15, 0), 'right', 'center'),
+        _ANN = {'R': ((_offx_pt, 0), 'left', 'center'), 'L': ((-_offx_pt, 0), 'right', 'center'),
                 'U': ((0, _offy_pt), 'center', 'center'),
                 'D': ((0, -_offy_pt), 'center', 'center')}
         _cand = [(_score(_box(s)), _k, s) for _k, s in enumerate('RLUD')]
