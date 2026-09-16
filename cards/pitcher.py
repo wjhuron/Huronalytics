@@ -566,21 +566,26 @@ SOCIAL_XLABEL_STACK = 0.0695
 SOCIAL_LABEL_GAP_PT = 4.0
 # Usage-sized centroid discs on the social movement plot (2026-09-16, per
 # Wally: the rule on every social card, daily and season, not an option).
-# Marker area (pt^2) = K x the type's share of the plotted pitches, ONE
-# scale on every card so a 30% pitch draws the same disc on every arm (a
-# per-card max anchor made every card its own ruler, the window-percentile
-# trap). Capped at S_CAP (a reliever's 60% fastball) and floored at S_MIN
-# (a one-pitch type stays a visible dot). No count inside: the table discs
-# carry it. Area, not diameter, carries the share.
-# K is a display convention informed by a diagnostic, not an optimum: the
-# disc-touch rate across 18,876 2026 MLB outings rises monotonically with
-# K (scripts/research/cards/bubble_overlap.py), so no interior optimum
-# exists. At 1667 it equals the retired fixed 320 pt^2 disc's (4.9% vs
-# 4.7%, and 7.9% vs 9.3% on starters); 2333 costs two more points for more
-# contrast and Wally chose 1667 as the cleaner card. The cap binds on 3%
-# of reliever types at 1667, the floor on 13% of starter types.
-SOCIAL_BUBBLE_K = 1667.0          # pt^2 per unit share: 30% -> 500
-SOCIAL_BUBBLE_S_CAP = 1200.0
+# Marker area (pt^2) = S30 x (share / 0.30) ^ EXP, where share is the type's
+# share of the plotted pitches: ONE scale on every card, so a 30% pitch
+# draws the same disc on every arm (a per-card max anchor made every card
+# its own ruler, the window-percentile trap). EXP 0.5 compresses the top
+# smoothly: a linear map (EXP 1) with a cap drew a reliever's 69-83% pitch
+# at 2.3-2.4x a starter's primary and "way too big" (Tolman/Lord 09-15,
+# per Wally), and a cap is a cliff that collapses 53% and 41% to the same
+# disc (Lovelady). Under the square root 83% draws 1.7x, 53% 1.3x, 12%
+# 0.6x and 2% 0.26x of the 30% disc, ordering strict everywhere, so no
+# cap is needed; S_MIN floors a one-pitch type. No count inside: the
+# table discs carry it. Area, not diameter, carries the share.
+# S30 and EXP are display conventions, not optima: the disc-touch rate
+# across 18,876 2026 MLB outings rises monotonically with disc size
+# (scripts/research/cards/bubble_overlap.py, linear K sweep), so no
+# interior optimum exists; S30 500 matched the retired fixed 320 pt^2
+# disc's touch rate on the linear map (4.9% vs 4.7%). Exponents 0.4-0.5
+# keep the dominant disc under ~1.5-1.7x the primary with strict ordering;
+# 0.5 is the standard compression.
+SOCIAL_BUBBLE_S30 = 500.0         # pt^2 at a 30% share
+SOCIAL_BUBBLE_EXP = 0.5
 SOCIAL_BUBBLE_S_MIN = 90.0
 SOCIAL_BUBBLE_SIDE_GAP_PT = 6.0   # label offset past a usage disc's edge (R/L slots)
 # Stuff+ is shape-family: measured per-type k = 13 (seeds 12.9-13.8), so 15
@@ -2348,8 +2353,8 @@ def render_social_card(config, pitches, output_file):
     _ntot = sum(n_ for _p, _h, _v, n_ in _cents) or 1
 
     def _disc_s(n_):
-        return min(SOCIAL_BUBBLE_S_CAP,
-                   max(SOCIAL_BUBBLE_S_MIN, SOCIAL_BUBBLE_K * n_ / _ntot))
+        return max(SOCIAL_BUBBLE_S_MIN,
+                   SOCIAL_BUBBLE_S30 * ((n_ / _ntot) / 0.30) ** SOCIAL_BUBBLE_EXP)
 
     _chip_boxes = []
     for _p, mh, mvv, n_ in _cents:
