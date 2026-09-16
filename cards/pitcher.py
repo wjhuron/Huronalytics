@@ -2580,10 +2580,9 @@ def render_social_card(config, pitches, output_file):
                 if is_total:
                     # The outing line (2026-09-13, per Wally): no disc, no
                     # word, no 100% usage, no grade chips (the tiles carry
-                    # Stuff+/Loc+). The pitch count sits where the discs
-                    # stack, in the numeral face, so the column reads
-                    # 31 / 27 / 26 / 10 / 8 / 102.
-                    txt(_cx, ry, str(r_['n']), fs, TEXT_PRIMARY, '500')
+                    # Stuff+/Loc+), and no pitch count either — the header
+                    # already says "N pitches" (same day, per Wally).
+                    pass
                 else:
                     ax.scatter([_cx], [_cy], s=215, color=col, edgecolors='none',
                                transform=ax.transAxes, zorder=4)
@@ -5550,9 +5549,12 @@ def main():
     if scratch_tab:
         # Scratch-tab mode: the rows' PitchIDs embed the game_pks the data
         # came from (Pitcher2026 player_id pulls), so fetch exactly those
-        # boxscores — works for MLB and MiLB feeds alike.
+        # boxscores — works for MLB and MiLB feeds alike. WINDOW rows only:
+        # summing every gamePk on the tab gave a 09-12 daily card the season
+        # line (17.2 IP / 34 K) instead of the outing's (2026-09-13, per Wally).
         _pks = sorted({str(r.get('PitchID', '')).split('_')[0]
-                       for r in all_rows if r.get('PitchID')} - {''})
+                       for _pl in pitches_by_pitcher.values() for r in _pl
+                       if r.get('PitchID')} - {''})
         print(f"  Fetching {len(_pks)} boxscores from scratch-tab game IDs...")
         for _pk in _pks:
             _bx = fetch_boxscore(_pk) or {}
