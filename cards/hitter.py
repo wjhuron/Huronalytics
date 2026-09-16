@@ -61,10 +61,13 @@ from cards.pitcher import (
     pct_cell_color as _default_pct_cell_color,
     raw_cell_color as _default_raw_cell_color,
     OUTPUT_DIR, METADATA_PATH, _load_guts,
-    is_barrel, barrel_flag, compute_iz, _compute_pitch_xrv,
+    is_barrel, compute_iz, _compute_pitch_xrv,
     GUTS_LG_WOBA, GUTS_WOBA_SCALE,
     SWING_DESC, STRIKE_DESC,
 )
+# barrel_flag's single home is pipeline.utils (2026-09-07); cards.pitcher stopped
+# re-exporting it and every hitter card failed at import until 2026-09-16.
+from pipeline.utils import barrel_flag  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────
 # WARM PAPER THEME — the canonical hitter-card look.
