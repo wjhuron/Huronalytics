@@ -2001,6 +2001,7 @@
 "Rojas, Josh": 73.0,
 "Rojas, Kendry": 74.0,
 "Rojas, Miguel": 70.0,
+"Rojas, Yondrei": 71.0,
 "Rolison, Ryan": 74.0,
 "Rom, Drew": 73.0,
 "Romano, Jordan": 77.0,
@@ -2229,6 +2230,7 @@
 "Stallings, Jacob": 77.0,
 "Stammen, Craig": 74.0,
 "Stanek, Ryne": 76.0,
+"Stanifer, Gage": 75.0,
 "Stanton, Giancarlo": 77.0,
 "Stashak, Cody": 74.0,
 "Staumont, Josh": 75.0,
@@ -8660,6 +8662,9 @@
 "Rojas, Miguel": [
 500743
 ],
+"Rojas, Yondrei": [
+700292
+],
 "Rolison, Ryan": [
 669020
 ],
@@ -9344,6 +9349,9 @@
 ],
 "Stanek, Ryne": [
 592773
+],
+"Stanifer, Gage": [
+804948
 ],
 "Stanton, Giancarlo": [
 519317
@@ -10609,6 +10617,6 @@
 594798
 ]
 },
-"league_mean": 73.74,
-"n": 2650
+"league_mean": 73.73,
+"n": 2652
 }
