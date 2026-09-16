@@ -2448,6 +2448,7 @@ def render_social_card(config, pitches, output_file):
             l_at = [v for v in (_atom_of(p, 'Loc+', 'loc')
                                 for p in pl) if v is not None]
             xrv, n_est = _social_xrv(pl, estimate=_xrv_est)
+            rv = _social_rv(pl, estimate=_xrv_est)
             return {
                 'pt': label, 'n': len(pl), 'sw': len(sw),
                 'whiff': (wh / len(sw)) if sw else None,
@@ -2463,6 +2464,9 @@ def render_social_card(config, pitches, output_file):
                 'xrv': xrv,
                 'xrv100': (xrv / len(pl) * 100) if xrv is not None else None,
                 'xrv_est': n_est,
+                # Actual RV, same denominator rule.
+                'rv': rv,
+                'rv100': (rv / len(pl) * 100) if rv is not None else None,
             }
 
         def _stats(plist):
@@ -2485,8 +2489,8 @@ def render_social_card(config, pitches, output_file):
         # pitch type) grain: Whiff% .242, Zone% .183 (defined on every
         # pitch, r .35 with the Loc+ atoms so not a restatement), CSW%
         # .048 = the least reliable candidate measured.
-        # xRV after Whiff% (2026-09-10, per Wally): runs on the daily card,
-        # per 100 on the season card. Chosen over RV, RV/100 and xwOBAcon
+        # Run value after Whiff% (2026-09-10, per Wally): runs on the daily
+        # card, per 100 on the season card. xRV chosen over RV, RV/100 and xwOBAcon
         # on the 2026 cache: at the outing x type grain xRV is defined on
         # every pitch where xwOBAcon has <= 2 BIP in 44% of cells, and RV
         # is xRV plus luck on 2-4 balls (r .70, gap SD .71 = xRV SD .70);
@@ -2497,14 +2501,36 @@ def render_social_card(config, pitches, output_file):
         # information), so it is not a column.
         # The three numerals moved left to make the slot; chips unchanged.
         _xrv_lab = 'xRV' if _xrv_est else 'xRV/100'
-        SPLIT_COLS = [('USAGE', 0.335, 'r', 'usepct'),
-                      ('ZONE%', 0.450, 'r', 'zone'),
-                      ('WHIFF%', 0.565, 'r', 'whiff'),
-                      (_xrv_lab, 0.680, 'r', 'xrv' if _xrv_est else 'xrv100'),
-                      ('STUFF+', 0.775, 'c', 'stuff'),
-                      # LOC+ chips: optical overshoot past the spine (see
-                      # tile_row) — flat face flush at the right margin.
-                      ('LOC+', 0.9018, 'c', 'loc')]
+        _rv_lab = 'RV' if _xrv_est else 'RV/100'
+        _xrv_key = 'xrv' if _xrv_est else 'xrv100'
+        _rv_key = 'rv' if _xrv_est else 'rv100'
+        # RV then xRV on the DAILY card (2026-09-16, per Wally): one outing's
+        # story is the gap between what happened (RV, the sheet's RunExp
+        # summed, the leaderboard's runValue rule) and what the contact
+        # earned (xRV); either column alone hides it, and at this grain both
+        # are description, not skill (split-half r .012). The SEASON card
+        # keeps xRV/100 alone, the measured pick above. social_rv forces a
+        # slot set on either card. 'both' closes the numeral spacing from
+        # 0.115 to 0.0925 for the fifth slot; the chips do not move.
+        _srv = config.get('social_rv') or ('xrv' if is_season else 'both')
+        if _srv == 'both':
+            _num_cols = [('USAGE', 0.310, 'r', 'usepct'),
+                         ('ZONE%', 0.4025, 'r', 'zone'),
+                         ('WHIFF%', 0.495, 'r', 'whiff'),
+                         (_rv_lab, 0.5875, 'r', _rv_key),
+                         (_xrv_lab, 0.680, 'r', _xrv_key)]
+        else:
+            _rv_col = ((_rv_lab, 0.680, 'r', _rv_key) if _srv == 'rv'
+                       else (_xrv_lab, 0.680, 'r', _xrv_key))
+            _num_cols = [('USAGE', 0.335, 'r', 'usepct'),
+                         ('ZONE%', 0.450, 'r', 'zone'),
+                         ('WHIFF%', 0.565, 'r', 'whiff'),
+                         _rv_col]
+        SPLIT_COLS = _num_cols + [('STUFF+', 0.775, 'c', 'stuff'),
+                                  # LOC+ chips: optical overshoot past the
+                                  # spine (see tile_row) — flat face flush
+                                  # at the right margin.
+                                  ('LOC+', 0.9018, 'c', 'loc')]
         # Pitches the estimate has to fill on this card (0 once the backfill
         # has run). Logged only: the card carries no marker (the 'xRV*'
         # header and its footer line were rendered and removed the same
@@ -4688,6 +4714,17 @@ def _social_xrv(plist, estimate=False):
     return tot, n_est
 
 
+def _social_rv(plist, estimate=False):
+    """Summed ACTUAL run value in runs for a row of pitches, pitcher-positive:
+    the sheet's RunExp summed over every pitch that carries one, the
+    leaderboard's own runValue rule (pipeline.compute.compute_stats).
+    estimate=True fills a pre-backfill game's missing RunExp from the same
+    league tables the xRV estimate uses. Returns rv_runs or None."""
+    ps, _n = (_xrv_fill_estimates(plist) if estimate else (plist, 0))
+    vals = [v for v in (sf(p.get('RunExp')) for p in ps) if v is not None]
+    return sum(vals) if vals else None
+
+
 def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
     """Heavy one-time setup for scratch-tab / daily cards: MLB pickle baselines
     (Loc+ surfaces + norm pool, xRV count anchoring), Stuff+ scoring (bundle
@@ -5124,6 +5161,7 @@ def main():
     social          = True              # True = consolidated social card (daily/season by date mode) instead of the full card
     bats            = None               # Batter-handedness filter: "L", "R", or None for both
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
+    social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xrv"; force "xrv", "rv", or "both"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     output_dir      = OUTPUT_DIR
 
@@ -5144,6 +5182,9 @@ def main():
                         help='Season-card RV columns: per-100 rates (default), cumulative '
                              'totals (PitchRV/xPitchRV), or both pairs. Single-game cards '
                              'always show cumulative xPitchRV.')
+    parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both'],
+                        help='Social-table run-value slot(s); default: both (RV, xRV) on '
+                             'a daily card, xrv (xRV/100) on a season card')
     parser.add_argument('--pitch-qual', type=int, default=None,
                         help='Min pitches for a pitch type\'s RV COLORING '
                              f'(default {CARD_COLOR_MIN_PITCHES}; values always render)')
@@ -5185,6 +5226,7 @@ def main():
     if args.bats is not None: bats = args.bats
     bats_filter = bats
     if args.rv_mode is not None: rv_mode = args.rv_mode
+    if args.social_rv is not None: social_rv = args.social_rv
     if args.pitch_qual is not None: pitch_qual = args.pitch_qual
 
     # Parse filter_pitchers string into list
@@ -5845,6 +5887,7 @@ def main():
             'pitch_lb': (scratch_pitch_lb if scratch_ctx is not None
                          else pitch_lb_by_pitcher.get((pitcher_name, eff_team), {})),
             'rv_mode': rv_mode,
+            'social_rv': social_rv,
             'pitch_qual': pitch_qual,
             # DAILY ONLY — his own season baselines (see _season_pitch_lb_for).
             'season_pitch_lb': _season_pitch_lb_for(pitcher_name, eff_team,
