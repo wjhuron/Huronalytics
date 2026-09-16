@@ -23,7 +23,7 @@ bugs in an afternoon. None of that is needed.
 WHAT THIS DOES INSTEAD:
   * window values: computed from the window's pitches by the pipeline's own
     functions (compute_hitter_stats, compute_expected_stats).
-  * BB+ / SD+ / CT+ / Hitter+: the hitter's WINDOW pitches scored against the
+  * BB+ / SD+ / CT+ / Process+: the hitter's WINDOW pitches scored against the
     SEASON league anchors and cell tables, so the number means "at season
     league rates, this is what he did over the window".
   * percentiles: the window value's rank inside the SHIPPED season
@@ -45,9 +45,9 @@ from pipeline.utils import (
 EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
 AAA_TEAMS = ('ROC', 'AAA')
 
-HITTER_PLUS_W_BB = 0.52
-HITTER_PLUS_W_SD = 0.17
-HITTER_PLUS_W_CT = 0.31
+PROCESS_PLUS_W_BB = 0.52
+PROCESS_PLUS_W_SD = 0.17
+PROCESS_PLUS_W_CT = 0.31
 
 
 def _is_combined(t):
@@ -239,6 +239,9 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
         _ev_adj = ((nb * _ev_c + _n0_ev * 100.0) / (nb + _n0_ev)
                    if _n0_ev else _ev_c)
         _raw = _w_con * _con_adj + _w_ev * _ev_adj
+        # Process+ input: the same blend on the UNSHRUNK ingredients (server
+        # convention, see the BB+ block in process_data).
+        row['_procBb'] = _w_con * _con_plus + _w_ev * _ev_c
         _btp = metadata.get('bbPlusBtPrior') or {}
         _anch = _btp.get('anchors') or {}
         _bs, _sq = row.get('batSpeed'), row.get('squaredUpPct')
@@ -260,12 +263,13 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
         if _wrc.get('factor'):
             _v = (100.0 + (_v - 100.0) * _wrc['factor']
                   + (_wrc.get('shift') or 0.0))
-        # 6 dp, the PLUS_STORE_DP convention — this value feeds the Hitter+
+        # 6 dp, the PLUS_STORE_DP convention — this value feeds the Process+
         # standardization below at computation precision; display rounds
         # at the card layer.
         row['bbPlus'] = round(_v, 6)
     else:
         row['bbPlus'] = None
+        row['_procBb'] = None
 
     # ── SD+ / CT+ : the hitter's WINDOW swings scored against the SEASON cell
     # tables. all_pitches builds the league table, so the tables and the
@@ -323,14 +327,16 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
     s, c = sd_res.get(hitter_key), ct_res.get(hitter_key)
     row['sdPlus'] = s['sdPlus'] if s else None
     row['sdPlusRaw'] = round(s['raw_sd_adj'], 5) if s else None
+    row['_procSd'] = s['raw_sd'] if s else None
     row['sdPlusN'] = s['n_decisions'] if s else 0
     row['ctPlus'] = c['ctPlus'] if c else None
     row['ctPlusRaw'] = round(c['raw_ct_adj'], 5) if c else None
+    row['_procCt'] = c['raw_ct'] if c else None
     row['ctPlusN'] = c['n_swings'] if c else 0
     # Post-chain scaling (2026-08-27 audit): the season path multiplies by
     # plusReanchor and applies the plusWrcScale factor/shift AFTER the raw
     # computation; the window skipped both, so window SD+/CT+ read ~1.2
-    # points high and fed pre-chain values into the post-chain Hitter+
+    # points high and fed pre-chain values into the post-chain Process+
     # anchors below. Same two stages the bbPlus block above applies.
     for _pk in ('sdPlus', 'ctPlus'):
         if row.get(_pk) is None:
@@ -342,23 +348,26 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
                   + (_wrc.get('shift') or 0.0))
         row[_pk] = round(_v, 6)
 
-    # ── Hitter+ : composite on the SEASON standardization, so a window number
-    # sits on the same ruler as the season card and as every other window.
-    std = metadata.get('hitterPlusStandardization') or {}
+    # ── Process+ : composite of the UNSHRUNK inputs on the SEASON
+    # standardization (metadata processPlusStandardization: bbRaw / sdRaw /
+    # ctRaw), so a window number sits on the same ruler as the season card
+    # and as every other window. A pre-Process+ artifact has no such block
+    # and the window reads None, never a number on a different ruler.
+    std = metadata.get('processPlusStandardization') or {}
     wsm = std.get('wrcScaleMatch') or {}
-    ok = all(std.get(k, {}).get('sd') for k in ('bbPlus', 'sdPlus', 'ctPlus'))
-    if ok and all(row.get(k) is not None for k in ('bbPlus', 'sdPlus', 'ctPlus')):
-        z = (HITTER_PLUS_W_BB * (row['bbPlus'] - std['bbPlus']['mean']) / std['bbPlus']['sd']
-             + HITTER_PLUS_W_SD * (row['sdPlus'] - std['sdPlus']['mean']) / std['sdPlus']['sd']
-             + HITTER_PLUS_W_CT * (row['ctPlus'] - std['ctPlus']['mean']) / std['ctPlus']['sd'])
+    ok = all(std.get(k, {}).get('sd') for k in ('bbRaw', 'sdRaw', 'ctRaw'))
+    if ok and all(row.get(k) is not None for k in ('_procBb', '_procSd', '_procCt')):
+        z = (PROCESS_PLUS_W_BB * (row['_procBb'] - std['bbRaw']['mean']) / std['bbRaw']['sd']
+             + PROCESS_PLUS_W_SD * (row['_procSd'] - std['sdRaw']['mean']) / std['sdRaw']['sd']
+             + PROCESS_PLUS_W_CT * (row['_procCt'] - std['ctRaw']['mean']) / std['ctRaw']['sd'])
         v = 100.0 + (std.get('scale') or 40.0) * z
-        shift = (metadata.get('plusReanchor') or {}).get('hitterPlusShift') or 0.0
+        shift = (metadata.get('plusReanchor') or {}).get('processPlusShift') or 0.0
         v += shift
         if wsm.get('factor'):
             v = 100.0 + (v - 100.0) * wsm['factor']
-        row['hitterPlus'] = round(v, 1)
+        row['processPlus'] = round(v, 1)
     else:
-        row['hitterPlus'] = None
+        row['processPlus'] = None
 
     # ── wRC+ : FanGraphs' own value FOR THIS DATE RANGE. FG serves custom
     # ranges (month=1000 + startdate/enddate), so there is no reason to

@@ -7,7 +7,7 @@ a hitter audience. Sections, top to bottom:
 1. Pitch type color stripe (header band).
 2. Identity zone (left): photo, name, "LHH | TEAM | Age", season label,
    headline stats strip
-   (PA, AVG, OBP, SLG, BB%, K%, wRC+, SD+, CT+, BB+, Hitter+).
+   (PA, AVG, OBP, SLG, BB%, K%, wRC+, SD+, CT+, BB+, Process+).
 3. LA x Spray scatter (right): MLB wOBAcon zone heatmap, EV-colored dots,
    purple Median Placement marker (median LA x median spray), xwOBAsp annotation.
 4. BIP donut + per-pitch-group composition bars (Hard / Breaking / Offspeed).
@@ -207,18 +207,18 @@ HITTER_STAT_LINE_COLOR = {
     'K%':      ('kPct',       'pct', False),
     # Tint distances track each metric's SHIPPED spread (run-truth rescale,
     # 2026-08-15): SD+/CT+ are pinned at pool SD 10 (skill z-ruler), BB+ at
-    # 0.66 x wRC+'s SD (~14), Hitter+ at 0.82 x (~17) — full colour lands at
+    # 0.66 x wRC+'s SD (~14), Process+ at r x (~17) — full colour lands at
     # ~2 SD for each, matching the wRC+ cell's visual intensity per SD.
     'SD+':     ('sdPlus',     'raw', True,  10),
     'CT+':     ('ctPlus',     'raw', True,  10),
     'BB+':     ('bbPlus',     'raw', True,  14),
-    'Hitter+': ('hitterPlus', 'raw', True,  17),
+    'Process+': ('processPlus', 'raw', True,  17),
 }
 
 # Headline stat order — MLB default. ROC overrides this since the + family
 # and bat-tracking metrics aren't computed for AAA.
 # Headline strip — non-redundant with the percentile bubble panel below.
-# Bubbles already carry BB%, K%, SD+, CT+, BB+, Hitter+ and the QoC family,
+# Bubbles already carry BB%, K%, SD+, CT+, BB+, Process+ and the QoC family,
 # so the strip focuses on the slash line and the bottom-line production
 # stats (wOBA = true linear-weighted runs, wRC+ = park/league-adjusted).
 HEADLINE_STATS_MLB = ['PA', 'HR', 'AVG', 'OBP', 'SLG', 'OPS', 'wOBA', 'wRC+']
@@ -843,7 +843,7 @@ def fmt_signed_decimal(v, decimals=1):
 #              'dec1' (96.3), 'dec1+' (signed, e.g. +8.7), 'mph' (96.3 mph)
 
 # 2026-08-12 restructure (per Wally): RESULT leads with the "+" family so the
-# Hitter+ decomposition reads top-down (composite, then its three components),
+# Process+ decomposition reads top-down (composite, then its three components),
 # with Bat Speed folded in as the physical input. The standalone BAT TRACKING
 # section is gone — Squared-Up% and Blast% dropped, Bat Speed promoted here.
 # Directionality is handled by the stored percentiles, which are already
@@ -851,7 +851,7 @@ def fmt_signed_decimal(v, decimals=1):
 # "lower is better" needs no special casing at render time.
 BUBBLE_COLUMNS = [
     ('RESULT', [
-        ('Hitter+',           'hitterPlus',   'hitterPlus_pctl',   'int'),
+        ('Process+',          'processPlus',  'processPlus_pctl',  'int'),
         ('Batted Ball+',      'bbPlus',       'bbPlus_pctl',       'int'),
         ('Contact+',          'ctPlus',       'ctPlus_pctl',       'int'),
         ('Swing Decisions+',  'sdPlus',       'sdPlus_pctl',       'int'),
@@ -1271,7 +1271,7 @@ def _render_percentile_bubbles(fig, h_row):
 #     to use. (FanGraphs DOES serve custom date ranges; we just do not ask
 #     it for them yet.) Our own formula would be a different quantity under
 #     the same name.
-#   * SD+, CT+, BB+, Hitter+ — each needs a whole-league cell table (SD+,
+#   * SD+, CT+, BB+, Process+ — each needs a whole-league cell table (SD+,
 #     CT+) or the league xwOBAcon anchor (BB+) measured over the SAME
 #     window, which only a pipeline run can produce.
 #   * every *_pctl — a percentile needs an all-MLB pool over the same
@@ -1284,7 +1284,7 @@ def _render_percentile_bubbles(fig, h_row):
 # 529 PA against 535, all six the walks. Every other key matched exactly,
 # and OBP/OPS/BB%/K% moved only by that denominator.
 WINDOW_UNAVAILABLE = ('wRCplus', 'xWRCplus', 'wRC',
-                      'sdPlus', 'ctPlus', 'bbPlus', 'hitterPlus')
+                      'sdPlus', 'ctPlus', 'bbPlus', 'processPlus')
 
 
 class _SkipFGOverride(Exception):
@@ -1471,7 +1471,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                           and v is not None})
             window_pool = True
             print(f"  Scored in {_time.time() - _t0:.1f}s. "
-                  f"{h_row.get('pa')} PA, Hitter+ {h_row.get('hitterPlus')}, "
+                  f"{h_row.get('pa')} PA, Process+ {h_row.get('processPlus')}, "
                   f"wRC+ {h_row.get('wRCplus')}. Percentiles rank this window "
                   f"against the full-season MLB pool.")
         except Exception as _e:
@@ -1698,7 +1698,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         elif k == 'SD+':  stat_values.append(fmt_int(h_row.get('sdPlus')))
         elif k == 'CT+':  stat_values.append(fmt_int(h_row.get('ctPlus')))
         elif k == 'BB+':  stat_values.append(fmt_int(h_row.get('bbPlus')))
-        elif k == 'Hitter+': stat_values.append(fmt_int(h_row.get('hitterPlus')))
+        elif k == 'Process+': stat_values.append(fmt_int(h_row.get('processPlus')))
         else: stat_values.append('—')
 
     # Proportional column widths — every cell sized to its content + padding.
@@ -2460,8 +2460,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             # measured over the window. Say what the percentiles rank against,
             # because that is the one thing a reader cannot infer.
             _notes = (
-                '•  Hitter+, Batted Ball+, Contact+ and Swing Decisions+: 100 is league\n'
+                '•  Process+, Batted Ball+, Contact+ and Swing Decisions+: 100 is league\n'
                 '    average and each point is 1% better or worse, the way wRC+ reads.\n'
+                '•  Process+ grades the process shown this season, with no pull toward\n'
+                '    league average; a gap against wRC+ is results ahead of or behind process.\n'
                 '•  GB% is colored so that lower = better.\n'
                 '•  Values are for this date window. Percentiles rank them against '
                 'the full-season MLB pool\n    (ROC rows excluded; a traded player counts once, '
@@ -2473,15 +2475,17 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             _notes = (
                 '•  Every value on this card is computed from this date '
                 'window\'s pitches only.\n'
-                '•  Hitter+, Batted Ball+, Contact+, Swing Decisions+ and '
+                '•  Process+, Batted Ball+, Contact+, Swing Decisions+ and '
                 'wRC+ need the window pool, so they read "—".\n'
                 '•  Percentile bars are grey: the season-pool scoring for this '
                 'window did not run.'
             )
         else:
             _notes = (
-                '•  Hitter+, Batted Ball+, Contact+ and Swing Decisions+: 100 is league\n'
+                '•  Process+, Batted Ball+, Contact+ and Swing Decisions+: 100 is league\n'
                 '    average and each point is 1% better or worse, the way wRC+ reads.\n'
+                '•  Process+ grades the process shown this season, with no pull toward\n'
+                '    league average; a gap against wRC+ is results ahead of or behind process.\n'
                 '•  GB% is colored so that lower = better.\n'
                 '•  Z-Swing% and Z-Contact% count in-zone pitches only: swings at '
                 'strikes, and contact on those swings.'

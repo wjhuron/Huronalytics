@@ -1993,7 +1993,7 @@ const Aggregator = {
    * Team mode: aggregate season boxscore/pre-computed hitter stats from
    * HITTER_DATA to team level. Counting stats are true sums (RV at full
    * precision); rates are weighted by their natural denominators (PA for
-   * wOBA/wRC+/Hitter+, competitive swings for bat tracking, competitive runs
+   * wOBA/wRC+/Process+, competitive swings for bat tracking, competitive runs
    * for sprint speed, scored-pitch N for SD+/CT+). Respects the bats filter.
    */
   _teamHitterBoxscore: function (filters) {
@@ -2029,7 +2029,7 @@ const Aggregator = {
       wadd(a, 'wOBA', h.wOBA, h.pa);
       wadd(a, 'wRCplus', h.wRCplus, h.pa);
       wadd(a, 'xWRCplus', h.xWRCplus, h.pa);
-      wadd(a, 'hitterPlus', h.hitterPlus, h.pa);
+      wadd(a, 'processPlus', h.processPlus, h.pa);
       wadd(a, 'sdPlus', h.sdPlus, h.sdPlusN);
       wadd(a, 'ctPlus', h.ctPlus, h.ctPlusN);
       const compW = h.nCompSwings;
@@ -2190,7 +2190,7 @@ const Aggregator = {
       'twoStrikeWhiffPct', 'firstPitchSwingPct',
       'avgFbDist', 'avgHrDist',
       'sprintSpeed', 'runValue',
-      'wRCplus', 'xWRCplus', 'hitterPlus', 'hWAR', 'fWAR',
+      'wRCplus', 'xWRCplus', 'processPlus', 'hWAR', 'fWAR',
       'hr', 'sb',
     ];
     const HITTER_INVERT = {
@@ -2448,7 +2448,7 @@ const Aggregator = {
       // bbPlusMinBip (below it a score is >2/3 prior). Matters most here
       // because date/hand filters shrink the sample — a filtered 40-BIP
       // slice now shows a heavily regressed value instead of a blank.
-      // (Hitter+ is pass-through season value, not recomputed client-side,
+      // (Process+ is pass-through season value, not recomputed client-side,
       // so it's gated server-side instead.)
       const bbW = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusWeights) || null;
       // Two ingredients since 2026-08-19, each shrunk at its OWN n0 BEFORE
@@ -2510,7 +2510,7 @@ const Aggregator = {
         }
         const shrunkBB = 100 + (rawBB - 100) * bbSlope;
         // Mirror the server's re-anchor (all-MLB PA-weighted mean = 100).
-        // sd/ct/hitterPlus are pass-through; bbPlus is the only "+"
+        // sd/ct/processPlus are pass-through; bbPlus is the only "+"
         // recomputed client-side, so it must apply the same factor.
         const bbReAnchor = (DataStore && DataStore.metadata &&
                             DataStore.metadata.plusReanchor &&
@@ -2536,9 +2536,9 @@ const Aggregator = {
         obj.bbPlus = null;
       }
 
-      // Hitter+ is precomputed on the server (needs SD+ and CT+ which require
+      // Process+ is precomputed on the server (needs SD+ and CT+ which require
       // per-pitch weight-table lookups not available client-side). Keep the
-      // season-long hitterPlus value from the boxscore merge — it flows through
+      // season-long processPlus value from the boxscore merge — it flows through
       // the hBoxAlways fields alongside sdPlus/ctPlus/wRCplus.
 
       // Compute avgFbDist and avgHrDist from BIP records
@@ -2587,14 +2587,14 @@ const Aggregator = {
                         'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'squaredUpPct', 'idealAAPct',
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
                         'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
-                        // SD+, CT+, and Hitter+ are precomputed against the
+                        // SD+, CT+, and Process+ are precomputed against the
                         // full season (need the 360-cell / 60-cell RV weight
                         // tables and hitter-standardization SDs that aren't
                         // available client-side), so always surface the
                         // season values even under filters.
                         'sdPlus', 'sdPlusN', 'sdPlusRaw',
                         'ctPlus', 'ctPlusN', 'ctPlusRaw',
-                        'hitterPlus',
+                        'processPlus',
                         // hWAR and its components are season-level (pipeline/hwar.py)
                         'hWAR', 'hWAR_se', 'hBatRuns', 'hBsrRuns', 'hFldRuns', 'hPosRuns', 'hReplRuns', 'fWAR', 'fWAR_pctl'];
     // Rate stats that micro data computes (skip when filtered)

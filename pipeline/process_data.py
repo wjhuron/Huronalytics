@@ -1340,7 +1340,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             whole season. Everything computed from all_pitches is already
             correct for the window, including the boxscore merge (its dates
             are derived from all_pitches below), every league average, the
-            SD+/CT+ cell tables, the BB+ anchor, the Hitter+ standardization
+            SD+/CT+ cell tables, the BB+ anchor, the Process+ standardization
             and every percentile pool. This flag exists only to suppress the
             three merges that pull SEASON-scoped numbers from outside
             all_pitches, which would otherwise put season values on window
@@ -1529,7 +1529,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
 
     # --- Tier 2: fill xwOBA for ROC pitches (Savant doesn't publish their
     # per-pitch xwOBA model output for AAA). The fix unlocks xwOBAcon,
-    # xwOBA, BB+, and Hitter+ for ROC hitters via the existing per-hitter
+    # xwOBA, BB+, and Process+ for ROC hitters via the existing per-hitter
     # aggregations downstream.
     #
     # BIP fill: pipeline_xwoba3d.py — joint EV x LA x spray x bats
@@ -3262,7 +3262,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # half's actual wOBA — an xwOBA target is model-family biased toward EV
     # channels and produced a false positive on an earlier screen).
     #   BB+     r .2902 -> .3134  (+.0232)  6/6 seasons
-    #   Hitter+ r .3645 -> .3954  (+.0309)  6/6 seasons
+    #   Process+ r .3645 -> .3954  (+.0309)  6/6 seasons
     #
     # CONSTANTS, labelled honestly. n0_con 130 and n0_ev 0 were unanimous
     # across all six held-out seasons. w_ev 0.40 and the percentile are a
@@ -3320,7 +3320,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # four were tested at the same weight and every one makes the bias WORSE
     # (0/6 seasons improved), even though three of them nudge accuracy up.
     #
-    # BETA is measured LIVE from the current pool, matching how Hitter+
+    # BETA is measured LIVE from the current pool, matching how Process+
     # handles its own run-truth. Frozen fallback is the 2021-2026 mean; the
     # per-season values were 4.017 / 4.017 / 4.393 / 4.099 / 4.326 / 4.378,
     # a 9% spread, and live vs frozen changed held-out r by less than .0001.
@@ -3480,6 +3480,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                       / (n_bip + BB_PLUS_N0_EV))
             _raw = (BB_PLUS_W_CON * con_adj + BB_PLUS_W_EV * ev_adj
                     + BB_PLUS_W_SP * sp_plus)
+            # Process+ input (2026-09-16): the same blend on the UNSHRUNK
+            # ingredients, before the bat prior and the slope match. The
+            # n0 shrink and the prior are predictive devices; Process+ is
+            # descriptive and carries no pull toward league. Private key,
+            # stripped at write, never displayed.
+            row['_procBb'] = (BB_PLUS_W_CON * con_plus + BB_PLUS_W_EV * ev_plus
+                              + BB_PLUS_W_SP * sp_plus)
             # Bat-tracking prior blend (see the D1 block above). Mirrored in
             # js/aggregator.js — the two move in the same commit, like every
             # BB+ constant.
@@ -3503,10 +3510,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                     and n_bip >= BB_PLUS_MIN_BIP):
                 _bb_missing_ev += 1
             row['bbPlus'] = None
+            row['_procBb'] = None
     if _bb_missing_ev:
-        # Fail loud: an EV feed gap silently blanks BB+ and therefore Hitter+.
+        # Fail loud: an EV feed gap silently blanks BB+ and therefore Process+.
         print(f"  WARNING: {_bb_missing_ev} hitters have xwOBAcon but no ev95 "
-              f"— BB+ and Hitter+ are None for them. Check the ExitVelo "
+              f"— BB+ and Process+ are None for them. Check the ExitVelo "
               f"column in the sheets before publishing.")
     # The applied/skipped split is the degrade tell: skipped covers every
     # ROC row (AAA has no bat tracking) plus real MLB gaps. "0 applied" on
@@ -3517,7 +3525,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     hitter_league_avgs['bbPlus'] = 100.0
 
     # PD+ is retired. Superseded by SD+ (decision) and CT+ (contact-frequency).
-    # Hitter+ now composites BB+, SD+, CT+ directly; see below.
+    # Process+ composites the unshrunk BB+, SD+, CT+ inputs directly; see below.
 
     # SD+ — decision-only discipline index (xRV-weighted cells, dv_A formula,
     # Bayesian-regressed to league, ratio-to-league). See pipeline_sdplus.py.
@@ -3551,6 +3559,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         if r is not None:
             row['sdPlus'] = r['sdPlus']
             row['sdPlusRaw'] = round(r['raw_sd_adj'], 5)
+            row['_procSd'] = r['raw_sd']   # unshrunk, Process+ input
             row['sdPlusN'] = r['n_decisions']
             zdv = r.get('zone_dv') or {}
             row['sdPlusHeart']      = (round(zdv['heart'], 5)      if zdv.get('heart')      is not None else None)
@@ -3561,6 +3570,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         else:
             row['sdPlus'] = None
             row['sdPlusRaw'] = None
+            row['_procSd'] = None
             row['sdPlusN'] = 0
             row['sdPlusHeart'] = None
             row['sdPlusShadowIn'] = None
@@ -3579,7 +3589,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # BB+'s e9a9080a, measured by ctplus_bt_prior_build.py). BAT SPEED
     # ONLY — the squared-up coefficient flipped sign across seasons and
     # dropping it improved held-out RMSE at every matched config. The beta
-    # is NEGATIVE (power/contact tradeoff as kinetics); Hitter+ still nets
+    # is NEGATIVE (power/contact tradeoff as kinetics); Process+ still nets
     # bat speed positive through BB+'s larger positive weight.
     # CT_BT_K=40: interior (20 < 40 > 80, 12/12 cells). CT_BT_S0=10: a
     # STATED CONVENTION — the harness's s0 curve is censored below 100
@@ -3635,6 +3645,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         if r is not None:
             row['ctPlus'] = r['ctPlus']
             row['ctPlusRaw'] = round(r['raw_ct_adj'], 5)
+            row['_procCt'] = r['raw_ct']   # unshrunk, prior-free, Process+ input
             row['ctPlusN'] = r['n_swings']
             zdv = r.get('zone_dv') or {}
             row['ctPlusHeart']      = (round(zdv['heart'], 5)      if zdv.get('heart')      is not None else None)
@@ -3645,6 +3656,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         else:
             row['ctPlus'] = None
             row['ctPlusRaw'] = None
+            row['_procCt'] = None
             row['ctPlusN'] = 0
             row['ctPlusHeart'] = None
             row['ctPlusShadowIn'] = None
@@ -3658,8 +3670,23 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     team_games_played = compute_team_games_played(all_pitches)
     print(f"  Team games played: {dict(sorted(team_games_played.items()))}")
 
-    # Hitter+ — composite of BB+ (contact quality), SD+ (decision quality),
-    # CT+ (contact frequency), combined on z-scores of the qualified pool.
+    # Process+ (2026-09-16; named Process+ until then) — a DESCRIPTIVE grade
+    # of the process behind the production: BB+ (contact quality), SD+
+    # (decision quality), CT+ (contact frequency), combined on z-scores of
+    # the qualified pool. The inputs are the UNSHRUNK, prior-free atoms
+    # (_procBb / _procSd / _procCt), not the displayed columns: the n0
+    # shrinkage and the bat-tracking priors pull a small sample toward
+    # league average, which is a forecasting device, and a descriptive grade
+    # reads a 70-PA stretch as what it was. Measured 2026-09-16
+    # (scripts/research/hitter/hitterplus_shrinkage_sweep.py, 2021-2026):
+    # same-season fit is monotone toward zero shrinkage, 6/6 seasons at
+    # every PA floor (+.033 at 100 PA, +.012 qualified); BB+'s n0 carries
+    # the whole effect, SD+/CT+ shrinkage is flat, so unshrinking those two
+    # is a convention. Qualified hitters move <1 point; the 100-199 PA band
+    # spreads from SD 9.7 to 13.1, matching wRC+. The weights are unchanged:
+    # the descriptive optimum (.49-.50/.17/.33, hitterplus_descriptive.py)
+    # is inside noise of 52/17/31, which sits inside the flat region at the
+    # qualified floor.
     # Weights (2026-07-13): 52/17/31, derived MULTI-SEASON out of sample
     # (scripts/research/hitter/derive_weights_multiseason.py + derive_weights_lopo2.py:
     # full-season year-N components → year-N+1 wOBA, pairs 2021→22 …
@@ -3674,15 +3701,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # 2026-07-02 — collinearity artifact; 70/15/15 prior retired 2026-07-13
     # by the derivation above. The half-season derivation couldn't price
     # SD+/CT+ at n=209; four full season pairs can.)
-    HITTER_PLUS_W_BB = 0.52
-    HITTER_PLUS_W_SD = 0.17
-    HITTER_PLUS_W_CT = 0.31
-    HITTER_PLUS_TARGET_SD = 40  # interim/fallback scale. The final display
+    PROCESS_PLUS_W_BB = 0.52
+    PROCESS_PLUS_W_SD = 0.17
+    PROCESS_PLUS_W_CT = 0.31
+    PROCESS_PLUS_TARGET_SD = 40  # interim/fallback scale. The final display
                                 # scale is set AFTER the FG override fills
                                 # wRC+: the wRC+ scale-match step re-scales
                                 # the qualified pool's SD to the pool's
                                 # measured wRC+ SD (~23 mid-season), so
-                                # Hitter+ reads in wRC+'s currency. This 40
+                                # Process+ reads in wRC+'s currency. This 40
                                 # only survives if wRC+ fails to populate.
 
     # Standardization uses the leaderboard-qualified hitter pool (ROC-aware:
@@ -3694,7 +3721,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     for _row in hitter_leaderboard:
         # MLB-only standardization pool: ROC hitters now have full bb/sd/ct
         # via the Tier 1 SD+/CT+ unlock and the Tier 2 xwOBAcon fill, but
-        # the Hitter+ baseline must stay MLB-anchored (translation framing,
+        # the Process+ baseline must stay MLB-anchored (translation framing,
         # same convention as bbPlus re-anchor and percentile pool — ROC
         # ranks against MLB, doesn't contribute to the MLB baseline).
         if _row.get('_isROC') or _row.get('_isCombined'):
@@ -3704,55 +3731,61 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         _team_g = team_games_played.get(_row.get('team'))
         _pa_thresh = _hitter_pa_per_game(False) * (_team_g or 0)
         if _team_g and _row.get('pa', 0) >= _pa_thresh and \
-           _row.get('bbPlus') is not None and _row.get('sdPlus') is not None and _row.get('ctPlus') is not None:
+           _row.get('_procBb') is not None and _row.get('_procSd') is not None and _row.get('_procCt') is not None:
             _hplus_qual.append(_row)
     if len(_hplus_qual) >= 10:
         def _mean(vals): return sum(vals)/len(vals)
         def _sd(vals):
             m = _mean(vals)
             return math.sqrt(sum((v-m)**2 for v in vals)/len(vals))
-        _m_bb = _mean([h['bbPlus'] for h in _hplus_qual]); _s_bb = _sd([h['bbPlus'] for h in _hplus_qual])
-        _m_sd = _mean([h['sdPlus'] for h in _hplus_qual]); _s_sd = _sd([h['sdPlus'] for h in _hplus_qual])
-        _m_ct = _mean([h['ctPlus'] for h in _hplus_qual]); _s_ct = _sd([h['ctPlus'] for h in _hplus_qual])
+        _m_bb = _mean([h['_procBb'] for h in _hplus_qual]); _s_bb = _sd([h['_procBb'] for h in _hplus_qual])
+        _m_sd = _mean([h['_procSd'] for h in _hplus_qual]); _s_sd = _sd([h['_procSd'] for h in _hplus_qual])
+        _m_ct = _mean([h['_procCt'] for h in _hplus_qual]); _s_ct = _sd([h['_procCt'] for h in _hplus_qual])
     else:
-        # Defensive fallback — shouldn't trigger in any real season
-        _m_bb, _s_bb = 100.0, 15.0
-        _m_sd, _s_sd = 100.0, 10.0
-        _m_ct, _s_ct = 100.0,  3.0
+        # Fail closed: a thin pool (a broken atom, a first-week run) ships
+        # Process+ as None on every row and says so, never a made-up ruler.
+        _m_bb = _m_sd = _m_ct = 0.0
+        _s_bb = _s_sd = _s_ct = 0.0
+        print(f"  WARNING: Process+ standardization pool is {len(_hplus_qual)} "
+              f"(< 10) — Process+ is None on every row this run.")
 
-    hitter_plus_standardization = {
-        'bbPlus': {'mean': round(_m_bb, 3), 'sd': round(_s_bb, 3)},
-        'sdPlus': {'mean': round(_m_sd, 3), 'sd': round(_s_sd, 3)},
-        'ctPlus': {'mean': round(_m_ct, 3), 'sd': round(_s_ct, 3)},
-        'weights': {'bb': HITTER_PLUS_W_BB, 'sd': HITTER_PLUS_W_SD, 'ct': HITTER_PLUS_W_CT},
+    # The stats describe the UNSHRUNK inputs (bbRaw = the BB+ blend before
+    # n0/prior/slope-match, in percent units; sdRaw = raw decision value in
+    # runs; ctRaw = raw actual/expected contact ratio). pipeline/window_pool.py
+    # and scripts/tools/platoon_splits.py rebuild Process+ from these.
+    process_plus_standardization = {
+        'bbRaw': {'mean': round(_m_bb, 6), 'sd': round(_s_bb, 6)},
+        'sdRaw': {'mean': round(_m_sd, 6), 'sd': round(_s_sd, 6)},
+        'ctRaw': {'mean': round(_m_ct, 6), 'sd': round(_s_ct, 6)},
+        'weights': {'bb': PROCESS_PLUS_W_BB, 'sd': PROCESS_PLUS_W_SD, 'ct': PROCESS_PLUS_W_CT},
         'scale': None,  # set below after the realized-SD rescale is computed
         'nQualified': len(_hplus_qual),
     }
 
     def _composite_z(row):
-        bbp, sdp, ctp = row.get('bbPlus'), row.get('sdPlus'), row.get('ctPlus')
+        bbp, sdp, ctp = row.get('_procBb'), row.get('_procSd'), row.get('_procCt')
         if bbp is None or sdp is None or ctp is None:
             return None
         if _s_bb <= 0 or _s_sd <= 0 or _s_ct <= 0:
             return None
-        return (HITTER_PLUS_W_BB * (bbp - _m_bb) / _s_bb
-                + HITTER_PLUS_W_SD * (sdp - _m_sd) / _s_sd
-                + HITTER_PLUS_W_CT * (ctp - _m_ct) / _s_ct)
+        return (PROCESS_PLUS_W_BB * (bbp - _m_bb) / _s_bb
+                + PROCESS_PLUS_W_SD * (sdp - _m_sd) / _s_sd
+                + PROCESS_PLUS_W_CT * (ctp - _m_ct) / _s_ct)
 
     # Rescale so the REALIZED SD over the qualified pool is exactly
-    # HITTER_PLUS_TARGET_SD (wRC+-like spread by construction, not by hope).
+    # PROCESS_PLUS_TARGET_SD (wRC+-like spread by construction, not by hope).
     _qual_zs = [z for z in (_composite_z(h) for h in _hplus_qual) if z is not None]
     _z_sd = _sd(_qual_zs) if len(_qual_zs) >= 10 else 0.0
-    _scale = HITTER_PLUS_TARGET_SD / _z_sd if _z_sd > 1e-9 else HITTER_PLUS_TARGET_SD
-    hitter_plus_standardization['scale'] = round(_scale, 3)
+    _scale = PROCESS_PLUS_TARGET_SD / _z_sd if _z_sd > 1e-9 else PROCESS_PLUS_TARGET_SD
+    process_plus_standardization['scale'] = round(_scale, 3)
 
     for row in hitter_leaderboard:
         z = _composite_z(row)
-        row['hitterPlus'] = (100 + _scale * z) if z is not None else None
-    hitter_league_avgs['hitterPlus'] = 100.0
-    print(f"  Hitter+ computed (BB+/SD+/CT+ composite, weights "
-          f"{HITTER_PLUS_W_BB:.0%}/{HITTER_PLUS_W_SD:.0%}/{HITTER_PLUS_W_CT:.0%}, "
-          f"scale {_scale:.1f} → SD {HITTER_PLUS_TARGET_SD}).")
+        row['processPlus'] = (100 + _scale * z) if z is not None else None
+    hitter_league_avgs['processPlus'] = 100.0
+    print(f"  Process+ computed (unshrunk BB+/SD+/CT+ composite, weights "
+          f"{PROCESS_PLUS_W_BB:.0%}/{PROCESS_PLUS_W_SD:.0%}/{PROCESS_PLUS_W_CT:.0%}, "
+          f"scale {_scale:.1f} → SD {PROCESS_PLUS_TARGET_SD}).")
 
     # ── All-MLB-mean re-anchor for the four "+" indices ──────────────
     # Anchor 100 to the PA-weighted MEAN of ALL MLB hitters (matches the
@@ -3760,10 +3793,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # pipeline's "league average" numbers: every player contributes to
     # the mean, qualification only gates percentile coloring at render).
     # bb/sd/ct are ratio indices → rescale multiplicatively (×100/mean).
-    # hitterPlus is an additive z-index (100 + 40·z) → recenter additively
+    # processPlus is an additive z-index (100 + 40·z) → recenter additively
     # (+100−mean) to preserve its SD spread. The bbPlus factor is published
     # in metadata because the frontend recomputes bbPlus under filters and
-    # must mirror the same scale; sd/ct/hitterPlus are server-precomputed
+    # must mirror the same scale; sd/ct/processPlus are server-precomputed
     # pass-through. No medians used — Wally's rule.
     def _all_mlb_pa_weighted_mean(_stat):
         _pairs = []
@@ -3806,24 +3839,20 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             for _r in hitter_leaderboard:
                 if _r.get(_stat) is not None:
                     _r[_stat] = _r[_stat] * _f
-            # Keep the Hitter+ standardization metadata consistent with the
-            # re-anchored component scale (mean & sd scale by the factor).
-            _sd_meta = hitter_plus_standardization.get(_stat)
-            if _sd_meta:
-                _sd_meta['mean'] = round(_sd_meta['mean'] * _f, 3)
-                _sd_meta['sd'] = round(_sd_meta['sd'] * _f, 3)
-    _mean_h = _all_mlb_pa_weighted_mean('hitterPlus')
+            # (The Process+ standardization describes the UNSHRUNK inputs,
+            # which this component re-anchor does not touch.)
+    _mean_h = _all_mlb_pa_weighted_mean('processPlus')
     if _mean_h is not None:
         _shift = round(100.0 - _mean_h, PLUS_FACTOR_DP)
-        plus_reanchor['hitterPlusShift'] = _shift
+        plus_reanchor['processPlusShift'] = _shift
         for _r in hitter_leaderboard:
-            if _r.get('hitterPlus') is not None:
-                _r['hitterPlus'] = _r['hitterPlus'] + _shift
+            if _r.get('processPlus') is not None:
+                _r['processPlus'] = _r['processPlus'] + _shift
     # 100 = PA-weighted mean of ALL MLB hitters (FG/Savant convention).
     hitter_league_avgs['bbPlus'] = 100.0
     hitter_league_avgs['sdPlus'] = 100.0
     hitter_league_avgs['ctPlus'] = 100.0
-    hitter_league_avgs['hitterPlus'] = 100.0
+    hitter_league_avgs['processPlus'] = 100.0
     print(f"  Plus re-anchor (all-MLB PA-weighted mean -> 100): {plus_reanchor}")
 
     # --- Metadata ---
@@ -3856,7 +3885,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         'sdPlusWeights': sd_weights,
         'ctPlusWeights': ct_weights,
         'locPlusWeights': loc_weights,
-        'hitterPlusStandardization': hitter_plus_standardization,
+        'processPlusStandardization': process_plus_standardization,
         'plusReanchor': plus_reanchor,
         # BB+/SD+/CT+ wRC+-spread match (factor + additive shift per stat).
         # Read by js/aggregator.js for the client-side bbPlus recompute, which
@@ -4307,7 +4336,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # merge + wRC+ (kPct, bbPct, avg, obp, slg, ops, iso, wRCplus, xWRCplus). The
     # first pass above runs before the boxscore merge, so these are None on every
     # row at that point. Fill in anything still missing; leave the plus-metrics
-    # (bbPlus/pdPlus/hitterPlus = 100) and already-computed avgs alone.
+    # (bbPlus/pdPlus/processPlus = 100) and already-computed avgs alone.
     #
     # wOBA is special-cased: pass 1 DID compute it (pitch-derived), but the
     # boxscore merge then overwrites every player's displayed wOBA with the
@@ -4320,15 +4349,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             continue
         _compute_hitter_lg_avg(stat)
 
-    # ── Hitter+ → run-truth scale (LIVE r since 2026-08-18) ──
-    # THE CONTRACT: Hitter+ is a "+" stat, so one point must be one percent.
+    # ── Process+ → run-truth scale (LIVE r since 2026-08-18) ──
+    # THE CONTRACT: Process+ is a "+" stat, so one point must be one percent.
     # 115 means the hitter is 15% better than league average at producing
     # runs, exactly the way 115 wRC+ does. That is a slope-1 requirement:
     #
-    #     slope = r x SD(wRC+) / SD(Hitter+)
+    #     slope = r x SD(wRC+) / SD(Process+)
     #
-    # so the slope is 1 if and only if SD(Hitter+) = r x SD(wRC+). Note the
-    # direction: matching Hitter+ to wRC+'s FULL spread would BREAK the
+    # so the slope is 1 if and only if SD(Process+) = r x SD(wRC+). Note the
+    # direction: matching Process+ to wRC+'s FULL spread would BREAK the
     # contract, not honour it — at SD 20.6 the slope falls to r = 0.795 and a
     # 115 would be worth only 11.9%. The deflation IS the wRC+ scale.
     #
@@ -4338,7 +4367,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # so a 115 read 14.6% instead of 15.0%. Live r pins it to 1.000 by
     # construction, every run.
     # The cost, accepted deliberately: the ruler now moves as r drifts, so a
-    # Hitter+ quoted in May is not the identical ruler as one quoted in
+    # Process+ quoted in May is not the identical ruler as one quoted in
     # September. Same trade the component re-anchor already makes. The live r
     # is published in metadata (wrcScaleMatch.r) so any quoted value can be
     # reconstructed. Guarded below — a thin or degenerate pool falls back to
@@ -4359,15 +4388,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         _team_g = team_games_played.get(_row.get('team'))
         if not _team_g or _row.get('pa', 0) < _hitter_pa_per_game(False) * _team_g:
             continue
-        if _row.get('hitterPlus') is None or _row.get('wRCplus') is None:
+        if _row.get('processPlus') is None or _row.get('wRCplus') is None:
             continue
-        _pool_hp.append(_row['hitterPlus'])
+        _pool_hp.append(_row['processPlus'])
         _pool_wrc.append(_row['wRCplus'])
     if len(_pool_hp) >= 10:
         def _psd(vals):
             m = sum(vals) / len(vals)
             return math.sqrt(sum((x - m) ** 2 for x in vals) / len(vals))
-        HITTER_RUN_TRUTH = 0.82   # fallback only: r(Hitter+, wRC+), 6-season mean
+        HITTER_RUN_TRUTH = 0.82   # fallback only: r(Process+, wRC+), 6-season mean
         # Live r over the qualified pool. r is invariant to the affine rescale
         # below, so measuring it on the pre-rescale values is the same as
         # measuring it after.
@@ -4392,25 +4421,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             _r_used, _r_src = _r_live, 'live'
         else:
             _r_used, _r_src = HITTER_RUN_TRUTH, 'frozen'
-            print(f"  Hitter+ run-truth: live r unusable "
+            print(f"  Process+ run-truth: live r unusable "
                   f"(r={_r_live if _r_live is not None else 'n/a'}, "
                   f"n={len(_pool_hp)}) — falling back to the frozen "
                   f"{HITTER_RUN_TRUTH} constant.")
         if _sd_hp > 1e-9 and _sd_wrc > 1e-9:
             _f = (_r_used * _sd_wrc) / _sd_hp
             for _row in hitter_leaderboard:
-                if _row.get('hitterPlus') is not None:
-                    _row['hitterPlus'] = 100.0 + (_row['hitterPlus'] - 100.0) * _f
-            hitter_plus_standardization['wrcScaleMatch'] = {
+                if _row.get('processPlus') is not None:
+                    _row['processPlus'] = 100.0 + (_row['processPlus'] - 100.0) * _f
+            process_plus_standardization['wrcScaleMatch'] = {
                 'poolWrcSd': round(_sd_wrc, 3), 'poolHpSd': round(_sd_hp, 3),
                 'factor': round(_f, 4), 'n': len(_pool_hp),
                 'r': round(_r_used, 4), 'rSource': _r_src,
                 'rLive': (round(_r_live, 4) if _r_live is not None else None)}
-            print(f"  Hitter+ rescaled to slope 1.000 using the {_r_src} "
+            print(f"  Process+ rescaled to slope 1.000 using the {_r_src} "
                   f"r={_r_used:.3f} (pool wRC+ SD {_sd_wrc:.1f}, factor "
                   f"{_f:.3f}, n={len(_pool_hp)}). One point = one percent.")
     else:
-        print("  Hitter+ wRC+ scale match skipped (wRC+ pool too small) — SD-40 scale stands.")
+        print("  Process+ wRC+ scale match skipped (wRC+ pool too small) — SD-40 scale stands.")
 
     # ── BB+/SD+/CT+ display scales ──
     # CURRENT POLICY (2026-08-18, the "+" contract; this header rewritten
@@ -4420,7 +4449,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # hard-pinned to 1.0 (NO spread matching for components), and the only
     # adjustment applied here is the ADDITIVE PA-weighted re-anchor to 100.
     # wRC+ scaling exists in exactly two places, neither of them here:
-    # Hitter+ (live-r deflation, below) and xWRC+ (the run-truth cap).
+    # Process+ (live-r deflation, below) and xWRC+ (the run-truth cap).
     # Measured run slopes, kept for context
     # (scripts/research/hitter/hitter_spread_atlas.py, 2021-2026 replicates,
     # wRC+ points per 1 SD of metric):
@@ -4428,10 +4457,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     #   SD+   5.8 desc /  6.1 pred  (real, stable skill; tiny run payoff)
     #   CT+  ~0 both horizons       (quantity trades against quality)
     # The value differences between components are carried explicitly by
-    # the Hitter+ weights.
+    # the Process+ weights.
     #
     # Ordering matters and is load-bearing:
-    #   - AFTER Hitter+ is built from these three, so Hitter+ is invariant by
+    #   - AFTER Process+ is built from these three, so Process+ is invariant by
     #     construction rather than by cancellation.
     #   - re-anchors ADDITIVELY on unrounded values, so the multiplicative
     #     re-anchor's 1-decimal rounding residual is not amplified by the
@@ -4483,7 +4512,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         # A point therefore means the same THING everywhere but not the same
         # RARITY, which is the trade the "+" convention makes by definition.
         #
-        # Hitter+ is NOT touched here. It is built above from these three and
+        # Process+ is NOT touched here. It is built above from these three and
         # is already on the wRC+ point scale, where a point is one percent of
         # league run production. It satisfies the same contract in run units.
         _sd_wrc_c = _cpsd([r['wRCplus'] for r in _comp_pool])
@@ -4510,12 +4539,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                            PLUS_FACTOR_DP)
             for _r, _v in _scaled:
                 _r[_stat] = _v + _shift
-            # Keep the published component scale in step with the shipped
-            # values (documentation only — nothing reads it back).
-            _sd_meta = hitter_plus_standardization.get(_stat)
-            if _sd_meta:
-                _sd_meta['mean'] = round(100.0 + (_sd_meta['mean'] - 100.0) * _f + _shift, 3)
-                _sd_meta['sd'] = round(_sd_meta['sd'] * _f, 3)
+            # (The Process+ standardization describes the UNSHRUNK inputs,
+            # which this component rescale does not touch.)
             plus_wrc_scale[_stat] = {'factor': _f, 'shift': _shift}
         plus_wrc_scale['poolWrcSd'] = round(_sd_wrc_c, 3)
         plus_wrc_scale['n'] = len(_comp_pool)
@@ -4530,7 +4555,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         # xwRC+'s spread ran ~1.09x wRC+'s (the excess is xwOBA input
         # sampling noise), while its measured slope on same-season wRC+ is
         # 0.85 (atlas, 2021-2026 replicates). Same live-anchored treatment
-        # as Hitter+/BB+. Re-anchors to its own PRIOR PA-weighted mean, not
+        # as Process+/BB+. Re-anchors to its own PRIOR PA-weighted mean, not
         # to 100: the league-level xwRC+ vs wRC+ gap (contact quality vs
         # results league-wide) is information the cap must not erase.
         XWRC_RUN_TRUTH = 0.85
@@ -4564,7 +4589,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
               "ratio-to-league scale stands.")
 
     # ── FINAL PRECISION PASS for the hitter "+" family ─────────────────
-    # BB+, SD+, CT+ and Hitter+ each pass through three stages before they
+    # BB+, SD+, CT+ and Process+ each pass through three stages before they
     # reach the artifact: the component build, the all-MLB re-anchor, and
     # the wRC+ scale match. Every stage used to round to 1 decimal and the
     # error accumulated — 34% of hitters landed 0.1 away from a single-pass
@@ -4595,7 +4620,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # js/aggregator.js rounds its filtered BB+ to the same precision.
     PLUS_STORE_DP = 6
     for _row in hitter_leaderboard:
-        for _stat in ('bbPlus', 'sdPlus', 'ctPlus', 'hitterPlus'):
+        for _stat in ('bbPlus', 'sdPlus', 'ctPlus', 'processPlus'):
             _v = _row.get(_stat)
             if _v is not None:
                 _row[_stat] = round(_v, PLUS_STORE_DP)

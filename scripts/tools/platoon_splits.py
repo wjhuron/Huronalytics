@@ -283,7 +283,10 @@ class League:
         self.siera_constant = metadata['sieraConstant']
         self.lg_xwobacon = metadata['hitterLeagueAverages']['xwOBAcon']
         self.reanchor = metadata['plusReanchor']
-        self.hstd = metadata['hitterPlusStandardization']
+        self.hstd = metadata['processPlusStandardization']
+        self.lg_ev95 = metadata['hitterLeagueAverages'].get('ev95')
+        self.bb_w = metadata.get('bbPlusWeights') or {'con': 0.60, 'ev': 0.40}
+        self.bb_beta = metadata.get('bbPlusBeta') or 4.205
         self.team_games = metadata['teamGamesPlayed']
         self.max_tg = max(self.team_games.values())
 
@@ -416,18 +419,55 @@ class League:
         v = (n_bip * raw + 60 * 100.0) / (n_bip + 60)
         return round(v * self.reanchor['bbPlus'], 1)
 
-    def hitter_plus(self, bbp, sdp, ctp):
-        """Same three steps the pipeline applies, in order: composite z on the
-        standardized components, the all-MLB re-anchor shift, then the wRC+
-        spread match. The z is invariant to the component re-anchor (numerator
-        and denominator scale together), so post-re-anchor inputs are correct."""
-        if bbp is None or sdp is None or ctp is None:
+    def sd_raw(self, pitches):
+        raw = SD.compute_hitter_sd({('x', 'x'): pitches}, self.sd_table,
+                                   self.sd_zone_w).get(('x', 'x'))
+        return raw['raw_sd'] if raw else None
+
+    def ct_raw(self, pitches):
+        raw = CT.compute_hitter_ct({('x', 'x'): pitches}, self.ct_table).get(('x', 'x'))
+        return raw['raw_ct'] if raw else None
+
+    @staticmethod
+    def ev95(pitches):
+        """95th-percentile exit velocity of the balls in play (linear
+        interpolation, numpy convention) — the BB+ EV ingredient."""
+        evs = []
+        for p in pitches:
+            if p.get('Description') != 'In Play':
+                continue
+            try:
+                v = float(p.get('ExitVelo'))
+            except (TypeError, ValueError):
+                continue
+            if v == v:
+                evs.append(v)
+        if not evs:
             return None
+        evs.sort()
+        k = 0.95 * (len(evs) - 1)
+        f = int(k)
+        c = min(f + 1, len(evs) - 1)
+        return evs[f] + (evs[c] - evs[f]) * (k - f)
+
+    def process_plus(self, xwobacon, ev95, n_bip, sd_raw, ct_raw):
+        """Process+ (2026-09-16, replaced Hitter+): the 52/17/31 composite of
+        the UNSHRUNK, prior-free atoms — the BB+ blend on the raw xwOBAcon and
+        EV95 ratios (no n0, no bat prior, no slope match), raw SD+ and raw
+        CT+ — z-scored on metadata.processPlusStandardization (bbRaw / sdRaw
+        / ctRaw), then the all-MLB re-anchor shift, then the wRC+ spread
+        match. Same three steps as pipeline/process_data.py, in order."""
+        if (xwobacon is None or n_bip < 30 or sd_raw is None or ct_raw is None
+                or ev95 is None or not self.lg_ev95):
+            return None
+        bb = (self.bb_w['con'] * 100.0 * xwobacon / self.lg_xwobacon
+              + self.bb_w['ev'] * (100.0 + (100.0 * ev95 / self.lg_ev95 - 100.0)
+                                   * self.bb_beta))
         s = self.hstd
-        z = (s['weights']['bb'] * (bbp - s['bbPlus']['mean']) / s['bbPlus']['sd']
-             + s['weights']['sd'] * (sdp - s['sdPlus']['mean']) / s['sdPlus']['sd']
-             + s['weights']['ct'] * (ctp - s['ctPlus']['mean']) / s['ctPlus']['sd'])
-        hp = s['scale'] * z + self.reanchor['hitterPlusShift']
+        z = (s['weights']['bb'] * (bb - s['bbRaw']['mean']) / s['bbRaw']['sd']
+             + s['weights']['sd'] * (sd_raw - s['sdRaw']['mean']) / s['sdRaw']['sd']
+             + s['weights']['ct'] * (ct_raw - s['ctRaw']['mean']) / s['ctRaw']['sd'])
+        hp = s['scale'] * z + self.reanchor['processPlusShift']
         wsm = s.get('wrcScaleMatch')
         if wsm and wsm.get('factor'):
             hp *= wsm['factor']
@@ -510,8 +550,9 @@ def hitter_row(pitches, skill_pitches, lg):
     row['sdPlus'], row['sdPlusN'] = lg.sd_plus(skill_pitches)
     row['ctPlus'], row['ctPlusN'] = lg.ct_plus(skill_pitches)
     row['bbPlus'] = lg.bb_plus(row.get('xwOBAcon'), row.get('nBip') or 0)
-    row['hitterPlus'] = lg.hitter_plus(row.get('bbPlus'), row.get('sdPlus'),
-                                       row.get('ctPlus'))
+    row['processPlus'] = lg.process_plus(row.get('xwOBAcon'), lg.ev95(skill_pitches),
+                                         row.get('nBip') or 0, lg.sd_raw(skill_pitches),
+                                         lg.ct_raw(skill_pitches))
     return row
 
 
@@ -640,7 +681,7 @@ HITTER_METRICS = [
     ('iso',             'ISO',          'avg', True),
     ('wOBA',            'wOBA',         'avg', True),
     ('xwOBA',           'xwOBA',        'avg', True),
-    ('hitterPlus',      'Hitter+',      1,     True),
+    ('processPlus',     'Process+',     1,     True),
     ('sdPlus',          'SD+',          1,     True),
     ('ctPlus',          'CT+',          1,     True),
     ('bbPlus',          'BB+',          1,     True),
@@ -1145,7 +1186,7 @@ def validate(lg, pitcher_groups, hitter_groups, sd_groups, p_lb, h_lb,
         for k in ['pa', 'avg', 'obp', 'slg', 'wOBA', 'xwOBA', 'xwOBAcon',
                   'xwOBAsp', 'babip', 'kPct', 'bbPct', 'hardHitPct',
                   'barrelPct', 'airPullPct', 'chasePct', 'izContactPct',
-                  'maxEV', 'bbPlus', 'sdPlus', 'ctPlus', 'hitterPlus']:
+                  'maxEV', 'bbPlus', 'sdPlus', 'ctPlus', 'processPlus']:
             a, b = mine.get(k), ref.get(k)
             if a is None or b is None:
                 print(f"    {k:18s} mine={a} shipped={b}")
@@ -1214,7 +1255,7 @@ README_LINES = [
     '',
     'Baselines:',
     '    Only the player\'s own pitches are split. Every league anchor (SD+/CT+ cell',
-    '    tables, BB+ denominator, Hitter+ standardization, SACQ zones, xRV count',
+    '    tables, BB+ denominator, Process+ standardization, SACQ zones, xRV count',
     '    offsets) stays full-season and MLB, so vs-R and vs-L are on one scale and',
     '    comparable to the season card.',
     '',

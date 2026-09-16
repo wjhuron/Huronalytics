@@ -13,7 +13,7 @@ same-hand ones. Pools come from scripts/tools/platoon_splits.py, which is valida
 against the shipped leaderboard.
 
 League ANCHORS stay full-season and MLB (SD+/CT+ cell tables, BB+ denominator,
-Hitter+ standardization, SACQ zones, xRV count offsets). Only the player's own
+Process+ standardization, SACQ zones, xRV count offsets). Only the player's own
 pitches are split, so the two cards are on one scale and comparable to the
 season card they came from.
 
@@ -67,7 +67,7 @@ MIN_SPLIT_PA = 20          # below this a card asserts more than the sample can
 # platoon_splits computes. Bat tracking is absent for the minors, so those three
 # stay None rather than inheriting a stale season percentile.
 HITTER_PCTL_KEYS = [
-    'xwOBA', 'hitterPlus', 'sdPlus', 'ctPlus', 'bbPlus',
+    'xwOBA', 'processPlus', 'sdPlus', 'ctPlus', 'bbPlus',
     'xwOBAcon', 'babip', 'maxEV', 'hardHitPct', 'barrelPct', 'airPullPct',
     'bbPct', 'kPct', 'chasePct', 'izContactPct', 'xwOBAsp',
 ]

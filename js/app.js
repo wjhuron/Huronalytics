@@ -55,7 +55,7 @@
     pitchMetrics:          { key: 'stuffScore', dir: 'desc' },
     pitcherSwingDecisions: { key: 'cswPct',     dir: 'desc' },
     pitcherBattedBall:     { key: 'xwOBAcon',   dir: 'asc'  },
-    hitterStats:           { key: 'hitterPlus', dir: 'desc' },
+    hitterStats:           { key: 'processPlus', dir: 'desc' },
     hitterSwingDecisions:  { key: 'sdPlus',     dir: 'desc' },
     hitterBattedBall:      { key: 'bbPlus',     dir: 'desc' },
     hitterBatTracking:     { key: 'batSpeed',   dir: 'desc' },

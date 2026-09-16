@@ -246,6 +246,20 @@ def check_pitch_detail_shards():
         ok(f"{name}: {len(index)} shards, {total:,} bytes, index matches disk")
 
 
+def check_populated(filename, key, min_rows):
+    """A column that is present but None on every row is the silent-blank
+    failure (the 0-Stuff+-grades shape). Process+ is None only where an
+    atom is missing, so fewer than min_rows populated rows is a bad run."""
+    data = load_json(filename)
+    if data is None:
+        return
+    n = sum(1 for r in data if r.get(key) is not None)
+    if n < min_rows:
+        fail(f"{filename}: only {n} rows have a non-null '{key}' (expected {min_rows}+)")
+    else:
+        ok(f"{filename}: {n} rows with a non-null '{key}'")
+
+
 def main():
     print("=== Output validation ===")
 
@@ -255,8 +269,9 @@ def main():
     check_leaderboard('pitcher_leaderboard_rs.json', 50,
                       ['pitcher', 'team', 'era', 'kPct'], 'pitcher')
     check_leaderboard('hitter_leaderboard_rs.json', 50,
-                      ['hitter', 'team', 'pa', 'avg'], 'hitter')
+                      ['hitter', 'team', 'pa', 'avg', 'processPlus'], 'hitter')
     check_woba_bounds()
+    check_populated('hitter_leaderboard_rs.json', 'processPlus', 50)
 
     print("Embed chunks:")
     check_gz_chunk('data_core.json.gz', 500_000,

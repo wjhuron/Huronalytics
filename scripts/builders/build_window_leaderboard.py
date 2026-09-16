@@ -17,7 +17,7 @@ therefore identical by construction to a season run:
   * every league average, weighted the same way
   * the SD+ and CT+ cell weight tables, rebuilt over the window
   * the BB+ league xwOBAcon anchor
-  * the Hitter+ composite, its standardization, and the plus re-anchor
+  * the Process+ composite, its standardization, and the plus re-anchor
   * every percentile pool
 
 `window_mode=True` suppresses only the three merges that reach OUTSIDE the

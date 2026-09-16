@@ -51,8 +51,8 @@ var PlayerPage = {
   // Change the card list and this list in the same commit.
   HITTING_STATS: [
     { _section: 'Result' },
-    { key: 'hitterPlus',   label: 'Hitter+',     format: function(v) { return v != null ? Math.round(v) : '—'; } },
-    // Hitter+ components (weights: BB+ 52%, SD+ 17%, CT+ 31%)
+    { key: 'processPlus',   label: 'Process+',     format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    // Process+ components (weights: BB+ 52%, SD+ 17%, CT+ 31%)
     { key: 'bbPlus',       label: 'BB+',         format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'ctPlus',       label: 'CT+',         format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'sdPlus',       label: 'SD+',         format: function(v) { return v != null ? Math.round(v) : '—'; } },
@@ -100,7 +100,7 @@ var PlayerPage = {
     { key: 'hWAR', label: 'hWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'fWAR', label: 'fWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'hitterPlus', label: 'Hitter+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
+    { key: 'processPlus', label: 'Process+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'bbPct', label: 'BB%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'kPct', label: 'K%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'bbToK', label: 'BB/K', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
@@ -110,9 +110,9 @@ var PlayerPage = {
   // G is meaningless per hand. wOBA and xWRC+ now split — the Guts linear
   // weights ship in metadata and the hitter micro carries IBB, so the
   // aggregator rebuilds both under the filter on the same scale as the season
-  // value. wRC+ and Hitter+ stay out: wRC+ is overwritten with the canonical
+  // value. wRC+ and Process+ stay out: wRC+ is overwritten with the canonical
   // FanGraphs number (which has no per-hand split, so a pipeline-formula
-  // version would read on a different scale), and Hitter+ needs the SD+/CT+
+  // version would read on a different scale), and Process+ needs the SD+/CT+
   // weight tables, which are server-side only.
   HITTER_PLATOON_STATS_COLS: [
     { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
@@ -1149,8 +1149,8 @@ var PlayerPage = {
       }
 
       var val = stat._val !== undefined ? stat._val : data[stat.key];
-      if (stat.key === 'hitterPlus' && val == null && data.hitterPlus != null) {
-        val = data.hitterPlus;
+      if (stat.key === 'processPlus' && val == null && data.processPlus != null) {
+        val = data.processPlus;
       }
       var pctl = stat._pctl !== undefined ? stat._pctl : data[stat.key + '_pctl'];
       // BIP qualification: <20 BIP → show gray outline
