@@ -27,6 +27,13 @@ next-season target is never a training label), predicts Y, and is scored:
   nxt_rv_r  pitcher mean pred over Y -> mean actual RV (rv_raw, luck
             included) over Y+1. Secondary: the outcome the public models
             validate on.
+  nxt_wh_r  nxt_r WITHIN pitcher hand (2026-09-17): grade and target are
+            demeaned within hand before the correlation. nxt_r pools the
+            hands, so a feature that only moves one hand's LEVEL wins it
+            without ranking anyone better (THROWS: pooled +0.040 z 4.9,
+            within-hand -0.001). A ranking gain shows on both; a level
+            shift shows on nxt_r alone. Computed in the summary from the
+            cached aggregates, so it needs no refit and covers old runs.
 
 2026-09-02 repairs (see the audit in memory/project_stuff_gate_v2_2026_08):
   * TWO grades are scored for every metric. "raw" = the pitcher's mean of
@@ -145,6 +152,8 @@ GRADES = (('raw', 's', 't'), ('rend', 's_r', 't'),
           ('adj', 's', 'tadj'), ('adj_rend', 's_r', 'tadj'))
 GRADE_KEY = {'raw': 'nxt_r', 'rend': 'nxt_r_rend',
              'adj': 'nxt_adj_r', 'adj_rend': 'nxt_adj_r_rend'}
+# within-hand twins of raw / rend (grade column), target 't'
+WH_GRADES = (('wh', 's'), ('wh_rend', 's_r'))
 
 
 def pear(a, b):
@@ -896,6 +905,110 @@ def run(spec_path, pairs, seeds, names_only=None):
             gc.collect()
 
 
+# ── within-hand decomposition (2026-09-17) ───────────────────────────────
+_HAND = None
+
+
+def hand_map():
+    """season -> {pitcher: 'R' | 'L'}, cached in data/_gate_v2/
+    pitcher_hand.json and built from the season frames on first use. A name
+    with two hands inside one season takes the hand of most pitches and is
+    counted out loud (none as of 2026-09-17)."""
+    global _HAND
+    if _HAND is None:
+        fn = os.path.join(CACHE, 'pitcher_hand.json')
+        if not os.path.exists(fn):
+            out = {}
+            for y in SEASONS:
+                d = pd.read_pickle(season_path(y))[['pitcher', 'throws']]
+                c = d.groupby(['pitcher', 'throws']).size().unstack(fill_value=0)
+                amb = int((c.gt(0).sum(1) > 1).sum())
+                if amb:
+                    print(f'  hand_map {y}: {amb} names with two hands -> majority hand',
+                          flush=True)
+                out[str(y)] = c.idxmax(1).to_dict()
+                del d
+                gc.collect()
+            tmp = fn + '.tmp'
+            with open(tmp, 'w') as f:
+                json.dump(out, f)
+            os.replace(tmp, fn)
+        _HAND = {int(y): m for y, m in json.load(open(fn)).items()}
+    return _HAND
+
+
+def hand_codes(index, Y):
+    """0 = RHP, 1 = LHP for a pitcher index of season Y. A pitcher the map
+    does not know is an error, not a default hand."""
+    hm = hand_map()[int(Y)]
+    miss = [p for p in index if p not in hm]
+    if miss:
+        raise SystemExit(f'hand_map {Y}: {len(miss)} pitchers without a hand, e.g. '
+                         f'{miss[:3]}; delete data/_gate_v2/pitcher_hand.json to rebuild')
+    return np.array([1 if hm[p] == 'L' else 0 for p in index])
+
+
+def _demean_by(x, h):
+    """x, h: (B, m). Subtract the row-wise mean of each hand group."""
+    out = x.copy()
+    for g in (0, 1):
+        m = (h == g)
+        cnt = np.maximum(m.sum(1, keepdims=True), 1)
+        out -= m * ((x * m).sum(1, keepdims=True) / cnt)
+    return out
+
+
+def _r_rows(x, y):
+    x = x - x.mean(1, keepdims=True)
+    y = y - y.mean(1, keepdims=True)
+    return (x * y).sum(1) / np.sqrt((x * x).sum(1) * (y * y).sum(1))
+
+
+def _r_masked(x, y, m):
+    """Row-wise r over the entries where m is True (x, y, m: (B, n))."""
+    cnt = np.maximum(m.sum(1, keepdims=True), 1)
+    x = (x - (x * m).sum(1, keepdims=True) / cnt) * m
+    y = (y - (y * m).sum(1, keepdims=True) / cnt) * m
+    return (x * y).sum(1) / np.sqrt((x * x).sum(1) * (y * y).sum(1))
+
+
+def wh_r(s, t, h):
+    """Within-hand r: both series demeaned within hand, one correlation."""
+    s, t, h = (np.asarray(v, float)[None, :] for v in (s, t, h))
+    return float(_r_rows(_demean_by(s, h), _demean_by(t, h))[0])
+
+
+def wh_delta(a, b, Y, B=BOOT_B, seed=0, boot=True):
+    """a, b: nxt tables of one pair. Within-hand delta r (a minus b) for the
+    raw and rendered grade, the same delta inside each hand, and (boot) the
+    paired pitcher-bootstrap SE with the hand demeaning redone inside every
+    resample."""
+    j = a.join(b, lsuffix='_a', rsuffix='_b', how='inner')
+    h = hand_codes(j.index, Y)
+    t = j['t_a'].values.astype(float)
+    out = {'n_R': int((h == 0).sum()), 'n_L': int((h == 1).sum())}
+    if boot:
+        idx = np.random.default_rng(seed).integers(0, len(j), size=(B, len(j)))
+        hb, tb = h[idx], _demean_by(t[idx], h[idx])
+    for g, col in WH_GRADES:
+        if f'{col}_a' not in j or f'{col}_b' not in j:
+            continue            # 2026-08-23 aggregates carry no rendered grade
+        sa, sb = j[f'{col}_a'].values.astype(float), j[f'{col}_b'].values.astype(float)
+        out[f'd_{g}'] = wh_r(sa, t, h) - wh_r(sb, t, h)
+        for tag, code in (('R', 0), ('L', 1)):
+            m = h == code
+            out[f'd_{g}_{tag}'] = pear(sa[m], t[m]) - pear(sb[m], t[m])
+        if boot:
+            d = (_r_rows(_demean_by(sa[idx], hb), tb)
+                 - _r_rows(_demean_by(sb[idx], hb), tb))
+            out[f'se_boot_{g}'] = float(d.std())
+            for tag, code in (('R', 0), ('L', 1)):
+                m = hb == code
+                d = _r_masked(sa[idx], t[idx], m) - _r_masked(sb[idx], t[idx], m)
+                out[f'se_boot_{g}_{tag}'] = float(d.std())
+    return out
+
+
 # ── summary with paired pitcher bootstrap + seed variance ────────────────
 def boot_delta(a, b, B=BOOT_B, seed=0):
     """a, b: nxt tables (index pitcher, cols s, s_r, t). Paired bootstrap
@@ -995,6 +1108,7 @@ def summarize(names=None, quiet=False):
         for Y, g in byY.items():
             P(f'    {name} {Y}: raw sd {g["raw"]["sd"]:.4f} d={["%+.4f" % x for x in g["raw"]["d"]]}'
               f'  rend sd {g["rend"]["sd"]:.4f} d={["%+.4f" % x for x in g["rend"]["d"]]}')
+    all_rows = []
     for name in variants:
         P(f'\n{name}:')
         rows = []
@@ -1028,6 +1142,21 @@ def summarize(names=None, quiet=False):
             for g in GRADE_KEY:
                 ssd = sd_pool[g] if np.isfinite(sd_pool[g]) else 0.0
                 row[f'se_comb_{g}'] = float(np.sqrt(row[f'se_boot_{g}'] ** 2 + ssd ** 2 / m))
+            # within-hand twins, from the cached aggregates of every seed
+            wh = wh_delta(a, b, Y)
+            per = [wh if s == s0 else
+                   wh_delta(nxt_table(pd.read_pickle(agg_path(name, int(Y), int(s)))),
+                            nxt_table(pd.read_pickle(agg_path('SHIPPED', int(Y), int(s)))),
+                            Y, boot=False) for s in seeds]
+            row.update(n_R=wh['n_R'], n_L=wh['n_L'])
+            for g, _ in WH_GRADES:
+                row[f'd_{g}'] = float(np.mean([w[f'd_{g}'] for w in per]))
+                row[f'd_{g}_seeds'] = [w[f'd_{g}'] for w in per]
+                row[f'd_{g}_R'] = float(np.mean([w[f'd_{g}_R'] for w in per]))
+                row[f'd_{g}_L'] = float(np.mean([w[f'd_{g}_L'] for w in per]))
+                row[f'se_boot_{g}'] = wh[f'se_boot_{g}']
+                row[f'se_boot_{g}_R'] = wh[f'se_boot_{g}_R']
+                row[f'se_boot_{g}_L'] = wh[f'se_boot_{g}_L']
             rows.append(row)
             P(f'  {Y}->{int(Y)+1} d_nxt raw {row["d_raw"]:+.4f} (boot {row["se_boot_raw"]:.4f}, '
               f'comb {row["se_comb_raw"]:.4f})  rend {row["d_rend"]:+.4f} '
@@ -1038,16 +1167,47 @@ def summarize(names=None, quiet=False):
               f'/{row["d_adj_rend"]:+.4f}'
               + ('  [PARTIAL 2026 target; 2026 trains the other pairs]'
                  if row['partial'] else ''))
+            P(f'           within hand: d_wh raw {row["d_wh"]:+.4f} (boot {row["se_boot_wh"]:.4f}) '
+              f'rend {row["d_wh_rend"]:+.4f} (boot {row["se_boot_wh_rend"]:.4f}) | '
+              f'RHP {row["d_wh_R"]:+.4f} (boot {row["se_boot_wh_R"]:.4f}, n {row["n_R"]})  '
+              f'LHP {row["d_wh_L"]:+.4f} (boot {row["se_boot_wh_L"]:.4f}, n {row["n_L"]})')
         if not rows:
             continue
         rows4 = [r for r in rows if not r['partial']]
         block = {'pairs': rows}
+        all_rows.append((name, rows))
         for tag, rs in (('all', rows), ('excl_2025_26', rows4)):
             block[tag] = {g: pool(rs, sd_pool[g], g) for g in GRADE_KEY}
         out['variants'][name] = block
+    # seed SD of the within-hand delta, same rule as seed_sd(): RMS over the
+    # pairs of every reference config that has >= 2 seeds
+    wh_var = {g: [] for g, _ in WH_GRADES}
+    for name, rows in all_rows:
+        if name in SEED_REFS:
+            for r in rows:
+                if r['m_seeds'] >= 2:
+                    for g, _ in WH_GRADES:
+                        wh_var[g].append(float(np.var(r[f'd_{g}_seeds'], ddof=1)))
+    sd_wh = {g: (float(np.sqrt(np.mean(v))) if v else float('nan')) for g, v in wh_var.items()}
+    out['_seed_sd']['pooled'].update(sd_wh)
+    P('\nseed SD of the within-hand delta: '
+      + '  '.join(f'{g} {sd_wh[g]:.4f}' for g, _ in WH_GRADES)
+      + ('' if all(np.isfinite(v) for v in sd_wh.values())
+         else '  [no multi-seed reference in this summary: bootstrap SE only]'))
+    for name, rows in all_rows:
+        block = out['variants'][name]
+        rows4 = [r for r in rows if not r['partial']]
+        for r in rows:
+            for g, _ in WH_GRADES:
+                ssd = sd_wh[g] if np.isfinite(sd_wh[g]) else 0.0
+                r[f'se_comb_{g}'] = float(np.sqrt(r[f'se_boot_{g}'] ** 2 + ssd ** 2 / r['m_seeds']))
+        for tag, rs in (('all', rows), ('excl_2025_26', rows4)):
+            for g, _ in WH_GRADES:
+                block[tag][g] = pool(rs, sd_wh[g], g)
+        P(f'\n{name} pooled:')
         for tag, key in (('ALL 5', 'all'), ('EXCL 2025-26', 'excl_2025_26')):
             first = True
-            for g in GRADE_KEY:
+            for g in list(GRADE_KEY) + [w for w, _ in WH_GRADES]:
                 pg = block[key][g]
                 if not pg:
                     continue

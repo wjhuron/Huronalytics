@@ -264,6 +264,22 @@ PHYS_Z_FRAC = 0.30
 # command map; the choice (6/0.30 conservative, ~9-13/0.40 argmax of the
 # velo-controlled objective) is Wally's. Results:
 # data/_loc_fullseason_replicate_{cellfit,wide,widegrid}.json.
+# DECIDED 2026-09-17 (Wally): 6.0 / 0.30 STAYS, as the DESCRIPTIVE choice.
+# scripts/research/locplus/locplus_target_audit.py re-read objective (2) with
+# what it lacked (actual RV, a next-season test, a paired bootstrap, a
+# Stuff+ partial, a count-mix partial, the full 2026 season, five in-season
+# cutoffs, a joint K sweep). Correction to the note above: the Stuff+
+# relation DOES fade with smoothing (rendered Loc+ vs out-of-sample Stuff+
+# r -.11 at 6/0.30, .00 at 13/0.75), which is why the uncontrolled objective
+# rises to the grid edge; controlled, the PREDICTIVE optimum is interior at
+# 9 in / 0.55 (+0.019 next season, z 3.2, 5/5; survives the count-mix
+# control; K flat). It was not adopted because it halves the surface's
+# range, blurs the zone edge and erases the slider chase pocket, and because
+# Pitcher+, hpERA and the outing Pitching+ gain nothing from it (outing
+# -0.0014, 0/5 folds). Displayed atoms describe; the composites forecast. A
+# predictive sibling would start from 9 / 0.55, gates FF 30 / SI 35 / FC 26
+# / SL 26 / CU 29 / CH 42. A pitcher-level win alone is not a reason to move
+# these two numbers again.
 # Optional per-group bandwidth override, {group: (x_inches, z_frac)}. Empty
 # means one bandwidth for every pitch-type group. Applies to the physical
 # surfaces built per (group, bh, ph) — whiff / foul / xwOBAcon / swing. The
