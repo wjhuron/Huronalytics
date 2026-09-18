@@ -1040,7 +1040,7 @@ def _hitter_stat_cell_color(value_str, league_avg, scale, higher_is_better,
     return f'#{r:02x}{g:02x}{b:02x}'
 
 
-def _render_percentile_bubbles(fig, h_row):
+def _render_percentile_bubbles(fig, h_row, show_notes=False):
     """Single-column percentile panel matching the website's PERCENTILE
     RANKINGS sidebar. Vertical stack of section sub-headers + pill-bar rows:
 
@@ -1061,9 +1061,12 @@ def _render_percentile_bubbles(fig, h_row):
     # "Launch Angle" y-label, which hangs ~0.015 further left at ~0.417. 0.405
     # put the widest value ("116.3 mph") right up against it.
     GRID_LEFT, GRID_RIGHT = 0.020, 0.390
-    # GRID_BOT raised 0.030 -> 0.098 to clear the reader's notes below, with
-    # a visible gap: at 0.088 the last bubble row sat almost on top of them.
-    GRID_TOP, GRID_BOT = 0.715, 0.098
+    # GRID_BOT sits at 0.098 while the reader's notes render below the grid
+    # (raised from 0.030 on 2026-08-12: at 0.088 the last bubble row sat
+    # almost on top of them). With the notes off it returns to 0.030, the
+    # value it had before the notes existed.
+    GRID_TOP = 0.715
+    GRID_BOT = 0.098 if show_notes else 0.030
     col_w = GRID_RIGHT - GRID_LEFT
 
     # ROC (AAA) hitters: hide the BAT TRACKING section entirely. Bat
@@ -1364,7 +1367,8 @@ def _build_window_hitter_row(season_row, window_pitches, metadata):
 # ─────────────────────────────────────────────────────────────────────
 def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                        output_dir=OUTPUT_DIR, layout='bubbles', la_view='damage',
-                       date_filter=None, date_display=None, date_slug=None):
+                       date_filter=None, date_display=None, date_slug=None,
+                       show_notes=False):
     """Render a seasonal hitter card, or a card for one date window.
 
     date_filter:
@@ -1385,6 +1389,9 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         'classic' — legacy variant. Heat maps (Whiff/Damage × RHP/LHP) on the
             left, LA × Spray on the right, Contact Profile + Pitch Group table
             at the bottom. Still selectable via --layout classic.
+    show_notes:
+        'bubbles' layout only. True draws the reader's notes under the
+        percentile grid. False drops them and the grid takes the space.
     """
     _span = date_display or year_label
     print(f"Generating hitter card: {hitter_name} ({team_abbrev or 'auto'}) — {_span} [layout={layout}]")
@@ -2448,9 +2455,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # so the classic-layout code below is untouched.
     # ═════════════════════════════════════════════════════════════════
     if layout == 'bubbles':
-        _render_percentile_bubbles(fig, h_row)
+        _render_percentile_bubbles(fig, h_row, show_notes=show_notes)
 
-        # Watermark — bottom-right corner.
         # Reader's notes — the same job the pitcher card's below-table block
         # does. Each line exists because the number above it is either
         # directionally ambiguous, freshly rescaled, or luck-laden, and a
@@ -2458,7 +2464,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         # Ordered to follow the rail above: RESULT's "+" family, then Quality of
         # Contact's GB%, then Plate Discipline's Swing%. Bulleted so each note
         # reads as its own item rather than one running paragraph.
-        if window_pool:
+        # show_notes=False drops the block and hands its band to the grid.
+        if not show_notes:
+            _notes = None
+        elif window_pool:
             # Pooled window card: everything the season card shows is present,
             # measured over the window. Say what the percentiles rank against,
             # because that is the one thing a reader cannot infer.
@@ -2502,9 +2511,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                     'only, not every swing.\n    The percentile ranks it against '
                     'MLB values built from all tracked swings (50+ mph).'
                 )
-        fig.text(0.020, 0.068, _notes, fontsize=13, color=TEXT_MUTED, va='top',
-                 ha='left', fontfamily='IBM Plex Sans', fontweight='600',
-                 linespacing=1.5)
+        if _notes:
+            fig.text(0.020, 0.068, _notes, fontsize=13, color=TEXT_MUTED,
+                     va='top', ha='left', fontfamily='IBM Plex Sans',
+                     fontweight='600', linespacing=1.5)
+
+        # Watermark — bottom-right corner.
 
         fig.text(0.99, 0.012, 'huronalytics.vercel.app', color=TEXT_PRIMARY,
                   fontsize=9, fontfamily='IBM Plex Sans', ha='right',
@@ -3027,6 +3039,7 @@ def main():
     year_label     = "2026 Season"        # Display label on the card
     layout         = "bubbles"            # Card layout: "bubbles" or "classic"
     la_view        = "damage"             # LA x spray coloring: "damage" or "outcome"
+    show_notes     = False                # Reader's notes under the bubble grid: True or False
     output_dir     = OUTPUT_DIR
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
@@ -3053,6 +3066,9 @@ def main():
                               "gradient + barrel/hard-hit/other dots + quality-contact "
                               "concentration ellipse; 'outcome' = full wOBAcon zones + "
                               "1B/2B/3B/HR/out dots.")
+    parser.add_argument('--notes', default=None, choices=['on', 'off'],
+                         help="'on' draws the reader's notes under the bubble grid; "
+                              "'off' drops them and the grid takes the space.")
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -3063,6 +3079,7 @@ def main():
     if args.output_dir is not None: output_dir = args.output_dir
     if args.layout is not None: layout = args.layout
     if args.la_view is not None: la_view = args.la_view
+    if args.notes is not None: show_notes = (args.notes == 'on')
 
     # Parse filter_hitters string into a list (empty string → render all)
     if filter_hitters:
@@ -3117,7 +3134,8 @@ def main():
                                 year_label=year_label, output_dir=output_dir,
                                 layout=layout, la_view=la_view,
                                 date_filter=date_filter,
-                                date_display=date_display, date_slug=date_slug)
+                                date_display=date_display, date_slug=date_slug,
+                                show_notes=show_notes)
     else:
         # No specific names: render every (qualified) hitter, optionally filtered by team
         leaderboard = load_hitter_leaderboard()
@@ -3132,7 +3150,8 @@ def main():
                                 year_label=year_label, output_dir=output_dir,
                                 layout=layout, la_view=la_view,
                                 date_filter=date_filter,
-                                date_display=date_display, date_slug=date_slug)
+                                date_display=date_display, date_slug=date_slug,
+                                show_notes=show_notes)
 
 
 if __name__ == '__main__':
