@@ -2283,6 +2283,7 @@
 "Sulser, Beau": 74.0,
 "Sulser, Cole": 72.0,
 "Susac, Daniel": 77.0,
+"Susana, Jarlin": 78.0,
 "Suter, Brent": 76.0,
 "Suzuki, Seiya": 71.0,
 "Su\u00e1rez, Albert": 75.0,
@@ -9509,6 +9510,9 @@
 "Susac, Daniel": [
 691740
 ],
+"Susana, Jarlin": [
+703186
+],
 "Suter, Brent": [
 608718
 ],
@@ -10617,6 +10621,6 @@
 594798
 ]
 },
-"league_mean": 73.73,
-"n": 2652
+"league_mean": 73.74,
+"n": 2653
 }
