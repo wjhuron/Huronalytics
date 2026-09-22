@@ -661,8 +661,10 @@ def _compute_pitch_rv(pitches_list):
 # but shrinkage here acts as an n-weighting device (the slope of unshrunk
 # stuff on the other half grows .15 -> .39 from 20-pitch to 80-pitch
 # outings), so 42 is a CONVENTION inside the flat region, not a reliability
-# constant. xRV rides the sheet supplement, so a card built before the
-# morning backfill drifts ~0.5 pts (p95 1.5) and self-corrects.
+# constant. xRV rides the sheet supplement; before the morning backfill the
+# slot takes the league-table fill the social table uses (see the tile's
+# call site in main), mean gap 0.10 pts to the next-day rerun, p95 0.30,
+# against 0.53 / 1.54 with the slot at league average (2026-09-21).
 PP_OUTING_W = {'stuff': 0.205, 'loc': 0.169, 'csw': 0.252, 'xrv100': 0.374}
 PP_OUTING_K = {'stuff': 42.0, 'loc': 185.0, 'csw': 398.0, 'xrv100': 1581.0}
 # Two floors, deliberately different (2026-08-28, per Wally):
@@ -5827,20 +5829,34 @@ def main():
                 # The social renderer's atom maps are built above for every
                 # scratch-context card (_social_atom_maps); _stuff_of/_loc_of
                 # here resolve the same atoms for the outing grade.
+                # The xRV slot before the backfill (2026-09-21, per Wally)
+                # takes the same league-table fill the social table uses, so
+                # the tile and the table read one xRV. Measured on 9,224
+                # second-half 2026 outings with the tables fit on the first
+                # half (scripts/research/cards/pplus_outing_xrv_estimate.py):
+                # a league-average slot moved the rounded grade against the
+                # next-day rerun on 46% of outings (68% of starts, 5.9% by
+                # 2+ points); the fill moves 10% (17% of starts, none by
+                # 2+), mean gap 0.10 pts, p95 0.30. A backfilled game passes
+                # through untouched, so the rerun still self-corrects.
+                _np_pp, _np_est = _xrv_fill_estimates(_np_)
                 outing_pp = _outing_pitching_plus(
-                    _np_, scratch_ctx['outing_pool'], _stuff_of, _loc_of)
+                    _np_pp, scratch_ctx['outing_pool'], _stuff_of, _loc_of)
                 if outing_pp[0] is not None:
                     print(f"  Pitching+ (outing): {outing_pp[0]:.0f} "
                           f"({_ordinal(outing_pp[1])} pctl)")
-                    # Every degrade announces itself: with no RunExp/xwOBA on
-                    # any pitch (live-scrape state, supplement not yet run)
-                    # the xRV slot scores league-average and the grade leans
-                    # on process only. Fix: python3 pipeline/refresh_pickle.py
-                    # after the sheets supplement lands.
-                    if not _compute_pitch_xrv(_np_):
+                    # Every degrade announces itself: the fill stands in for
+                    # the supplement until the rerun; with nothing to fill
+                    # from, the slot scores league-average and the grade
+                    # leans on process only.
+                    if _np_est:
+                        print(f"  xRV slot of Pitching+: {_np_est} of "
+                              f"{len(_np_)} pitches estimated from feed "
+                              "columns (Savant backfill pending)")
+                    elif not _compute_pitch_xrv(_np_pp):
                         print("  [WARN] Pitching+ scored without xRV — no "
-                              "RunExp/xwOBA on these pitches yet (drift "
-                              "~0.5 pts, p95 1.5, until the supplement)")
+                              "RunExp/xwOBA on these pitches and nothing "
+                              "to estimate from")
                     stat_headers = stat_headers + ['PITCHING+']
                     # Value only (2026-08-28, per Wally): the percentile
                     # lives in the cell tint, not the text.
