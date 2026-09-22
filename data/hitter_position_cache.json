@@ -2557,7 +2557,7 @@
   },
   "667452": {
     "position": "RF",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "687069": {
     "position": null,
@@ -2589,7 +2589,7 @@
   },
   "666163": {
     "position": "C",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "686676": {
     "position": null,
@@ -2645,11 +2645,11 @@
   },
   "682729": {
     "position": "LF",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "691024": {
     "position": null,
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "661531": {
     "position": "C",
@@ -2685,7 +2685,7 @@
   },
   "676551": {
     "position": "RF",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "828599": {
     "position": "CF",
@@ -2705,11 +2705,11 @@
   },
   "682988": {
     "position": "1B",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "681190": {
     "position": null,
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "690469": {
     "position": null,
@@ -2753,19 +2753,19 @@
   },
   "695763": {
     "position": null,
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "699302": {
     "position": "RF",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "678760": {
     "position": "LF",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "806146": {
     "position": "SS",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "684976": {
     "position": null,
@@ -2849,7 +2849,7 @@
   },
   "805805": {
     "position": "CF",
-    "fetched": "2026-09-14"
+    "fetched": "2026-09-22"
   },
   "703155": {
     "position": "RF",
@@ -2916,7 +2916,19 @@
     "fetched": "2026-09-21"
   },
   "814154": {
-    "position": "DH",
-    "fetched": "2026-09-14"
+    "position": "LF",
+    "fetched": "2026-09-22"
+  },
+  "676480": {
+    "position": "2B",
+    "fetched": "2026-09-22"
+  },
+  "815589": {
+    "position": "RF",
+    "fetched": "2026-09-22"
+  },
+  "693306": {
+    "position": "1B",
+    "fetched": "2026-09-22"
   }
 }
