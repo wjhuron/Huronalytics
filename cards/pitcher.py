@@ -4624,16 +4624,32 @@ def _xrv_anchors():
 # xRV needs two Savant supplement columns the morning backfill fills: RunExp
 # on every pitch and xwOBA on balls in play. A card rendered before that
 # backfill has neither. These tables stand in from feed-only columns:
-#   RunExp <- league mean by (count, description, terminal event)
+#   RunExp <- league mean by (count, description, terminal event) off
+#             contact, and by (count, event, outs, batted-ball type) on a
+#             ball in play
 #   xwOBA  <- league mean by (exit velo 2 mph bin, launch angle 4 deg bin)
 # Validated on 2026 MLB pitches, tables fit on the first half of the season
 # and scored on the second (scratch daily_col_screen.py, 2026-09-10):
 # r .977 per non-BIP pitch, r .981 per BIP; summed per outing x pitch type
 # r .980 with the Savant xRV, mean |err| 0.10 runs; per outing r .978,
 # 0.14 runs. The bin widths are the screen's; a sweep is owed before any
-# use beyond the pre-backfill gap. The fill touches ONLY pitches that lack
-# the real column, so a backfilled game renders the Savant value untouched
-# and the next-day rerun self-corrects, the way Pitching+ already does.
+# use beyond the pre-backfill gap.
+# The ball-in-play RunExp fill is from 2026-09-21 (per Wally). Until then
+# a ball in play got xwOBA only, so RV on a pre-backfill card summed the
+# takes, whiffs and fouls and omitted every hit and out on contact: Herz
+# 2026-09-21 printed 4 ER at RV +0.4, changeup RV 0.0 against xRV -1.4.
+# Its key was swept over every scrape-time field (Runners is a supplement
+# column and cannot enter) in scripts/research/cards/
+# xrv_estimate_bip_runexp_key.py, nine replicates (both half-seasons and
+# leave-one-month-out), per outing x type mean |err| on the held-out side:
+# event alone .127 runs, + count .090, + outs .067, + batted-ball type
+# .064, each step 9/9; per BIP r .986. That is the full field set, so it
+# is best on an exhaustive grid, not an interior optimum. A key the fit
+# never saw (0.3% of balls in play) falls back to the event mean, then the
+# league BIP mean, the chain the sweep scored.
+# The fill touches ONLY pitches that lack the real column, so a backfilled
+# game renders the Savant value untouched and the next-day rerun
+# self-corrects, the way Pitching+ already does.
 XRV_EST_EV_BIN = 2.0      # mph
 XRV_EST_LA_BIN = 4.0      # degrees
 _XRV_EST_TERMINAL = frozenset({'Strikeout', 'Walk', 'Hit By Pitch',
@@ -4642,9 +4658,19 @@ _XRV_EST_CACHE = None
 
 
 def _xrv_est_keys(p):
-    """(RunExp table key, xwOBA table key or None) for one pitch."""
-    ev = p.get('Event') if p.get('Event') in _XRV_EST_TERMINAL else ''
-    rk = (str(p.get('Count') or ''), str(p.get('Description') or ''), ev)
+    """(RunExp table key, xwOBA table key or None) for one pitch.
+
+    Off contact the RunExp key is (count, description, terminal event), the
+    event one of _XRV_EST_TERMINAL or ''. On a ball in play it is (count,
+    'In Play', event, outs, batted-ball type); the two shapes never collide
+    because only a ball in play carries the 'In Play' description."""
+    if p.get('Description') == 'In Play':
+        rk = (str(p.get('Count') or ''), 'In Play', str(p.get('Event') or ''),
+              str(p.get('Outs') if p.get('Outs') not in (None, '') else ''),
+              str(p.get('BBType') or ''))
+    else:
+        ev = p.get('Event') if p.get('Event') in _XRV_EST_TERMINAL else ''
+        rk = (str(p.get('Count') or ''), str(p.get('Description') or ''), ev)
     xk = None
     _ev, _la = sf(p.get('ExitVelo')), sf(p.get('LaunchAngle'))
     if _ev is not None and _la is not None:
@@ -4655,34 +4681,43 @@ def _xrv_est_keys(p):
 def _xrv_estimate_tables():
     global _XRV_EST_CACHE
     if _XRV_EST_CACHE is None:
-        rv_acc, xw_acc, glob = defaultdict(lambda: [0.0, 0]), defaultdict(lambda: [0.0, 0]), [0.0, 0]
+        rv_acc, xw_acc = defaultdict(lambda: [0.0, 0]), defaultdict(lambda: [0.0, 0])
+        rv_ev_acc = defaultdict(lambda: [0.0, 0])   # ball in play, by event
+        rv_bip_glob, xw_glob = [0.0, 0], [0.0, 0]
         for p in _load_mlb_pickle():
             is_bip = p.get('Description') == 'In Play'
             rk, xk = _xrv_est_keys(p)
+            rv = sf(p.get('RunExp'))
+            if rv is not None:
+                a = rv_acc[rk]; a[0] += rv; a[1] += 1
+                if is_bip:
+                    b = rv_ev_acc[rk[2]]; b[0] += rv; b[1] += 1
+                    rv_bip_glob[0] += rv; rv_bip_glob[1] += 1
             if is_bip:
                 xw = sf(p.get('xwOBA'))
                 if xw is not None and xk is not None:
                     a = xw_acc[xk]; a[0] += xw; a[1] += 1
-                    glob[0] += xw; glob[1] += 1
-            else:
-                rv = sf(p.get('RunExp'))
-                if rv is not None:
-                    a = rv_acc[rk]; a[0] += rv; a[1] += 1
+                    xw_glob[0] += xw; xw_glob[1] += 1
         _XRV_EST_CACHE = {
             'rv': {k: s / n for k, (s, n) in rv_acc.items()},
+            'rv_ev': {k: s / n for k, (s, n) in rv_ev_acc.items()},
+            'rv_bip_glob': (rv_bip_glob[0] / rv_bip_glob[1]) if rv_bip_glob[1] else None,
             'xw': {k: s / n for k, (s, n) in xw_acc.items()},
-            'xw_glob': (glob[0] / glob[1]) if glob[1] else None,
+            'xw_glob': (xw_glob[0] / xw_glob[1]) if xw_glob[1] else None,
         }
+        _n_bip = sum(1 for k in _XRV_EST_CACHE['rv'] if k[1] == 'In Play')
         print(f"  [ctx] xRV estimate tables: {len(_XRV_EST_CACHE['rv'])} "
-              f"RunExp cells, {len(_XRV_EST_CACHE['xw'])} EVxLA cells")
+              f"RunExp cells ({_n_bip} on contact), "
+              f"{len(_XRV_EST_CACHE['xw'])} EVxLA cells")
     return _XRV_EST_CACHE
 
 
 def _xrv_fill_estimates(pitches):
-    """Copies of the pitch dicts with a missing RunExp (non-BIP) or a
-    missing xwOBA (BIP) filled from the estimate tables. Returns
-    (filled_list, n_filled). Pitches that already carry the real column
-    are returned as-is, so a backfilled game is untouched."""
+    """Copies of the pitch dicts with a missing RunExp (every pitch) or a
+    missing xwOBA (ball in play) filled from the estimate tables. Returns
+    (filled_list, n_filled), a pitch counted once however many columns it
+    took. Pitches that already carry the real column are returned as-is,
+    so a backfilled game is untouched."""
     # The pre-backfill state is a NON-BIP pitch without RunExp: the supplement
     # writes RunExp on 100% of pitches (measured on every 2026 date through
     # 09-09), so a backfilled game never trips this. A BIP without xwOBA is
@@ -4697,25 +4732,31 @@ def _xrv_fill_estimates(pitches):
     out, n_fill = [], 0
     for p in pitches:
         is_bip = p.get('Description') == 'In Play'
-        need = (sf(p.get('xwOBA')) is None) if is_bip else (sf(p.get('RunExp')) is None)
-        if not need:
+        need_rv = sf(p.get('RunExp')) is None
+        need_xw = is_bip and sf(p.get('xwOBA')) is None
+        if not (need_rv or need_xw):
             out.append(p)
             continue
         if tabs is None:
             tabs = _xrv_estimate_tables()
         rk, xk = _xrv_est_keys(p)
-        q = dict(p)
-        if is_bip:
+        q, filled = dict(p), False
+        if need_xw:
             v = tabs['xw'].get(xk) if xk is not None else None
             if v is None and xk is not None:
                 v = tabs['xw_glob']      # off-table EV/LA: league BIP mean
             # No EV/LA at all: leave it, compute_xrv prices the count mean.
             if v is not None:
-                q['xwOBA'] = v; n_fill += 1
-        else:
+                q['xwOBA'] = v; filled = True
+        if need_rv:
             v = tabs['rv'].get(rk)
+            if v is None and is_bip:
+                # Unseen (count, event, outs, type): event mean, then league.
+                v = tabs['rv_ev'].get(rk[2], tabs['rv_bip_glob'])
             if v is not None:
-                q['RunExp'] = v; n_fill += 1
+                q['RunExp'] = v; filled = True
+        if filled:
+            n_fill += 1
         out.append(q)
     return out, n_fill
 
@@ -4737,8 +4778,9 @@ def _social_rv(plist, estimate=False):
     """Summed ACTUAL run value in runs for a row of pitches, pitcher-positive:
     the sheet's RunExp summed over every pitch that carries one, the
     leaderboard's own runValue rule (pipeline.compute.compute_stats).
-    estimate=True fills a pre-backfill game's missing RunExp from the same
-    league tables the xRV estimate uses. Returns rv_runs or None."""
+    estimate=True fills a pre-backfill game's missing RunExp on every pitch,
+    balls in play included, from the same league tables the xRV estimate
+    uses. Returns rv_runs or None."""
     ps, _n = (_xrv_fill_estimates(plist) if estimate else (plist, 0))
     vals = [v for v in (sf(p.get('RunExp')) for p in ps) if v is not None]
     return sum(vals) if vals else None
