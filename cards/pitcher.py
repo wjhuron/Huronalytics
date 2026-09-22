@@ -4980,6 +4980,17 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
     n = len(pitches)
     if n == 0:
         return None, {}, {}
+    # Single-game card before the Savant backfill (2026-09-21, per Wally):
+    # the window row takes the same league-table fill the social table and
+    # the Pitching+ tile use, so RV, xRV/100 and Pitcher+ score instead of
+    # nulling, and all three read one xRV. Season and date-range cards sum
+    # what the sheet carries, the leaderboard's own rule. Local copies only:
+    # the tile fills its own list and logs its own count.
+    if ctx.get('xrv_estimate'):
+        pitches, _n_est = _xrv_fill_estimates(pitches)
+        if _n_est:
+            print(f"  xRV (window row): {_n_est} of {n} pitches estimated "
+                  "from feed columns (Savant backfill pending)")
     throws = pitches[0].get('Throws')
 
     row = {'count': n}
@@ -5012,7 +5023,9 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
     # league-mean BIP value by count, so the total is a handful of league
     # averages over N pitches and says nothing about this arm (Susana scratch
     # card, 2026-09-07: -1.0 total, -0.4/100, from 24 BIP over 259 pitches).
-    # Gate on the data and null the stat rather than draw a fiction.
+    # Gate on the data and null the stat rather than draw a fiction. A
+    # single-game card filled both columns above, so this trips only on a
+    # season or range card with nothing to sum.
     _has_rv_src = (any(sf(p.get('RunExp')) is not None for p in pitches)
                    or any(sf(p.get('xwOBA')) is not None for p in pitches
                           if p.get('Description') == 'In Play'))
@@ -5605,6 +5618,11 @@ def main():
         except Exception as _e:
             import traceback; traceback.print_exc()
             print(f"  WARNING: daily Stuff+/Loc+ context failed ({_e}) — omitting those columns")
+    if scratch_ctx is not None:
+        # A single-game card fills RunExp and xwOBA from the league tables
+        # before the backfill (see _compute_scratch_pitcher_context); season
+        # and date-range cards never estimate.
+        scratch_ctx['xrv_estimate'] = not is_multi_game
 
     # Step 2: Fetch boxscore stats (per source team, aggregated across game dates)
     print("\nStep 2: Fetching boxscore stats from MLB API...")
