@@ -429,6 +429,7 @@
 "Chourio, Jackson": 73.0,
 "Church, Marc": 75.0,
 "Church, Nathan": 70.0,
+"Cijntje, Jurrangelo": 71.0,
 "Cimber, Adam": 75.0,
 "Cishek, Steve": 78.0,
 "Cisnero, Jos\u00e9": 75.0,
@@ -2075,6 +2076,7 @@
 "Santana, Dennis": 74.0,
 "Santana, Edgar": 74.0,
 "Santana, Ervin": 74.0,
+"Santana, Sandro": 70.0,
 "Santiago, H\u00e9ctor": 72.0,
 "Santillan, Tony": 75.0,
 "Santos, Antonio": 75.0,
@@ -3943,6 +3945,9 @@
 ],
 "Church, Nathan": [
 701675
+],
+"Cijntje, Jurrangelo": [
+701388
 ],
 "Cimber, Adam": [
 643256
@@ -8885,6 +8890,9 @@
 "Santana, Ervin": [
 429722
 ],
+"Santana, Sandro": [
+811139
+],
 "Santiago, H\u00e9ctor": [
 502327
 ],
@@ -10621,6 +10629,6 @@
 594798
 ]
 },
-"league_mean": 73.74,
-"n": 2653
+"league_mean": 73.73,
+"n": 2655
 }
