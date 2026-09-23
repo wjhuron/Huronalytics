@@ -2,7 +2,7 @@
 
 The build. Sheets in, leaderboard JSON and gzipped embeds out. Read the root `CLAUDE.md` first; this file covers only what is specific to the metric math.
 
-`process_data.py` is 5,000 lines and runs as one ordered pass. Stage boundaries are marked with `# ====` banners. Order matters: percentiles are computed in a single pass near the end (around line 4315) and everything upstream must have written its values by then.
+`process_data.py` is several thousand lines and runs as one ordered pass. Stage boundaries are marked with `# ====` banners. Order matters: percentiles are computed in a single pass near the end (the `compute_percentile_ranks_with_aaa` calls) and everything upstream must have written its values by then.
 
 ## Module map
 
@@ -16,9 +16,14 @@ The build. Sheets in, leaderboard JSON and gzipped embeds out. Read the root `CL
 | `sdplus.py` | SD+, zone-band swing decisions |
 | `contact.py` | CT+ |
 | `commandplus.py` | Command+, K=1 cell means with a thin-cell cascade |
-| `eraplus.py` | The ERA estimator family |
+| `eraplus.py` | The ERA estimator family and pitcher hWAR |
 | `xwoba3d.py` | xwOBA on the EV × LA × spray grid |
 | `pitcherplus.py` | Pitcher+ composite |
+| `hwar.py` | Position-player hWAR: batting, baserunning, fielding, positional and replacement runs |
+| `window_pool.py` | Date-window scoring: one hitter over any date range, ranked against the season pool |
+| `fg_overrides.py` | Canonical FanGraphs values (wRC+, FIP, xFIP, SIERA) cached for the pipeline |
+| `guts.py` | The season's FanGraphs Guts row |
+| `refresh_pickle.py` | Fast refresh of `data/all_pitches_rs_cache.pkl` |
 | `xmove.py` | Expected movement (xIVB/xHB), per-type fit on slot + extension + velocity (the hitter's view), scored per pitch; physics basis kept for research |
 
 ## Constants are measured, not chosen
@@ -42,7 +47,7 @@ The pattern across `sdplus`, `contact`, `xwoba3d`, and `commandplus` is the same
 
 Two different zone definitions live in `utils.py` on purpose.
 
-- **`compute_in_zone`** (line 369) is the exact Savant geometry: rounded-rect with the ball-radius rule, built from `HALF_PLATE_FT` (8.5") and `BALL_RADIUS_FT` (1.45"). This is what InZone means everywhere it is displayed. It is validated to 100% agreement with Savant.
+- **`compute_in_zone`** is the exact Savant geometry: rounded-rect with the ball-radius rule, built from `HALF_PLATE_FT` (8.5") and `BALL_RADIUS_FT` (1.45"). This is what InZone means everywhere it is displayed. It is validated to 100% agreement with Savant.
 - **`ZONE_HALF_WIDTH = 0.83`** is the older rectangle. It survives **only** as the band boundary for SD+ zones, where the rectangle is what the bands were fit against. It over-counts corners by about 0.22% and must never be substituted for `compute_in_zone`.
 
 SD+ bands run off `HEART_X` (6.7"), `SHADOW_X` (13.3"), and `CHASE_X` (20.0") with vertical fractions of the measured zone height.
@@ -60,7 +65,7 @@ Values from different levels are not on the same scale, and mixing them silently
 Three different things get confused constantly:
 
 - **The percentile pool is all MLB players.** Every row gets a stored rank. Qualification does not filter the pool.
-- **Qualification is a render-time coloring gate**, applied in the site layer, not here. Hitters: 3.1 PA times team games (2.7 for ROC). Constants live at `utils.py:101`.
+- **Qualification is a render-time coloring gate**, applied in the site layer, not here. Hitters: 3.1 PA times team games (2.7 for ROC). The constants are the `QUAL_*` block in `utils.py`.
 - **A computation floor is neither.** `MIN_HITTER_SWINGS = 65`, `MIN_CELL = 20`, `MIN_POOL = 300` in `commandplus` and `50` in `pitcherplus` are floors below which a value is not computed at all. Note that the two `MIN_POOL` values count different units: pitches in one file, qualified pitchers in the other.
 
 ## Event and swing semantics

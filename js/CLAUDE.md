@@ -70,13 +70,14 @@ R reports use a punched-up variant of the same palette. Cards and the site share
 
 ## Mirrors of the Python side
 
-Two blocks here are hand-maintained copies of pipeline constants, because JS cannot import Python. **Both halves change in the same commit or the site disagrees with the pipeline.**
+The pieces below are hand-maintained copies of pipeline code, because JS cannot import Python. **Both halves change in the same commit or the site disagrees with the pipeline.**
 
 | Here | Mirrors |
 | --- | --- |
 | `aggregator.js` `QUAL` block | `pipeline/utils.py` `QUAL_*` constants |
 | `utils.js` `hitterPaPerGame` / `pitcherIpPerGame` | `pipeline/utils.py` same-named helpers |
 | `aggregator.js` `INVERT` maps | `pipeline/compute.py` `*_INVERT*` sets |
+| `utils.js` `playerKey` / `isCombinedTeam` / `buildQualContext` | `pipeline/utils.py` `player_key` / `is_combined_team` / `current_team_by_player` |
 
 A metric added to the Python inversion set but not here gets colored backwards on one surface and correctly on the other, which is very hard to spot.
 
@@ -84,7 +85,7 @@ A metric added to the Python inversion set but not here gets colored backwards o
 
 The percentile pool is all MLB players and every row already carries a stored rank from the pipeline. Qualification only decides whether a cell gets colored. Do not filter the pool client-side, and do not recompute ranks here.
 
-Multi-team players: the combined 2TM/3TM row shows in the All Teams view and per-team rows are hidden; selecting a specific team inverts that. The qualifier denominator for a multi-team player is the max team games across their teams.
+Multi-team players: the combined 2TM/3TM row shows in the All Teams view and per-team rows are hidden; selecting a specific team inverts that. The qualifier denominator for a multi-team player is the games of the club he most recently played for (the latest `lastGameDate` on his MLB stint rows), resolved in `Utils.buildQualContext`. It falls back to the longest schedule among his clubs only when a stint row has no `lastGameDate`, and it warns in the console when it does.
 
 ## Failure log
 
