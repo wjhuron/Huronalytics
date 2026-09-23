@@ -4182,43 +4182,12 @@ def render_card(config, pitches, output_file):
     for x1,y1,x2,y2 in [(l,b,r_,b),(l,t,r_,t),(l,b,l,t),(r_,b,r_,t)]:
         fig.add_artist(plt.Line2D([x1,x2],[y1,y2], transform=fig.transFigure, color=ACCENT, linewidth=2, zorder=10))
 
-    # Stuff+ footnote — season cards only, just below the table's bottom border.
-    # Left edge aligned under the Stuff+ column (the outcomes-block divider);
-    # two lines so it never runs past the card's right edge.
+    # The explanatory footnote block under the table (RV units, fade rule,
+    # window pool claim, hdERA/hpERA definitions) was removed 2026-09-23
+    # per Wally. Those definitions still live in the module docstrings and
+    # the js/leaderboard.js desc strings.
     # Below-table drop: classic-frame inches on season cards (0.008 * 17.5in).
     _below_off = (0.008 * FIG_H) / fig_h if is_season else 0.008
-    if is_season and 'Stuff+' in col_headers:
-        _sp_cell = table.get_celld()[(0, col_headers.index('Stuff+'))]
-        _sp_x = _sp_cell.get_window_extent(renderer).x0 / fig_bbox.width
-        # RV line names the columns the card ACTUALLY carries: --rv-mode swaps
-        # them (see rv_cols above), and the old hardcoded per-100 wording named
-        # absent columns and the wrong unit on a totals card.
-        _rv_line = {
-            'per100': 'PitchRV/100 actual, xPitchRV/100 expected runs saved per 100 pitches.',
-            'totals': 'PitchRV actual, xPitchRV expected runs saved, cumulative over the window.',
-            'both':   'PitchRV/xPitchRV are cumulative runs saved; the /100 pair is the same thing per 100 pitches.',
-        }[config.get('rv_mode') or 'per100']
-        # Two DIFFERENT gates: outcome-rate cells fade under the constant, while
-        # the RV columns fade under _pt_qual_min, which --pitch-qual moves.
-        _fade_line = (f'Faded values: fewer than {CARD_COLOR_MIN_PITCHES} pitches of that type, '
-                      f'too small to grade; the value still renders and colors in as pitches accumulate')
-        if _pt_qual_min != CARD_COLOR_MIN_PITCHES:
-            _fade_line = (f'Faded values: fewer than {CARD_COLOR_MIN_PITCHES} pitches of that type '
-                          f'({_pt_qual_min} for the RV columns), too small to grade; the value still renders')
-        _sp_note = _rv_line + ' xPitchRV is luck-neutral on contact\n' + _fade_line
-        # Window cards keep their pool claim (the values and the pools come
-        # from different spans, so it is load-bearing there). The season-card
-        # equivalent was dropped 2026-08-31 per Wally: on a season card the
-        # values and the pool are the same span, so it said nothing.
-        if config.get('is_date_range'):
-            _sp_note += ('\nValues are for this date window. Percentiles and the + grades '
-                         'score against the full-season MLB pools and anchors, with no minimum sample')
-        if 'hdERA' in config.get('stat_headers', []):
-            _sp_note += ('\nhdERA = ERA from shrunk xwOBA alone, luck stripped; it describes the season'
-                         '\nhpERA is a forward estimate from stuff, role, park, grounders, xRV, '
-                         'location, in-zone whiffs, K% and pitcher hand')
-        fig.text(_sp_x, b - _below_off, _sp_note,
-                 fontsize=8, color='#000000', va='top', ha='left', fontfamily='IBM Plex Sans', fontweight='bold', linespacing=1.5)
 
     # Watermark — just below the table border. Bottom-LEFT on season cards
     # (unchanged); bottom-RIGHT on daily, where the left of that band is now
