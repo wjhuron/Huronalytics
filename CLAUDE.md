@@ -38,14 +38,14 @@ Number the steps of a procedure. State the result of a step if the result is not
 
 ## Ask before you assume
 
-Never guess at intent. If a task leaves anything open (which metric, which season, which player pool, whether a change ships or stays research), stop and ask. One question up front is cheaper than half a day in the wrong direction.
+Never guess at intent on a choice that changes the work. If a task leaves one open (which metric, which season, which player pool, whether a change ships or stays research), stop and ask. One question up front is cheaper than half a day in the wrong direction. Make the small calls yourself: names, layout, the order of steps.
 
 - Ask when the request could reasonably mean two different things.
 - Ask before changing a shipped metric's definition, a column set, or anything that lands in `data/*_rs.json`.
 - A request is a hypothesis, not an order. If the thing asked for has no value, or the value is already captured by something shipped, say so before building it.
 - Do not widen scope past what was asked. Note the adjacent thing you spotted, do not fix it unprompted.
 - Do not "clean up" from a snapshot whose age you have not checked.
-- If you had to assume something you could not resolve, list it explicitly at the top of your summary.
+- At the top of your summary, list every call you made yourself that shaped a result, a file, or a number, and any open choice you could not ask about.
 
 ## The loop
 
