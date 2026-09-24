@@ -932,6 +932,7 @@
 "Haggerty, Sam": 71.0,
 "Hahn, Jesse": 77.0,
 "Hale, David": 74.0,
+"Hales, Skylar": 76.0,
 "Hall, DL": 73.0,
 "Hall, Darick": 76.0,
 "Halpin, Petey": 71.0,
@@ -994,6 +995,7 @@
 "Henderson, Gunnar": 75.0,
 "Henderson, Logan": 72.0,
 "Hendricks, Kyle": 75.0,
+"Hendrickson, Josh": 76.0,
 "Hendriks, Liam": 72.0,
 "Hendrix, Ryan": 75.0,
 "Hendry, Brian": 76.0,
@@ -1348,6 +1350,7 @@
 "Lorenzen, Michael": 73.0,
 "Loup, Aaron": 71.0,
 "Loutos, Ryan": 77.0,
+"Love, Austin": 75.0,
 "Lovelady, Richard": 72.0,
 "Lowder, Rhett": 73.0,
 "Lowe, Brandon": 69.0,
@@ -1577,6 +1580,7 @@
 "Mize, Casey": 75.0,
 "Mlodzinski, Carmen": 74.0,
 "Molina, Anthony": 73.0,
+"Molina, Mason": 74.0,
 "Molina, Yadier": 71.0,
 "Moll, Sam": 69.0,
 "Monasterio, Andruw": 71.0,
@@ -2104,6 +2108,7 @@
 "Schreiber, John": 74.0,
 "Schrock, Max": 69.0,
 "Schuemann, Max": 72.0,
+"Schultz, Andrew": 76.0,
 "Schultz, Noah": 82.0,
 "Schultz, Paxton": 75.0,
 "Schwarber, Kyle": 71.0,
@@ -5456,6 +5461,9 @@
 "Hale, David": [
 571735
 ],
+"Hales, Skylar": [
+813766
+],
 "Hall, DL": [
 669084
 ],
@@ -5641,6 +5649,9 @@
 ],
 "Hendricks, Kyle": [
 543294
+],
+"Hendrickson, Josh": [
+681973
 ],
 "Hendriks, Liam": [
 521230
@@ -6704,6 +6715,9 @@
 "Loutos, Ryan": [
 702795
 ],
+"Love, Austin": [
+676153
+],
 "Lovelady, Richard": [
 663992
 ],
@@ -7390,6 +7404,9 @@
 ],
 "Molina, Anthony": [
 683627
+],
+"Molina, Mason": [
+695766
 ],
 "Molina, Yadier": [
 425877
@@ -8973,6 +8990,9 @@
 ],
 "Schuemann, Max": [
 680474
+],
+"Schultz, Andrew": [
+669697
 ],
 "Schultz, Noah": [
 702273
@@ -10629,6 +10649,6 @@
 594798
 ]
 },
-"league_mean": 73.73,
-"n": 2655
+"league_mean": 73.74,
+"n": 2660
 }
