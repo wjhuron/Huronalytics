@@ -221,6 +221,83 @@ HEIGHT_CLIP = (70.0, 80.0)
 # v14.1 (2026-08-23) kept 'v14' and the pre-clip local bundle passed every
 # guard for ten days. v15 = v14.1 minus kin_eff__ff, trained on xgboost 3.4.1.
 BUNDLE_VERSION = 'v15'
+
+# Bundle FRESHNESS (2026-09-23). The version string guards the config, not
+# the data: a retrain on more data keeps the version, so the local
+# stuff_models.pkl (downloaded by hand) silently falls behind the release CI
+# scores with. The 2026-09-11 retrain left the local 09-02 bundle scoring
+# every card ~2.5 Stuff+ points per pitch off the site and the Sheets column
+# (15.5% exact matches on 690k pitches; 99.5% after the refresh) for twelve
+# days, with every guard green. Every run writes the bundle it scored with
+# to BUNDLE_INFO_PATH, which CI commits; local consumers call
+# check_bundle_fresh() on the bundle they load.
+BUNDLE_INFO_PATH = os.path.join(DATA, 'stuff_bundle_info.json')
+BUNDLE_REFRESH_CMD = ('curl -sfL --retry 3 https://github.com/wjhuron/Huronalytics/releases/'
+                      'download/latest-data/stuff_models.pkl.gz | gunzip -c > '
+                      'stuff_plus/stuff_models.pkl')
+
+
+def write_bundle_info(bundle):
+    """Record the version and trained_through of the bundle this run scored
+    with, plus the anchor scales it graded on (temp file + rename, never a
+    partial file). The scales matter because a score-only run re-derives
+    them from the live season (_standardize) while the release bundle keeps
+    its retrain-day scales: with the same models the card's atoms matched the
+    Sheets integers on 89% of pitches, and within 1 point on all of them,
+    until live_scales() read these."""
+    info = {'version': bundle.get('version'),
+            'trained_through': str(bundle.get('trained_through') or '')[:10],
+            'league': bundle.get('league'),
+            'na_pt_scale': bundle.get('na_pt_scale'),
+            'na_ov_scale': bundle.get('na_ov_scale')}
+    tmp = BUNDLE_INFO_PATH + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(info, f, indent=1)
+    os.replace(tmp, BUNDLE_INFO_PATH)
+    print(f"  bundle info: {info['version']} trained through {info['trained_through']} "
+          f"-> {os.path.relpath(BUNDLE_INFO_PATH, ROOT)}")
+
+
+def check_bundle_fresh(bundle):
+    """Raise when the loaded bundle is older than the one CI last scored
+    with. A missing info file (before CI first writes it) is announced and
+    not checked. A LOCAL retrain is newer than the release and passes."""
+    if not os.path.exists(BUNDLE_INFO_PATH):
+        print(f'  bundle freshness NOT checked: {os.path.relpath(BUNDLE_INFO_PATH, ROOT)} '
+              'is absent (CI writes it on every run)')
+        return
+    with open(BUNDLE_INFO_PATH) as f:
+        ci = json.load(f)
+    mine = str(bundle.get('trained_through') or '')[:10]
+    theirs = str(ci.get('trained_through') or '')[:10]
+    if ci.get('version') != bundle.get('version') or mine < theirs:
+        raise RuntimeError(
+            f"local stuff_models.pkl is {bundle.get('version')!r} trained through "
+            f"{mine or 'unknown'}, but CI last scored with {ci.get('version')!r} trained "
+            f"through {theirs} ({os.path.relpath(BUNDLE_INFO_PATH, ROOT)}). Local Stuff+ "
+            f"would disagree with the site and the Sheets column. Refresh it:\n  "
+            f"{BUNDLE_REFRESH_CMD}")
+
+
+def live_scales(bundle):
+    """(league, na_pt_scale) for per-pitch atoms. When BUNDLE_INFO_PATH
+    describes THIS bundle (same version and trained_through), the scales CI
+    graded on in its last run, so a local atom equals the Sheets integer;
+    otherwise the bundle's own stored scales, announced (a local retrain, or
+    no info file yet)."""
+    if os.path.exists(BUNDLE_INFO_PATH):
+        with open(BUNDLE_INFO_PATH) as f:
+            ci = json.load(f)
+        same = (ci.get('version') == bundle.get('version')
+                and str(ci.get('trained_through') or '')[:10]
+                == str(bundle.get('trained_through') or '')[:10])
+        if same and ci.get('league') and ci.get('na_pt_scale'):
+            return ci['league'], ci['na_pt_scale']
+    print('  Stuff+ atoms use the bundle\'s stored anchor scales, not the live ones '
+          'CI graded with; card atoms can differ from the Sheets column by 1')
+    return bundle['league'], bundle['na_pt_scale']
+
+
 _HEIGHTS = None
 
 
@@ -1371,6 +1448,8 @@ def main():
                          'fold_models': fold_models, 'fold_pitchers': fold_pitchers,
                          'fold_models_na': fold_models_na,
                          'trained_through': max((d for d in df['date'].dropna()), default='')}, f)
+        with open(os.path.join(HERE, 'stuff_models.pkl'), 'rb') as f:
+            write_bundle_info(pickle.load(f))
     else:
         # Score-only: refresh the anchor scales in place (models untouched).
         # Cards' cell-fallback atoms read bundle['league'] — if the scales
@@ -1379,6 +1458,7 @@ def main():
         B['league'], B['na_pt_scale'], B['na_ov_scale'] = league, na_pt, na_ov
         with open(os.path.join(HERE, 'stuff_models.pkl'), 'wb') as f:
             pickle.dump(B, f)
+        write_bundle_info(B)
 
     # report + metric history (drift visibility: EVERY run, retrain and
     # score-only alike, appends its OOF descriptive r and split-half

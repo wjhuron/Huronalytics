@@ -4369,6 +4369,10 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
             'wjhuron/Huronalytics/releases/download/latest-data/'
             'stuff_models.pkl.gz | gunzip -c > '
             'stuff_plus/stuff_models.pkl')
+    # the version guard above checks the config; this checks the DATA: a
+    # retrain keeps the version, so an old local bundle passed every guard
+    # while scoring ~2.5 points per pitch off the site (2026-09-11 to 09-23)
+    _sv.check_bundle_fresh(bundle)
 
     print(f"  [scratch] Stuff+ bundle {bundle.get('version', '?')} "
           f"(trained through {bundle.get('trained_through', '?')})")
@@ -4399,6 +4403,10 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     # sheet atoms, breaking the exact-match guarantee.
     _folds = bundle.get('fold_pitchers') or []
     _fold_of = {pp: k for k, ps in enumerate(_folds) for pp in ps}
+    # the anchor scales CI graded the Sheets column with (live, re-derived
+    # every run), not the bundle's retrain-day ones, which left 11% of atoms
+    # one point off the sheet (2026-09-23)
+    _league, _na_league = _sv.live_scales(bundle)
     for pitcher, sub in df.groupby('pitcher'):
         _fi = _fold_of.get(pitcher, 0)
         has_arm = any(sf(p.get('ArmAngle')) is not None
@@ -4407,13 +4415,13 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
             _fms = bundle.get('fold_models') or []
             model = _fms[_fi] if _fi < len(_fms) else bundle['model']
             X = _sv.design(sub).reindex(columns=bundle['features'], fill_value=0)
-            pt_scale = bundle['league']
+            pt_scale = _league
         else:
             _fms = bundle.get('fold_models_na') or []
             model = _fms[_fi] if _fi < len(_fms) else bundle['model_na']
             na_cols = model.get_booster().feature_names
             X = _sv.design(sub, bundle['noarm_feats']).reindex(columns=na_cols, fill_value=0)
-            pt_scale = bundle['na_pt_scale']
+            pt_scale = _na_league
         raw = -model.predict(X)
         sub = sub.reset_index(drop=True)
         atoms_all = []
