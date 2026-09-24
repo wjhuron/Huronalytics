@@ -34,6 +34,15 @@ next-season target is never a training label), predicts Y, and is scored:
             within-hand -0.001). A ranking gain shows on both; a level
             shift shows on nxt_r alone. Computed in the summary from the
             cached aggregates, so it needs no refit and covers old runs.
+  nxt_wr_r  nxt_r WITHIN pitcher ROLE (2026-09-23), the same construction
+            with role in place of hand. Role is the Y+1 (target-season)
+            starter share: share of appearances (pitcher, date) with >=
+            ROLE_SP_PITCHES pitches; >= ROLE_SP_SHARE starter, <=
+            ROLE_RP_SHARE reliever, else swingman. Relievers grade higher
+            AND post better next-season targets, so the pooled nxt_r credits
+            the SP/RP level gap: SHIPPED s0 pooled .406 vs within role .339
+            (5/5 pairs, stuff_sweeper_role.py). A feature that only moves the
+            reliever LEVEL wins nxt_r and not nxt_wr_r.
 
 2026-09-02 repairs (see the audit in memory/project_stuff_gate_v2_2026_08):
   * TWO grades are scored for every metric. "raw" = the pitcher's mean of
@@ -154,6 +163,11 @@ GRADE_KEY = {'raw': 'nxt_r', 'rend': 'nxt_r_rend',
              'adj': 'nxt_adj_r', 'adj_rend': 'nxt_adj_r_rend'}
 # within-hand twins of raw / rend (grade column), target 't'
 WH_GRADES = (('wh', 's'), ('wh_rend', 's_r'))
+# within-role twins (2026-09-23). The cutoffs are CONVENTIONS, not measured:
+# the pooled-vs-within gap read the same at 35 and 60 pitches.
+WR_GRADES = (('wr', 's'), ('wr_rend', 's_r'))
+ROLE_SP_PITCHES = 45
+ROLE_SP_SHARE, ROLE_RP_SHARE = 0.7, 0.3
 
 
 def pear(a, b):
@@ -948,10 +962,10 @@ def hand_codes(index, Y):
     return np.array([1 if hm[p] == 'L' else 0 for p in index])
 
 
-def _demean_by(x, h):
-    """x, h: (B, m). Subtract the row-wise mean of each hand group."""
+def _demean_by(x, h, groups=(0, 1)):
+    """x, h: (B, m). Subtract the row-wise mean of each group."""
     out = x.copy()
-    for g in (0, 1):
+    for g in groups:
         m = (h == g)
         cnt = np.maximum(m.sum(1, keepdims=True), 1)
         out -= m * ((x * m).sum(1, keepdims=True) / cnt)
@@ -1003,6 +1017,90 @@ def wh_delta(a, b, Y, B=BOOT_B, seed=0, boot=True):
                  - _r_rows(_demean_by(sb[idx], hb), tb))
             out[f'se_boot_{g}'] = float(d.std())
             for tag, code in (('R', 0), ('L', 1)):
+                m = hb == code
+                d = _r_masked(sa[idx], t[idx], m) - _r_masked(sb[idx], t[idx], m)
+                out[f'se_boot_{g}_{tag}'] = float(d.std())
+    return out
+
+
+# ── within-role decomposition (2026-09-23) ───────────────────────────────
+_ROLE = None
+ROLE_CODES = {'SP': 0, 'RP': 1, 'SW': 2}
+
+
+def role_map():
+    """season -> {pitcher: 'SP' | 'RP' | 'SW'}, cached in data/_gate_v2/
+    pitcher_role.json and built from the season frames on first use (share
+    of appearances with >= ROLE_SP_PITCHES pitches; delete the file after a
+    frame rebuild or a cutoff change)."""
+    global _ROLE
+    if _ROLE is None:
+        fn = os.path.join(CACHE, 'pitcher_role.json')
+        if not os.path.exists(fn):
+            out = {}
+            for y in SEASONS:
+                d = pd.read_pickle(season_path(y))[['pitcher', 'date']]
+                app = d.groupby(['pitcher', d['date'].astype(str).str.slice(0, 10)]).size()
+                sp = (app >= ROLE_SP_PITCHES).groupby(level=0).mean()
+                out[str(y)] = {p: ('SP' if v >= ROLE_SP_SHARE else
+                                   'RP' if v <= ROLE_RP_SHARE else 'SW')
+                               for p, v in sp.items()}
+                del d
+                gc.collect()
+            tmp = fn + '.tmp'
+            with open(tmp, 'w') as f:
+                json.dump({'sp_pitches': ROLE_SP_PITCHES, 'sp_share': ROLE_SP_SHARE,
+                           'rp_share': ROLE_RP_SHARE, 'roles': out}, f)
+            os.replace(tmp, fn)
+        j = json.load(open(fn))
+        if (j.get('sp_pitches'), j.get('sp_share'), j.get('rp_share')) != (
+                ROLE_SP_PITCHES, ROLE_SP_SHARE, ROLE_RP_SHARE):
+            raise SystemExit('pitcher_role.json was built with other cutoffs; '
+                             'delete data/_gate_v2/pitcher_role.json to rebuild')
+        _ROLE = {int(y): m for y, m in j['roles'].items()}
+    return _ROLE
+
+
+def role_codes(index, Y1):
+    """0 = SP, 1 = RP, 2 = swingman for a pitcher index, by the role in the
+    TARGET season Y1. A pitcher the map does not know is an error."""
+    rm = role_map()[int(Y1)]
+    miss = [p for p in index if p not in rm]
+    if miss:
+        raise SystemExit(f'role_map {Y1}: {len(miss)} pitchers without a role, e.g. '
+                         f'{miss[:3]}; delete data/_gate_v2/pitcher_role.json to rebuild')
+    return np.array([ROLE_CODES[rm[p]] for p in index])
+
+
+def wr_delta(a, b, Y, B=BOOT_B, seed=0, boot=True):
+    """Within-role twin of wh_delta: delta r (a minus b) with grade and
+    target demeaned within the Y+1 role, per-role deltas for SP and RP, and
+    (boot) the paired pitcher-bootstrap SE with the demeaning redone inside
+    every resample."""
+    j = a.join(b, lsuffix='_a', rsuffix='_b', how='inner')
+    h = role_codes(j.index, int(Y) + 1)
+    groups = tuple(ROLE_CODES.values())
+    t = j['t_a'].values.astype(float)
+    out = {'n_SP': int((h == 0).sum()), 'n_RP': int((h == 1).sum()),
+           'n_SW': int((h == 2).sum())}
+    if boot:
+        idx = np.random.default_rng(seed).integers(0, len(j), size=(B, len(j)))
+        hb, tb = h[idx], _demean_by(t[idx], h[idx], groups)
+    for g, col in WR_GRADES:
+        if f'{col}_a' not in j or f'{col}_b' not in j:
+            continue
+        sa, sb = j[f'{col}_a'].values.astype(float), j[f'{col}_b'].values.astype(float)
+        dm = [_r_rows(_demean_by(v[None, :], h[None, :], groups),
+                      _demean_by(t[None, :], h[None, :], groups))[0] for v in (sa, sb)]
+        out[f'd_{g}'] = float(dm[0] - dm[1])
+        for tag, code in (('SP', 0), ('RP', 1)):
+            m = h == code
+            out[f'd_{g}_{tag}'] = pear(sa[m], t[m]) - pear(sb[m], t[m])
+        if boot:
+            d = (_r_rows(_demean_by(sa[idx], hb, groups), tb)
+                 - _r_rows(_demean_by(sb[idx], hb, groups), tb))
+            out[f'se_boot_{g}'] = float(d.std())
+            for tag, code in (('SP', 0), ('RP', 1)):
                 m = hb == code
                 d = _r_masked(sa[idx], t[idx], m) - _r_masked(sb[idx], t[idx], m)
                 out[f'se_boot_{g}_{tag}'] = float(d.std())
@@ -1149,6 +1247,20 @@ def summarize(names=None, quiet=False):
                             nxt_table(pd.read_pickle(agg_path('SHIPPED', int(Y), int(s)))),
                             Y, boot=False) for s in seeds]
             row.update(n_R=wh['n_R'], n_L=wh['n_L'])
+            wr = wr_delta(a, b, Y)
+            per_r = [wr if s == s0 else
+                     wr_delta(nxt_table(pd.read_pickle(agg_path(name, int(Y), int(s)))),
+                              nxt_table(pd.read_pickle(agg_path('SHIPPED', int(Y), int(s)))),
+                              Y, boot=False) for s in seeds]
+            row.update(n_SP=wr['n_SP'], n_RP=wr['n_RP'], n_SW=wr['n_SW'])
+            for g, _ in WR_GRADES:
+                row[f'd_{g}'] = float(np.mean([w[f'd_{g}'] for w in per_r]))
+                row[f'd_{g}_seeds'] = [w[f'd_{g}'] for w in per_r]
+                row[f'd_{g}_SP'] = float(np.mean([w[f'd_{g}_SP'] for w in per_r]))
+                row[f'd_{g}_RP'] = float(np.mean([w[f'd_{g}_RP'] for w in per_r]))
+                row[f'se_boot_{g}'] = wr[f'se_boot_{g}']
+                row[f'se_boot_{g}_SP'] = wr[f'se_boot_{g}_SP']
+                row[f'se_boot_{g}_RP'] = wr[f'se_boot_{g}_RP']
             for g, _ in WH_GRADES:
                 row[f'd_{g}'] = float(np.mean([w[f'd_{g}'] for w in per]))
                 row[f'd_{g}_seeds'] = [w[f'd_{g}'] for w in per]
@@ -1171,6 +1283,11 @@ def summarize(names=None, quiet=False):
               f'rend {row["d_wh_rend"]:+.4f} (boot {row["se_boot_wh_rend"]:.4f}) | '
               f'RHP {row["d_wh_R"]:+.4f} (boot {row["se_boot_wh_R"]:.4f}, n {row["n_R"]})  '
               f'LHP {row["d_wh_L"]:+.4f} (boot {row["se_boot_wh_L"]:.4f}, n {row["n_L"]})')
+            P(f'           within role: d_wr raw {row["d_wr"]:+.4f} (boot {row["se_boot_wr"]:.4f}) '
+              f'rend {row["d_wr_rend"]:+.4f} (boot {row["se_boot_wr_rend"]:.4f}) | '
+              f'SP {row["d_wr_SP"]:+.4f} (boot {row["se_boot_wr_SP"]:.4f}, n {row["n_SP"]})  '
+              f'RP {row["d_wr_RP"]:+.4f} (boot {row["se_boot_wr_RP"]:.4f}, n {row["n_RP"]})  '
+              f'SW n {row["n_SW"]}')
         if not rows:
             continue
         rows4 = [r for r in rows if not r['partial']]
@@ -1181,33 +1298,34 @@ def summarize(names=None, quiet=False):
         out['variants'][name] = block
     # seed SD of the within-hand delta, same rule as seed_sd(): RMS over the
     # pairs of every reference config that has >= 2 seeds
-    wh_var = {g: [] for g, _ in WH_GRADES}
+    TWINS = WH_GRADES + WR_GRADES
+    wh_var = {g: [] for g, _ in TWINS}
     for name, rows in all_rows:
         if name in SEED_REFS:
             for r in rows:
                 if r['m_seeds'] >= 2:
-                    for g, _ in WH_GRADES:
+                    for g, _ in TWINS:
                         wh_var[g].append(float(np.var(r[f'd_{g}_seeds'], ddof=1)))
     sd_wh = {g: (float(np.sqrt(np.mean(v))) if v else float('nan')) for g, v in wh_var.items()}
     out['_seed_sd']['pooled'].update(sd_wh)
-    P('\nseed SD of the within-hand delta: '
-      + '  '.join(f'{g} {sd_wh[g]:.4f}' for g, _ in WH_GRADES)
+    P('\nseed SD of the within-hand / within-role delta: '
+      + '  '.join(f'{g} {sd_wh[g]:.4f}' for g, _ in TWINS)
       + ('' if all(np.isfinite(v) for v in sd_wh.values())
          else '  [no multi-seed reference in this summary: bootstrap SE only]'))
     for name, rows in all_rows:
         block = out['variants'][name]
         rows4 = [r for r in rows if not r['partial']]
         for r in rows:
-            for g, _ in WH_GRADES:
+            for g, _ in TWINS:
                 ssd = sd_wh[g] if np.isfinite(sd_wh[g]) else 0.0
                 r[f'se_comb_{g}'] = float(np.sqrt(r[f'se_boot_{g}'] ** 2 + ssd ** 2 / r['m_seeds']))
         for tag, rs in (('all', rows), ('excl_2025_26', rows4)):
-            for g, _ in WH_GRADES:
+            for g, _ in TWINS:
                 block[tag][g] = pool(rs, sd_wh[g], g)
         P(f'\n{name} pooled:')
         for tag, key in (('ALL 5', 'all'), ('EXCL 2025-26', 'excl_2025_26')):
             first = True
-            for g in list(GRADE_KEY) + [w for w, _ in WH_GRADES]:
+            for g in list(GRADE_KEY) + [w for w, _ in TWINS]:
                 pg = block[key][g]
                 if not pg:
                     continue
