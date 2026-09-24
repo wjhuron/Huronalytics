@@ -610,6 +610,20 @@ def prepare(d, slopes, anchor='true'):
         ~d['pitch_type'].isin(T.VD_MASK_TYPES))
     d['ivb_diff'] = d['ivb'] - d['r_iv']
     d['hb_diff'] = d['hb'] - d['r_hb']
+    # 2026-09-24: production's pre-v17 MIXED diffs (adjusted pitch minus a
+    # RAW fastball reference) = the consistent diff + the per-pitcher offset
+    # adj(ref) - raw(ref) from stuff_fbref_currency.py. Variant FBREF_RAW.
+    off = fbref_offsets().get(str(int(d['season'].iloc[0])), {}) if len(d) else {}
+    if off:
+        k = d['pitcher'].astype(str) + '|' + d['throws'].astype(str)
+        oi = k.map({kk: v[0] for kk, v in off.items()})
+        oh = k.map({kk: v[1] for kk, v in off.items()})
+        miss = oi.isna() & d['ivb_diff'].notna()
+        if miss.any():
+            print(f'    fbref offset missing for {int(miss.sum())} pitches '
+                  f'({d.loc[miss, "pitcher"].nunique()} pitchers): rawref diff left NaN')
+        d['ivb_diff_rawref'] = d['ivb_diff'] + oi
+        d['hb_diff_rawref'] = d['hb_diff'] + oh
     d['vaa_diff'] = d['vaa'] - d['r_vaa']
     d['acc_v_diff'] = d['acc_v'] - d['r_av']
     d['acc_h_diff'] = d['acc_h'] - d['r_ah']
@@ -623,6 +637,17 @@ def prepare(d, slopes, anchor='true'):
 
 ARM_SIDE_SIGN = 1.0
 _HEIGHT = None
+_FBREF = None
+
+
+def fbref_offsets():
+    """{season: {"pitcher|throws": [off_ivb, off_hb]}} from
+    stuff_fbref_currency.py; empty when the file is absent."""
+    global _FBREF
+    if _FBREF is None:
+        path = os.path.join(CACHE, 'fbref_offsets.json')
+        _FBREF = json.load(open(path)) if os.path.exists(path) else {}
+    return _FBREF
 
 
 def height_map():
