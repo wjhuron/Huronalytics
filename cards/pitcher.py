@@ -4338,9 +4338,10 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     transformed features with models trained on different ones, silently
     drifting every grade).
     Full model when the pitcher has any
-    ArmAngle data (build_df fills gaps with his own average); otherwise the
-    no-arm companion model anchored to its MLB (no-arm) scales — exactly the
-    ROC path in train_stuff.main(). k_shrink overrides the season K_SHRINK
+    arm angle after the fills (his own average in build_df, then his
+    prior-season slot from the bundle's arm_prior, v16); otherwise the
+    no-arm companion model anchored to its MLB (no-arm) scales, exactly as
+    train_stuff.main() grades such a pitch. k_shrink overrides the season K_SHRINK
     (used lightly for daily cards)."""
     import pickle as _pickle
     _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -4379,6 +4380,10 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     all_pitches = [p for pl in norm_by_pitcher.values() for p in pl]
     # v15: no kinematics sidecar (kin_eff__ff retired 2026-09-02).
     df = _sv.build_df(all_pitches)
+    # v16 arm-angle chain, the same as train_stuff.main: prior-season slot
+    # from the bundle's table, then (below) the no-arm companion for a
+    # pitcher who still has none
+    df = _sv.fill_arm_prior(df, bundle.get('arm_prior'))
     overall, per_pt, atoms_by_pid = {}, {}, {}
     if not len(df):
         return overall, per_pt, atoms_by_pid
@@ -4409,8 +4414,9 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     _league, _na_league = _sv.live_scales(bundle)
     for pitcher, sub in df.groupby('pitcher'):
         _fi = _fold_of.get(pitcher, 0)
-        has_arm = any(sf(p.get('ArmAngle')) is not None
-                      for p in norm_by_pitcher.get(pitcher, []))
+        # after the fills, not the raw sheet column: a pitcher with a
+        # prior-season slot is scored by the full model, as in CI
+        has_arm = bool(sub['arm_angle'].notna().any())
         if has_arm:
             _fms = bundle.get('fold_models') or []
             model = _fms[_fi] if _fi < len(_fms) else bundle['model']

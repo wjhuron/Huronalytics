@@ -220,7 +220,11 @@ HEIGHT_CLIP = (70.0, 80.0)
 # of scoring transformed features with models trained on different ones.
 # v14.1 (2026-08-23) kept 'v14' and the pre-clip local bundle passed every
 # guard for ten days. v15 = v14.1 minus kin_eff__ff, trained on xgboost 3.4.1.
-BUNDLE_VERSION = 'v15'
+# v16 (2026-09-23) = v15 + the arm-angle chain: prior-season fill
+# (fill_arm_prior, table stored in the bundle as 'arm_prior'), then the no-arm
+# companion for MLB rows still without an arm angle, instead of the full
+# model's missing-value branches. Same features and params.
+BUNDLE_VERSION = 'v16'
 
 # Bundle FRESHNESS (2026-09-23). The version string guards the config, not
 # the data: a retrain on more data keeps the version, so the local
@@ -508,6 +512,44 @@ def _arm_means(pitches):
     return {'pt': {k: s / n for k, (s, n) in pt.items() if n},
             'all': {k: s / n for k, (s, n) in al.items() if n}}
 
+
+def arm_prior_table(season_frames):
+    """{'pt': {(pitcher, pitch_type): deg}, 'all': {pitcher: deg}} from built
+    PRIOR-season frames, given as [(year, frame), ...]. Each key takes its
+    MOST RECENT season (arm slots drift over years). Stored in the bundle at
+    retrain so score-only runs and cards fill from the same table."""
+    pt, al = {}, {}
+    for _yr, fr in sorted(season_frames, key=lambda t: -t[0]):
+        a = fr[fr['arm_angle'].notna()]
+        for k, v in a.groupby(['pitcher', 'pitch_type'])['arm_angle'].mean().items():
+            pt.setdefault(k, float(v))
+        for k, v in a.groupby('pitcher')['arm_angle'].mean().items():
+            al.setdefault(k, float(v))
+    return {'pt': pt, 'all': al}
+
+
+def fill_arm_prior(frame, arm_prior):
+    """Rows still without arm angle after build_df's same-frame and ROC/AAA
+    fills take the pitcher's most recent prior-season MLB arm angle (per
+    pitch type, then overall). Arm angle is a stable pitcher trait; the
+    missing-value branches it replaces graded Gonsolin's curveball 28.5 on
+    2026-09-22 where his 2025 slot gives 92.5 (per-pitch distance from the
+    2025-slot grade: 7.3 pts on the missing branch, 4.3 on the no-arm model).
+    Whatever is still missing is
+    scored by the no-arm companion (train_stuff.main, the card)."""
+    if not len(frame) or not arm_prior or not frame['arm_angle'].isna().any():
+        return frame
+    na = frame['arm_angle'].isna()
+    fill = [arm_prior['pt'].get((p, t), arm_prior['all'].get(p, np.nan))
+            for p, t in zip(frame.loc[na, 'pitcher'], frame.loc[na, 'pitch_type'])]
+    fill = pd.Series(fill, index=frame.index[na], dtype='float64')
+    frame.loc[na, 'arm_angle'] = fill
+    who = sorted(frame.loc[fill.index[fill.notna()], 'pitcher'].unique())
+    print(f'  arm-angle prior-season fill: {int(fill.notna().sum())}/{int(na.sum())} '
+          f'rows ({len(who)} pitchers{": " + ", ".join(who[:5]) if who else ""}); '
+          f'{int(fill.isna().sum())} left to the no-arm model')
+    return frame
+
 def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     # pass 1: per-pitcher primary fastball reference (handedness-normalized).
     # VAA gets its own count: a pitch missing VAA must not dilute the mean
@@ -701,7 +743,8 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
         _n_left = int(out['arm_angle'].isna().sum())
         print(f'  arm-angle impute: {_n_miss - _n_left}/{_n_miss} missing filled '
               f'from pitcher averages ({_n_fb} of those from the ROC/AAA '
-              f'fallback; {_n_left} left to model-missing)')
+              f'fallback; {_n_left} still missing: fill_arm_prior, then the '
+              f'no-arm model)')
     # height (v14): pitcher stature from the shipped artifact; missing rows
     # impute to the frozen league mean and are logged (a new arm whose name
     # the builder could not resolve, or an absent artifact).
@@ -990,6 +1033,7 @@ def main():
     # 2025 targets use 2025 Guts constants (run environment differs).
     df_prior = None
     B = None
+    arm_prior = {}
     if args.score_only:
         _bp = os.path.join(HERE, 'stuff_models.pkl')
         with open(_bp, 'rb') as f:
@@ -1008,6 +1052,10 @@ def main():
             sys.exit('--score-only bundle predates the v12 config (cross/nVAA/'
                      'velo_diff-mask) — its fold models trained on different '
                      'features; run a full retrain (workflow: retrain=true) first')
+        if 'arm_prior' not in B:
+            sys.exit('--score-only bundle has no arm_prior table (pre-v16) — run a '
+                     'full retrain (workflow: retrain=true) first')
+        arm_prior = B['arm_prior']
         print(f'  score-only: using cached bundle ({len(B["fold_models"])} fold models, '
               f'trained {B.get("trained_through", "unknown")})')
     elif os.path.exists(PRIOR_PKL):
@@ -1022,6 +1070,7 @@ def main():
             return d[d['target_xrv'].notna()].reset_index(drop=True)
 
         p25 = pickle.load(open(PRIOR_PKL, 'rb'))
+        prior_years = [2025]
         prior_dfs = [_build_with_guts(_harmonize_tags(p25, pitches),
                                       PRIOR_LG_WOBA, PRIOR_WOBA_SCALE)]
         print(f'  + {len(prior_dfs[0])} prior-season (2025) training pitches')
@@ -1034,6 +1083,7 @@ def main():
                 continue
             _d = _build_with_guts(pickle.load(open(_pkl, 'rb')), *HIST_GUTS[_yr])
             prior_dfs.append(_d)
+            prior_years.append(_yr)
             print(f'  + {len(_d)} prior-season ({_yr}) training pitches')
         df_prior = pd.concat(prior_dfs, ignore_index=True)
         print(f'  prior total: {len(df_prior)} pitches across {len(prior_dfs)} seasons')
@@ -1047,6 +1097,9 @@ def main():
                          f'{_cov:.1%} (<90%) — training pickle likely predates '
                          f'the SpinAxis augmentation; refresh the release '
                          f'assets before retraining')
+        arm_prior = arm_prior_table(list(zip(prior_years, prior_dfs)))
+        print(f"  arm_prior table: {len(arm_prior['pt'])} (pitcher, type) and "
+              f"{len(arm_prior['all'])} pitcher arm angles from {sorted(prior_years)}")
     else:
         print('  (no prior-season pickle found — training on current season only)')
 
@@ -1060,6 +1113,12 @@ def main():
                      'scripts/ci/build_pitcher_heights.py before retraining')
         print(f'  height coverage (MLB rows): {_hcov:.2%}')
 
+    # v16 arm-angle chain, step 3: prior-season slot for rows the same-frame
+    # and ROC/AAA fills left empty; step 4 (the no-arm companion) follows the
+    # standardization below.
+    df = fill_arm_prior(df, arm_prior)
+    df_extra = fill_arm_prior(df_extra, arm_prior)
+    _noarm = df['arm_angle'].isna().values
     X = design(df); y = df['target_xrv'].values
     if B is not None:
         X = X.reindex(columns=B['features'], fill_value=0)
@@ -1135,14 +1194,24 @@ def main():
     # of showing noise flukes. High-sample arms are essentially unaffected.
     def _standardize(grp_keys, qual_min):
         a = df.groupby(grp_keys)['stuff_raw'].agg(rawmean='mean', n='size').reset_index()
+        # v16: the anchor POOL leaves out rows without an arm angle; their
+        # stuff_raw is re-derived from the no-arm companion right after this
+        # (identical to v15 whenever every row has an arm angle)
+        pa = (df[~_noarm].groupby(grp_keys)['stuff_raw']
+              .agg(rawmean='mean', n='size').reset_index() if _noarm.any() else a)
+        pgroups = (dict(list(pa.groupby('pitch_type'))) if 'pitch_type' in grp_keys
+                   else {'ALL': pa})
         a['stuff_mean'] = 100.0
         scale = {}
         groups = a.groupby('pitch_type') if 'pitch_type' in grp_keys else [('ALL', a)]
         for key, sub in groups:
-            q = sub[sub['n'] >= qual_min]
-            base = q if len(q) >= 5 else sub
+            psub = pgroups.get(key, sub.iloc[0:0])
+            if not len(psub):
+                psub = sub
+            q = psub[psub['n'] >= qual_min]
+            base = q if len(q) >= 5 else psub
             if key in ANCHOR_BORROW and 'pitch_type' in grp_keys:
-                donor = a[a['pitch_type'].isin(ANCHOR_BORROW[key])]
+                donor = pa[pa['pitch_type'].isin(ANCHOR_BORROW[key])]
                 dq = donor[donor['n'] >= qual_min]
                 base = dq if len(dq) >= 5 else donor
             mu, sd = float(base['rawmean'].mean()), float(base['rawmean'].std())
@@ -1155,10 +1224,69 @@ def main():
 
     agg, league = _standardize(['pitcher', 'team', 'pitch_type'], QUAL_N)
 
+    # The no-arm companion (raw_na, its fold models and anchor scales) is
+    # computed here, before the per-pitch atoms, because v16 step 4 below
+    # needs it for MLB rows; the ROC block further down reuses it.
+    Xna = design(df, NOARM_FEATS)
+    if B is not None:
+        Xna = Xna.reindex(columns=B['features_na'], fill_value=0)
+        model_na = B['model_na']
+        # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC
+        # scores are ranked against carry no in-sample luck inflation.
+        df['raw_na'] = _cached_oof(Xna, B['fold_models_na'], B['fold_pitchers'])
+    else:
+        if df_prior is not None:
+            Xna_all = pd.concat([Xna, design(df_prior, NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)],
+                                ignore_index=True)
+            yna_all = np.concatenate([y, df_prior['target_xrv'].values])
+        else:
+            Xna_all, yna_all = Xna, y
+        model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna_all, yna_all)
+        # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
+        # are ranked against carry no in-sample luck inflation. ROC pitches are not
+        # in the training set, so model_na's predictions on ROC are truly OOS.
+        df['raw_na'], fold_models_na, _fp_na = _oof_predict(Xna, feats=NOARM_FEATS)
+
+    def _na_scale(keys, qual_min):
+        a = df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
+        out = {}
+        groups = a.groupby('pitch_type') if 'pitch_type' in keys else [('ALL', a)]
+        for key, sub in groups:
+            q = sub[sub['n'] >= qual_min]; base = q if len(q) >= 5 else sub
+            if key in ANCHOR_BORROW and 'pitch_type' in keys:
+                donor = a[a['pitch_type'].isin(ANCHOR_BORROW[key])]
+                dq = donor[donor['n'] >= qual_min]
+                base = dq if len(dq) >= 5 else donor
+            out[key] = {'mu': float(base['rawmean'].mean()), 'sd': float(base['rawmean'].std())}
+        return out
+    na_pt = _na_scale(['pitcher', 'team', 'pitch_type'], QUAL_N)
+    na_ov = _na_scale(['pitcher', 'team', 'throws'], 2 * QUAL_N)['ALL']
+
+    # v16 arm-angle chain, step 4: an MLB row still without an arm angle (a
+    # debut with no ROC/AAA and no prior-season slot) takes the no-arm
+    # companion's grade instead of the full model's missing-value branches.
+    # Mapped onto the full model's raw scale per pitch type, so its atom is
+    # exactly the companion's atom, 100 + 10 (raw_na - mu_na) / sd_na: the
+    # number the card and the ROC path give the same pitch.
+    def _noarm_equiv(pt, raw_na):
+        lm = pt.map({k: v['mu'] for k, v in league.items() if isinstance(v, dict)})
+        ls = pt.map({k: v['sd'] for k, v in league.items() if isinstance(v, dict)})
+        nm = pt.map({k: v['mu'] for k, v in na_pt.items()})
+        ns = pt.map({k: v['sd'] for k, v in na_pt.items()})
+        return (lm + (raw_na - nm) / ns * ls).to_numpy(dtype='float64')
+
+    if _noarm.any():
+        _eq = _noarm_equiv(df.loc[_noarm, 'pitch_type'], df.loc[_noarm, 'raw_na'])
+        _ok = np.isfinite(_eq)
+        df.loc[np.flatnonzero(_noarm)[_ok], 'stuff_raw'] = _eq[_ok]
+        print(f'  no-arm companion: {int(_ok.sum())} MLB pitches from '
+              f'{df.loc[_noarm, "pitcher"].nunique()} pitchers re-graded; '
+              f'{int((~_ok).sum())} kept on the full model (no anchor for the type)')
+
     # ROC/AAA feature frame, built here so the retrain path below can score
     # its units for support alongside MLB (target_xrv is None at ROC — we
     # only score; the Stuff+ scoring itself happens further down).
-    roc_df = build_df(roc_pitches)
+    roc_df = fill_arm_prior(build_df(roc_pitches), arm_prior)
 
     # low-model-support flag per unit (see compute_support docstring)
     if B is not None:
@@ -1208,40 +1336,6 @@ def main():
     #    the minors backfill: rows WITH arm angle (96-97%) use the FULL model,
     #    rows without fall back to the no-arm companion (the _arm mask below).
     #    This block ONLY affects ROC; MLB above is untouched. ──
-    Xna = design(df, NOARM_FEATS)
-    if B is not None:
-        Xna = Xna.reindex(columns=B['features_na'], fill_value=0)
-        model_na = B['model_na']
-        # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC
-        # scores are ranked against carry no in-sample luck inflation.
-        df['raw_na'] = _cached_oof(Xna, B['fold_models_na'], B['fold_pitchers'])
-    else:
-        if df_prior is not None:
-            Xna_all = pd.concat([Xna, design(df_prior, NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)],
-                                ignore_index=True)
-            yna_all = np.concatenate([y, df_prior['target_xrv'].values])
-        else:
-            Xna_all, yna_all = Xna, y
-        model_na = xgb.XGBRegressor(**_params_for(Xna)); model_na.fit(Xna_all, yna_all)
-        # MLB anchor distribution for ROC is also OOF, so the mu/sd the ROC scores
-        # are ranked against carry no in-sample luck inflation. ROC pitches are not
-        # in the training set, so model_na's predictions on ROC are truly OOS.
-        df['raw_na'], fold_models_na, _fp_na = _oof_predict(Xna, feats=NOARM_FEATS)
-
-    def _na_scale(keys, qual_min):
-        a = df.groupby(keys)['raw_na'].agg(rawmean='mean', n='size').reset_index()
-        out = {}
-        groups = a.groupby('pitch_type') if 'pitch_type' in keys else [('ALL', a)]
-        for key, sub in groups:
-            q = sub[sub['n'] >= qual_min]; base = q if len(q) >= 5 else sub
-            if key in ANCHOR_BORROW and 'pitch_type' in keys:
-                donor = a[a['pitch_type'].isin(ANCHOR_BORROW[key])]
-                dq = donor[donor['n'] >= qual_min]
-                base = dq if len(dq) >= 5 else donor
-            out[key] = {'mu': float(base['rawmean'].mean()), 'sd': float(base['rawmean'].std())}
-        return out
-    na_pt = _na_scale(['pitcher', 'team', 'pitch_type'], QUAL_N)
-    na_ov = _na_scale(['pitcher', 'team', 'throws'], 2 * QUAL_N)['ALL']
 
     if len(roc_df):
         # ── Per-pitcher arm branch (2026-07-25) ──
@@ -1344,6 +1438,23 @@ def main():
             mask = _pf == k
             if mask.any():
                 raw_e[mask] = -mm.predict(Xe[mask])
+        # v16 step 4 for target-less rows: fresh games are exactly where the
+        # arm angle is still missing
+        _na_e = df_extra['arm_angle'].isna().values
+        if _na_e.any():
+            _fm_na = B['fold_models_na'] if B is not None else fold_models_na
+            Xe_na = design(df_extra[_na_e], NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)
+            _r_na = np.full(int(_na_e.sum()), np.nan)
+            _pf_na = _pf[_na_e]
+            for k, mm in enumerate(_fm_na):
+                mask = _pf_na == k
+                if mask.any():
+                    _r_na[mask] = -mm.predict(Xe_na[mask])
+            _eq = _noarm_equiv(df_extra.loc[_na_e, 'pitch_type'],
+                               pd.Series(_r_na, index=df_extra.index[_na_e]))
+            _ok = np.isfinite(_eq)
+            raw_e[np.flatnonzero(_na_e)[_ok]] = _eq[_ok]
+            print(f'  no-arm companion: {int(_ok.sum())} target-less pitches re-graded')
         df_extra = df_extra.assign(stuff_raw=raw_e)
 
     def _atom_series(frame, anchors, raw_col):
@@ -1447,6 +1558,7 @@ def main():
                          'na_pt_scale': na_pt, 'na_ov_scale': na_ov,
                          'fold_models': fold_models, 'fold_pitchers': fold_pitchers,
                          'fold_models_na': fold_models_na,
+                         'arm_prior': arm_prior,
                          'trained_through': max((d for d in df['date'].dropna()), default='')}, f)
         with open(os.path.join(HERE, 'stuff_models.pkl'), 'rb') as f:
             write_bundle_info(pickle.load(f))
