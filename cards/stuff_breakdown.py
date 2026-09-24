@@ -220,8 +220,9 @@ def render(meta, panels, order, labels, out_path):
     n_rows = len(order)
     row_h = 0.70
     panel_top_in = 4.75
-    panel_bot_in = panel_top_in + n_rows * row_h
-    fig_h = panel_bot_in + 3.0
+    pad = 0.6                          # rows of headroom above and below the chain for the avg / grade labels
+    panel_bot_in = panel_top_in + (n_rows + 2 * pad) * row_h
+    fig_h = panel_bot_in + 2.3
     fig = plt.figure(figsize=(16, fig_h), dpi=100)
     fig.patch.set_facecolor(BG)
     H = fig_h
@@ -286,7 +287,7 @@ def render(meta, panels, order, labels, out_path):
     # row labels
     names = [labels[f] for f in order]
     for i, (nm, sub) in enumerate(names):
-        yc = top - (i + 0.5) * row_h / H
+        yc = top - (pad + i + 0.5) * row_h / H
         fig.text(0.03 + lab_w - 0.008, yc + 0.06 / H, nm, fontsize=15, fontfamily='IBM Plex Sans',
                  fontweight='bold', color=TEXT_PRIMARY, ha='right', va='bottom')
         fig.text(0.03 + lab_w - 0.008, yc - 0.03 / H, sub, fontsize=12, fontfamily='IBM Plex Sans',
@@ -299,7 +300,7 @@ def render(meta, panels, order, labels, out_path):
         for s in ax.spines.values():
             s.set_visible(False)
         ax.set_xlim(lo, hi)
-        ax.set_ylim(n_rows, 0)
+        ax.set_ylim(n_rows + pad, -pad)
         ax.set_yticks([])
         ax.tick_params(axis='x', colors=TEXT_MUTED, labelsize=13)
         for tick in ax.get_xticklabels():
@@ -322,7 +323,10 @@ def render(meta, panels, order, labels, out_path):
         d = p['data']
         # the chain starts at the average MLB pitch of the type (the solid
         # line), not at the scale's 100: the two differ by a few tenths
-        ax.axvline(d['anchor'], color=TEXT_SECONDARY, linewidth=1.3)
+        ax.vlines(d['anchor'], -pad / 2, n_rows + pad, color=TEXT_SECONDARY, linewidth=1.3)
+        ax.text(d['anchor'], -pad / 2, 'avg', ha='center', va='center', fontsize=13.5,
+                fontfamily='IBM Plex Sans', fontweight='bold', color=TEXT_SECONDARY, zorder=6,
+                bbox=dict(facecolor=BG, edgecolor='none', pad=1.5))
         cum = d['anchor']
         steps = [d['delta'][f] for f in order]
         for i, v in enumerate(steps):
@@ -332,12 +336,16 @@ def render(meta, panels, order, labels, out_path):
             if i + 1 < len(steps):
                 ax.plot([cum + v, cum + v], [i + 0.86, i + 1.14], color=TEXT_FAINT, linewidth=0.9, zorder=2)
             xt = right + 0.012 * (hi - lo) if v >= 0 else left - 0.012 * (hi - lo)
-            ax.text(xt, i + 0.5, _signed(v), va='center', ha='left' if v >= 0 else 'right',
-                    fontsize=13.5, fontfamily='IBM Plex Sans', fontweight='bold',
-                    color=ACCENT if v >= 0 else '#5a6878', zorder=6,
-                    bbox=dict(facecolor=BG, edgecolor='none', pad=0.6))
+            if abs(v) >= 0.05:             # a bar that rounds to 0.0 gets no label
+                ax.text(xt, i + 0.5, _signed(v), va='center', ha='left' if v >= 0 else 'right',
+                        fontsize=13.5, fontfamily='IBM Plex Sans', fontweight='bold',
+                        color=ACCENT if v >= 0 else '#5a6878', zorder=6,
+                        bbox=dict(facecolor=BG, edgecolor='none', pad=0.6))
             cum += v
-        ax.axvline(d['total'], color=ACCENT, linewidth=1.5, linestyle='--', zorder=4)
+        ax.vlines(d['total'], -pad, n_rows + pad / 2, color=ACCENT, linewidth=1.5, linestyle='--', zorder=4)
+        ax.text(d['total'], n_rows + pad / 2, f"{r0(d['site'])}", ha='center', va='center', fontsize=14.5,
+                fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT, zorder=6,
+                bbox=dict(facecolor=BG, edgecolor='none', pad=1.5))
         fig.text(px + pw / 2, y(panel_bot_in + 0.48), f"{r0(d['site'])} Stuff+", ha='center',
                  va='top', fontsize=18, fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT)
         if r0(d['total']) != r0(d['site']):
@@ -359,18 +367,9 @@ def render(meta, panels, order, labels, out_path):
                                   color=col, linewidth=2, linestyle=ls))
         fig.text(fx + 0.016, fy + 0.1 / H, lab, fontsize=13, fontfamily='IBM Plex Sans',
                  color=TEXT_SECONDARY, va='center')
-    notes = [
-        f"Each bar shows how much one input moved these pitches away from the average 2026 MLB "
-        f"{PITCH_NAMES.get(pt, pt).lower()} (solid line), in Stuff+ points. The values come directly from the "
-        f"model.",
-        'Related inputs share credit (for example, velocity and the velocity gap to the fastball), so read those '
-        'bars together. vs LHH / vs RHH use only the pitches thrown to that batter hand.',
-        'The bars add up to each panel\'s grade before rounding; grades match the site. ' + meta['model_text'],
-    ]
-    for i, t in enumerate(notes):
-        fig.text(0.03, fy - (0.42 + 0.34 * i) / H, t, fontsize=12.5, fontfamily='IBM Plex Sans',
-                 fontweight=500, color=TEXT_SECONDARY, va='top')
-    fig.text(0.965, fy - 1.10 / H, 'huronalytics.vercel.app', fontsize=13, fontfamily='IBM Plex Sans',
+    fig.text(0.03, fy - 0.42 / H, meta['model_text'], fontsize=12.5, fontfamily='IBM Plex Sans',
+             fontweight=500, color=TEXT_SECONDARY, va='top')
+    fig.text(0.965, fy - 0.42 / H, 'huronalytics.vercel.app', fontsize=13, fontfamily='IBM Plex Sans',
              fontweight='bold', color=TEXT_SECONDARY, ha='right', va='top')
     fig.savefig(out_path, dpi=150, facecolor=BG)
     plt.close(fig)
@@ -481,10 +480,6 @@ def main():
     # header facts from the sheet rows of the window
     wid = set(w['pid'])
     wr = [p for p in rows if p.get('PitchID') in wid]
-    def _mean(col):
-        v = [T.sf(p.get(col)) for p in wr]
-        v = [x for x in v if x is not None]
-        return float(np.mean(v)) if v else float('nan')
     team = max(wr, key=lambda p: str(p.get('Game Date'))).get('PTeam')
     hand = wr[0].get('Throws')
     if lo_d == hi_d:
@@ -508,8 +503,8 @@ def main():
         'display_name': display, 'window_text': window_text,
         'sub_text': f"{'LHP' if hand == 'L' else 'RHP'}  |  {team}  |  {'MLB' if level == 'MLB' else 'AAA'}",
         'pitch_type': pitch_type, 'n_pitches': len(w), 'photo': img, 'anchor': overall['anchor'],
-        'velo': f"{_mean('Velocity'):.1f}", 'ivb': f"{_mean('IndVertBrk'):.1f}",
-        'hb': f"{_mean('HorzBrk'):.1f}",
+        'velo': f"{w['velocity'].mean():.1f}", 'ivb': f"{w['ivb'].mean():.1f}",
+        'hb': f"{w['hb'].mean():.1f}",
         'overall': _tile(panels[0]), 'vs_l': _tile(panels[1]), 'vs_r': _tile(panels[2]),
         'model_text': (f"Stuff+ {B['version']}, trained through {B['trained_through']}; "
                        f"{'' if has_arm else 'graded without arm angle (none recorded yet); '}"
