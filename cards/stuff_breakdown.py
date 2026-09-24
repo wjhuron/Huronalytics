@@ -220,12 +220,13 @@ def render(meta, panels, order, labels, out_path):
     # chart font sizes; the card is 16 in wide, and the longest row name and
     # the value labels are what limit them
     FS_NAME, FS_SUB, FS_VAL, FS_TICK = 20, 16, 18, 17
-    FS_TITLE, FS_N, FS_AVG, FS_END, FS_GRADE, FS_LEG = 21, 16, 17, 19, 24, 17
+    FS_TITLE, FS_N, FS_AVG, FS_GRADE, FS_LEG = 21, 16, 17, 24, 17
     n_rows = len(order)
     row_h = 0.85
     panel_top_in = 5.2
-    pad = 0.6                          # rows of headroom above and below the chain for the avg / grade labels
-    panel_bot_in = panel_top_in + (n_rows + 2 * pad) * row_h
+    pad = 0.6                          # rows of headroom above the chain for the avg label
+    pad_bot = 0.2                      # rows below the last bar
+    panel_bot_in = panel_top_in + (n_rows + pad + pad_bot) * row_h
     fig_h = panel_bot_in + 1.95
     fig = plt.figure(figsize=(16, fig_h), dpi=100)
     fig.patch.set_facecolor(BG)
@@ -239,7 +240,7 @@ def render(meta, panels, order, labels, out_path):
     ax_photo.axis('off')
     if meta.get('photo') is not None:
         ax_photo.imshow(meta['photo'])
-    fig.text(0.15, y(0.95), meta['display_name'], fontsize=30, fontfamily='Bitter',
+    fig.text(0.15, y(0.95), meta['display_name'], fontsize=36, fontfamily='Bitter',
              fontweight='black', color=TEXT_PRIMARY, va='bottom')
     fig.text(0.15, y(1.45), meta['window_text'], fontsize=20, fontfamily='IBM Plex Sans',
              color=ACCENT, va='bottom')
@@ -256,7 +257,7 @@ def render(meta, panels, order, labels, out_path):
         fig.patches.append(FancyBboxPatch((tx, ty), tw, th, boxstyle='round,pad=0,rounding_size=0.006',
                                           transform=fig.transFigure, facecolor=DARK_CELL if r == 0 else DARKER,
                                           edgecolor=SUBTLE_BORDER, linewidth=1))
-        fig.text(tx + tw / 2, ty + th * 0.74, lab, fontsize=12, fontfamily='IBM Plex Sans Condensed',
+        fig.text(tx + tw / 2, ty + th * 0.74, lab, fontsize=15, fontfamily='IBM Plex Sans Condensed',
                  fontweight='bold', color=TEXT_SECONDARY, ha='center', va='center')
         fig.text(tx + tw / 2, ty + th * 0.33, val, fontsize=23, fontfamily='IBM Plex Sans',
                  fontweight='bold', color=TEXT_PRIMARY if r == 0 else ACCENT, ha='center', va='center')
@@ -323,7 +324,7 @@ def render(meta, panels, order, labels, out_path):
         for s in ax.spines.values():
             s.set_visible(False)
         ax.set_xlim(lo, hi)
-        ax.set_ylim(n_rows + pad, -pad)
+        ax.set_ylim(n_rows + pad_bot, -pad)
         ax.set_yticks([])
         ax.tick_params(axis='x', colors=TEXT_MUTED, labelsize=FS_TICK)
         for tick in ax.get_xticklabels():
@@ -346,7 +347,7 @@ def render(meta, panels, order, labels, out_path):
         d = p['data']
         # the chain starts at the average MLB pitch of the type (the solid
         # line), not at the scale's 100: the two differ by a few tenths
-        ax.vlines(d['anchor'], -pad / 2, n_rows + pad, color=TEXT_SECONDARY, linewidth=1.3)
+        ax.vlines(d['anchor'], -pad / 2, n_rows + pad_bot, color=TEXT_SECONDARY, linewidth=1.3)
         ax.text(d['anchor'], -pad / 2, 'avg', ha='center', va='center', fontsize=FS_AVG,
                 fontfamily='IBM Plex Sans', fontweight='bold', color=TEXT_SECONDARY, zorder=6,
                 bbox=dict(facecolor=BG, edgecolor='none', pad=1.5))
@@ -364,10 +365,7 @@ def render(meta, panels, order, labels, out_path):
                     color=ACCENT if v >= 0 else '#5a6878', zorder=6,
                     bbox=dict(facecolor=BG, edgecolor='none', pad=0.6))
             cum += v
-        ax.vlines(d['total'], -pad, n_rows + pad / 2, color=ACCENT, linewidth=1.5, linestyle='--', zorder=4)
-        ax.text(d['total'], n_rows + pad / 2, f"{r0(d['site'])}", ha='center', va='center', fontsize=FS_END,
-                fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT, zorder=6,
-                bbox=dict(facecolor=BG, edgecolor='none', pad=1.5))
+        ax.vlines(d['total'], -pad, n_rows + pad_bot, color=ACCENT, linewidth=1.5, linestyle='--', zorder=4)
         fig.text(px + pw / 2, y(panel_bot_in + 0.55), f"{r0(d['site'])} Stuff+", ha='center',
                  va='top', fontsize=FS_GRADE, fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT)
         if r0(d['total']) != r0(d['site']):
