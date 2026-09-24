@@ -80,7 +80,7 @@ FEATURE_LABELS = {
     'cross':        ('Break across the spin axis', _f('{:+.1f} in')),
     'cross_abs':    ('Size of break across the axis', _f('{:.1f} in')),
     'height':       ('Pitcher height', _f('{:.0f} in')),
-    'platoon_same': ('Batter-hand matchup', None),   # formatted from the same-hand share
+    'platoon_same': ('Batter-hand matchup', None),   # formatted from the batter-hand mix
 }
 
 
@@ -491,7 +491,7 @@ def main():
     for f in feats:
         nm, fmt = FEATURE_LABELS.get(f, (f, _f('{:.2f}')))
         if f == 'platoon_same':
-            labels[f] = (nm, f"same-hand share {_pct(w['platoon_same'].mean())}")
+            labels[f] = (nm, f"LHH {_pct((w['bats'] == 'L').mean())}  |  RHH {_pct((w['bats'] == 'R').mean())}")
         elif f == 'velo_diff' and w[f].isna().all():
             labels[f] = (nm, 'blank on FF/SI (model routing only)')
         else:
