@@ -362,7 +362,7 @@ def render(meta, panels, order, labels, out_path):
     notes = [
         f"Each bar shows how much one input moved these pitches away from the average 2026 MLB "
         f"{PITCH_NAMES.get(pt, pt).lower()} (solid line), in Stuff+ points. The values come directly from the "
-        f"model (TreeSHAP).",
+        f"model.",
         'Related inputs share credit (for example, velocity and the velocity gap to the fastball), so read those '
         'bars together. vs LHH / vs RHH use only the pitches thrown to that batter hand.',
         'The bars add up to each panel\'s grade before rounding; grades match the site. ' + meta['model_text'],
