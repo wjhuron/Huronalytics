@@ -360,11 +360,12 @@ def render(meta, panels, order, labels, out_path):
         fig.text(fx + 0.016, fy + 0.1 / H, lab, fontsize=13, fontfamily='IBM Plex Sans',
                  color=TEXT_SECONDARY, va='center')
     notes = [
-        'Each bar is an exact contribution from the Stuff+ model (TreeSHAP): how much one input moved these pitches '
-        'away from the average 2026 MLB pitch of this type (the solid line).',
-        'The bars in a panel add up to that panel\'s grade. vs LHH / vs RHH use only the pitches thrown to that '
-        'batter hand. Grades are the site value, rounded half up.',
-        meta['model_text'],
+        f"Each bar shows how much one input moved these pitches away from the average 2026 MLB "
+        f"{PITCH_NAMES.get(pt, pt).lower()} (solid line), in Stuff+ points. The values come directly from the "
+        f"model (TreeSHAP).",
+        'Related inputs share credit (for example, velocity and the velocity gap to the fastball), so read those '
+        'bars together. vs LHH / vs RHH use only the pitches thrown to that batter hand.',
+        'The bars add up to each panel\'s grade before rounding; grades match the site. ' + meta['model_text'],
     ]
     for i, t in enumerate(notes):
         fig.text(0.03, fy - (0.42 + 0.34 * i) / H, t, fontsize=12.5, fontfamily='IBM Plex Sans',
@@ -511,8 +512,7 @@ def main():
         'hb': f"{_mean('HorzBrk'):.1f}",
         'overall': _tile(panels[0]), 'vs_l': _tile(panels[1]), 'vs_r': _tile(panels[2]),
         'model_text': (f"Stuff+ {B['version']}, trained through {B['trained_through']}; "
-                       f"{'fold model that never saw this pitcher' if level == 'MLB' else 'full model (ROC)'}"
-                       f"{'' if has_arm else ', no-arm companion (no arm angle yet)'}; "
+                       f"{'' if has_arm else 'graded without arm angle (none recorded yet); '}"
                        f"data through {last}."),
     }
     os.makedirs(output_dir, exist_ok=True)
