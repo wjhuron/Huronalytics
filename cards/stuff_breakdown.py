@@ -295,9 +295,8 @@ def render(meta, panels, order, labels, out_path):
         for v in [d['delta'][f] for f in order]:
             left, right = (cum, cum + v) if v >= 0 else (cum + v, cum)
             a1, b1 = min(a1, left), max(b1, right)
-            if abs(v) >= 0.05:
-                share = _label_in(_signed(v)) / pw_in + 0.02
-                (need_r if v >= 0 else need_l).append((right if v >= 0 else left, share))
+            share = _label_in(_signed(v)) / pw_in + 0.02
+            (need_r if v >= 0 else need_l).append((right if v >= 0 else left, share))
             cum += v
     lo, hi = a1, b1
     for _ in range(30):                # the label share depends on the range; iterate to a fixed point
@@ -360,11 +359,10 @@ def render(meta, panels, order, labels, out_path):
             if i + 1 < len(steps):
                 ax.plot([cum + v, cum + v], [i + 0.86, i + 1.14], color=TEXT_FAINT, linewidth=0.9, zorder=2)
             xt = right + 0.012 * (hi - lo) if v >= 0 else left - 0.012 * (hi - lo)
-            if abs(v) >= 0.05:             # a bar that rounds to 0.0 gets no label
-                ax.text(xt, i + 0.5, _signed(v), va='center', ha='left' if v >= 0 else 'right',
-                        fontsize=FS_VAL, fontfamily='IBM Plex Sans', fontweight='bold',
-                        color=ACCENT if v >= 0 else '#5a6878', zorder=6,
-                        bbox=dict(facecolor=BG, edgecolor='none', pad=0.6))
+            ax.text(xt, i + 0.5, _signed(v), va='center', ha='left' if v >= 0 else 'right',
+                    fontsize=FS_VAL, fontfamily='IBM Plex Sans', fontweight='bold',
+                    color=ACCENT if v >= 0 else '#5a6878', zorder=6,
+                    bbox=dict(facecolor=BG, edgecolor='none', pad=0.6))
             cum += v
         ax.vlines(d['total'], -pad, n_rows + pad / 2, color=ACCENT, linewidth=1.5, linestyle='--', zorder=4)
         ax.text(d['total'], n_rows + pad / 2, f"{r0(d['site'])}", ha='center', va='center', fontsize=FS_END,
