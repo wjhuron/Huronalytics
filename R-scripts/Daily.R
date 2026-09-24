@@ -187,9 +187,10 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
       else
         NA_character_,
 
-      # Stuff+ (conditional on column existing in CSV)
+      # Stuff+ (conditional on column existing in CSV). Whole number, 0.5
+      # rounds UP like the site (R's round() is half-to-even: 116.5 -> 116).
       avg_stuff_plus = if (has_stuff_plus)
-        sprintf("%.0f", round(mean(`Stuff+`, na.rm = TRUE)))
+        sprintf("%.0f", floor(mean(`Stuff+`, na.rm = TRUE) + 0.5))
       else
         NA_character_,
 
@@ -276,7 +277,7 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
     # weight a 3-pitch type the same as a 30-pitch one. Same format as the
     # per-type rows above.
     avg_stuff_plus = fmt_or_blank(pitcher_data[["Stuff+"]], "%.0f",
-                                  function(x) round(mean(x))),
+                                  function(x) floor(mean(x) + 0.5)),
     iz_percent = sprintf(
       "%.1f%%",
       sum(pitcher_data$InZone == "Yes", na.rm = TRUE) / total_pitches * 100

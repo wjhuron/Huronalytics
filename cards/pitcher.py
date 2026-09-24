@@ -1414,7 +1414,7 @@ def _format_bubble_value(v, spec):
     if spec == 'pct1':
         return f'{v * 100:.1f}%' if abs(v) <= 1 else f'{v:.1f}%'
     if spec == 'int':
-        return f'{int(round(v))}'
+        return f'{half_up(v)}'
     if spec == 'dec1':
         v = v + 0.0 if abs(v) >= 0.05 else 0.0   # avoid '-0.0'
         return f'{v:.1f}'
@@ -2175,14 +2175,14 @@ def render_social_card(config, pitches, output_file):
             {'v': str(box.get('er', '—')), 'k': 'ER'},
             {'v': str(box.get('so', '—')), 'k': 'K'},
             {'v': str(box.get('bb', '—')), 'k': 'BB'},
-            {'v': '—' if sg is None else f"{sg:.0f}", 'k': 'STUFF+', 'fc': gtint(sg)},
-            {'v': '—' if lg_ is None else f"{lg_:.0f}", 'k': 'LOC+', 'fc': gtint(lg_)},
+            {'v': '—' if sg is None else f"{half_up(sg)}", 'k': 'STUFF+', 'fc': gtint(sg)},
+            {'v': '—' if lg_ is None else f"{half_up(lg_)}", 'k': 'LOC+', 'fc': gtint(lg_)},
         ]
         # Same two-line format as the STUFF+/LOC+ tiles (per Wally): value
         # over key, no sub-line — the percentile lives only in the tint.
         _opp = config.get('outing_pitching') or (None, None)
         line.append({
-            'v': '—' if _opp[0] is None else f"{_opp[0]:.0f}",
+            'v': '—' if _opp[0] is None else f"{half_up(_opp[0])}",
             'k': 'PITCHING+',
             'fc': (_percentile_color(_opp[1])[0] if _opp[1] is not None
                    else DARK_CELL)})
@@ -2265,7 +2265,7 @@ def render_social_card(config, pitches, output_file):
                 ('hpERA',       'hpERA',    lambda v: f"{v:.2f}"),
                 ('kPct',        'K%',       lambda v: f"{v*100:.1f}%"),
                 ('bbPct',       'BB%',      lambda v: f"{v*100:.1f}%"),
-                ('pitcherPlus', 'PITCHER+', lambda v: f"{v:.0f}")):
+                ('pitcherPlus', 'PITCHER+', lambda v: f"{half_up(v)}")):
             cell = _num(key, fmt)
             cell['k'] = lab
             line.append(cell)
@@ -3340,7 +3340,7 @@ def render_card(config, pitches, output_file):
                                for p in pitches if p.get('Bats') == h)
                    if l is not None]
             v = (sum(_lh) / len(_lh)) if _lh else None
-        return _hand_title[h] if v is None else f'{_hand_title[h]} (Loc+ {int(round(v))})'
+        return _hand_title[h] if v is None else f'{_hand_title[h]} (Loc+ {half_up(v)})'
 
     if len(_loc_hands) == 1:
         _h = _loc_hands[0]
@@ -3719,9 +3719,9 @@ def render_card(config, pitches, output_file):
             fmt_fi(sum(relzs)/len(relzs)) if relzs else '—',fmt_fi(sum(relxs)/len(relxs)) if relxs else '—',
             fmt_fi(sum(exts)/len(exts)) if exts else '—',
             f"{sum(armangles)/len(armangles):.1f}°" if armangles else '—',
-            (f"{int(round(stuff_by_pt[pt]))}"
+            (f"{half_up(stuff_by_pt[pt])}"
              if stuff_by_pt.get(pt) is not None else '—'),
-            (f"{int(round(locplus_by_pt[pt]))}" if locplus_by_pt.get(pt) is not None else '—'),
+            (f"{half_up(locplus_by_pt[pt])}" if locplus_by_pt.get(pt) is not None else '—'),
             f"{iz_n/n*100:.1f}%" if n else '—',
             # CSW% — called strikes plus whiffs over PITCHES (not swings), so
             # unlike Whiff% it is defined on the full per-type sample.
@@ -3817,8 +3817,8 @@ def render_card(config, pitches, output_file):
         fmt_fi(sum(t_relxs)/len(t_relxs)) if t_relxs else '—',
         fmt_fi(sum(t_exts)/len(t_exts)) if t_exts else '—',
         f"{sum(t_armangles)/len(t_armangles):.1f}°" if t_armangles else '—',
-        (f"{int(round(_total_stuff))}" if _total_stuff is not None else '—'),
-        (f"{int(round(_total_locplus))}" if _total_locplus is not None else '—'),
+        (f"{half_up(_total_stuff)}" if _total_stuff is not None else '—'),
+        (f"{half_up(_total_locplus)}" if _total_locplus is not None else '—'),
         f"{t_iz/tc*100:.1f}%" if tc else '—',
         f"{(t_called + len(t_wh))/tc*100:.1f}%" if tc else '—',
         f"{len(t_wh)/len(t_sw)*100:.1f}%" if t_sw else '—',
@@ -4276,6 +4276,21 @@ def _normalize_scratch_pitch(row):
         p['Barrel'] = '6' if is_barrel(sf(p.get('ExitVelo')), sf(p.get('LaunchAngle'))) else ''
     p['InZone'] = compute_in_zone(p)
     return p
+
+
+def half_up(v):
+    """Whole-number display of a + stat: 0.5 rounds UP (2026-09-24, per Wally),
+    the site's Math.round. Python's round() rounds half to EVEN, so a card
+    showed 116.5 as 116 while the site showed 117. Display only: the
+    per-pitch atoms stay int(round()) because they must equal the Sheets
+    integers CI writes."""
+    return int(math.floor(v + 0.5))
+
+
+def _stuff_rank_key(v):
+    """Stuff+ ranks on the 1-decimal value it always ranked on; the stored
+    and computed values carry full precision for display only."""
+    return None if v is None else round(v, 1)
 
 
 def _rank_in_mlb_pool(val, sorted_pool, invert=False):
@@ -4871,7 +4886,7 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
             _raw_prows = json.load(f)
         _prows = _scratch_mlb_pool_rows(_raw_prows)
         for s in _SCRATCH_POOL_STATS:
-            vals = [r.get(s) for r in _prows]
+            vals = [(_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s)) for r in _prows]
             ctx['pitcher_pools'][s] = sorted(v for v in vals if v is not None)
         # Pitcher+ percentile pool — the pipeline's own convention (qualified
         # MLB baseline rows, apply_pitcher_plus), NOT the all-MLB pool the
@@ -4889,7 +4904,8 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
             by_type[r.get('pitchType')].append(r)
         for pt, rows in by_type.items():
             for s in ('velocity', 'nVAA', 'stuffScore', 'locPlus'):
-                pt_pools[pt][s] = sorted(v for v in (r.get(s) for r in rows) if v is not None)
+                pt_pools[pt][s] = sorted(v for v in ((_stuff_rank_key(r.get(s)) if s == 'stuffScore'
+                                                      else r.get(s)) for r in rows) if v is not None)
         ctx['pitch_pools'] = dict(pt_pools)
     except Exception as _e:
         print(f"  WARNING: could not build scratch percentile pools: {_e}")
@@ -5050,12 +5066,13 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
         _s, _l = _pitch_atoms(_p)
         if _s is not None: _Sa.append(_s)
         if _l is not None: _La.append(_l)
-    row['stuffScore'] = round(sum(_Sa) / len(_Sa), 1) if _Sa else None
+    row['stuffScore'] = sum(_Sa) / len(_Sa) if _Sa else None   # full precision; ranks on 1 decimal
     row['locPlus'] = round(sum(_La) / len(_La), 1) if _La else None
 
     # Percentile bubbles — rank each computed stat into the MLB pool.
     for s in _SCRATCH_POOL_STATS:
-        row[s + '_pctl'] = _rank_in_mlb_pool(row.get(s), ctx['pitcher_pools'].get(s) or [],
+        _v = _stuff_rank_key(row.get(s)) if s == 'stuffScore' else row.get(s)
+        row[s + '_pctl'] = _rank_in_mlb_pool(_v, ctx['pitcher_pools'].get(s) or [],
                                              invert=(s in _SCRATCH_INVERT_PITCHER))
 
     # Pitcher+ — the six-component shrunk-z composite, scored on the
@@ -5123,7 +5140,7 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
             _s2, _l2 = _pitch_atoms(_p2)
             if _s2 is not None: _Spt.append(_s2)
             if _l2 is not None: _Lpt.append(_l2)
-        d['stuffScore'] = round(sum(_Spt) / len(_Spt), 1) if _Spt else None
+        d['stuffScore'] = sum(_Spt) / len(_Spt) if _Spt else None   # full precision; ranks on 1 decimal
         lp = round(sum(_Lpt) / len(_Lpt), 1) if _Lpt else None
         if lp is not None:
             locplus_by_pt[pt] = lp
@@ -5136,7 +5153,7 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
         if nvp is not None and pt not in ('FF', 'FC'):
             nvp = 100 - nvp
         d['nVAA_pctl'] = nvp
-        d['stuffScore_pctl'] = _rank_in_mlb_pool(d['stuffScore'], pools.get('stuffScore') or [])
+        d['stuffScore_pctl'] = _rank_in_mlb_pool(_stuff_rank_key(d['stuffScore']), pools.get('stuffScore') or [])
         pitch_lb[pt] = d
 
     # Per-hand Loc+ for the location-plot titles. Same integer atoms as every
@@ -5844,7 +5861,7 @@ def main():
                 outing_pp = _outing_pitching_plus(
                     _np_pp, scratch_ctx['outing_pool'], _stuff_of, _loc_of)
                 if outing_pp[0] is not None:
-                    print(f"  Pitching+ (outing): {outing_pp[0]:.0f} "
+                    print(f"  Pitching+ (outing): {half_up(outing_pp[0])} "
                           f"({_ordinal(outing_pp[1])} pctl)")
                     # Every degrade announces itself: the fill stands in for
                     # the supplement until the rerun; with nothing to fill
@@ -5861,7 +5878,7 @@ def main():
                     stat_headers = stat_headers + ['PITCHING+']
                     # Value only (2026-08-28, per Wally): the percentile
                     # lives in the cell tint, not the text.
-                    stat_values = stat_values + [f"{outing_pp[0]:.0f}"]
+                    stat_values = stat_values + [f"{half_up(outing_pp[0])}"]
 
         print(f"  Stat line: {' | '.join(f'{h}:{v}' for h,v in zip(stat_headers, stat_values))}")
 

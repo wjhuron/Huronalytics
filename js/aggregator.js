@@ -350,7 +350,10 @@ const Aggregator = {
     const mlbValid = [];
     const rocValid = [];  // interpolated (ROC + per-team rows of multi-team players)
     for (let i = 0; i < rows.length; i++) {
-      const rawVal = rows[i][metricKey];
+      let rawVal = rows[i][metricKey];
+      // Stuff+ is carried at full precision for display (2026-09-24) but ranks
+      // on the 1-decimal value it always ranked on, so no percentile moves.
+      if (metricKey === 'stuffScore' && typeof rawVal === 'number') rawVal = Number(rawVal.toFixed(1));
       if (rawVal !== null && rawVal !== undefined && rawVal === rawVal && qualifyFn(rows[i])) {
         const entry = { idx: i, val: useAbs ? Math.abs(rawVal) : rawVal };
         if (self._isROCTeam(rows[i].team) || rows[i]._inPool === false) {
@@ -391,7 +394,8 @@ const Aggregator = {
     if (interpolateSubMinimum) {
       for (let s = 0; s < rows.length; s++) {
         if (processed[s]) continue;
-        const sVal = rows[s][metricKey];
+        let sVal = rows[s][metricKey];
+        if (metricKey === 'stuffScore' && typeof sVal === 'number') sVal = Number(sVal.toFixed(1));   // same rank key as above
         if (sVal === null || sVal === undefined) {
           rows[s][pctlKey] = null;
           processed[s] = true;
@@ -663,7 +667,9 @@ const Aggregator = {
       fbPct: bipStats.fbPct,
       puPct: bipStats.puPct,
       xwOBAsp: bipStats.xwOBAsp,
-      stuffScore: nStuff > 0 ? Number((sumStuff / nStuff).toFixed(1)) : null,
+      // full precision (2026-09-24): Stuff+ displays as a whole number
+      // rounded half up, which must see the true mean, not a 1-decimal copy
+      stuffScore: nStuff > 0 ? sumStuff / nStuff : null,
       locPlus: nLoc > 0 ? Number((sumLoc / nLoc).toFixed(1)) : null,
       locPlusN: nLoc > 0 ? nLoc : null,
     };
@@ -1615,7 +1621,7 @@ const Aggregator = {
 
       // Grade atoms: filtered Stuff+/Loc+ as plain averages of the
       // per-pitch integers (identical to the Sheets columns / window cards).
-      obj.stuffScore = ms.nStuff > 0 ? Number((ms.sumStuff / ms.nStuff).toFixed(1)) : null;
+      obj.stuffScore = ms.nStuff > 0 ? ms.sumStuff / ms.nStuff : null;   // full precision, see above
       obj.locPlus = ms.nLoc > 0 ? Number((ms.sumLoc / ms.nLoc).toFixed(1)) : null;
       obj.locPlusN = ms.nLoc > 0 ? ms.nLoc : null;
 
@@ -3299,7 +3305,7 @@ const Aggregator = {
         // Per-game CSW% (2026-08-27, per Wally): one outcome column so each
         // start's grades sit next to their process result.
         cswPct: a2.n > 0 ? a2.csw / a2.n : null,
-        stuffScore: a2.nS > 0 ? Number((a2.sS / a2.nS).toFixed(1)) : null,
+        stuffScore: a2.nS > 0 ? a2.sS / a2.nS : null,   // full precision; the page rounds
         locPlus: a2.nL > 0 ? Number((a2.sL / a2.nL).toFixed(1)) : null,
       });
     }

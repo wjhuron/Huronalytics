@@ -1498,14 +1498,19 @@ def main():
         m = target.merge(_atom_stats(keys), on=keys, how='left')
         has = m['atom_mean'].notna()
         m.loc[has, 'stuff_mean'] = m.loc[has, 'atom_mean']
+        # the exact mean of the whole-number atoms, for the stored value only
+        # (write_exact_stuff); every rank and consumer keeps stuff_mean
+        m['stuff_exact'] = np.where(has, m['atom_sum'] / m['atom_n'].where(m['atom_n'] > 0),
+                                    m['stuff_mean'])
         m['atom_sum'] = m['atom_sum'].fillna(0.0)
         m['atom_n'] = m['atom_n'].fillna(0).astype(int)
         return m.drop(columns=['atom_mean'])
 
     agg = _apply_atom_means(agg, ['pitcher', 'team', 'pitch_type'])
     overall = _apply_atom_means(overall, ['pitcher', 'team', 'throws'])
-    # re-save the CSV so it carries the displayed (atom-mean) values
-    agg.to_csv(os.path.join(HERE, 'pitcher_stuff.csv'), index=False)
+    # re-save the CSV so it carries the displayed (atom-mean) values; the
+    # exact mean is an in-run helper for the stored value, not a CSV column
+    agg.drop(columns=['stuff_exact']).to_csv(os.path.join(HERE, 'pitcher_stuff.csv'), index=False)
 
     # ── Per-pitch grade dump for the Sheets write-back ──
     # Scale (i), unregressed (2026-07-18, per Wally): each pitch graded with the
@@ -1674,6 +1679,25 @@ def _combo_score(parts):
     return round(sum(s for s, _n in parts) / tot_n, 1)
 
 
+def _combo_exact(parts):
+    """_combo_score without the 1-decimal rounding (the stored value)."""
+    if not parts:
+        return None
+    tot_n = sum(n for _s, n in parts)
+    return sum(s for s, _n in parts) / tot_n if tot_n > 0 else None
+
+
+# Stored precision of stuffScore (2026-09-24, per Wally: Stuff+ displays as a
+# whole number, 0.5 rounds UP, on every surface). The site and cards round
+# the stored value; at 1 decimal that double-rounded (a true 116.46 stored
+# as 116.5 showed 117). A unit's value is a mean of whole-number atoms over
+# n pitches, so it moves in steps of 1/n: 6 decimals keeps the nearest
+# value below any x.5 distinct from it for every n under 500,000. Ranks,
+# hpERA and Pitcher+ still read the 1-decimal value (identical to before);
+# write_exact_stuff swaps the stored value in as the last step of inject().
+STUFF_STORE_DECIMALS = 6
+
+
 def _pctl(sc, pool):
     below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
     return round((below + 0.5 * equal) / len(pool) * 100)
@@ -1838,6 +1862,8 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     pl_path = os.path.join(DATA, 'pitch_leaderboard_rs.json')
     pl = json.load(open(pl_path))
     look = {(r.pitcher, r.team, r.pitch_type): r.stuff_mean for r in agg.itertuples()}
+    look_x = {(r.pitcher, r.team, r.pitch_type): getattr(r, 'stuff_exact', r.stuff_mean)
+              for r in agg.itertuples()}
     flag_look = {(r.pitcher, r.team, r.pitch_type): bool(getattr(r, 'low_support', False))
                  for r in agg.itertuples()}
     # Pool a pitcher's MLB per-team RAW predictions to score the combined 2TM/3TM row.
@@ -1906,6 +1932,8 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     pp_path = os.path.join(DATA, 'pitcher_leaderboard_rs.json')
     pp = json.load(open(pp_path))
     olook = {(r.pitcher, r.team, r.throws): r.stuff_mean for r in overall.itertuples()}
+    olook_x = {(r.pitcher, r.team, r.throws): getattr(r, 'stuff_exact', r.stuff_mean)
+               for r in overall.itertuples()}
     oflag = {(r.pitcher, r.team, r.throws): bool(getattr(r, 'low_support', False))
              for r in overall.itertuples()}
     pool_ov = defaultdict(list)
@@ -1994,6 +2022,34 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
         _era_const = None
         print('  eraplus SKIPPED: inject() called without mlb_pitches')
     sort_rows_default(pp)
+
+    # LAST: store stuffScore at STUFF_STORE_DECIMALS. Everything above (the
+    # ranks, Pitcher+, hdERA/hpERA) read the 1-decimal value and is unchanged.
+    def write_exact_stuff(rows, exact, combo_pool, row_key, combo_key):
+        n = 0
+        for row in rows:
+            if row.get('stuffScore') is None:
+                continue
+            k = row_key(row)
+            if k in exact:
+                v = exact[k]
+            elif _is_combined_team(row['team']):
+                v = _combo_exact(combo_pool.get(combo_key(row)))
+            else:
+                continue
+            if v is not None and np.isfinite(v):
+                row['stuffScore'] = round(float(v), STUFF_STORE_DECIMALS)
+                n += 1
+        return n
+    n_x_pp = write_exact_stuff(pp, olook_x, pool_ov,
+                               lambda r: (r['pitcher'], r['team'], r.get('throws')),
+                               lambda r: (r['pitcher'], r.get('throws')))
+    n_x_pl = write_exact_stuff(pl, look_x, pool_pt,
+                               lambda r: (r['pitcher'], r['team'], r['pitchType']),
+                               lambda r: (r['pitcher'], r['pitchType']))
+    json.dump(pl, open(pl_path, 'w'))
+    print(f'  stuffScore stored at {STUFF_STORE_DECIMALS} decimals: {n_x_pl} pitch rows, '
+          f'{n_x_pp} pitcher rows (ranks and consumers used the 1-decimal value)')
 
     json.dump(pp, open(pp_path, 'w'))
 
