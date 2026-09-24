@@ -217,12 +217,16 @@ def _signed(v):
 
 
 def render(meta, panels, order, labels, out_path):
+    # chart font sizes; the card is 16 in wide, and the longest row name and
+    # the value labels are what limit them
+    FS_NAME, FS_SUB, FS_VAL, FS_TICK = 20, 16, 18, 17
+    FS_TITLE, FS_N, FS_AVG, FS_END, FS_GRADE, FS_LEG = 21, 16, 17, 19, 24, 17
     n_rows = len(order)
-    row_h = 0.70
-    panel_top_in = 4.75
+    row_h = 0.85
+    panel_top_in = 5.2
     pad = 0.6                          # rows of headroom above and below the chain for the avg / grade labels
     panel_bot_in = panel_top_in + (n_rows + 2 * pad) * row_h
-    fig_h = panel_bot_in + 2.3
+    fig_h = panel_bot_in + 1.95
     fig = plt.figure(figsize=(16, fig_h), dpi=100)
     fig.patch.set_facecolor(BG)
     H = fig_h
@@ -237,9 +241,9 @@ def render(meta, panels, order, labels, out_path):
         ax_photo.imshow(meta['photo'])
     fig.text(0.15, y(0.95), meta['display_name'], fontsize=30, fontfamily='Bitter',
              fontweight='black', color=TEXT_PRIMARY, va='bottom')
-    fig.text(0.15, y(1.45), meta['window_text'], fontsize=17, fontfamily='IBM Plex Sans',
+    fig.text(0.15, y(1.45), meta['window_text'], fontsize=20, fontfamily='IBM Plex Sans',
              color=ACCENT, va='bottom')
-    fig.text(0.15, y(1.95), meta['sub_text'], fontsize=15, fontfamily='IBM Plex Sans',
+    fig.text(0.15, y(1.95), meta['sub_text'], fontsize=18, fontfamily='IBM Plex Sans',
              color=TEXT_MUTED, va='bottom')
     tiles = [('VELO', meta['velo']), ('IVB', meta['ivb']), ('HB', meta['hb']),
              ('OVERALL', meta['overall']), ('VS LHH', meta['vs_l']), ('VS RHH', meta['vs_r'])]
@@ -259,38 +263,58 @@ def render(meta, panels, order, labels, out_path):
 
     # section title
     pt = meta['pitch_type']
-    fig.text(0.03, y(3.5), f"{PITCH_NAMES.get(pt, pt)} Stuff+", fontsize=25, fontfamily='Bitter',
+    fig.text(0.03, y(3.5), f"{PITCH_NAMES.get(pt, pt)} Stuff+", fontsize=29, fontfamily='Bitter',
              fontweight='black', color=PITCH_COLORS.get(pt, TEXT_PRIMARY), va='bottom')
-    fig.text(0.03, y(3.92), f"{meta['n_pitches']} pitches  |  how each input moved the grade from the "
-             f"average 2026 MLB {PITCH_NAMES.get(pt, pt).lower()}", fontsize=14,
+    fig.text(0.03, y(4.0), f"{meta['n_pitches']} pitches  |  how each input moved the grade from the "
+             f"average 2026 MLB {PITCH_NAMES.get(pt, pt).lower()}", fontsize=18,
              fontfamily='IBM Plex Sans', color=TEXT_MUTED, va='bottom')
-
-    # panels: shared x range
-    lo, hi = 100.0, 100.0
-    for p in panels:
-        if not p['data']:
-            continue
-        cum = p['data']['anchor']
-        lo, hi = min(lo, cum), max(hi, cum)
-        for v in [p['data']['delta'][f] for f in order]:
-            cum += v
-            lo, hi = min(lo, cum), max(hi, cum)
-    span = max(hi - lo, 20.0)
-    lo = np.floor((lo - 0.12 * span) / 10) * 10
-    hi = np.ceil((hi + 0.12 * span) / 10) * 10
 
     top = y(panel_top_in)
     bottom = y(panel_bot_in)
-    lab_w = 0.235
-    pgap = 0.04
+    lab_w = 0.245
+    pgap = 0.03
     pw = (0.965 - 0.03 - lab_w - 2 * pgap) / 3
+    pw_in = pw * 16
+
+    # panels: one shared x range, just wide enough that every bar and its
+    # value label (measured at FS_VAL) sit inside it
+    rend = fig.canvas.get_renderer()
+    def _label_in(t):
+        tx = fig.text(0, 0, t, fontsize=FS_VAL, fontfamily='IBM Plex Sans', fontweight='bold')
+        w_in = tx.get_window_extent(rend).width / fig.dpi
+        tx.remove()
+        return w_in
+    a1 = b1 = 100.0
+    need_l, need_r = [], []            # (bar edge, label width as a share of the panel)
+    for p in panels:
+        if not p['data']:
+            continue
+        d = p['data']
+        cum = d['anchor']
+        a1, b1 = min(a1, cum, d['total']), max(b1, cum, d['total'])
+        for v in [d['delta'][f] for f in order]:
+            left, right = (cum, cum + v) if v >= 0 else (cum + v, cum)
+            a1, b1 = min(a1, left), max(b1, right)
+            if abs(v) >= 0.05:
+                share = _label_in(_signed(v)) / pw_in + 0.02
+                (need_r if v >= 0 else need_l).append((right if v >= 0 else left, share))
+            cum += v
+    lo, hi = a1, b1
+    for _ in range(30):                # the label share depends on the range; iterate to a fixed point
+        r = hi - lo
+        lo = min([a1] + [e - k * r for e, k in need_l])
+        hi = max([b1] + [e + k * r for e, k in need_r])
+    lo, hi = lo - 0.01 * (hi - lo), hi + 0.01 * (hi - lo)
+    if hi - lo < 20.0:
+        c = (hi + lo) / 2
+        lo, hi = c - 10.0, c + 10.0
     # row labels
     names = [labels[f] for f in order]
     for i, (nm, sub) in enumerate(names):
         yc = top - (pad + i + 0.5) * row_h / H
-        fig.text(0.03 + lab_w - 0.008, yc + 0.06 / H, nm, fontsize=15, fontfamily='IBM Plex Sans',
+        fig.text(0.03 + lab_w - 0.008, yc + 0.06 / H, nm, fontsize=FS_NAME, fontfamily='IBM Plex Sans',
                  fontweight='bold', color=TEXT_PRIMARY, ha='right', va='bottom')
-        fig.text(0.03 + lab_w - 0.008, yc - 0.03 / H, sub, fontsize=12, fontfamily='IBM Plex Sans',
+        fig.text(0.03 + lab_w - 0.008, yc - 0.03 / H, sub, fontsize=FS_SUB, fontfamily='IBM Plex Sans',
                  color=TEXT_MUTED, ha='right', va='top')
 
     for k, p in enumerate(panels):
@@ -302,7 +326,7 @@ def render(meta, panels, order, labels, out_path):
         ax.set_xlim(lo, hi)
         ax.set_ylim(n_rows + pad, -pad)
         ax.set_yticks([])
-        ax.tick_params(axis='x', colors=TEXT_MUTED, labelsize=13)
+        ax.tick_params(axis='x', colors=TEXT_MUTED, labelsize=FS_TICK)
         for tick in ax.get_xticklabels():
             tick.set_fontfamily('IBM Plex Sans')
         ax.grid(axis='x', color=SUBTLE_BORDER, linewidth=0.6, linestyle=':')
@@ -310,10 +334,10 @@ def render(meta, panels, order, labels, out_path):
         ax.xaxis.set_major_locator(MaxNLocator(nbins=6, steps=[1, 2, 5, 10], integer=True))
         n = p['data']['n'] if p['data'] else 0
         flag = '  (small sample)' if 0 < n < STUFF_COLOR_MIN_PITCHES else ''
-        ax.set_title(p['title'], fontsize=16, fontfamily='IBM Plex Sans',
-                     fontweight='bold', color=TEXT_SECONDARY, pad=30)
+        ax.set_title(p['title'], fontsize=FS_TITLE, fontfamily='IBM Plex Sans',
+                     fontweight='bold', color=TEXT_SECONDARY, pad=40)
         ax.text(0.5, 1.012, f"n = {n}{', small sample' if flag else ''}", transform=ax.transAxes,
-                ha='center', va='bottom', fontsize=12.5, fontfamily='IBM Plex Sans',
+                ha='center', va='bottom', fontsize=FS_N, fontfamily='IBM Plex Sans',
                 color=ACCENT if flag else TEXT_MUTED)
         if not p['data']:
             ax.text((lo + hi) / 2, n_rows / 2, 'no pitches', ha='center', va='center',
@@ -324,7 +348,7 @@ def render(meta, panels, order, labels, out_path):
         # the chain starts at the average MLB pitch of the type (the solid
         # line), not at the scale's 100: the two differ by a few tenths
         ax.vlines(d['anchor'], -pad / 2, n_rows + pad, color=TEXT_SECONDARY, linewidth=1.3)
-        ax.text(d['anchor'], -pad / 2, 'avg', ha='center', va='center', fontsize=13.5,
+        ax.text(d['anchor'], -pad / 2, 'avg', ha='center', va='center', fontsize=FS_AVG,
                 fontfamily='IBM Plex Sans', fontweight='bold', color=TEXT_SECONDARY, zorder=6,
                 bbox=dict(facecolor=BG, edgecolor='none', pad=1.5))
         cum = d['anchor']
@@ -338,39 +362,40 @@ def render(meta, panels, order, labels, out_path):
             xt = right + 0.012 * (hi - lo) if v >= 0 else left - 0.012 * (hi - lo)
             if abs(v) >= 0.05:             # a bar that rounds to 0.0 gets no label
                 ax.text(xt, i + 0.5, _signed(v), va='center', ha='left' if v >= 0 else 'right',
-                        fontsize=13.5, fontfamily='IBM Plex Sans', fontweight='bold',
+                        fontsize=FS_VAL, fontfamily='IBM Plex Sans', fontweight='bold',
                         color=ACCENT if v >= 0 else '#5a6878', zorder=6,
                         bbox=dict(facecolor=BG, edgecolor='none', pad=0.6))
             cum += v
         ax.vlines(d['total'], -pad, n_rows + pad / 2, color=ACCENT, linewidth=1.5, linestyle='--', zorder=4)
-        ax.text(d['total'], n_rows + pad / 2, f"{r0(d['site'])}", ha='center', va='center', fontsize=14.5,
+        ax.text(d['total'], n_rows + pad / 2, f"{r0(d['site'])}", ha='center', va='center', fontsize=FS_END,
                 fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT, zorder=6,
                 bbox=dict(facecolor=BG, edgecolor='none', pad=1.5))
-        fig.text(px + pw / 2, y(panel_bot_in + 0.48), f"{r0(d['site'])} Stuff+", ha='center',
-                 va='top', fontsize=18, fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT)
+        fig.text(px + pw / 2, y(panel_bot_in + 0.55), f"{r0(d['site'])} Stuff+", ha='center',
+                 va='top', fontsize=FS_GRADE, fontfamily='IBM Plex Sans', fontweight='bold', color=ACCENT)
         if r0(d['total']) != r0(d['site']):
-            fig.text(px + pw / 2, y(panel_bot_in + 0.85), f"bars sum to {d['total']:.1f}",
-                     ha='center', va='top', fontsize=12, fontfamily='IBM Plex Sans', color=TEXT_MUTED)
+            fig.text(px + pw / 2, y(panel_bot_in + 0.95), f"bars sum to {d['total']:.1f}",
+                     ha='center', va='top', fontsize=15, fontfamily='IBM Plex Sans', color=TEXT_MUTED)
 
-    # legend + footer
-    fy = y(panel_bot_in + 1.35)
-    for i, (lab, col) in enumerate((('Raises the grade', ACCENT), ('Lowers the grade', LOWER_COLOR))):
-        fx = 0.16 + i * 0.16
-        fig.patches.append(FancyBboxPatch((fx, fy), 0.014, 0.2 / H, boxstyle='square,pad=0',
-                                          transform=fig.transFigure, facecolor=col, edgecolor='none'))
-        fig.text(fx + 0.019, fy + 0.1 / H, lab, fontsize=13, fontfamily='IBM Plex Sans',
-                 color=TEXT_SECONDARY, va='center')
+    # legend row: keys from the left, watermark on the right
+    fy = y(panel_bot_in + 1.45)        # centre line of the row
     avg_lab = f"Average MLB {PITCH_NAMES.get(pt, pt).lower()}"
-    for fx, ls, col, lab in ((0.48, '-', TEXT_SECONDARY, avg_lab), (0.70, '--', ACCENT, 'Grade')):
-        # vertical key marks, drawn like the vertical lines they label
-        fig.add_artist(plt.Line2D([fx + 0.006] * 2, [fy - 0.05 / H, fy + 0.25 / H], transform=fig.transFigure,
-                                  color=col, linewidth=2, linestyle=ls))
-        fig.text(fx + 0.016, fy + 0.1 / H, lab, fontsize=13, fontfamily='IBM Plex Sans',
-                 color=TEXT_SECONDARY, va='center')
-    fig.text(0.03, fy - 0.42 / H, meta['model_text'], fontsize=12.5, fontfamily='IBM Plex Sans',
-             fontweight=500, color=TEXT_SECONDARY, va='top')
-    fig.text(0.965, fy - 0.42 / H, 'huronalytics.vercel.app', fontsize=13, fontfamily='IBM Plex Sans',
-             fontweight='bold', color=TEXT_SECONDARY, ha='right', va='top')
+    x = 0.03
+    for kind, col, ls, lab in (('box', ACCENT, None, 'Raises the grade'),
+                               ('box', LOWER_COLOR, None, 'Lowers the grade'),
+                               ('line', TEXT_SECONDARY, '-', avg_lab),
+                               ('line', ACCENT, '--', 'Grade')):
+        if kind == 'box':
+            fig.patches.append(FancyBboxPatch((x, fy - 0.13 / H), 0.018, 0.26 / H, boxstyle='square,pad=0',
+                                              transform=fig.transFigure, facecolor=col, edgecolor='none'))
+            tx0 = x + 0.024
+        else:                          # vertical key marks, drawn like the vertical lines they label
+            fig.add_artist(plt.Line2D([x + 0.006] * 2, [fy - 0.18 / H, fy + 0.18 / H], transform=fig.transFigure,
+                                      color=col, linewidth=2.4, linestyle=ls))
+            tx0 = x + 0.016
+        t = fig.text(tx0, fy, lab, fontsize=FS_LEG, fontfamily='IBM Plex Sans', color=TEXT_SECONDARY, va='center')
+        x = tx0 + t.get_window_extent(rend).width / (16 * fig.dpi) + 0.035
+    fig.text(0.965, fy, 'huronalytics.vercel.app', fontsize=FS_LEG, fontfamily='IBM Plex Sans',
+             fontweight='bold', color=TEXT_SECONDARY, ha='right', va='center')
     fig.savefig(out_path, dpi=150, facecolor=BG)
     plt.close(fig)
 
@@ -518,6 +543,7 @@ def main():
 
     # the same numbers as text
     print(f"\n{display} {pitch_type}  {window_text}  ({len(w)} pitches)")
+    print(f"  {meta['model_text']}")
     print(f"  Stuff+ (site value, half up): overall {meta['overall']}, vs LHH {meta['vs_l']}, "
           f"vs RHH {meta['vs_r']}   exact: " + ', '.join(
               f"{p['data']['site']:.3f}" if p['data'] else '-' for p in panels))
