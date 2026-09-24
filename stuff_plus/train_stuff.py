@@ -224,7 +224,14 @@ HEIGHT_CLIP = (70.0, 80.0)
 # (fill_arm_prior, table stored in the bundle as 'arm_prior'), then the no-arm
 # companion for MLB rows still without an arm angle, instead of the full
 # model's missing-value branches. Same features and params.
-BUNDLE_VERSION = 'v16'
+# v17 (2026-09-24) = v16 with the fastball reference for ivb_diff / hb_diff
+# built from the density-adjusted movement (xIndVrtBrk/xHorzBrk), the same
+# columns the pitch side has used since 2026-07-02. The reference had stayed
+# on raw IndVertBrk/HorzBrk, so every diff mixed the two (+0.3 in IVB, +0.2 in
+# HB on average, up to ~3.4 in for Coors arms). stuff_gate_v2's prepare()
+# already built the diffs from the adjusted columns, so the gate had scored
+# the consistent feature all along.
+BUNDLE_VERSION = 'v17'
 
 # Bundle FRESHNESS (2026-09-23). The version string guards the config, not
 # the data: a retrain on more data keeps the version, so the local
@@ -552,13 +559,16 @@ def fill_arm_prior(frame, arm_prior):
 
 def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     # pass 1: per-pitcher primary fastball reference (handedness-normalized).
+    # Movement is the DENSITY-ADJUSTED xIndVrtBrk/xHorzBrk, the same columns
+    # pass 2 reads for the pitch, so ivb_diff / hb_diff subtract like from
+    # like (v17; raw IndVertBrk/HorzBrk until 2026-09-24).
     # VAA gets its own count: a pitch missing VAA must not dilute the mean
     # toward 0 by incrementing the shared n while contributing 0.0.
     fb = defaultdict(lambda: defaultdict(lambda: {'v': 0.0, 'iv': 0.0, 'hb': 0.0, 'vaa': 0.0, 'n': 0, 'n_vaa': 0}))
     for p in pitches:
         pt, thr = p.get('Pitch Type'), p.get('Throws')
         if pt not in FB_TYPES or thr not in ('L', 'R'): continue
-        v, iv, hb, vaa = sf(p.get('Velocity')), sf(p.get('IndVertBrk')), sf(p.get('HorzBrk')), sf(p.get('VAA'))
+        v, iv, hb, vaa = sf(p.get('Velocity')), sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk')), sf(p.get('VAA'))
         vaa = _nvaa(pt, vaa, sf(p.get('PlateZ')))   # v12: reference is nVAA too
         if None in (v, iv, hb): continue
         s = 1.0 if thr == 'R' else -1.0
