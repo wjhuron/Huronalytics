@@ -84,6 +84,15 @@ FEATURE_LABELS = {
 }
 
 
+# Fixed row order (per Wally 2026-09-24): speed, movement, spin, approach,
+# delivery, then the batter context. Every card reads the same way, so two
+# cards compare row by row. Inputs a model lacks (arm_angle on the no-arm
+# companion) are skipped.
+ROW_ORDER = ['velocity', 'velo_diff', 'ivb', 'ivb_diff', 'hb', 'hb_diff',
+             'spin_rate', 'cross', 'cross_abs', 'vaa', 'vaa_diff',
+             'extension', 'arm_angle', 'rel_x', 'height', 'platoon_same']
+
+
 def _pct(v):
     return f'{100 * v:.0f}%'
 
@@ -208,7 +217,7 @@ def _signed(v):
 
 
 def render(meta, panels, order, labels, out_path):
-    n_rows = len(order) + 1
+    n_rows = len(order)
     row_h = 0.70
     panel_top_in = 4.75
     panel_bot_in = panel_top_in + n_rows * row_h
@@ -260,8 +269,9 @@ def render(meta, panels, order, labels, out_path):
     for p in panels:
         if not p['data']:
             continue
-        cum = 100.0
-        for v in [p['data']['anchor'] - 100.0] + [p['data']['delta'][f] for f in order]:
+        cum = p['data']['anchor']
+        lo, hi = min(lo, cum), max(hi, cum)
+        for v in [p['data']['delta'][f] for f in order]:
             cum += v
             lo, hi = min(lo, cum), max(hi, cum)
     span = max(hi - lo, 20.0)
@@ -274,8 +284,7 @@ def render(meta, panels, order, labels, out_path):
     pgap = 0.04
     pw = (0.965 - 0.03 - lab_w - 2 * pgap) / 3
     # row labels
-    names = [('Average MLB ' + PITCH_NAMES.get(pt, pt).lower(), labels['__anchor__'])] + \
-            [labels[f] for f in order]
+    names = [labels[f] for f in order]
     for i, (nm, sub) in enumerate(names):
         yc = top - (i + 0.5) * row_h / H
         fig.text(0.03 + lab_w - 0.008, yc + 0.06 / H, nm, fontsize=15, fontfamily='IBM Plex Sans',
@@ -310,10 +319,12 @@ def render(meta, panels, order, labels, out_path):
                     fontsize=16, color=TEXT_FAINT, fontfamily='IBM Plex Sans')
             ax.set_xticks([])
             continue
-        ax.axvline(100, color=TEXT_SECONDARY, linewidth=1.1)
         d = p['data']
-        cum = 100.0
-        steps = [d['anchor'] - 100.0] + [d['delta'][f] for f in order]
+        # the chain starts at the average MLB pitch of the type (the solid
+        # line), not at the scale's 100: the two differ by a few tenths
+        ax.axvline(d['anchor'], color=TEXT_SECONDARY, linewidth=1.3)
+        cum = d['anchor']
+        steps = [d['delta'][f] for f in order]
         for i, v in enumerate(steps):
             left, right = (cum, cum + v) if v >= 0 else (cum + v, cum)
             ax.barh(i + 0.5, right - left, left=left, height=0.72,
@@ -336,21 +347,28 @@ def render(meta, panels, order, labels, out_path):
     # legend + footer
     fy = y(panel_bot_in + 1.35)
     for i, (lab, col) in enumerate((('Raises the grade', ACCENT), ('Lowers the grade', LOWER_COLOR))):
-        fx = 0.38 + i * 0.16
+        fx = 0.16 + i * 0.16
         fig.patches.append(FancyBboxPatch((fx, fy), 0.014, 0.2 / H, boxstyle='square,pad=0',
                                           transform=fig.transFigure, facecolor=col, edgecolor='none'))
         fig.text(fx + 0.019, fy + 0.1 / H, lab, fontsize=13, fontfamily='IBM Plex Sans',
                  color=TEXT_SECONDARY, va='center')
+    avg_lab = f"Average MLB {PITCH_NAMES.get(pt, pt).lower()}"
+    for fx, ls, col, lab in ((0.48, '-', TEXT_SECONDARY, avg_lab), (0.70, '--', ACCENT, 'Grade')):
+        # vertical key marks, drawn like the vertical lines they label
+        fig.add_artist(plt.Line2D([fx + 0.006] * 2, [fy - 0.05 / H, fy + 0.25 / H], transform=fig.transFigure,
+                                  color=col, linewidth=2, linestyle=ls))
+        fig.text(fx + 0.016, fy + 0.1 / H, lab, fontsize=13, fontfamily='IBM Plex Sans',
+                 color=TEXT_SECONDARY, va='center')
     notes = [
         'Each bar is an exact contribution from the Stuff+ model (TreeSHAP): how much one input moved these pitches '
-        'away from the average 2026 MLB pitch of this type. 100 is the scale anchor.',
+        'away from the average 2026 MLB pitch of this type (the solid line).',
         'The bars in a panel add up to that panel\'s grade. vs LHH / vs RHH use only the pitches thrown to that '
-        'batter hand. Grades are the site value (the mean of whole-number pitch grades), rounded half up.',
+        'batter hand. Grades are the site value, rounded half up.',
         meta['model_text'],
     ]
     for i, t in enumerate(notes):
-        fig.text(0.03, fy - (0.42 + 0.34 * i) / H, t, fontsize=12, fontfamily='IBM Plex Sans',
-                 color=TEXT_FAINT if i < 2 else TEXT_MUTED, va='top')
+        fig.text(0.03, fy - (0.42 + 0.34 * i) / H, t, fontsize=12.5, fontfamily='IBM Plex Sans',
+                 fontweight=500, color=TEXT_SECONDARY, va='top')
     fig.text(0.965, fy - 1.10 / H, 'huronalytics.vercel.app', fontsize=13, fontfamily='IBM Plex Sans',
              fontweight='bold', color=TEXT_SECONDARY, ha='right', va='top')
     fig.savefig(out_path, dpi=150, facecolor=BG)
@@ -435,9 +453,10 @@ def main():
         panels.append({'title': title, 'data': breakdown(C[mask], ref_mean, feats, mu, sd) if mask.any() else None})
 
     overall = panels[0]['data']
-    order = sorted(feats, key=lambda f: -abs(overall['delta'][f]))
+    order = [f for f in ROW_ORDER if f in feats] + [f for f in feats if f not in ROW_ORDER]
     if top_n:
-        order = order[:top_n]
+        keep = set(sorted(order, key=lambda f: -abs(overall['delta'][f]))[:top_n])
+        order = [f for f in order if f in keep]
         # fold the rest into one row so the panels still add up
         rest = [f for f in feats if f not in order]
         if rest:
@@ -447,7 +466,7 @@ def main():
             order.append('__other__')
 
     # row labels with the overall means of what the model sees
-    labels = {'__anchor__': f"{r0(overall['anchor'])} Stuff+ ({ref_n:,} pitches)"}
+    labels = {}
     for f in feats:
         nm, fmt = FEATURE_LABELS.get(f, (f, _f('{:.2f}')))
         if f == 'platoon_same':
@@ -486,8 +505,8 @@ def main():
         return f"{r0(p['data']['site'])}" if p['data'] else '-'
     meta = {
         'display_name': display, 'window_text': window_text,
-        'sub_text': f"{'LHP' if hand == 'L' else 'RHP'}  |  {team}  |  {level}",
-        'pitch_type': pitch_type, 'n_pitches': len(w), 'photo': img,
+        'sub_text': f"{'LHP' if hand == 'L' else 'RHP'}  |  {team}  |  {'MLB' if level == 'MLB' else 'AAA'}",
+        'pitch_type': pitch_type, 'n_pitches': len(w), 'photo': img, 'anchor': overall['anchor'],
         'velo': f"{_mean('Velocity'):.1f}", 'ivb': f"{_mean('IndVertBrk'):.1f}",
         'hb': f"{_mean('HorzBrk'):.1f}",
         'overall': _tile(panels[0]), 'vs_l': _tile(panels[1]), 'vs_r': _tile(panels[2]),
@@ -509,8 +528,9 @@ def main():
               f"{p['data']['site']:.3f}" if p['data'] else '-' for p in panels))
     hdr = f"  {'input':<32}" + ''.join(f"{p['title']:>12}" for p in panels)
     print(hdr)
-    print(f"  {'average MLB ' + pitch_type + ' (anchor)':<32}" +
-          ''.join(f"{(p['data']['anchor'] - 100 if p['data'] else float('nan')):>+12.1f}" for p in panels))
+    print(f"  {'start: average MLB ' + pitch_type:<32}" +
+          ''.join(f"{(p['data']['anchor'] if p['data'] else float('nan')):>12.1f}" for p in panels)
+          + f"   ({ref_n:,} pitches)")
     for f in order:
         nm = labels[f][0] if f in labels else f
         print(f"  {nm:<32}" + ''.join(f"{(p['data']['delta'][f] if p['data'] else float('nan')):>+12.1f}"
