@@ -949,6 +949,7 @@
 "Hanhold, Eric": 77.0,
 "Hanifee, Brenan": 77.0,
 "Hanner, Bradley": 76.0,
+"Hansen, Pete": 74.0,
 "Happ, Ian": 70.0,
 "Happ, J.A.": 77.0,
 "Hardman, Tyler": 74.0,
@@ -5511,6 +5512,9 @@
 ],
 "Hanner, Bradley": [
 690440
+],
+"Hansen, Pete": [
+677337
 ],
 "Happ, Ian": [
 664023
@@ -10650,5 +10654,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2660
+"n": 2661
 }
