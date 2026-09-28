@@ -2025,6 +2025,7 @@
 "Rooney, John": 77.0,
 "Rortvedt, Ben": 70.0,
 "Rosario, Amed": 73.0,
+"Rosario, Jerming": 73.0,
 "Rosenberg, Kenny": 73.0,
 "Ross, Dylan": 77.0,
 "Ross, Joe": 76.0,
@@ -8743,6 +8744,9 @@
 "Rosario, Amed": [
 642708
 ],
+"Rosario, Jerming": [
+682645
+],
 "Rosenberg, Kenny": [
 670046
 ],
@@ -10654,5 +10658,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2661
+"n": 2662
 }
