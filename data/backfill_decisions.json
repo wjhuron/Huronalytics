@@ -1874,13 +1874,6 @@
     "-0.155"
    ]
   },
-  "815865_001_04|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
-   ]
-  },
   "815865_002_01|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -1893,13 +1886,6 @@
    "origin": "review",
    "rejected": [
     "5"
-   ]
-  },
-  "815865_002_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.769"
    ]
   },
   "815865_002_02|xBA": {
@@ -1921,13 +1907,6 @@
    "origin": "review",
    "rejected": [
     "0.409"
-   ]
-  },
-  "815865_003_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.051"
    ]
   },
   "815865_003_02|RunExp": {
@@ -1979,13 +1958,6 @@
     "0.041"
    ]
   },
-  "815865_004_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.051"
-   ]
-  },
   "815865_004_02|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -1998,13 +1970,6 @@
    "origin": "review",
    "rejected": [
     "3"
-   ]
-  },
-  "815865_004_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.317"
    ]
   },
   "815865_004_03|xBA": {
@@ -2203,13 +2168,6 @@
     "-1.1"
    ]
   },
-  "815865_008_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.070"
-   ]
-  },
   "815865_008_04|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -2222,20 +2180,6 @@
    "origin": "review",
    "rejected": [
     "-0.199"
-   ]
-  },
-  "815865_008_05|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
-   ]
-  },
-  "815865_009_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.060"
    ]
   },
   "815865_009_02|HorzBrk": {
@@ -3001,20 +2945,6 @@
     "0.388"
    ]
   },
-  "815865_023_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.049"
-   ]
-  },
-  "815865_023_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.073"
-   ]
-  },
   "815865_023_03|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -3043,13 +2973,6 @@
     "0.065"
    ]
   },
-  "815865_024_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.074"
-   ]
-  },
   "815865_024_03|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -3076,13 +2999,6 @@
    "origin": "review",
    "rejected": [
     "4"
-   ]
-  },
-  "815865_025_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.689"
    ]
   },
   "815865_025_02|xBA": {
@@ -3421,20 +3337,6 @@
     "0.062"
    ]
   },
-  "815865_034_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.037"
-   ]
-  },
-  "815865_034_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.067"
-   ]
-  },
   "815865_034_04|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -3454,13 +3356,6 @@
    "origin": "review",
    "rejected": [
     "-0.296"
-   ]
-  },
-  "815865_034_06|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
    ]
   },
   "815865_035_01|RunExp": {
@@ -3498,13 +3393,6 @@
     "-0.204"
    ]
   },
-  "815865_035_05|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
-   ]
-  },
   "815865_036_01|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -3524,13 +3412,6 @@
    "origin": "review",
    "rejected": [
     "2"
-   ]
-  },
-  "815865_036_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.310"
    ]
   },
   "815865_036_03|xBA": {
@@ -3645,13 +3526,6 @@
     "0.071"
    ]
   },
-  "815865_039_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.027"
-   ]
-  },
   "815865_039_04|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -3694,25 +3568,11 @@
     "-0.087"
    ]
   },
-  "815865_040_04|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
-   ]
-  },
   "815865_041_01|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
    "rejected": [
     "-0.048"
-   ]
-  },
-  "815865_041_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.067"
    ]
   },
   "815865_041_03|Barrel": {
@@ -3995,13 +3855,6 @@
     "-0.044"
    ]
   },
-  "815865_046_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.317"
-   ]
-  },
   "815865_046_03|xBA": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -4051,13 +3904,6 @@
     "-0.075"
    ]
   },
-  "815865_047_04|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
-   ]
-  },
   "815865_048_01|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -4070,13 +3916,6 @@
    "origin": "review",
    "rejected": [
     "-0.031"
-   ]
-  },
-  "815865_048_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.090"
    ]
   },
   "815865_048_04|RunExp": {
@@ -4112,13 +3951,6 @@
    "origin": "review",
    "rejected": [
     "2"
-   ]
-  },
-  "815865_049_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.283"
    ]
   },
   "815865_049_02|xBA": {
@@ -4198,13 +4030,6 @@
     "-0.088"
    ]
   },
-  "815865_051_04|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.162"
-   ]
-  },
   "815865_051_05|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -4245,20 +4070,6 @@
    "origin": "review",
    "rejected": [
     "0.714"
-   ]
-  },
-  "815865_052_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.049"
-   ]
-  },
-  "815865_052_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.073"
    ]
   },
   "815865_052_03|RunExp": {
@@ -4308,20 +4119,6 @@
    "origin": "review",
    "rejected": [
     "0.786"
-   ]
-  },
-  "815865_053_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.049"
-   ]
-  },
-  "815865_053_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.073"
    ]
   },
   "815865_053_03|RunExp": {
@@ -5122,25 +4919,11 @@
     "0.590"
    ]
   },
-  "815865_071_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.049"
-   ]
-  },
   "815865_071_02|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
    "rejected": [
     "-0.077"
-   ]
-  },
-  "815865_071_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.083"
    ]
   },
   "815865_071_04|RunExp": {
@@ -5155,13 +4938,6 @@
    "origin": "review",
    "rejected": [
     "-0.189"
-   ]
-  },
-  "815865_071_05|xwOBA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.698"
    ]
   },
   "815865_072_01|Barrel": {
@@ -5218,13 +4994,6 @@
    "origin": "review",
    "rejected": [
     "-0.036"
-   ]
-  },
-  "815865_073_04|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.052"
    ]
   },
   "815865_073_05|RunExp": {
@@ -5297,13 +5066,6 @@
     "0.083"
    ]
   },
-  "815865_075_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.202"
-   ]
-  },
   "815865_075_03|xwOBA": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -5360,20 +5122,6 @@
     "0.898"
    ]
   },
-  "815865_077_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.049"
-   ]
-  },
-  "815865_077_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.073"
-   ]
-  },
   "815865_077_03|Barrel": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -5414,13 +5162,6 @@
    "origin": "review",
    "rejected": [
     "0.065"
-   ]
-  },
-  "815865_078_02|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.074"
    ]
   },
   "815865_078_03|RunExp": {
@@ -5617,13 +5358,6 @@
    "origin": "review",
    "rejected": [
     "3"
-   ]
-  },
-  "815865_080_10|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "0.236"
    ]
   },
   "815865_080_10|xBA": {
@@ -77625,13 +77359,6 @@
     "-0.864"
    ]
   },
-  "822734_103_01|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.366"
-   ]
-  },
   "822734_115_08|RunExp": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -101150,34 +100877,6 @@
     "-0.626"
    ]
   },
-  "823755_037_06|HAA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-2.198"
-   ]
-  },
-  "823755_037_06|HorzBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-8.2"
-   ]
-  },
-  "823755_037_06|IndVertBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "14.5"
-   ]
-  },
-  "823755_037_06|OTilt": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "11:01"
-   ]
-  },
   "823755_037_06|PlateX": {
    "asof": "2026-08-17",
    "origin": "review",
@@ -101192,67 +100891,11 @@
     "1.7844"
    ]
   },
-  "823755_037_06|RelPosX": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "2.3690"
-   ]
-  },
   "823755_037_06|Spin Rate": {
    "asof": "2026-08-17",
    "origin": "review",
    "rejected": [
     "2322"
-   ]
-  },
-  "823755_037_06|xHorzBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-8.6"
-   ]
-  },
-  "823755_037_06|xIndVrtBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "15.2"
-   ]
-  },
-  "823755_037_07|Description": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "Foul"
-   ]
-  },
-  "823755_037_07|HAA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.603"
-   ]
-  },
-  "823755_037_07|HorzBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-14.3"
-   ]
-  },
-  "823755_037_07|IndVertBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "5.0"
-   ]
-  },
-  "823755_037_07|OTilt": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "9:38"
    ]
   },
   "823755_037_07|PlateX": {
@@ -101262,53 +100905,11 @@
     "1.0645"
    ]
   },
-  "823755_037_07|RTilt": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "10:22"
-   ]
-  },
-  "823755_037_07|RelPosZ": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "5.3713"
-   ]
-  },
   "823755_037_07|Spin Rate": {
    "asof": "2026-08-17",
    "origin": "review",
    "rejected": [
     "2216"
-   ]
-  },
-  "823755_037_07|VAA": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-5.683"
-   ]
-  },
-  "823755_037_07|Velocity": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "93.4"
-   ]
-  },
-  "823755_037_07|xHorzBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-15.0"
-   ]
-  },
-  "823755_037_07|xIndVrtBrk": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "5.3"
    ]
   },
   "823757_077_03|RTilt": {
@@ -125150,13 +124751,6 @@
     "2.000"
    ]
   },
-  "824991_010_03|RunExp": {
-   "asof": "2026-08-17",
-   "origin": "review",
-   "rejected": [
-    "-0.420"
-   ]
-  },
   "824994_021_04|RTilt": {
    "asof": "2026-07-06",
    "origin": "bootstrap_2026_07_06_snapshot",
@@ -130538,6 +130132,6 @@
  "missing": {},
  "missing_note": "Whole pitches a sweep found absent from the sheet and that were not appended. Suppressed while the feed still gives exactly these FEED_COLS values; raised again, with the changed columns named, when any of them moves.",
  "note": "Values deliberately left out of the sheet. A blank-fill candidate matching one of these exactly is suppressed. Bootstrapped from data/_tracking_pitches.pkl and data/_statcast2026_full.pkl (both 2026-07-06); every run since appends what the review rejected.",
- "updated": "2026-08-23",
+ "updated": "2026-09-28",
  "version": 1
 }
