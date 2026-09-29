@@ -16,7 +16,7 @@ matplotlib
 Pillow
 
 # Scrapers + Savant/MLB API pulls (scrapers/pitcher2026.py,
-# scrapers/mlb_transactions.py, pipeline/guts.py)
+# scrapers/transactions.py, pipeline/guts.py)
 requests
 beautifulsoup4
 openpyxl

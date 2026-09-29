@@ -15,9 +15,12 @@ import time
 import re
 
 
-def scrape_milb_transactions(start_date, end_date):
+def scrape_transactions(start_date, end_date):
     """
-    Scrape MiLB transactions for signings, releases, and elected free agency between specified dates.
+    Scrape MLB and MiLB transactions (signings, releases, free agency, outrights,
+    selections, trades, waiver claims, purchases) between specified dates.
+    Each date reads milb.com first, then mlb.com; a transaction listed on both
+    sites is kept once (Player|Date|Type), with the milb.com row winning.
     """
 
     # MLB Team Affiliates mapping
@@ -191,16 +194,22 @@ def scrape_milb_transactions(start_date, end_date):
         'Rancho Cucamonga Quakes': 'A', 'Lake Elsinore Storm': 'A', 'San Jose Giants': 'A',
     }
 
+    mlb_teams = set(team_mapping.values())
+
     def get_team_and_level(milb_team_name):
         """
-        Return (mlb_team, level) tuple from a MiLB team name.
+        Return (mlb_team, level) tuple from a MiLB or MLB team name.
         Example: 'Norfolk Tides' -> ('Baltimore Orioles', 'AAA')
                  'FCL Orioles' -> ('Baltimore Orioles', 'CPX')
                  'DSL Twins' -> ('Minnesota Twins', 'DSL')
+                 'Baltimore Orioles' -> ('Baltimore Orioles', 'MLB')
                  Unknown team -> (original_name, '')
         """
         if not milb_team_name:
             return (None, '')
+
+        if milb_team_name in mlb_teams:
+            return (milb_team_name, 'MLB')
 
         # Check for DSL teams
         if milb_team_name.startswith('DSL '):
@@ -283,17 +292,75 @@ def scrape_milb_transactions(start_date, end_date):
 
         return f"{last_name}, {first_name}"
 
-    def parse_transaction(transaction_text, team_name):
-        """Parse transaction text to extract player, position, and transaction type."""
+    # Position pattern and player-name pattern, shared by every parser below.
+    # The name is captured token-by-token (word chars, accents, periods,
+    # apostrophes, hyphens) rather than as [^.]+ — the old class stopped
+    # at the first period, so "P.J. Labriola" came out as "P".
+    POS = r'(RHP|LHP|CF|LF|RF|INF|1B|2B|3B|SS|OF|DH|TWP|IF|C)'
+    NAME = (r'([\wÀ-ſ][\wÀ-ſ.\'\-]*'
+            r'(?:\s+[\wÀ-ſ][\wÀ-ſ.\'\-]+)*)')
 
-        # Skip header rows
+    def clean_name(name):
+        """Strip trailing periods, but keep the one on a Jr./Sr. suffix."""
+        name = name.strip()
+        if not re.search(r'\b(?:Jr|Sr)\.$', name, flags=re.IGNORECASE):
+            name = re.sub(r'\.+$', '', name).strip()
+        return name
+
+    def parse_trade_players(segment):
+        """
+        Split one side of a trade ("C Logan O'Hoppe and RHP Chase Silseth",
+        "RHP Camilo Doval and cash") into (position, player) pairs. Items
+        without a position token (cash, a player to be named later, draft
+        picks, bonus pool money) are not players and are skipped.
+        """
+        players = []
+        for item in re.split(r',\s*(?:and\s+)?|\s+and\s+', segment):
+            item = item.strip().rstrip('.').strip()
+            match = re.match(rf'^{POS}\s+{NAME}$', item)
+            if match:
+                players.append((match.group(1), clean_name(match.group(2))))
+        return players
+
+    def parse_transaction(transaction_text, team_name):
+        """
+        Parse transaction text into a list of {player, position, team,
+        transaction_type} dicts, or None. A trade returns one dict per player
+        it moves, each tagged with the club the player goes to; every other
+        transaction returns a single dict.
+        """
         if transaction_text == 'Transaction' or not transaction_text:
             return None
 
-        transaction_text = transaction_text.strip()
+        text = transaction_text.strip()
 
-        # Define position pattern once for reuse
-        POS = r'(RHP|LHP|CF|LF|RF|INF|1B|2B|3B|SS|OF|DH|TWP|IF|C)'
+        # Trade: "Team A traded <players> to Team B [for <players>]."
+        # Players in the first list go to Team B, players in the second list
+        # go to Team A. Team A comes from the text, not the row logo: the same
+        # text is listed under both clubs' logos, and the Player|Date|Type key
+        # dedupes the repeat. The "for" clause is absent on a player-to-be-
+        # named or cash completion.
+        match = re.search(r'^(.+?)\s+traded\s+(.+?)\s+to\s+(.+?)(?:\s+for\s+(.+?))?\s*\.?\s*$',
+                          text, re.IGNORECASE)
+        if match:
+            from_team = match.group(1).strip()
+            to_team = match.group(3).strip()
+            parsed = []
+            for segment, dest in ((match.group(2), to_team), (match.group(4) or '', from_team)):
+                for position, player in parse_trade_players(segment):
+                    parsed.append({
+                        'player': player,
+                        'position': position,
+                        'team': dest,
+                        'transaction_type': 'traded'
+                    })
+            return parsed or None
+
+        single = parse_single(text, team_name)
+        return [single] if single else None
+
+    def parse_single(transaction_text, team_name):
+        """Parse a non-trade transaction text into player, position, and transaction type."""
 
         # Pattern for outrighted: "Team outrighted POSITION Player to MiLB Team"
         pattern_outright = rf'outright(?:ed)?\s+{POS}\s+(.+?)\s+(?:to|off)\b'
@@ -306,13 +373,50 @@ def scrape_milb_transactions(start_date, end_date):
                 'transaction_type': 'outrighted'
             }
 
+        # mlb.com form: "Team sent POSITION Player outright to MiLB Team."
+        match = re.search(rf'\bsent\s+{POS}\s+(.+?)\s+outright\b', transaction_text, re.IGNORECASE)
+        if match:
+            return {
+                'player': match.group(2).strip(),
+                'position': match.group(1),
+                'team': team_name,
+                'transaction_type': 'outrighted'
+            }
+
+        # Waiver claim: "Team claimed POSITION Player off waivers from Other Team ."
+        match = re.search(rf'\bclaimed\s+{POS}\s+(.+?)\s+off\s+waivers\b', transaction_text, re.IGNORECASE)
+        if match:
+            return {
+                'player': match.group(2).strip(),
+                'position': match.group(1),
+                'team': team_name,
+                'transaction_type': 'claimed'
+            }
+
+        # Rule 5 / cash purchase: "Team purchased contract of POSITION Player in the Rule 5 Draft ..."
+        match = re.search(rf'\bpurchased\s+(?:the\s+)?contract\s+of\s+{POS}\s+(.+?)(?:\s+(?:in|from)\b|\s*\.\s*$)',
+                          transaction_text, re.IGNORECASE)
+        if match:
+            return {
+                'player': clean_name(match.group(2)),
+                'position': match.group(1),
+                'team': team_name,
+                'transaction_type': 'purchased'
+            }
+
+        # Independent-league acquisition: "Team acquired POSITION Player from the <club> of the <league>."
+        match = re.search(rf'\bacquired\s+{POS}\s+(.+?)\s+from\b', transaction_text, re.IGNORECASE)
+        if match:
+            return {
+                'player': match.group(2).strip(),
+                'position': match.group(1),
+                'team': team_name,
+                'transaction_type': 'acquired'
+            }
+
         # Pattern 1: "Team released/signed POSITION Player ."
-        # The name is captured token-by-token (word chars, accents, periods,
-        # apostrophes, hyphens) rather than as [^.]+ — the old class stopped
-        # at the first period, so "P.J. Labriola" came out as "P".
-        NAME = (r'([\wÀ-ſ][\wÀ-ſ.\'\-]*'
-                r'(?:\s+[\wÀ-ſ][\wÀ-ſ.\'\-]+)*)')
-        pattern1 = rf'(released|signed)\s+{POS}\s+{NAME}\s*\.'
+        # \b keeps "reassigned RHP X to the minor leagues" from reading as a signing.
+        pattern1 = rf'\b(released|signed)\s+{POS}\s+{NAME}\s*\.'
         match = re.search(pattern1, transaction_text, re.IGNORECASE)
         if match:
             return {
@@ -359,14 +463,15 @@ def scrape_milb_transactions(start_date, end_date):
                 }
 
         # Pattern 4: Signing - "Team signed free agent [POSITION] Player to a minor league contract"
+        # or a major-league deal with no tail: "Team signed free agent LF Player ."
         # Position is optional to handle both cases
         # Require whitespace after the optional position so a name whose first
         # letter is a position token (e.g. 'C'arlos) isn't truncated.
-        pattern4 = rf'signed free agent\s+(?:{POS}\s+)?(.+?)\s+to\b'
+        pattern4 = rf'signed free agent\s+(?:{POS}\s+)?(.+?)(?:\s+to\b|\s*\.\s*$)'
         match = re.search(pattern4, transaction_text, re.IGNORECASE)
         if match:
             return {
-                'player': match.group(2).strip(),
+                'player': clean_name(match.group(2)),
                 'position': match.group(1),  # Will be None if no position
                 'team': team_name,
                 'transaction_type': 'signing'
@@ -435,6 +540,17 @@ def scrape_milb_transactions(start_date, end_date):
 
         return max_page
 
+    # One URL scheme per site. milb.com dates are dashed, mlb.com dates are slashed.
+    sources = [
+        ('MiLB', lambda d: f"https://www.milb.com/transactions/{d.strftime('%Y-%m-%d')}"),
+        ('MLB', lambda d: f"https://www.mlb.com/transactions/{d.strftime('%Y/%m/%d')}"),
+    ]
+
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    })
+
     # Convert dates
     start = datetime.strptime(start_date, '%Y-%m-%d')
     end = datetime.strptime(end_date, '%Y-%m-%d')
@@ -446,111 +562,106 @@ def scrape_milb_transactions(start_date, end_date):
         date_str = current_date.strftime('%Y-%m-%d')
         print(f"\nScraping transactions for {date_str}...")
 
-        page = 1
         date_total_transactions = 0
 
-        while True:  # Continue until we determine there are no more pages
-            if page == 1:
-                url = f"https://www.milb.com/transactions/{date_str}"
-            else:
-                url = f"https://www.milb.com/transactions/{date_str}/p-{page}"
+        for source, base_url in sources:
+            page = 1
 
-            try:
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-                response = requests.get(url, headers=headers)
-
-                # Check if page exists (404 means no more pages)
-                if response.status_code == 404:
-                    print(f"  Page {page} returned 404 - no more pages for this date")
-                    break
-
-                response.raise_for_status()
-                soup = BeautifulSoup(response.text, 'html.parser')
-
-                # Find the transaction table
-                table = soup.find('table')
-                if not table:
-                    print(f"  No table found on page {page} - ending pagination for this date")
-                    break
-
-                rows = table.find_all('tr')
-                transactions_on_page = 0
-
-                for row in rows:
-                    cells = row.find_all('td')
-
-                    # Should have 3 cells: Team (logo), Date, Transaction
-                    if len(cells) >= 3:
-                        # Extract team from first cell
-                        team_cell = cells[0]
-                        milb_team_name = None
-
-                        img = team_cell.find('img')
-                        if img:
-                            milb_team_name = img.get('alt') or img.get('title')
-
-                        if not milb_team_name:
-                            team_text = team_cell.get_text(strip=True)
-                            if team_text and team_text != 'Team':
-                                milb_team_name = team_text
-
-                        # Get transaction text
-                        transaction_text = cells[2].get_text(separator=' ', strip=True)
-                        transaction_text = re.sub(r'^\d{2}/\d{2}/\d{2}\s*', '', transaction_text)
-                        transaction_text = re.sub(r'\s+', ' ', transaction_text)
-
-                        parsed = parse_transaction(transaction_text, milb_team_name)
-
-                        if parsed and parsed['transaction_type']:
-                            # Determine which team name to use
-                            if parsed['team']:
-                                milb_team_for_formatting = parsed['team']
-                            elif milb_team_name:
-                                milb_team_for_formatting = milb_team_name
-                            else:
-                                milb_team_for_formatting = None
-
-                            # Get team and level separately
-                            team, level = get_team_and_level(milb_team_for_formatting)
-
-                            # Format player name as Last, First
-                            formatted_player = format_name_last_first(parsed['player'])
-
-                            all_transactions.append({
-                                'date': date_str,
-                                'transaction_type': parsed['transaction_type'],
-                                'player': formatted_player,
-                                'position': parsed['position'],
-                                'team': team,
-                                'level': level
-                            })
-                            transactions_on_page += 1
-
-                date_total_transactions += transactions_on_page
-                print(f"  Page {page}: Found {transactions_on_page} transactions")
-
-                # Check if there are more pages
-                max_page = check_for_more_pages(soup, page)
-
-                if max_page > page:
-                    print(f"  Detected pages up to page {max_page}")
-                    page += 1
-                    time.sleep(1)  # Be nice to the server
+            while True:  # Continue until we determine there are no more pages
+                if page == 1:
+                    url = base_url(current_date)
                 else:
-                    print(f"  No more pages detected after page {page}")
-                    break
+                    url = f"{base_url(current_date)}/p-{page}"
 
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 404:
-                    print(f"  Page {page} not found (404) - no more pages for this date")
-                else:
-                    print(f"  HTTP Error on {url}: {e}")
-                break
-            except Exception as e:
-                print(f"  Error on {url}: {e}")
-                break
+                try:
+                    response = session.get(url, allow_redirects=True, timeout=30)
+
+                    # Check if page exists (404 means no more pages)
+                    if response.status_code == 404:
+                        print(f"  {source} page {page} returned 404 - no more pages for this date")
+                        break
+
+                    response.raise_for_status()
+                    soup = BeautifulSoup(response.text, 'html.parser')
+
+                    # Find the transaction table
+                    table = soup.find('table')
+                    if not table:
+                        print(f"  {source}: no table found on page {page} - ending pagination for this date")
+                        break
+
+                    rows = table.find_all('tr')
+                    transactions_on_page = 0
+
+                    for row in rows:
+                        cells = row.find_all('td')
+
+                        # Should have 3 cells: Team (logo), Date, Transaction
+                        if len(cells) >= 3:
+                            # Extract team from first cell
+                            team_cell = cells[0]
+                            row_team_name = None
+
+                            img = team_cell.find('img')
+                            if img:
+                                row_team_name = img.get('alt') or img.get('title')
+
+                            if not row_team_name:
+                                team_text = team_cell.get_text(strip=True)
+                                if team_text and team_text != 'Team':
+                                    row_team_name = team_text
+
+                            # Get transaction text
+                            transaction_text = cells[2].get_text(separator=' ', strip=True)
+                            transaction_text = re.sub(r'^\d{2}/\d{2}/\d{2}\s*', '', transaction_text)
+                            transaction_text = re.sub(r'\s+', ' ', transaction_text)
+
+                            for parsed in parse_transaction(transaction_text, row_team_name) or []:
+                                if not (parsed['transaction_type'] and parsed['player']):
+                                    continue
+
+                                # Determine which team name to use
+                                team_for_formatting = parsed['team'] or row_team_name
+
+                                # Get team and level separately
+                                team, level = get_team_and_level(team_for_formatting)
+
+                                # Format player name as Last, First
+                                formatted_player = format_name_last_first(parsed['player'])
+
+                                all_transactions.append({
+                                    'date': date_str,
+                                    'transaction_type': parsed['transaction_type'],
+                                    'player': formatted_player,
+                                    'position': parsed['position'],
+                                    'team': team,
+                                    'level': level
+                                })
+                                transactions_on_page += 1
+
+                    date_total_transactions += transactions_on_page
+                    print(f"  {source} page {page}: Found {transactions_on_page} transactions")
+
+                    # Check if there are more pages
+                    max_page = check_for_more_pages(soup, page)
+
+                    if max_page > page:
+                        print(f"  {source}: detected pages up to page {max_page}")
+                        page += 1
+                        time.sleep(1)  # Be nice to the server
+                    else:
+                        print(f"  {source}: no more pages detected after page {page}")
+                        break
+
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code == 404:
+                        print(f"  {source} page {page} not found (404) - no more pages for this date")
+                    else:
+                        print(f"  HTTP Error on {url}: {e}")
+                    break
+                except Exception as e:
+                    print(f"  Error on {url}: {e}")
+                    break
 
         print(f"  Total transactions for {date_str}: {date_total_transactions}")
         current_date += timedelta(days=1)
@@ -571,7 +682,7 @@ def main():
     end_date    = datetime.now().strftime('%Y-%m-%d')
 
     # ── CLI overrides (optional) ──
-    parser = argparse.ArgumentParser(description='Scrape MiLB transactions')
+    parser = argparse.ArgumentParser(description='Scrape MLB and MiLB transactions')
     parser.add_argument('--start', default=None, help='Start date YYYY-MM-DD')
     parser.add_argument('--end', default=None, help='End date YYYY-MM-DD')
     args = parser.parse_args()
@@ -584,7 +695,7 @@ def main():
     print(f"Starting scrape from {start_date} to {end_date}")
     print("=" * 70)
 
-    df_new = scrape_milb_transactions(start_date, end_date)
+    df_new = scrape_transactions(start_date, end_date)
 
     if df_new.empty:
         print("\nNo transactions found.")
