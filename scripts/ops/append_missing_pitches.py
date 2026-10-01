@@ -26,7 +26,8 @@ import requests
 from pipeline.fetch import DIVISION_WORKBOOK_IDS, read_sheet_with_retry
 from scrapers.backfill_supplement import (_retry_sheets_call, download_statcast,
                                           MLB_TEAMS)
-from scrapers.backfill_full import feed_rows, SAVANT_COLS, fetch_game_json
+from scrapers.backfill_full import (feed_rows, SAVANT_COLS, SAVANT_PLANE_COLS,
+                                    fetch_game_json)
 from scrapers.sheet_precision import fmt, as_float, STRING_COLS
 
 # Written by the model layer, never by a feed. Blank on a new row.
@@ -81,7 +82,9 @@ def main(pitch_ids, apply=False):
                 gpk = pid.split('_')[0]
                 # Savant supplement for this one game's date.
                 d = dates[gpk]
-                sav = download_statcast(ws.title, d, d, session) or {}
+                # download_statcast returns (lookup, roster), or None.
+                fetched = download_statcast(ws.title, d, d, session)
+                sav = fetched[0] if fetched else {}
                 parts = pid.split('_')
                 skey = (parts[0], str(int(parts[1])), str(int(parts[2])))
                 supp = sav.get(skey) or {}
@@ -98,6 +101,19 @@ def main(pitch_ids, apply=False):
                         row.append(identity[col])
                     elif col in GRADE_COLS:
                         row.append('')
+                    elif col in SAVANT_PLANE_COLS:
+                        # PlateX/PlateZ come from Savant ONLY (Wally 2026-10-01).
+                        # The feed's are the front-of-plate plane, higher by
+                        # 0.7083 x tan(VAA); never fall back to them. A blank is
+                        # filled by the next backfill_supplement run.
+                        v = supp.get(col)
+                        if v in (None, ''):
+                            print(f"      {col}: Savant has no value for {pid} "
+                                  f"yet, left BLANK (not the feed's); the next "
+                                  f"backfill_supplement run fills it")
+                            row.append('')
+                        else:
+                            row.append(fmt(col, as_float(v)))
                     elif col in src:
                         row.append(src[col])
                     elif col in SAVANT_COLS and col in supp:
