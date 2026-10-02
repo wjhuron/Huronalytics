@@ -117,7 +117,8 @@ scale need no fitted slope. Next-season prediction prefers 300-500, but that is 
 forecast, not a value. The hitter selection gradient is mild (.89/.82/.82 by PA tercile),
 so the same-season criterion is usable here; it is not on the pitcher side.
 HWAR_PARK_PASS_BAT: the share of the published runs factor that reaches xwOBA, measured
-WITHIN batter, home minus road (hwar_park_pass_within.py: .35, LOSO .33-.38; actual wOBA
+WITHIN batter, home minus road (hwar_park_pass_within.py: .37 +/- .04 on 2021-2026 with the
+complete 2026, LOSO .36-.41; .35 on the partial season until 2026-10-02; actual wOBA
 reads .99 in the same design). The across-batter exposure design is confounded by club
 quality and read -.18; do not re-measure it that way.
 """
@@ -130,7 +131,7 @@ HWAR_FLD_NOISE_SD = 4.3     # runs; ceiling on Savant FRV noise at HWAR_FLD_NOIS
 HWAR_FLD_NOISE_OUTS = 3000  # (2023-2026 pairs: 4.03 / 4.33 / 4.67 at medians 2944 / 2953 / 3088 outs). Scaled by sqrt(outs).
 HWAR_BSR_NOISE_SD = 1.7     # runs; ceiling on Savant BRV noise, same design (1.77 / 1.59 / 1.65), measured on listed runners
 HWAR_BSR_NOISE_PA = 450     # at their mean exposure (2026 listed runners: mean 449 PA, median 467). Scaled by sqrt(PA).
-HWAR_PARK_PASS_BAT = 0.35   # share of the published runs factor that reaches xwOBA, within batter
+HWAR_PARK_PASS_BAT = 0.37   # share of the published runs factor that reaches xwOBA, within batter
 
 
 def hitter_park_map(rows, park, aaa_teams):

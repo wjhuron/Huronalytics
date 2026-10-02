@@ -64,12 +64,12 @@ hWAR (2026-09-05): a deserved pitcher WAR on hdERA. One pitcher-season:
               through combined_park_map); shift recenters the innings-weighted MLB mean to
               lgRA9, so runs above average sum to zero across the league (the hdERA anchor is
               the 30-IP pool, whose mean is not the league's)
-    RAA     = (lgRA9 - RA9_dp) * IP / 9
+    RAA     = WAR_RAA_SCALE * (lgRA9 - RA9_dp) * IP / 9
     hWAR    = RAA / RPW + REPL * IP / 9
     RPW     = 4 r / (2 r)^WAR_PYTH_EXP with r = lgRA9, one season constant (the per-pitcher
               run-environment form is coded behind WAR_DYNAMIC_RPW and held off by decision).
               Team records read 10-11.7 (n 30, curvature)
-    hWAR_se = (DH_B / sd_pool) x shrink x WAR_XW_PA_SD / sqrt(PA) x IP/9 / RPW   sampling error bar,
+    hWAR_se = WAR_RAA_SCALE x (DH_B / sd_pool) x shrink x WAR_XW_PA_SD / sqrt(PA) x IP/9 / RPW   sampling error bar,
               on the runs scale hdERA itself uses (DH_B per pool SD of shrunk xwOBA, about 53
               runs/9 per xwOBA point; the linear-weights scale PA9/wOBAscale is 31 and reads 1.7x
               too narrow: war_error_bar.py, split-half variance ratio 1.09 on this scale)
@@ -272,6 +272,15 @@ WAR_PARK_PASS = 0.67     # share of the PUBLISHED runs park factor that reaches 
                          # pitcher park); the same design read the HITTER pass-through negative.
                          # (Actual runs move 1.67x the published factor: Savant's factor is shrunk,
                          # so 1.0 here is not "all".) Moved per Wally 2026-09-06.
+WAR_RAA_SCALE = 0.90     # runs scale of deserved RAA in WAR (hdERA itself is unchanged). Club runs allowed
+                         # regressed on the summed pitcher RAA (plus fielding and park), 2021-2026 with the
+                         # complete 2026: .96/.84/.92/.97/.95/.86, inverse-variance pooled .901 +/- .043
+                         # (z -2.3, 6/6 below 1; hwar_team_harness.py). Independent check: the innings-
+                         # weighted held-out slope of RA9 on the shipped rate reads .82-.94, mean ~.89, 6/6
+                         # (war_calibration_slope.py). DH_B is the unweighted 30-IP-pool slope, which the
+                         # per-pitcher selection bend inflates; the club level has no selection. Shipped
+                         # per Wally 2026-10-02. A centered rescale: league RAA sums to zero, so the pin
+                         # and every replacement bar are unchanged.
 WAR_DYNAMIC_RPW = False  # HELD (per Wally 2026-09-05): runs per win stays the season constant a
                          # reader can check. The dynamic form, (rate + lgRA9)/2 per pitcher as fWAR
                          # and bWAR do, was built and measured: aces +25% (Misiorowski 7.6 -> 9.6),
@@ -665,9 +674,9 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
                 rpw_i = 4.0 * _env / (2.0 * _env) ** WAR_PYTH_EXP
             else:
                 rpw_i = rpw
-            r['hWAR'] = round((lg_ra9 - rate_i) * ip9 / rpw_i + repl * ip9, 2)
+            r['hWAR'] = round(WAR_RAA_SCALE * (lg_ra9 - rate_i) * ip9 / rpw_i + repl * ip9, 2)
             pa = r.get('pa') or r.get('tbf') or 0
-            r['hWAR_se'] = (round((DH_B / _xw_sd) * (pa / (pa + N0_XW)) * WAR_XW_PA_SD / math.sqrt(pa) * ip9 / rpw_i, 2)
+            r['hWAR_se'] = (round(WAR_RAA_SCALE * (DH_B / _xw_sd) * (pa / (pa + N0_XW)) * WAR_XW_PA_SD / math.sqrt(pa) * ip9 / rpw_i, 2)
                             if pa > 0 and _xw_sd else None)
             n_war += 1
         war_const = {'lgRA9': round(lg_ra9, 4), 'lgERA': round(lg_era, 4), 'rpw': round(rpw, 4),
@@ -676,7 +685,7 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
                      'replPinned': pinned, 'replSpFixed': WAR_REPL_SP, 'replSpBand': WAR_REPL_SP_BAND,
                      'pool': WAR_POOL, 'poolGames': WAR_POOL_GAMES, 'poolShareHitters': WAR_POOL_SHARE_HITTERS,
                      'lgGames': lg_games, 'target': round(target, 2) if target is not None else None,
-                     'parkPass': WAR_PARK_PASS, 'shift': round(shift, 4), 'pythExp': WAR_PYTH_EXP,
+                     'parkPass': WAR_PARK_PASS, 'raaScale': WAR_RAA_SCALE, 'shift': round(shift, 4), 'pythExp': WAR_PYTH_EXP,
                      'nRows': n_war, 'sum': round(sum(r['hWAR'] for r in mlb if r.get('hWAR') is not None
                                                       and not is_combined_fn(r.get('team'))), 1)}
         print(f"  hWAR: {n_war} rows, RPW {rpw:.2f}, repl SP {repl_sp:.4f} / RP {repl_rp:.4f} wins per 9 "
