@@ -3529,7 +3529,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
 
     # SD+ — decision-only discipline index (xRV-weighted cells, dv_A formula,
     # Bayesian-regressed to league, ratio-to-league). See pipeline_sdplus.py.
-    from pipeline.sdplus import compute_sd_plus, compute_team_games_played
+    from pipeline.sdplus import compute_sd_plus, compute_team_games_played, team_extra_games
     # Include MLB teams AND multi-team aggregates AND ROC. Cell weight
     # tables stay MLB-baselined (filter applied inside compute_sd_plus /
     # compute_ct_plus); per-hitter aggregation looks ROC swings up
@@ -3669,6 +3669,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # team_games_played — used for 3.1 PA × TGP leaderboard qualification
     team_games_played = compute_team_games_played(all_pitches)
     print(f"  Team games played: {dict(sorted(team_games_played.items()))}")
+    # doubleheader extras for the site's date-based count (microData has no gamePk)
+    team_extra = team_extra_games(all_pitches, normalize_date)
 
     # Process+ (2026-09-16; named Process+ until then) — a DESCRIPTIVE grade
     # of the process behind the production: BB+ (contact quality), SD+
@@ -3882,6 +3884,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         'sacqLaZones': sacq_la_zones_output,
         'xmoveModels': export_xmove(xmove_models),
         'teamGamesPlayed': team_games_played,
+        'teamExtraGames': team_extra,
         'sdPlusWeights': sd_weights,
         'ctPlusWeights': ct_weights,
         'locPlusWeights': loc_weights,
@@ -5360,9 +5363,10 @@ def write_embedded_js(rs_result):
                      else 'nm:' + str(r.get(name_key) or i))
         return len(seen)
 
-    def _team_games_played(micro):
-        """Distinct game dates per team — the denominator for every 'Qualified'
-        threshold (IP or PA per team game).
+    def _team_games_played(micro, extra):
+        """Games per team — the denominator for every 'Qualified' threshold (IP
+        or PA per team game): distinct microData dates plus the doubleheader
+        extras (metadata teamExtraGames), since micro rows carry no gamePk.
 
         This lived only in microData, inside the 17.7 MB data_heavy chunk, so
         until that landed the qualified filter had a threshold of zero and the
@@ -5379,13 +5383,15 @@ def write_embedded_js(rs_result):
         seen = {}
         for row in micro['pitcherMicro']:
             seen.setdefault(row[team_idx], set()).add(row[date_idx])
-        return {teams[t]: len(dates) for t, dates in seen.items()}
+        dates = micro['lookups']['dates']
+        return {teams[t]: len(ds) + sum((extra.get(teams[t]) or {}).get(dates[d], 0) for d in ds)
+                for t, ds in seen.items()}
 
     # The shard index rides in metadata so it lands with data_core — the
     # client needs it before it can resolve any player page.
     metadata = dict(rs_result['metadata'])
     metadata['pitchDetailsIndex'] = pitch_detail_index
-    metadata['teamGames'] = _team_games_played(rs_result['micro_data'])
+    metadata['teamGames'] = _team_games_played(rs_result['micro_data'], metadata.get('teamExtraGames') or {})
     _roc = set(metadata.get('rocTeams') or [])
     metadata['homeCounts'] = {
         'pitchers': _count_distinct_mlb_players(pitcher_rows, 'pitcher', _roc),

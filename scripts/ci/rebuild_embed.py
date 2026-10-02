@@ -31,18 +31,21 @@ TABLES_GZ = os.path.join(DATA, 'data_tables.json.gz')
 HEAVY_GZ = os.path.join(DATA, 'data_heavy.json.gz')
 
 
-def _team_games_played(micro):
+def _team_games_played(micro, extra):
     """Mirrors process_data._team_games_played / Aggregator.getTeamGamesPlayed()
-    with no date range. Recomputed whenever microData is swapped below, so the
-    qualification denominator in data_core always matches the microData that
-    actually ships; a mismatch silently moves the Qualified cutoff."""
+    with no date range: distinct microData dates plus the doubleheader extras
+    (metadata teamExtraGames). Recomputed whenever microData is swapped below,
+    so the qualification denominator in data_core always matches the microData
+    that actually ships; a mismatch silently moves the Qualified cutoff."""
     ci = {c: i for i, c in enumerate(micro['pitcherCols'])}
     team_idx, date_idx = ci['teamIdx'], ci['dateIdx']
     teams = micro['lookups']['teams']
+    dates = micro['lookups']['dates']
     seen = {}
     for row in micro['pitcherMicro']:
         seen.setdefault(row[team_idx], set()).add(row[date_idx])
-    return {teams[t]: len(dates) for t, dates in seen.items()}
+    return {teams[t]: len(ds) + sum((extra.get(teams[t]) or {}).get(dates[d], 0) for d in ds)
+            for t, ds in seen.items()}
 
 
 def _read_gz(path):
@@ -123,7 +126,8 @@ def main(core_gz=CORE_GZ, heavy_gz=HEAVY_GZ, tables_gz=TABLES_GZ):
               f"refresh found — run scripts/ci/refresh_micro_grades.py first)")
     # Qualification denominators always follow the micro that actually
     # ships in data_heavy (swapped or kept), never a skipped candidate.
-    obj.setdefault('metadata', {})['teamGames'] = _team_games_played(heavy['microData'])
+    meta = obj.setdefault('metadata', {})
+    meta['teamGames'] = _team_games_played(heavy['microData'], meta.get('teamExtraGames') or {})
     _write_gz(core_gz, obj)
     print(f"  teamGames synced to shipping microData: "
           f"{len(obj['metadata']['teamGames'])} teams")

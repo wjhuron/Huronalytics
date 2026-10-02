@@ -3340,9 +3340,18 @@ const Aggregator = {
       teamDates[ti][dIdx] = true;
     }
 
+    // microData rows carry a date but no gamePk, so a doubleheader is one date.
+    // metadata.teamExtraGames ({team: {date: games - 1}}) adds the second game
+    // back; process_data._team_games_played does the same, so the two agree.
+    const extra = (typeof DataStore !== 'undefined' && DataStore.metadata &&
+                   DataStore.metadata.teamExtraGames) || {};
     const result = {};
     for (let ti2 in teamDates) {
-      result[teams[ti2]] = Object.keys(teamDates[ti2]).length;
+      const team = teams[ti2];
+      const ex = extra[team] || {};
+      let n = 0;
+      for (let dk in teamDates[ti2]) n += 1 + (ex[dates[dk]] || 0);
+      result[team] = n;
     }
     return result;
   },

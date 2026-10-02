@@ -508,23 +508,57 @@ def serialize_weight_table(smoothed):
     return out
 
 
+def _game_pk(p):
+    """gamePk from the PitchID prefix ('823934_075_04' -> '823934'), or None."""
+    pid = p.get('PitchID')
+    return str(pid).split('_', 1)[0] if pid else None
+
+
 def compute_team_games_played(all_pitches):
-    """Distinct (Game Date) count per MLB team, using both pitcher and
-    batter team columns. Close enough for MLB-standard qualification;
-    double-headers (rare) would be undercounted by at most a handful
-    per team per season."""
-    team_dates = defaultdict(set)
+    """Distinct gamePk count per MLB team, using both pitcher and batter
+    team columns. A date count undercounted every doubleheader (2026: 2404
+    league games against 2429 played, NYY and BAL 156 against 161), which
+    shrank the 3.1 PA / 1.0 IP qualification bars and the hWAR pool. A row
+    without a PitchID is counted by its date and announced."""
+    team_games = defaultdict(set)
+    no_pk = 0
     for p in all_pitches:
         if p.get('_source') != 'MLB':
             continue
-        date = p.get('Game Date')
-        if not date:
-            continue
+        pk = _game_pk(p)
+        if pk is None:
+            date = p.get('Game Date')
+            if not date:
+                continue
+            no_pk += 1
+            pk = 'date:' + str(date)
         for team_col in ('PTeam', 'BTeam'):
             team = p.get(team_col)
             if team and team in MLB_TEAMS:
-                team_dates[team].add(date)
-    return {t: len(d) for t, d in team_dates.items()}
+                team_games[team].add(pk)
+    if no_pk:
+        print(f'  team games WARNING: {no_pk} MLB pitches without a PitchID counted by date')
+    return {t: len(g) for t, g in team_games.items()}
+
+
+def team_extra_games(all_pitches, norm_date=None):
+    """{pitching team: {date: games that date - 1}} for every date a club
+    played more than one game, all sources (MLB and ROC). The site counts
+    team games from microData, whose rows carry a date but no gamePk, so it
+    adds these to its date count; process_data and rebuild_embed do the
+    same. No 2026 game spans two dates, so date count + extras = games.
+    norm_date: the date normalizer the microData keys use, so the keys match."""
+    games = defaultdict(lambda: defaultdict(set))
+    for p in all_pitches:
+        date = p.get('Game Date')
+        if norm_date and date:
+            date = norm_date(date)
+        team, pk = p.get('PTeam'), _game_pk(p)
+        if team and date and pk:
+            games[team][date].add(pk)
+    return {t: {d: len(g) - 1 for d, g in sorted(by_date.items()) if len(g) > 1}
+            for t, by_date in sorted(games.items())
+            if any(len(g) > 1 for g in by_date.values())}
 
 
 def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
