@@ -5,6 +5,8 @@ groups, with birthDate and position from the person hydrate. Baseball age = age 
 June 30 of the season. Cached per group-season in data/_proj/; an existing file is
 reused, so a re-run only pulls what is missing. The live season is always re-pulled.
 
+Triple-A (sportId 11) lines land as aaa_lines_{group}_{Y}.json with the same fields.
+
 Usage: python3 scripts/research/projection/pull_season_lines.py [first last]
 """
 import json
@@ -17,7 +19,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.a
 OUT = os.path.join(ROOT, 'data', '_proj')
 LIVE = 2026
 URL = ('https://statsapi.mlb.com/api/v1/stats?stats=season&group={g}&season={y}'
-       '&sportId=1&playerPool=ALL&limit=5000&hydrate=person')
+       '&sportId={s}&playerPool=ALL&limit=5000&hydrate=person')
+SPORTS = {1: '', 11: 'aaa_'}     # MLB, Triple-A (file prefix)
 
 
 def fetch(url):
@@ -32,11 +35,11 @@ def baseball_age(birth, season):
     return ref.year - b.year - ((ref.month, ref.day) < (b.month, b.day))
 
 
-def pull(group, season):
-    path = os.path.join(OUT, f'lines_{group}_{season}.json')
+def pull(group, season, sport=1):
+    path = os.path.join(OUT, f'{SPORTS[sport]}lines_{group}_{season}.json')
     if os.path.exists(path) and season != LIVE:
         return path, None
-    d = fetch(URL.format(g=group, y=season))
+    d = fetch(URL.format(g=group, y=season, s=sport))
     stat = d['stats'][0]
     rows = []
     for s in stat['splits']:
@@ -46,6 +49,7 @@ def pull(group, season):
                      'age': baseball_age(birth, season) if birth else None,
                      'pos': (p.get('primaryPosition') or {}).get('abbreviation'),
                      'numTeams': s.get('numTeams'), 'team': (s.get('team') or {}).get('id'),
+                     'parent': (s.get('team') or {}).get('parentOrgId'),
                      **s['stat']})
     if len(rows) != stat.get('totalSplits'):
         raise RuntimeError(f'{group} {season}: {len(rows)} rows of {stat.get("totalSplits")}; raise limit')
@@ -60,6 +64,7 @@ if __name__ == '__main__':
     first, last = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) == 3 else (2000, LIVE)
     os.makedirs(OUT, exist_ok=True)
     for y in range(first, last + 1):
-        for g in ('hitting', 'pitching'):
-            path, n = pull(g, y)
-            print(g, y, 'cached' if n is None else f'{n} rows')
+        for sport in SPORTS:
+            for g in ('hitting', 'pitching'):
+                path, n = pull(g, y, sport)
+                print(SPORTS[sport] or 'mlb_', g, y, 'cached' if n is None else f'{n} rows')
