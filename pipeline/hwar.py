@@ -122,7 +122,9 @@ complete 2026, LOSO .36-.41; .35 on the partial season until 2026-10-02; actual 
 reads .99 in the same design). The across-batter exposure design is confounded by club
 quality and read -.18; do not re-measure it that way.
 """
+import json
 import math
+import os
 from pipeline.utils import current_team_by_player, player_key, is_combined_team
 from pipeline.eraplus import WAR_PYTH_EXP, WAR_XW_PA_SD, WAR_POOL, WAR_POOL_GAMES, WAR_POOL_SHARE_HITTERS
 
@@ -451,3 +453,46 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
           f'(C {pos_tab["C"]:+.1f} SS {pos_tab["SS"]:+.1f} 1B {pos_tab["1B"]:+.1f} DH {pos_tab["DH"]:+.1f}); '
           f'club-row sums WAR {tot:.1f} fld {const["sumFld"]:+.1f} bsr {const["sumBsr"]:+.1f} pos {const["sumPos"]:+.1f}')
     return const
+
+
+# ── hpWAR: the projected sibling (2026-10-02) ─────────────────────────────────────────────
+# hpWAR is NOT computed here: the projection is a static artifact built offline by
+# scripts/builders/build_hpwar.py (method and backtests in its docstring and in
+# scripts/research/projection/), because it does not move during a season. This only merges it
+# onto the rows by mlbId. A RATE, unlike hWAR (site label hdWAR): hitters per 600 PA; pitchers per
+# 180 IP if the base-season start share is .5 or more, else per 60 IP (hpWAR_unit says which).
+# hpWAR / hpWAR3 / hpWAR5 = 1 / 3 / 5 seasons past the base. Triple-A rows get none (per Wally).
+HPWAR_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'hpwar_projections.json')
+HPWAR_KEYS = ('hpWAR', 'hpWAR3', 'hpWAR5')
+
+
+def apply_hpwar(pitcher_rows, hitter_rows, aaa_teams=('ROC', 'AAA')):
+    """Set hpWAR / hpWAR3 / hpWAR5 / hpWAR_unit (and hpWAR_thin, the flagged target years) on MLB
+    rows, stint and combined rows alike (a player-level value). Returns the metadata block.
+    A missing file aborts: it is committed, so its absence is a broken checkout, and a silent
+    blank column is the failure this repo guards against. Repair: scripts/builders/build_hpwar.py."""
+    if not os.path.exists(HPWAR_PATH):
+        raise FileNotFoundError(f'{HPWAR_PATH} is missing; rebuild it with python3 scripts/builders/build_hpwar.py')
+    with open(HPWAR_PATH) as f:
+        src = json.load(f)
+    aaa = set(aaa_teams)
+    counts = {}
+    for side, rows in (('pitchers', pitcher_rows), ('hitters', hitter_rows)):
+        table = src[side]
+        n = 0
+        for r in rows:
+            if r.get('team') in aaa:
+                continue
+            rec = table.get(str(r.get('mlbId'))) if r.get('mlbId') is not None else None
+            if not rec:
+                continue
+            for k in HPWAR_KEYS:
+                r[k] = rec.get(k)
+            r['hpWAR_unit'] = rec.get('unit')
+            r['hpWAR_thin'] = rec.get('thin') or None
+            n += 1
+        counts[side] = n
+    print(f"  hpWAR (static, base {src['base']}, built {src['built']}): {counts['hitters']} hitter rows, "
+          f"{counts['pitchers']} pitcher rows; MLB rows without a projection stay blank")
+    return {'base': src['base'], 'targets': src['targets'], 'built': src['built'], 'spShare': src['spShare'],
+            'rows': counts}

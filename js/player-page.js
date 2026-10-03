@@ -97,7 +97,7 @@ var PlayerPage = {
     { key: 'wOBA', label: 'wOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'xwOBA', label: 'xwOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; } },
     { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; } },
-    { key: 'hWAR', label: 'hWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'hWAR', label: 'hdWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'fWAR', label: 'fWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'processPlus', label: 'Process+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
@@ -253,7 +253,7 @@ var PlayerPage = {
     // carries the two house ERAs the leaderboard leads with.
     { key: 'hdERA', label: 'hdERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
     { key: 'hpERA', label: 'hpERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-    { key: 'hWAR', label: 'hWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
+    { key: 'hWAR', label: 'hdWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
     { key: 'fWAR', label: 'fWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
   ],
 

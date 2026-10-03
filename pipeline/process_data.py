@@ -39,7 +39,7 @@ from pipeline.fetch import (
 )
 from pipeline.xmove import (fit_models as fit_xmove_models, score_all as score_xmove,
                             export as export_xmove)
-from pipeline.hwar import apply_batting_runs, apply_hitter_war
+from pipeline.hwar import apply_batting_runs, apply_hitter_war, apply_hpwar
 from pipeline.eraplus import _load_park as load_park_factors_savant
 from pipeline.compute import (
     compute_expected_stats, compute_stats, compute_xrv,
@@ -4814,6 +4814,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             if _war:
                 hwar_const.update(_war)
                 metadata['hwarConstants'] = hwar_const
+
+        # -- hpWAR, the projected sibling: a static artifact merged by mlbId (pipeline/hwar.py)
+        if not window_mode:
+            metadata['hpwarMeta'] = apply_hpwar(pitcher_leaderboard, hitter_leaderboard, aaa_teams=AAA_TEAMS)
 
     # hdERA/hpERA anchor = unweighted mean ERA of the 30+ IP MLB pool (the
     # metrics' z-pool population, see pipeline_eraplus). Published here so
