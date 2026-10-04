@@ -115,6 +115,16 @@ VENUE_ELEVATION_FT_OVERRIDE = {
     2842: 52,    # Trenton Thunder Ballpark, Trenton NJ
     2508: 39,    # Ed Smith Stadium, Sarasota FL
     2700: 33,    # BayCare Ballpark, Clearwater FL
+    # ── Arizona Fall League 2026 ──────────────────────────────────────────
+    # Every AZ venue on the sportId=17 schedule. Surprise (2603) and Sloan
+    # (4629) are listed above; Salt River Fields (4249) reports its own
+    # elevation (1,298 ft; DEM 1,312). DEM at the venue API's coordinates;
+    # Kino has no coordinates in the API, so its point is the stadium's.
+    2501: 2579,  # Kino Veterans Memorial Stadium, Tucson AZ
+    2530: 1198,  # Peoria Stadium, Peoria AZ
+    2532: 1247,  # Scottsdale Stadium, Scottsdale AZ
+    3809: 1040,  # Camelback Ranch, Glendale AZ
+    3834: 965,   # Goodyear Ballpark, Goodyear AZ
 }
 
 
