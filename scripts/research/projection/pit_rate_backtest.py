@@ -47,6 +47,8 @@ def season(y):
         outs, bf = int(r.get('outs') or 0), int(r.get('battersFaced') or 0)
         if outs <= 0 or bf <= 0 or r.get('age') is None:
             continue
+        if r.get('pos') not in ('P', 'TWP'):
+            continue      # a position player pitching (2026-10-03: they sat in every pool and projected -.8)
         ip = outs / 3
         k, bb, hbp, hr = (int(r.get(c) or 0) for c in ('strikeOuts', 'baseOnBalls', 'hitByPitch', 'homeRuns'))
         g, gs = int(r.get('gamesPlayed') or 0), int(r.get('gamesStarted') or 0)
