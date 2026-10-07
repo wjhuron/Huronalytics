@@ -9,11 +9,17 @@ every replicate season).
     hdERA = poolERA + DH_B * z(xwOBA against, shrunk at N0_XW PA)
 
 hpERA (projected ERA, going forward): the Pitcher+ component set plus
-role and park, calibrated to future ERA. Weights are the fold-mean OLS
-fit on rest-of-season replicates 2021-2026 (one weight set serves both
-horizons: next-season transfer cost 0.001). Held-out r: 0.51 next
-season, 0.48 rest-of-season at the 60 IP gate — beats SIERA in all 11
-replicates.
+role, park and hand, calibrated to future ERA. Since 2026-10-07 one weight
+set is fit to BOTH horizons at once, next season and rest of season, on
+HONEST pools: every arm with >= 1 out in the target period counts,
+innings-weighted, held out by year (scripts/research/era/
+hpera_honest_refit.py). The previous fit gated the TARGET period at 60 IP,
+which selects on the outcome. Held out, the refit beats the previous
+weights 5/5 next season (MSE -3.2%, z -4.0) and 5/6 rest of season
+(-2.3%, z -4.2), and SIERA 5/5 and 6/6; it also wins in every
+history-defined class (starters 150+ IP, relievers 50+ IP, ...;
+hpera_refit_checks.py). Innings weighting is a convention (fit what is
+scored); the role weight depends on it (equal weights put it at -0.31).
 
     hpERA = poolERA + sum_c W_PH[c] * z(channel_c) + W_LHP * (lhp - poolLHPshare)
 
@@ -122,7 +128,9 @@ use for Rochester. The split is measured, not assumed: on ~800 pitcher-
 seasons appearing at both levels in the same season, 2023-2025
 (scripts/research/era/aaa_level_correction.py), the within-pitcher shift
 is +0.077 ERA for hpERA and +0.765 for hdERA. hpERA survives because its
-channels cancel and hdERA does not because it is nearly pure xwOBA. Their
+channels cancel and hdERA does not because it is nearly pure xwOBA. The
+2026-10-07 weights weaken the cancellation (K% weight x3): +0.171 ERA,
+derived from the per-channel shifts, not re-measured (see apply_era_plus). Their
 home park is NEUTRAL: Savant publishes no minor-league park factors, so
 the park channel z-scores a flat 1.00 for every ROC row. Neutral now
 stands by MEASUREMENT, not just data absence (2026-08-21,
@@ -217,8 +225,15 @@ IZSW_PER_PITCH = 0.33  # league iz-swings per pitch (.32-.34, 2021-2026);
 
 DH_B = 0.917                # LOSO slope, 30+ IP display population
 
-# hpERA fold-mean OLS weights (rest-of-season fit, gate 60), ERA direction.
-# REFIT 2026-09-05 with the pitcher-hand term below (scripts/research/era/
+# hpERA weights, ERA direction. REFIT 2026-10-07 (scripts/research/era/
+# hpera_honest_refit.py, final fit on every replicate): honest pools, NEXT
+# and ROS stacked at equal weight, target ERA minus league, innings-
+# weighted. K% rises (.053 -> .149) and the role term falls to ~0 (.298 ->
+# -.029: no weighting supports a starter penalty). xrv is POSITIVE here;
+# the harness reads -0.131 for the same channel (it negates a batter-
+# positive input). Previous set (2026-09-05, ROS gate 60): stuff .315 loc
+# .105 k .053 izwh .101 xrv .160 gb .151 gs .298 park .152, W_LHP -.211.
+# History of that set: REFIT 2026-09-05 with the pitcher-hand term below (scripts/research/era/
 # era_hand_weight_refit.py on the rebuilt replicates). Held-out r ROS-60
 # .4525 -> .4545 (4/6), NEXT-60 .5209 -> .5282 (4/5); the point is
 # calibration, not r: the LHP residual goes to zero in every test. These
@@ -229,14 +244,14 @@ DH_B = 0.917                # LOSO slope, 30+ IP display population
 # and reads -0.160 for the same channel. Previous set (2026-08-15, refit on
 # production-consistent shrinkage): stuff .297 loc .136 k .088 izwh .117
 # xrv .139 gb .162 gs .277 park .168.
-W_PH = {'stuff': 0.315, 'loc': 0.105, 'k': 0.053, 'izwh': 0.101,
-        'xrv': 0.160, 'gb': 0.151, 'gs': 0.298, 'park': 0.152}
+W_PH = {'stuff': 0.257, 'loc': 0.090, 'k': 0.149, 'izwh': 0.059,
+        'xrv': 0.131, 'gb': 0.143, 'gs': -0.029, 'park': 0.152}
 # Pitcher-hand term (2026-09-05): ERA credit for a left-hander, applied to
 # the RAW indicator centered at the pool's LHP share, so the pool-mean
 # forecast does not move. Fold-mean -0.211 ROS-60; -0.254 NEXT-60 with SE
 # .013 across the five year-pairs. Kept outside the z-sum on purpose: an
 # indicator's z would tie the weight to the pool share.
-W_LHP = -0.211
+W_LHP = -0.207      # refit 2026-10-07 with W_PH; -0.211 before
 # Scratch/window rows only, when the metadata bundle predates the term:
 # mean LHP share of the 2021-2026 60-IP replicate pools (.314 .269 .247
 # .276 .263 .301). The season path measures the live share.
@@ -592,6 +607,12 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
         #                        channels cancel -- Triple-A flatters the
         #                        four outcome channels by +0.262 and its
         #                        stuff and location give back -0.185
+        #           +0.171 ERA   with the 2026-10-07 weights, DERIVED (not
+        #                        re-measured: the paired corpus inputs are
+        #                        gone) from the per-channel shifts above,
+        #                        old contribution / old weight x new weight;
+        #                        the K% weight tripled (K +0.060 -> +0.169).
+        #                        Rochester rows still ship uncorrected.
         #   hdERA   +0.765 ERA   nearly pure xwOBA, so nothing offsets it
         #
         # and hdERA's honest correction is a REGRESSION, not a shift:
