@@ -258,7 +258,11 @@
         if (qp.page) urlState.page = parseInt(qp.page, 10) || 1;
         if (qp.pitch) urlState.pitchTypes = qp.pitch.split(',');
         if (qp.role) document.getElementById('role-filter').value = qp.role;
-        if (qp.fa === '1') document.getElementById('status-filter').value = 'fa';
+        if (qp.fa === '1') {
+          document.getElementById('status-filter').value = 'fa';
+          minIpInput.value = '0';
+          if (!qp.min) minCountInput.value = '1';
+        }
       }
       navigateToTab(tab, true, urlState);  // true = don't push hash (already there)
     } else {
@@ -588,7 +592,15 @@
     minBipInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minPitcherSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     document.getElementById('role-filter').addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
-    document.getElementById('status-filter').addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
+    document.getElementById('status-filter').addEventListener('change', function () {
+      // Free Agents opens on the whole pool: Min IP 0 and Min PA / Pitches 1.
+      // Leaving it restores the Qualified defaults.
+      const fa = this.value === 'fa';
+      minIpInput.value = fa ? '0' : 'Q';
+      minCountInput.value = fa ? '1' : 'Q';
+      Leaderboard.currentPage = 1;
+      refresh();
+    });
     dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
 
@@ -1042,6 +1054,7 @@
       throws: filters.throws,
       role: filters.role,
       viewMode: viewMode,
+      colorAll: filters.status === 'fa' && viewMode !== 'team',
     });
     saveURLState();
   }

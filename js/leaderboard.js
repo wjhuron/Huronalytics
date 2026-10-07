@@ -563,6 +563,9 @@ const Leaderboard = {
   render: function (data, columns, opts) {
     opts = opts || {};
     const self = this;
+    // Free Agents view colors every player row (per Wally 2026-10-07): the
+    // list is for scanning a small pool, not for ranking qualified arms.
+    this._colorAll = !!opts.colorAll;
     const visCols = this.getVisibleColumns(columns, data);
     let headerRow = document.getElementById('table-header');
     const tbody = document.getElementById('table-body');
@@ -1027,6 +1030,12 @@ const Leaderboard = {
             } else {
               showColor = paQual;
             }
+          }
+
+          // Free Agents view: color every player row. ROC rows stay uncolored.
+          if (!showColor && self._colorAll && !row._isTeamRow &&
+              !(Aggregator.loaded && Aggregator._isROCTeam(row.team))) {
+            showColor = true;
           }
 
           if (showColor) {
