@@ -19,6 +19,34 @@ const DataStore = {
     return this.rs;
   },
 
+  // Free Agents filter. data/free_agents.json is built locally by
+  // scripts/builders/build_free_agents.py (FanGraphs tracker + the released
+  // and elected-FA lists) and committed by hand, so it moves without a
+  // pipeline stamp: fetch with no-cache instead of the ?v= tag. Loaded only
+  // when the filter is first used. On failure the set stays null and the
+  // promise rejects; the caller resets the control rather than showing
+  // every player under a "Free Agents" label.
+  freeAgentIds: null,
+  _faPromise: null,
+  loadFreeAgents: function () {
+    var self = this;
+    if (this._faPromise) return this._faPromise;
+    this._faPromise = fetch('data/free_agents.json', { cache: 'no-cache' }).then(function (resp) {
+      if (!resp.ok) throw new Error('Free-agent list fetch failed: HTTP ' + resp.status);
+      return resp.json();
+    }).then(function (d) {
+      var ids = {};
+      (d.players || []).forEach(function (p) { ids[p.mlbId] = true; });
+      self.freeAgentIds = ids;
+      self.freeAgentsAsOf = d.generatedAt || '';
+      return ids;
+    }).catch(function (e) {
+      self._faPromise = null;
+      throw e;
+    });
+    return this._faPromise;
+  },
+
   /**
    * Fetch the gzipped payload and inflate it in the browser.
    *

@@ -1,0 +1,2140 @@
+{
+ "generatedAt": "2026-10-07",
+ "players": [
+  {
+   "mlbId": 445276,
+   "name": "Jansen, Kenley",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 453286,
+   "name": "Scherzer, Max",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 455119,
+   "name": "Martin, Chris",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 457705,
+   "name": "McCutchen, Andrew",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 467793,
+   "name": "Santana, Carlos",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 471911,
+   "name": "Carrasco, Carlos",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 472610,
+   "name": "García, Luis",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 500743,
+   "name": "Rojas, Miguel",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 500779,
+   "name": "Quintana, Jose",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 502054,
+   "name": "Pham, Tommy",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 502671,
+   "name": "Goldschmidt, Paul",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 516782,
+   "name": "Marte, Starling",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 518595,
+   "name": "d'Arnaud, Travis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 518886,
+   "name": "Kimbrel, Craig",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 519141,
+   "name": "Pomeranz, Drew",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 527048,
+   "name": "Pérez, Martín",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 542303,
+   "name": "Ozuna, Marcell",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 542888,
+   "name": "Armstrong, Shawn",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 543056,
+   "name": "Coulombe, Danny",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 543243,
+   "name": "Gray, Sonny",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 543309,
+   "name": "Higashioka, Kyle",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 543510,
+   "name": "McCann, James",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 543807,
+   "name": "Springer, George",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 543877,
+   "name": "Vázquez, Christian",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 545121,
+   "name": "Vargas, Ildemaro",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 545341,
+   "name": "Grichuk, Randal",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 547179,
+   "name": "Lorenzen, Michael",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 547184,
+   "name": "Kelly, Michael",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 548384,
+   "name": "Raley, Brooks",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 552640,
+   "name": "Kittredge, Andrew",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 553869,
+   "name": "Díaz, Elias",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 553993,
+   "name": "Suárez, Eugenio",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 571510,
+   "name": "Boyd, Matthew",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 571578,
+   "name": "Corbin, Patrick",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 571657,
+   "name": "Farmer, Kyle",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 571771,
+   "name": "Hernández, Enrique",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 571882,
+   "name": "Law, Derek",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 571912,
+   "name": "Maile, Luke",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 571945,
+   "name": "Mikolas, Miles",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 571948,
+   "name": "Milner, Hoby",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 572143,
+   "name": "Smith, Burch",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 572955,
+   "name": "Johnson, Pierce",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 573009,
+   "name": "Mantiply, Joe",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 573124,
+   "name": "Rogers, Taylor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 573204,
+   "name": "Thielbar, Caleb",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 592094,
+   "name": "Adam, Jason",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592206,
+   "name": "Castellanos, Nick",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592332,
+   "name": "Gausman, Kevin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592454,
+   "name": "Kahnle, Tommy",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592626,
+   "name": "Pederson, Joc",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 592662,
+   "name": "Ray, Robbie",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592773,
+   "name": "Stanek, Ryne",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 592791,
+   "name": "Taillon, Jameson",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592836,
+   "name": "Walker, Taijuan",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 592866,
+   "name": "Williams, Trevor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 594580,
+   "name": "Moll, Sam",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 594835,
+   "name": "Gonzales, Marco",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 595014,
+   "name": "Treinen, Blake",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 595345,
+   "name": "Okert, Steven",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 595978,
+   "name": "Hedges, Austin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 596001,
+   "name": "Junis, Jakob",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 596103,
+   "name": "Slater, Austin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 596142,
+   "name": "Sánchez, Gary",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 596146,
+   "name": "Kepler, Max",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 600869,
+   "name": "Candelario, Jeimer",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 601713,
+   "name": "Pivetta, Nick",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 602104,
+   "name": "Urías, Ramón",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605130,
+   "name": "Barlow, Scott",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605135,
+   "name": "Bassitt, Chris",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605137,
+   "name": "Bell, Josh",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 605154,
+   "name": "Brebbia, John",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605156,
+   "name": "Brooks, Aaron",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 605242,
+   "name": "Fulmer, Michael",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605244,
+   "name": "Garcia, Aramis",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 605280,
+   "name": "Holmes, Clay",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 605447,
+   "name": "Romano, Jordan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605452,
+   "name": "Ross, Joe",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 605488,
+   "name": "Springs, Jeffrey",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 605540,
+   "name": "Woodruff, Brandon",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 606115,
+   "name": "Arcia, Orlando",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 607067,
+   "name": "Rea, Colin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 607200,
+   "name": "Fedde, Erick",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 607259,
+   "name": "Martinez, Nick",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 607481,
+   "name": "Bummer, Aaron",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 607536,
+   "name": "Freeland, Kyle",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608032,
+   "name": "Estévez, Carlos",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 608337,
+   "name": "Giolito, Lucas",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 608348,
+   "name": "Kelly, Carson",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 608371,
+   "name": "Sims, Lucas",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608372,
+   "name": "Sugano, Tomoyuki",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608566,
+   "name": "Márquez, Germán",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608650,
+   "name": "Enns, Dietrich",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608701,
+   "name": "Refsnyder, Rob",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608718,
+   "name": "Suter, Brent",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 608723,
+   "name": "Voth, Austin",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 608841,
+   "name": "Meneses, Joey",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 609280,
+   "name": "Andujar, Miguel",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 615698,
+   "name": "Quantrill, Cal",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621107,
+   "name": "Eflin, Zach",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 621111,
+   "name": "Buehler, Walker",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621112,
+   "name": "Blackburn, Paul",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621121,
+   "name": "McCullers Jr., Lance",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621237,
+   "name": "Alvarado, José",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621242,
+   "name": "Díaz, Edwin",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 621345,
+   "name": "Minter, A.J.",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621366,
+   "name": "Borucki, Ryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621381,
+   "name": "Strahm, Matt",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621389,
+   "name": "Blach, Ty",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 621438,
+   "name": "Taylor, Tyrone",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 621493,
+   "name": "Ward, Taylor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 622608,
+   "name": "Senzatela, Antonio",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 622663,
+   "name": "Severino, Luis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 622694,
+   "name": "Hernández, Elieser",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 622761,
+   "name": "Mateo, Jorge",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 623149,
+   "name": "Sewald, Paul",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 623205,
+   "name": "Velazquez, Andrew",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 623465,
+   "name": "Phillips, Evan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 624424,
+   "name": "Conforto, Michael",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 624428,
+   "name": "Frazier, Adam",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 624585,
+   "name": "Soler, Jorge",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 624641,
+   "name": "Sosa, Edmundo",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 628452,
+   "name": "Iglesias, Raisel",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 640451,
+   "name": "Harvey, Hunter",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 641302,
+   "name": "Alexander, Tyler",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641343,
+   "name": "Bauers, Jake",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641487,
+   "name": "Crawford, J.P.",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641584,
+   "name": "Fraley, Jake",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641585,
+   "name": "France, J.P.",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 641598,
+   "name": "Garver, Mitch",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641680,
+   "name": "Heim, Jonah",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641755,
+   "name": "Kinley, Tyler",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641778,
+   "name": "Lauer, Eric",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641793,
+   "name": "Littell, Zack",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641816,
+   "name": "Mahle, Tyler",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641835,
+   "name": "Mayza, Tim",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 641941,
+   "name": "Pagán, Emilio",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 642086,
+   "name": "Smith, Dominic",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642133,
+   "name": "Tellez, Rowdy",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642152,
+   "name": "Trivino III, Lou",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642232,
+   "name": "Yarbrough, Ryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642397,
+   "name": "Soto, Gregory",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642528,
+   "name": "Loáisiga, Jonathan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642547,
+   "name": "Peralta, Freddy",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642701,
+   "name": "Santana, Dennis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642708,
+   "name": "Rosario, Amed",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 642759,
+   "name": "Fernández, Julian",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 643289,
+   "name": "Dubón, Mauricio",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 643361,
+   "name": "Herget, Kevin",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 643396,
+   "name": "Kiner-Falefa, Isiah",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 643410,
+   "name": "Leiter Jr., Mark",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 643446,
+   "name": "McNeil, Jeff",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 645302,
+   "name": "Robles, Victor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 647336,
+   "name": "Soroka, Michael",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 649966,
+   "name": "Urías, Luis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 650333,
+   "name": "Arraez, Luis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 650391,
+   "name": "Jiménez, Eloy",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 650402,
+   "name": "Torres, Gleyber",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 650556,
+   "name": "Abreu, Bryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 650633,
+   "name": "King, Michael",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 650644,
+   "name": "Civale, Aaron",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 650859,
+   "name": "Rengifo, Luis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656222,
+   "name": "Beeks, Jalen",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656271,
+   "name": "Burke, Brock",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656288,
+   "name": "Canning, Griffin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 656427,
+   "name": "Flaherty, Jack",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656464,
+   "name": "Ginkel, Kevin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656492,
+   "name": "Griffin, Foster",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656555,
+   "name": "Hoskins, Rhys",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656686,
+   "name": "Martin, Corbin",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 656756,
+   "name": "Montgomery, Jordan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656775,
+   "name": "Mullins, Cedric",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 656786,
+   "name": "Mushinski, Parker",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 656794,
+   "name": "Newcomb, Sean",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 656849,
+   "name": "Peterson, David",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 657041,
+   "name": "Thomas, Lane",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 657044,
+   "name": "Thompson, Ryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 657097,
+   "name": "Webb, Jacob",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 657265,
+   "name": "Strzelecki, Peter",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 657571,
+   "name": "Ferguson, Caleb",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 657612,
+   "name": "Hill, Tim",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 657656,
+   "name": "Laureano, Ramón",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 660162,
+   "name": "Moncada, Yoán",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 660761,
+   "name": "Suarez, José",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 660821,
+   "name": "Sánchez, Jesús",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 660853,
+   "name": "De Los Santos, Enyel",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 661527,
+   "name": "Martinez, Seth",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 662139,
+   "name": "Varsho, Daulton",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663423,
+   "name": "Thornton, Trent",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663432,
+   "name": "Rainey, Tanner",
+   "sources": [
+    "fangraphs",
+    "elected"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663460,
+   "name": "Bubic, Kris",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663554,
+   "name": "Mize, Casey",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663559,
+   "name": "Falter, Bailey",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 663624,
+   "name": "Mountcastle, Ryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 663697,
+   "name": "India, Jonathan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663757,
+   "name": "Grisham, Trent",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663765,
+   "name": "Woodford, Jake",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 663776,
+   "name": "Sandoval, Patrick",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663886,
+   "name": "Stephenson, Tyler",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663903,
+   "name": "Singer, Brady",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663978,
+   "name": "Paddack, Chris",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 663993,
+   "name": "Lowe, Nathaniel",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664023,
+   "name": "Happ, Ian",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664034,
+   "name": "France, Ty",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664040,
+   "name": "Lowe, Brandon",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664059,
+   "name": "Haggerty, Sam",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 664126,
+   "name": "Fairbanks, Pete",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664141,
+   "name": "Brubaker, JT",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664199,
+   "name": "Clarke, Taylor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664238,
+   "name": "Moore, Dylan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664353,
+   "name": "Urquidy, José",
+   "sources": [
+    "fangraphs",
+    "elected"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664702,
+   "name": "Straw, Myles",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 664731,
+   "name": "Higgins, P.J.",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 664761,
+   "name": "Bohm, Alec",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 664774,
+   "name": "Wade Jr., LaMonte",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 665862,
+   "name": "Chisholm Jr., Jazz",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 666181,
+   "name": "Benson, Will",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 666182,
+   "name": "Bichette, Bo",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 666969,
+   "name": "García, Adolis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 666971,
+   "name": "Gurriel Jr., Lourdes",
+   "sources": [
+    "fangraphs",
+    "released"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 668227,
+   "name": "Arozarena, Randy",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 668670,
+   "name": "Rogers, Jake",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 668678,
+   "name": "Gallen, Zac",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 668941,
+   "name": "Romero, JoJo",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 668942,
+   "name": "Rojas, Josh",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669087,
+   "name": "Huff, Sam",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 669160,
+   "name": "May, Dustin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 669211,
+   "name": "Akin, Keegan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669289,
+   "name": "Espinal, Santiago",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669371,
+   "name": "Henry, Cole",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 669373,
+   "name": "Skubal, Tarik",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669432,
+   "name": "Rogers, Trevor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669456,
+   "name": "Bieber, Shane",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669720,
+   "name": "Hays, Austin",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 669899,
+   "name": "Ward, Ryan",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 669920,
+   "name": "Alexander, Jason",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 670032,
+   "name": "Lopez, Nicky",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 670090,
+   "name": "Mills, Wyatt",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 670097,
+   "name": "Short, Zack",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 670167,
+   "name": "Schreiber, John",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 670280,
+   "name": "Bednar, David",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 670770,
+   "name": "Friedl, TJ",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 670950,
+   "name": "Richards, Trevor",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 670970,
+   "name": "Morejon, Adrian",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 671109,
+   "name": "Eder, Jake",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 671131,
+   "name": "Rutledge, Jackson",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 672820,
+   "name": "Sosa, Lenyn",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 673357,
+   "name": "Robert Jr., Luis",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 673490,
+   "name": "Kim, Ha-Seong",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 673513,
+   "name": "Matsui, Yuki",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP"
+  },
+  {
+   "mlbId": 673548,
+   "name": "Suzuki, Seiya",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 673995,
+   "name": "Wendzel, Davis",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 675448,
+   "name": "Hunt, Blake",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 675919,
+   "name": "Raquet, Nick",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 676369,
+   "name": "Velázquez, Nelson",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 676568,
+   "name": "Vanasco, Ricky",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 677870,
+   "name": "Jiménez, Leo",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 677950,
+   "name": "Thomas, Alek",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 680689,
+   "name": "Richardson, Lyon",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 680702,
+   "name": "Gerber, Joey",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 680704,
+   "name": "Sandlin, Nick",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 680777,
+   "name": "Jeffers, Ryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 680802,
+   "name": "Weiss, Ryan",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "PROBABLY_FA"
+  },
+  {
+   "mlbId": 681146,
+   "name": "Bride, Jonah",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 681520,
+   "name": "Kelly, Antoine",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 681911,
+   "name": "Vesia, Alex",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 684007,
+   "name": "Imanaga, Shota",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA"
+  },
+  {
+   "mlbId": 686747,
+   "name": "La Sorsa, Joe",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 687957,
+   "name": "Harris, Dustin",
+   "sources": [
+    "released"
+   ]
+  },
+  {
+   "mlbId": 694363,
+   "name": "Shuster, Jared",
+   "sources": [
+    "elected"
+   ]
+  },
+  {
+   "mlbId": 808970,
+   "name": "Go, Woo-Suk",
+   "sources": [
+    "released"
+   ]
+  }
+ ]
+}

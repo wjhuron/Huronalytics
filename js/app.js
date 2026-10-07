@@ -258,6 +258,7 @@
         if (qp.page) urlState.page = parseInt(qp.page, 10) || 1;
         if (qp.pitch) urlState.pitchTypes = qp.pitch.split(',');
         if (qp.role) document.getElementById('role-filter').value = qp.role;
+        if (qp.fa === '1') document.getElementById('status-filter').value = 'fa';
       }
       navigateToTab(tab, true, urlState);  // true = don't push hash (already there)
     } else {
@@ -482,6 +483,7 @@
       (!team && (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall')) ? '' : 'none';
     document.getElementById('min-pitcher-swings-filter-group').style.display =
       (!team && currentTab === 'pitcherSwingDecisions') ? '' : 'none';
+    document.getElementById('status-filter-group').style.display = team ? 'none' : '';
     searchInput.placeholder = team ? 'Team...' :
       (isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...');
   }
@@ -586,6 +588,7 @@
     minBipInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     minPitcherSwingsInput.addEventListener('input', function () { Leaderboard.currentPage = 1; refresh(); });
     document.getElementById('role-filter').addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
+    document.getElementById('status-filter').addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateStartInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
     dateEndInput.addEventListener('change', function () { Leaderboard.currentPage = 1; refresh(); });
 
@@ -892,6 +895,7 @@
       dateStart: dateStartInput.value || '',
       dateEnd: dateEndInput.value || '',
       role: document.getElementById('role-filter').value,
+      status: document.getElementById('status-filter').value,
     };
   }
 
@@ -970,6 +974,23 @@
 
     let data = DataStore.getFilteredDataV2(dataTab, filters);
     const columns = activeColumns();
+
+    // Free Agents: a player filter on top of every other filter. The league
+    // row below is built from its own unfiltered call, so it stays league.
+    if (filters.status === 'fa' && viewMode !== 'team') {
+      if (!DataStore.freeAgentIds) {
+        DataStore.loadFreeAgents().then(function () { refresh(); }, function (e) {
+          console.error(e);
+          const sel = document.getElementById('status-filter');
+          sel.value = 'all';
+          sel.title = 'Free-agent list failed to load';
+          refresh();
+        });
+        return;
+      }
+      const faIds = DataStore.freeAgentIds;
+      data = data.filter(function (r) { return faIds[r.mlbId] === true; });
+    }
 
     data = applyRangeFilters(data, columns);
 
@@ -1745,6 +1766,7 @@
     if (selectedPitchTypes.length > 0) parts.push('pitch=' + selectedPitchTypes.join(','));
     var roleVal = document.getElementById('role-filter').value;
     if (roleVal && roleVal !== 'all') parts.push('role=' + roleVal);
+    if (document.getElementById('status-filter').value === 'fa') parts.push('fa=1');
     const hash = route + (parts.length > 0 ? '?' + parts.join('&') : '');
     if (window.location.hash !== '#' + hash) {
       history.replaceState(null, '', '#' + hash);
