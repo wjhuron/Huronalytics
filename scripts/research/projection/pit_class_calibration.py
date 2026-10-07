@@ -34,7 +34,9 @@ PIT_EXP_K = 20
 MIN_IP_T = 30
 
 
-def main():
+def heldout_records(min_ip_t=MIN_IP_T):
+    """The production 1-year pitcher model, each target season 2022-2026 projected with OLS weights
+    fit on the other four. One record per pitcher with >= min_ip_t IP in T."""
     S = {y: pr.season(y) for y in range(2015, 2027)}
     stuff = json.load(open(os.path.join(pr.ROOT, 'data', '_era_internal_stuff.json')))
     H1 = json.load(open(os.path.join(P, '_pit_horizon_backtest.json')))['1']['pooled']
@@ -86,11 +88,16 @@ def main():
         p, _ = pr.fit_predict(np.vstack([Xd[b] for b in tr]), np.concatenate([y[b] for b in tr]),
                               np.concatenate([w[b] for b in tr]), Xd[B])
         for (pid, t, hist), pi in zip(R[B], p):
-            if t['ip'] < MIN_IP_T:
+            if t['ip'] < min_ip_t:
                 continue
             recs.append({'T': B + 1, 'pid': pid, 'ip': t['ip'], 'gs': t['gs'], 'pred': float(pi), 'act': t['ra9'],
                          'gap': hist_raw(hist, 'ra9') - hist_raw(hist, 'fip'), 'lvl': hist_raw(hist, 'ra9'),
                          'hist_ip': sum(h['ip'] for h in hist if h)})
+    return recs
+
+
+def main():
+    recs = heldout_records()
 
     def summarize(sel, label):
         r = [x for x in recs if sel(x)]
