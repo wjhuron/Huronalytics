@@ -464,6 +464,8 @@ def apply_hitter_war(rows, fielding, innings, baserunning, lg_ra9, woba_scale, t
 # hpWAR / hpWAR3 / hpWAR5 = 1 / 3 / 5 seasons past the base. Triple-A rows get none (per Wally).
 HPWAR_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'hpwar_projections.json')
 HPWAR_KEYS = ('hpWAR', 'hpWAR3', 'hpWAR5')
+# hpWARtot (2026-10-07): the one-season TOTAL, hpWAR x projected playing time (hpWAR_pt, IP or PA).
+HPWAR_EXTRA = {'hpWARtot': 'tot', 'hpWAR_pt': 'pt'}
 
 
 def apply_hpwar(pitcher_rows, hitter_rows, aaa_teams=('ROC', 'AAA')):
@@ -488,6 +490,8 @@ def apply_hpwar(pitcher_rows, hitter_rows, aaa_teams=('ROC', 'AAA')):
                 continue
             for k in HPWAR_KEYS:
                 r[k] = rec.get(k)
+            for k, src_k in HPWAR_EXTRA.items():
+                r[k] = rec.get(src_k)
             r['hpWAR_unit'] = rec.get('unit')
             r['hpWAR_thin'] = rec.get('thin') or None
             n += 1

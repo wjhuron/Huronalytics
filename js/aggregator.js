@@ -766,7 +766,7 @@ const Aggregator = {
                      'hpERAPlus', 'hpERAPlus_pctl',
                      'hWAR', 'hWAR_pctl', 'hWAR_se', 'fWAR', 'fWAR_pctl',
                      // hpWAR (projected, a rate) is a static season-level input
-                     'hpWAR', 'hpWAR3', 'hpWAR5', 'hpWAR_unit', 'hpWAR_thin',
+                     'hpWAR', 'hpWAR3', 'hpWAR5', 'hpWAR_unit', 'hpWAR_thin', 'hpWARtot', 'hpWAR_pt',
                      // Command+ is season-level like Pitcher+: targets are
                      // fit on the full season, so filtered views preserve
                      // rather than recompute it.
@@ -2606,7 +2606,7 @@ const Aggregator = {
                         // hWAR and its components are season-level (pipeline/hwar.py)
                         'hWAR', 'hWAR_se', 'hBatRuns', 'hBsrRuns', 'hFldRuns', 'hPosRuns', 'hReplRuns', 'fWAR', 'fWAR_pctl',
                         // hpWAR (projected, a rate) is a static season-level input
-                        'hpWAR', 'hpWAR3', 'hpWAR5', 'hpWAR_unit', 'hpWAR_thin'];
+                        'hpWAR', 'hpWAR3', 'hpWAR5', 'hpWAR_unit', 'hpWAR_thin', 'hpWARtot', 'hpWAR_pt'];
     // Rate stats that micro data computes (skip when filtered)
     const hBoxRateStats = ['avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK',
                            'doubles', 'triples', 'hr', 'xbh'];
