@@ -287,6 +287,57 @@ const COLUMNS = {
   ],
 };
 
+// Hidden Free Agents tabs (?roc=1 only; app.js FA_TABS), per Wally 2026-10-08.
+// Built from the existing column definitions so every tooltip, format and
+// percentile key stays single-homed; each pick is a COPY with its own group,
+// so the source tabs are untouched. Groups: Profile, 2026, Skills, Projected
+// (+ hdWAR Parts for hitters). Only the profile columns and the hdWAR parts
+// are new definitions.
+(function () {
+  function pick(tab, key, group, first) {
+    var src = COLUMNS[tab].filter(function (c) { return c.key === key; })[0];
+    if (!src) throw new Error('FA column ' + key + ' not found in ' + tab);
+    var c = Object.assign({}, src, { group: group });
+    delete c.sectionStart;
+    if (first) c.sectionStart = true;
+    return c;
+  }
+  function picks(group, list) {
+    return list.map(function (tk, i) { return pick(tk[0], tk[1], group, i === 0); });
+  }
+  var age = { key: 'faAge', label: 'Age', format: Utils.formatInt, sortType: 'numeric', noPercentile: true, sectionStart: true,
+    desc: 'Baseball age (as of June 30) in 2027, the first season of a new contract.', group: 'fa_profile' };
+  var source = { key: 'faSource', label: 'FA Source', format: function (v) { return v || '--'; }, sortType: 'string', noPercentile: true,
+    desc: 'Where the player comes from: FanGraphs free-agent tracker status (FA, Prob FA, Toss-up), Released, or Elected FA (your transaction lists).', group: 'fa_profile' };
+  var role = { key: 'faRole', label: 'Role', format: function (v) { return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true,
+    desc: 'SP if he started at least half of his 2026 games, else RP (the hpWAR Full unit rule).', group: 'fa_profile' };
+  var pos = { key: 'position', label: 'Pos', format: function (v) { return v || '--'; }, sortType: 'string', align: 'center', noPercentile: true,
+    desc: 'Primary 2026 position.', group: 'fa_profile' };
+  function runs(key, label, desc) {
+    return { key: key, label: label, format: Utils.formatDecimal(1), sortType: 'numeric', noPercentile: true, desc: desc, group: 'fa_hdwar' };
+  }
+  var P = 'pitcherStats', PB = 'pitcherBattedBall', PS = 'pitcherSwingDecisions';
+  COLUMNS.faPitchers = COLUMNS.pitcherStats.filter(function (c) { return c.group === 'info'; })
+    .concat([age, role, source])
+    .concat(picks('fa_2026', [[P, 'g'], [P, 'gs'], [P, 'ip'], [P, 'era'], [P, 'fip'], [P, 'xFIP'], [P, 'siera'], [P, 'hdERA'], [P, 'hWAR'], [P, 'fWAR']]))
+    .concat(picks('fa_skills', [[P, 'kPct'], [P, 'bbPct'], [P, 'kbbPct'], [PS, 'cswPct'], [PS, 'swStrPct'], [PB, 'xwOBA'], [PB, 'hardHitPct'],
+                                [PB, 'barrelPctAgainst'], [PB, 'gbPct'], [P, 'stuffScore'], [P, 'locPlus'], [P, 'pitcherPlus']]))
+    .concat(picks('projected', [[P, 'hpERA'], [P, 'hpWARtot'], [P, 'hpWAR'], [P, 'hpWAR_pt'], [P, 'hpWAR3'], [P, 'hpWAR5']]));
+  var H = 'hitterStats', HB = 'hitterBattedBall', HS = 'hitterSwingDecisions', HT = 'hitterBatTracking';
+  var hpos = Object.assign({}, pos);
+  var HINFO = { _rank: 1, hitter: 1, team: 1, stands: 1 };   // hitterStats' info group also holds PA/G/AB
+  COLUMNS.faHitters = COLUMNS.hitterStats.filter(function (c) { return HINFO[c.key]; })
+    .concat([age, hpos, source])
+    .concat(picks('fa_2026', [[H, 'pa'], [H, 'wRCplus'], [H, 'xWRCplus'], [H, 'avg'], [H, 'obp'], [H, 'slg'], [H, 'hr'], [H, 'sb'], [H, 'hWAR'], [H, 'fWAR']]))
+    .concat([runs('hBatRuns', 'Bat', 'hdWAR batting runs (2026).'), runs('hBsrRuns', 'BsR', 'hdWAR baserunning runs (2026).'),
+             runs('hFldRuns', 'Fld', 'hdWAR fielding runs (2026, Savant fielding run value).'), runs('hPosRuns', 'Pos', 'hdWAR positional runs (2026).')])
+    .concat(picks('fa_skills', [[H, 'wOBA'], [H, 'xwOBA'], [H, 'xSLG'], [HB, 'avgEVAll'], [HB, 'ev95'], [HB, 'hardHitPct'], [HB, 'barrelPct'],
+                                [HB, 'airPullPct'], [HB, 'bbPlus'], [H, 'bbPct'], [H, 'kPct'], [HS, 'chasePct'], [HS, 'izContactPct'], [HS, 'sdPlus'],
+                                [HS, 'ctPlus'], [H, 'processPlus'], [HT, 'batSpeed'], [H, 'sprintSpeed']]))
+    .concat(picks('projected', [[H, 'hpWARtot'], [H, 'hpWAR'], [H, 'hpWAR_pt'], [H, 'hpWAR3'], [H, 'hpWAR5']]));
+  COLUMNS.faHitters[COLUMNS.faHitters.indexOf(COLUMNS.faHitters.filter(function (c) { return c.key === 'hBatRuns'; })[0])].sectionStart = true;
+})();
+
 const Leaderboard = {
   currentSort: { key: null, dir: 'desc' },
   hiddenColumns: {},  // key -> true if hidden
@@ -614,7 +665,7 @@ const Leaderboard = {
 
     const groupRow = document.createElement('tr');
     groupRow.id = 'table-group-header';
-    const groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', advanced: 'Advanced', projected: 'Projected', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking', outcomes: 'Outcomes', expected: 'Expected', run_value: 'Run Value', quality: 'Quality', composition: 'Composition', supplemental: 'Supplemental', distance: 'Distance', baserunning: 'Baserunning' };
+    const groupLabels = { info: '', rates: 'Rates', stats: 'Stats', metrics: 'Metrics', counting: 'Counting', advanced: 'Advanced', projected: 'Projected', fa_profile: 'Profile', fa_2026: '2026', fa_skills: 'Skills', fa_hdwar: 'hdWAR Parts', ev: 'Exit Velo', batted_ball: 'Batted Ball', spray: 'Spray', discipline: 'Discipline', bat_tracking: 'Bat Tracking', outcomes: 'Outcomes', expected: 'Expected', run_value: 'Run Value', quality: 'Quality', composition: 'Composition', supplemental: 'Supplemental', distance: 'Distance', baserunning: 'Baserunning' };
     let prevGroup = null;
     const groupSpans = [];
     visCols.forEach(function (col) {

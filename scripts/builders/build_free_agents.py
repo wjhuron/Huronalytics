@@ -15,7 +15,9 @@ though he has AAA data: the filter is for players who played in MLB.
 Names are matched to mlbId through the shipped leaderboard rows. A name that
 matches several MLB players is resolved by role (pitcher vs hitter) and then
 by the listed team; anything still ambiguous is printed and left out, never
-guessed. Run it again after either Numbers file changes, then commit the JSON:
+guessed. Each player also carries his baseball age (June 30) in the season after BASE_SEASON, from
+the MLB season lines in data/_proj/ (lines_*_{year}.json, the projection inputs), for the hidden Free
+Agents page. Run it again after either Numbers file changes, then commit the JSON:
 
     python3 scripts/builders/build_free_agents.py
 """
@@ -40,6 +42,7 @@ OUT = os.path.join(DATA, 'free_agents.json')
 DOWNLOADS = os.path.expanduser('~/Downloads')
 
 FG_EXCLUDE = {'NOT_HAPPENING', 'PROBABLY_NOT_FA'}
+BASE_SEASON = 2026          # the season just played; ages are for BASE_SEASON + 1
 PITCHER_POS = {'P', 'SP', 'RP', 'RHP', 'LHP'}
 SUFFIX = re.compile(r'\b(jr|sr|ii|iii|iv)\b')
 
@@ -78,6 +81,28 @@ def mlb_index():
     for mid, p in idx.items():
         by_name.setdefault(norm_name(p['name']), []).append(mid)
     return idx, by_name
+
+
+def birth_dates():
+    """mlbId -> 'yyyy-mm-dd' from the season lines, most recent season first."""
+    out = {}
+    for y in range(BASE_SEASON, BASE_SEASON - 3, -1):
+        for kind in ('pitching', 'hitting'):
+            path = os.path.join(DATA, '_proj', f'lines_{kind}_{y}.json')
+            if not os.path.exists(path):
+                continue
+            with open(path) as f:
+                for r in json.load(f):
+                    if r.get('birth') and r['id'] not in out:
+                        out[r['id']] = r['birth']
+    if not out:
+        sys.exit('No season lines in data/_proj/; run scripts/research/projection/pull_season_lines.py first.')
+    return out
+
+
+def baseball_age(birth, season):
+    y, m, d = (int(x) for x in birth.split('-'))
+    return season - y - (1 if (m, d) > (6, 30) else 0)
 
 
 def resolve(name, pos, team, idx, by_name):
@@ -187,7 +212,13 @@ def main():
             else:
                 add(mid, source)
 
-    out = {'generatedAt': date.today().isoformat(),
+    births = birth_dates()
+    no_birth = 0
+    for mid, e in players.items():
+        b = births.get(mid)
+        e['age'] = baseball_age(b, BASE_SEASON + 1) if b else None
+        no_birth += b is None
+    out = {'generatedAt': date.today().isoformat(), 'ageSeason': BASE_SEASON + 1,
            'players': sorted(players.values(), key=lambda e: e['mlbId'])}
     fd, tmp_path = tempfile.mkstemp(dir=DATA, suffix='.json')
     with os.fdopen(fd, 'w') as f:
@@ -203,7 +234,7 @@ def main():
         by_src[' + '.join(e['sources'])] = by_src.get(' + '.join(e['sources']), 0) + 1
     for k, v in sorted(by_src.items()):
         print(f'  {v:4d}  {k}')
-    print(f'Wrote {len(players)} players to {os.path.relpath(OUT, ROOT)}')
+    print(f'Wrote {len(players)} players to {os.path.relpath(OUT, ROOT)} ({no_birth} without a birth date, age blank)')
     amb = [d for d in dropped if d[2].startswith('ambiguous')]
     nomlb = [d for d in dropped if not d[2].startswith('ambiguous')]
     print(f'Left out: {len(nomlb)} with no 2026 MLB row, {len(amb)} ambiguous')

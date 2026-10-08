@@ -11,15 +11,22 @@
     pitcherBattedBall: 'pitchers', pitcherSwingDecisions: 'pitchers',
     hitterStats: 'hitters', hitterBattedBall: 'hitters',
     hitterSwingDecisions: 'hitters', hitterBatTracking: 'hitters',
-    hitterPitch: 'hitters'
+    hitterPitch: 'hitters',
+    // Hidden Free Agents tabs (?roc=1 only, per Wally 2026-10-08). They BEHAVE
+    // as pitcher / hitter tabs (isPitcherTab / isHitterTab); only the nav
+    // section differs, via FA_TABS. Columns: leaderboard.js COLUMNS.faPitchers
+    // / faHitters.
+    faPitchers: 'pitchers', faHitters: 'hitters'
   };
+  const FA_TABS = { faPitchers: true, faHitters: true };
 
   const TAB_DATA = {
     pitcherStats: 'pitcher', pitchMetrics: 'pitch',
     pitcherBattedBall: 'pitcher', pitcherSwingDecisions: 'pitcher',
     hitterStats: 'hitter', hitterBattedBall: 'hitter',
     hitterSwingDecisions: 'hitter', hitterBatTracking: 'hitter',
-    hitterPitch: 'hitterPitch'
+    hitterPitch: 'hitterPitch',
+    faPitchers: 'pitcher', faHitters: 'hitter'
   };
 
   const TAB_ROUTE = {
@@ -27,7 +34,8 @@
     pitcherBattedBall: 'pitchers/batted-ball', pitcherSwingDecisions: 'pitchers/plate-discipline',
     hitterStats: 'hitters/stats', hitterBattedBall: 'hitters/batted-ball',
     hitterSwingDecisions: 'hitters/plate-discipline', hitterBatTracking: 'hitters/bat-tracking',
-    hitterPitch: 'hitters/pitch-type'
+    hitterPitch: 'hitters/pitch-type',
+    faPitchers: 'free-agents/pitchers', faHitters: 'free-agents/hitters'
   };
 
   const ROUTE_TAB = {};
@@ -59,7 +67,9 @@
     hitterSwingDecisions:  { key: 'sdPlus',     dir: 'desc' },
     hitterBattedBall:      { key: 'bbPlus',     dir: 'desc' },
     hitterBatTracking:     { key: 'batSpeed',   dir: 'desc' },
-    hitterPitch:           { key: 'xRv100',     dir: 'desc' }
+    hitterPitch:           { key: 'xRv100',     dir: 'desc' },
+    faPitchers:            { key: 'hpWARtot',   dir: 'desc' },
+    faHitters:             { key: 'hpWARtot',   dir: 'desc' }
   };
 
   function defaultSortFor(tab) {
@@ -91,6 +101,9 @@
   if (rocMode) {
     const catchTab = document.getElementById('catch-tab');
     if (catchTab) catchTab.style.display = 'inline-block';
+    // The Free Agents section rides the same link (per Wally 2026-10-08).
+    const faTab = document.getElementById('fa-section-tab');
+    if (faTab) faTab.style.display = '';
   }
 
   // Called once the heavy chunk + Aggregator are ready: undo the degraded
@@ -112,7 +125,7 @@
     }
     if (vsHandSelect) { vsHandSelect.disabled = false; vsHandSelect.title = ''; }
     var vmGroup = document.getElementById('view-mode-group');
-    if (vmGroup) vmGroup.style.display = '';
+    if (vmGroup) vmGroup.style.display = FA_TABS[currentTab] ? 'none' : '';
   }
 
   function init() {
@@ -231,7 +244,8 @@
       showAbs(['leaders', 'matrix', 'film', 'zone'].indexOf(av) >= 0 ? av : 'leaders', true, parts[1]);
       return;
     }
-    const tab = ROUTE_TAB[routePart];
+    let tab = ROUTE_TAB[routePart];
+    if (tab && FA_TABS[tab] && !rocMode) tab = null;    // hidden without ?roc=1
     if (tab) {
       if (parts[1]) {
         const qp = {};
@@ -288,6 +302,7 @@
 
     document.getElementById('pitcher-subtabs').style.display = 'none';
     document.getElementById('hitter-subtabs').style.display = 'none';
+    document.getElementById('fa-subtabs').style.display = 'none';
     hideAbs();
   }
 
@@ -311,6 +326,7 @@
     const pctlLeg = document.getElementById('pctl-legend'); if (pctlLeg) pctlLeg.style.display = 'none';
     document.getElementById('pitcher-subtabs').style.display = 'none';
     document.getElementById('hitter-subtabs').style.display = 'none';
+    document.getElementById('fa-subtabs').style.display = 'none';
     document.getElementById('abs-page').style.display = '';
     document.getElementById('abs-subtabs').style.display = '';
     document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
@@ -339,8 +355,10 @@
     if (_navigating) return;
     _navigating = true;
     try {
+    const prevTab = currentTab;
     currentTab = tab;
     currentSection = TAB_SECTION[tab];
+    const navSection = FA_TABS[tab] ? 'freeagents' : currentSection;
 
     if (!skipHash) {
       window.location.hash = TAB_ROUTE[tab];
@@ -353,11 +371,12 @@
       t.classList.remove('active');
       t.setAttribute('aria-selected', 'false');
     });
-    const sectionBtn = document.querySelector('.section-tab[data-section="' + currentSection + '"]');
+    const sectionBtn = document.querySelector('.section-tab[data-section="' + navSection + '"]');
     if (sectionBtn) { sectionBtn.classList.add('active'); sectionBtn.setAttribute('aria-selected', 'true'); }
 
-    document.getElementById('pitcher-subtabs').style.display = currentSection === 'pitchers' ? '' : 'none';
-    document.getElementById('hitter-subtabs').style.display = currentSection === 'hitters' ? '' : 'none';
+    document.getElementById('pitcher-subtabs').style.display = navSection === 'pitchers' ? '' : 'none';
+    document.getElementById('hitter-subtabs').style.display = navSection === 'hitters' ? '' : 'none';
+    document.getElementById('fa-subtabs').style.display = navSection === 'freeagents' ? '' : 'none';
 
     document.querySelectorAll('.nav-subtabs .tab').forEach(function (t) {
       t.classList.remove('active');
@@ -387,7 +406,8 @@
       currentTab === 'pitcherSwingDecisions' ? '' : 'none';
 
     const isPitcherTab = currentTab === 'pitcherStats' || currentTab === 'pitchMetrics' ||
-                       currentTab === 'pitcherBattedBall' || currentTab === 'pitcherSwingDecisions';
+                       currentTab === 'pitcherBattedBall' || currentTab === 'pitcherSwingDecisions' ||
+                       currentTab === 'faPitchers';
     document.getElementById('role-filter-group').style.display = isPitcherTab ? '' : 'none';
 
     // Hide Min Pitches on pitcherStats (uses Min IP / Min TBF instead)
@@ -454,6 +474,20 @@
       }
     }
 
+    // Free Agents tabs: always the FA pool, the whole of it, colored (the same
+    // settings the Status filter applies). Leaving them restores the defaults.
+    const statusSel = document.getElementById('status-filter');
+    if (FA_TABS[tab]) {
+      viewMode = 'player';
+      statusSel.value = 'fa';
+      minIpInput.value = '0';
+      minCountInput.value = '1';
+    } else if (FA_TABS[prevTab]) {
+      statusSel.value = 'all';
+      minIpInput.value = 'Q';
+      minCountInput.value = 'Q';
+    }
+
     applyViewModeUI();
 
     refresh();
@@ -487,7 +521,10 @@
       (!team && (currentTab === 'pitcherBattedBall' || currentTab === 'hitterBattedBall')) ? '' : 'none';
     document.getElementById('min-pitcher-swings-filter-group').style.display =
       (!team && currentTab === 'pitcherSwingDecisions') ? '' : 'none';
-    document.getElementById('status-filter-group').style.display = team ? 'none' : '';
+    document.getElementById('status-filter-group').style.display = (team || FA_TABS[currentTab]) ? 'none' : '';
+    const vmGroupFa = document.getElementById('view-mode-group');
+    if (FA_TABS[currentTab]) vmGroupFa.style.display = 'none';
+    else if (Aggregator.loaded) vmGroupFa.style.display = '';
     searchInput.placeholder = team ? 'Team...' :
       (isHitterTab(currentTab) ? 'Hitter name...' : 'Pitcher name...');
   }
@@ -779,6 +816,8 @@
           navigateToTab('hitterStats');
         } else if (section === 'abs') {
           showAbs('leaders');
+        } else if (section === 'freeagents') {
+          navigateToTab('faPitchers');
         }
       });
     });
@@ -931,6 +970,36 @@
   const ROC_HIDDEN_HITTER = ['batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'idealAAPct', 'squaredUpPct', 'sprintSpeed'];
   const ALL_ROC_HIDDEN = ROC_HIDDEN_PITCHER.concat(ROC_HIDDEN_HITTER);
 
+  // Profile cells for the Free Agents tabs: age, role and list source, on a
+  // COPY of the row (the source rows are shared by every tab).
+  const FG_STATUS_LABEL = { IS_FA: 'FA', PROBABLY_FA: 'Prob FA', TOSSUP: 'Toss-up' };
+  // The client re-aggregation does not carry `position`, so read it from the
+  // shipped hitter rows (built once; any MLB row of the player carries it).
+  let _faPosById = null;
+  function faPosition(id) {
+    if (!_faPosById) {
+      _faPosById = {};
+      (DataStore.rs.hitterData || []).forEach(function (h) {
+        if (h.position && h.mlbId != null && !_faPosById[h.mlbId]) _faPosById[h.mlbId] = h.position;
+      });
+    }
+    return _faPosById[id] || null;
+  }
+  function faProfile(r) {
+    const info = (DataStore.freeAgentInfo || {})[r.mlbId] || {};
+    const src = [];
+    if (info.fgStatus) src.push(FG_STATUS_LABEL[info.fgStatus] || info.fgStatus);
+    if ((info.sources || []).indexOf('released') !== -1) src.push('Released');
+    if ((info.sources || []).indexOf('elected') !== -1) src.push('Elected FA');
+    const g = r.g || 0;
+    return Object.assign({}, r, {
+      faAge: info.age != null ? info.age : null,
+      faSource: src.join(' / ') || null,
+      faRole: r.pitcher ? (g > 0 && (r.gs || 0) / g >= 0.5 ? 'SP' : 'RP') : null,
+      position: r.hitter ? (r.position || faPosition(r.mlbId)) : r.position
+    });
+  }
+
   function refresh() {
     const filters = getFilters();
     let dataTab = TAB_DATA[currentTab] || 'pitcher';
@@ -1002,6 +1071,7 @@
       }
       const faIds = DataStore.freeAgentIds;
       data = data.filter(function (r) { return faIds[r.mlbId] === true; });
+      if (FA_TABS[currentTab]) data = data.map(faProfile);
     }
 
     data = applyRangeFilters(data, columns);

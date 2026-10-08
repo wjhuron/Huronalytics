@@ -27,6 +27,7 @@ const DataStore = {
   // promise rejects; the caller resets the control rather than showing
   // every player under a "Free Agents" label.
   freeAgentIds: null,
+  freeAgentInfo: null,
   _faPromise: null,
   loadFreeAgents: function () {
     var self = this;
@@ -35,9 +36,16 @@ const DataStore = {
       if (!resp.ok) throw new Error('Free-agent list fetch failed: HTTP ' + resp.status);
       return resp.json();
     }).then(function (d) {
-      var ids = {};
-      (d.players || []).forEach(function (p) { ids[p.mlbId] = true; });
+      var ids = {}, info = {};
+      (d.players || []).forEach(function (p) {
+        ids[p.mlbId] = true;
+        info[p.mlbId] = { age: p.age, sources: p.sources || [], fgStatus: p.fgStatus || null };
+      });
       self.freeAgentIds = ids;
+      // Per-player age (in ageSeason) and list sources, for the hidden Free
+      // Agents tabs (app.js FA_TABS).
+      self.freeAgentInfo = info;
+      self.freeAgentAgeSeason = d.ageSeason || null;
       self.freeAgentsAsOf = d.generatedAt || '';
       return ids;
     }).catch(function (e) {

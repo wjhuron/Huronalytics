@@ -1,5 +1,6 @@
 {
- "generatedAt": "2026-10-07",
+ "generatedAt": "2026-10-08",
+ "ageSeason": 2027,
  "players": [
   {
    "mlbId": 445276,
@@ -7,7 +8,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 39
   },
   {
    "mlbId": 453286,
@@ -15,7 +17,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 42
   },
   {
    "mlbId": 455119,
@@ -24,7 +27,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 41
   },
   {
    "mlbId": 457705,
@@ -33,7 +37,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 40
   },
   {
    "mlbId": 467793,
@@ -42,7 +47,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 41
   },
   {
    "mlbId": 471911,
@@ -50,7 +56,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 40
   },
   {
    "mlbId": 472610,
@@ -59,7 +66,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 40
   },
   {
    "mlbId": 500743,
@@ -67,7 +75,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 500779,
@@ -75,7 +84,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 502054,
@@ -83,7 +93,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 39
   },
   {
    "mlbId": 502671,
@@ -91,7 +102,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 39
   },
   {
    "mlbId": 516782,
@@ -100,7 +112,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 518595,
@@ -108,7 +121,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 518886,
@@ -116,7 +130,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 39
   },
   {
    "mlbId": 519141,
@@ -125,7 +140,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 527048,
@@ -133,7 +149,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 542303,
@@ -142,7 +159,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 542888,
@@ -150,7 +168,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 36
   },
   {
    "mlbId": 543056,
@@ -159,7 +178,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 543243,
@@ -167,7 +187,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 37
   },
   {
    "mlbId": 543309,
@@ -175,7 +196,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 37
   },
   {
    "mlbId": 543510,
@@ -183,7 +205,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 543807,
@@ -191,7 +214,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 543877,
@@ -199,7 +223,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 545121,
@@ -207,7 +232,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 545341,
@@ -215,7 +241,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 547179,
@@ -223,14 +250,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 547184,
    "name": "Kelly, Michael",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 34
   },
   {
    "mlbId": 548384,
@@ -238,7 +267,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 39
   },
   {
    "mlbId": 552640,
@@ -246,7 +276,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 553869,
@@ -254,7 +285,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 553993,
@@ -262,7 +294,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 35
   },
   {
    "mlbId": 571510,
@@ -270,7 +303,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 36
   },
   {
    "mlbId": 571578,
@@ -278,7 +312,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 571657,
@@ -286,7 +321,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 571771,
@@ -294,7 +330,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 571882,
@@ -302,7 +339,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 571912,
@@ -310,7 +348,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 571945,
@@ -318,7 +357,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 571948,
@@ -326,7 +366,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 572143,
@@ -334,7 +375,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 572955,
@@ -342,14 +384,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 36
   },
   {
    "mlbId": 573009,
    "name": "Mantiply, Joe",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 36
   },
   {
    "mlbId": 573124,
@@ -357,7 +401,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 573204,
@@ -365,7 +410,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 40
   },
   {
    "mlbId": 592094,
@@ -373,7 +419,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 592206,
@@ -382,7 +429,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 592332,
@@ -390,7 +438,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 592454,
@@ -399,7 +448,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 592626,
@@ -407,7 +457,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 35
   },
   {
    "mlbId": 592662,
@@ -415,7 +466,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 592773,
@@ -423,7 +475,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 35
   },
   {
    "mlbId": 592791,
@@ -431,7 +484,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 592836,
@@ -440,7 +494,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 592866,
@@ -448,14 +503,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 594580,
    "name": "Moll, Sam",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 35
   },
   {
    "mlbId": 594835,
@@ -464,7 +521,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 595014,
@@ -472,7 +530,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 39
   },
   {
    "mlbId": 595345,
@@ -480,7 +539,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 595978,
@@ -488,7 +548,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 596001,
@@ -496,7 +557,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 34
   },
   {
    "mlbId": 596103,
@@ -504,7 +566,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 596142,
@@ -512,7 +575,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 34
   },
   {
    "mlbId": 596146,
@@ -521,15 +585,18 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 600869,
    "name": "Candelario, Jeimer",
    "sources": [
-    "fangraphs"
+    "fangraphs",
+    "elected"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 601713,
@@ -537,7 +604,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 34
   },
   {
    "mlbId": 602104,
@@ -546,7 +614,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 605130,
@@ -555,7 +624,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 605135,
@@ -563,7 +633,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 38
   },
   {
    "mlbId": 605137,
@@ -571,7 +642,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 34
   },
   {
    "mlbId": 605154,
@@ -579,14 +651,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 605156,
    "name": "Brooks, Aaron",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 37
   },
   {
    "mlbId": 605242,
@@ -594,14 +668,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 605244,
    "name": "Garcia, Aramis",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 34
   },
   {
    "mlbId": 605280,
@@ -609,7 +685,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 34
   },
   {
    "mlbId": 605447,
@@ -617,7 +694,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 605452,
@@ -625,7 +703,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 605488,
@@ -633,7 +712,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 34
   },
   {
    "mlbId": 605540,
@@ -641,7 +721,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 606115,
@@ -649,7 +730,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 607067,
@@ -657,7 +739,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 36
   },
   {
    "mlbId": 607200,
@@ -665,7 +748,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 607259,
@@ -673,7 +757,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 36
   },
   {
    "mlbId": 607481,
@@ -682,7 +767,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 607536,
@@ -690,7 +776,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 608032,
@@ -698,7 +785,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 34
   },
   {
    "mlbId": 608337,
@@ -706,7 +794,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 32
   },
   {
    "mlbId": 608348,
@@ -714,7 +803,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 32
   },
   {
    "mlbId": 608371,
@@ -722,7 +812,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 608372,
@@ -730,7 +821,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 608566,
@@ -738,7 +830,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 608650,
@@ -746,7 +839,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 608701,
@@ -755,7 +849,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 608718,
@@ -763,21 +858,24 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 608723,
    "name": "Voth, Austin",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 35
   },
   {
    "mlbId": 608841,
    "name": "Meneses, Joey",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 35
   },
   {
    "mlbId": 609280,
@@ -785,7 +883,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 32
   },
   {
    "mlbId": 615698,
@@ -793,7 +892,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 621107,
@@ -801,7 +901,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 33
   },
   {
    "mlbId": 621111,
@@ -809,7 +910,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 621112,
@@ -817,7 +919,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 621121,
@@ -826,7 +929,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 621237,
@@ -834,14 +938,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 621242,
    "name": "Díaz, Edwin",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 33
   },
   {
    "mlbId": 621345,
@@ -849,7 +955,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 621366,
@@ -857,7 +964,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 621381,
@@ -866,14 +974,16 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 621389,
    "name": "Blach, Ty",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 36
   },
   {
    "mlbId": 621438,
@@ -881,7 +991,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 621493,
@@ -889,7 +1000,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 622608,
@@ -897,7 +1009,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 32
   },
   {
    "mlbId": 622663,
@@ -905,14 +1018,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 33
   },
   {
    "mlbId": 622694,
    "name": "Hernández, Elieser",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 622761,
@@ -920,7 +1035,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 623149,
@@ -928,14 +1044,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 623205,
    "name": "Velazquez, Andrew",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 623465,
@@ -943,7 +1061,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 624424,
@@ -951,7 +1070,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 624428,
@@ -959,7 +1079,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 624585,
@@ -968,7 +1089,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 624641,
@@ -976,7 +1098,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 628452,
@@ -984,7 +1107,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 640451,
@@ -992,7 +1116,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 32
   },
   {
    "mlbId": 641302,
@@ -1000,7 +1125,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 641343,
@@ -1008,7 +1134,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 641487,
@@ -1016,7 +1143,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 641584,
@@ -1025,14 +1153,16 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 641585,
    "name": "France, J.P.",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 641598,
@@ -1040,7 +1170,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 641680,
@@ -1048,7 +1179,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 641755,
@@ -1056,7 +1188,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 641778,
@@ -1064,7 +1197,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 641793,
@@ -1072,7 +1206,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 641816,
@@ -1080,7 +1215,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 641835,
@@ -1088,7 +1224,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 641941,
@@ -1096,7 +1233,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 36
   },
   {
    "mlbId": 642086,
@@ -1104,7 +1242,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 642133,
@@ -1112,7 +1251,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 642152,
@@ -1120,7 +1260,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 642232,
@@ -1128,7 +1269,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 642397,
@@ -1136,7 +1278,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 642528,
@@ -1144,7 +1287,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 642547,
@@ -1152,7 +1296,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 642701,
@@ -1160,7 +1305,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 642708,
@@ -1168,14 +1314,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 642759,
    "name": "Fernández, Julian",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 31
   },
   {
    "mlbId": 643289,
@@ -1183,14 +1331,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 643361,
    "name": "Herget, Kevin",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 36
   },
   {
    "mlbId": 643396,
@@ -1198,7 +1348,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 643410,
@@ -1206,7 +1357,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 36
   },
   {
    "mlbId": 643446,
@@ -1214,7 +1366,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 35
   },
   {
    "mlbId": 645302,
@@ -1222,7 +1375,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 30
   },
   {
    "mlbId": 647336,
@@ -1230,7 +1384,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 29
   },
   {
    "mlbId": 649966,
@@ -1238,7 +1393,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 650333,
@@ -1246,7 +1402,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 650391,
@@ -1255,7 +1412,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 650402,
@@ -1263,7 +1421,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 650556,
@@ -1271,7 +1430,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 650633,
@@ -1279,7 +1439,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 32
   },
   {
    "mlbId": 650644,
@@ -1287,7 +1448,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 650859,
@@ -1295,7 +1457,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 656222,
@@ -1303,7 +1466,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 656271,
@@ -1311,7 +1475,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 656288,
@@ -1319,7 +1484,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 31
   },
   {
    "mlbId": 656427,
@@ -1327,7 +1493,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 656464,
@@ -1335,7 +1502,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 656492,
@@ -1343,7 +1511,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 656555,
@@ -1351,14 +1520,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 656686,
    "name": "Martin, Corbin",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 31
   },
   {
    "mlbId": 656756,
@@ -1366,7 +1537,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 656775,
@@ -1374,14 +1546,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 32
   },
   {
    "mlbId": 656786,
    "name": "Mushinski, Parker",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 31
   },
   {
    "mlbId": 656794,
@@ -1389,7 +1563,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 656849,
@@ -1397,7 +1572,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 657041,
@@ -1405,7 +1581,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 657044,
@@ -1413,21 +1590,24 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 35
   },
   {
    "mlbId": 657097,
    "name": "Webb, Jacob",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 33
   },
   {
    "mlbId": 657265,
    "name": "Strzelecki, Peter",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 657571,
@@ -1436,7 +1616,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 657612,
@@ -1444,7 +1625,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 37
   },
   {
    "mlbId": 657656,
@@ -1452,7 +1634,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 660162,
@@ -1460,21 +1643,24 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 660761,
    "name": "Suarez, José",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 29
   },
   {
    "mlbId": 660821,
    "name": "Sánchez, Jesús",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 29
   },
   {
    "mlbId": 660853,
@@ -1482,14 +1668,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 661527,
    "name": "Martinez, Seth",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 662139,
@@ -1497,7 +1685,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663423,
@@ -1505,7 +1694,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 663432,
@@ -1514,7 +1704,8 @@
     "fangraphs",
     "elected"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 663460,
@@ -1522,7 +1713,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 29
   },
   {
    "mlbId": 663554,
@@ -1530,14 +1722,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663559,
    "name": "Falter, Bailey",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 30
   },
   {
    "mlbId": 663624,
@@ -1545,7 +1739,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 30
   },
   {
    "mlbId": 663697,
@@ -1553,7 +1748,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663757,
@@ -1561,14 +1757,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663765,
    "name": "Woodford, Jake",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 30
   },
   {
    "mlbId": 663776,
@@ -1576,7 +1774,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663886,
@@ -1584,7 +1783,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663903,
@@ -1592,7 +1792,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 663978,
@@ -1601,7 +1802,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 663993,
@@ -1609,7 +1811,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 664023,
@@ -1617,7 +1820,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 664034,
@@ -1625,7 +1829,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 664040,
@@ -1633,14 +1838,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 664059,
    "name": "Haggerty, Sam",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 33
   },
   {
    "mlbId": 664126,
@@ -1648,7 +1855,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 664141,
@@ -1656,7 +1864,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 664199,
@@ -1664,7 +1873,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 664238,
@@ -1672,7 +1882,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 664353,
@@ -1681,7 +1892,8 @@
     "fangraphs",
     "elected"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 664702,
@@ -1689,14 +1901,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 32
   },
   {
    "mlbId": 664731,
    "name": "Higgins, P.J.",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 34
   },
   {
    "mlbId": 664761,
@@ -1704,7 +1918,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 664774,
@@ -1712,7 +1927,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
+  },
+  {
+   "mlbId": 664875,
+   "name": "Lawrence, Justin",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
   },
   {
    "mlbId": 665862,
@@ -1720,14 +1944,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 29
   },
   {
    "mlbId": 666181,
    "name": "Benson, Will",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 29
   },
   {
    "mlbId": 666182,
@@ -1735,7 +1961,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 29
   },
   {
    "mlbId": 666969,
@@ -1743,7 +1970,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 666971,
@@ -1752,7 +1980,8 @@
     "fangraphs",
     "released"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 668227,
@@ -1760,7 +1989,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 668670,
@@ -1768,7 +1998,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 668678,
@@ -1776,7 +2007,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
+  },
+  {
+   "mlbId": 668820,
+   "name": "Kranick, Max",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
   },
   {
    "mlbId": 668941,
@@ -1784,7 +2024,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 668942,
@@ -1792,14 +2033,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 669087,
    "name": "Huff, Sam",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 29
   },
   {
    "mlbId": 669160,
@@ -1807,7 +2050,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 29
   },
   {
    "mlbId": 669211,
@@ -1815,7 +2059,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 669289,
@@ -1823,14 +2068,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 669371,
    "name": "Henry, Cole",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 27
   },
   {
    "mlbId": 669373,
@@ -1838,7 +2085,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 669432,
@@ -1846,7 +2094,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 29
   },
   {
    "mlbId": 669456,
@@ -1854,7 +2103,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 669720,
@@ -1862,21 +2112,24 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 669899,
    "name": "Ward, Ryan",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 29
   },
   {
    "mlbId": 669920,
    "name": "Alexander, Jason",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 34
   },
   {
    "mlbId": 670032,
@@ -1884,21 +2137,24 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 670090,
    "name": "Mills, Wyatt",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 670097,
    "name": "Short, Zack",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 32
   },
   {
    "mlbId": 670167,
@@ -1906,7 +2162,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 670280,
@@ -1914,14 +2171,16 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 670770,
    "name": "Friedl, TJ",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 31
   },
   {
    "mlbId": 670950,
@@ -1929,7 +2188,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 34
   },
   {
    "mlbId": 670970,
@@ -1937,28 +2197,32 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 28
   },
   {
    "mlbId": 671109,
    "name": "Eder, Jake",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 28
   },
   {
    "mlbId": 671131,
    "name": "Rutledge, Jackson",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 28
   },
   {
    "mlbId": 672820,
    "name": "Sosa, Lenyn",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 27
   },
   {
    "mlbId": 673357,
@@ -1966,7 +2230,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 29
   },
   {
    "mlbId": 673490,
@@ -1974,7 +2239,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 673513,
@@ -1982,7 +2248,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP"
+   "fgStatus": "TOSSUP",
+   "age": 31
   },
   {
    "mlbId": 673548,
@@ -1990,77 +2257,88 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 32
   },
   {
    "mlbId": 673995,
    "name": "Wendzel, Davis",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 30
   },
   {
    "mlbId": 675448,
    "name": "Hunt, Blake",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 28
   },
   {
    "mlbId": 675919,
    "name": "Raquet, Nick",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 31
   },
   {
    "mlbId": 676369,
    "name": "Velázquez, Nelson",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 28
   },
   {
    "mlbId": 676568,
    "name": "Vanasco, Ricky",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 28
   },
   {
    "mlbId": 677870,
    "name": "Jiménez, Leo",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 26
   },
   {
    "mlbId": 677950,
    "name": "Thomas, Alek",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 27
   },
   {
    "mlbId": 680689,
    "name": "Richardson, Lyon",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 27
   },
   {
    "mlbId": 680702,
    "name": "Gerber, Joey",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 30
   },
   {
    "mlbId": 680704,
    "name": "Sandlin, Nick",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 30
   },
   {
    "mlbId": 680777,
@@ -2068,7 +2346,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 30
   },
   {
    "mlbId": 680802,
@@ -2076,21 +2355,24 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA"
+   "fgStatus": "PROBABLY_FA",
+   "age": 30
   },
   {
    "mlbId": 681146,
    "name": "Bride, Jonah",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 31
   },
   {
    "mlbId": 681520,
    "name": "Kelly, Antoine",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 27
   },
   {
    "mlbId": 681911,
@@ -2098,7 +2380,8 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 31
   },
   {
    "mlbId": 684007,
@@ -2106,35 +2389,40 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "IS_FA"
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 686747,
    "name": "La Sorsa, Joe",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 29
   },
   {
    "mlbId": 687957,
    "name": "Harris, Dustin",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 27
   },
   {
    "mlbId": 694363,
    "name": "Shuster, Jared",
    "sources": [
     "elected"
-   ]
+   ],
+   "age": 28
   },
   {
    "mlbId": 808970,
    "name": "Go, Woo-Suk",
    "sources": [
     "released"
-   ]
+   ],
+   "age": 28
   }
  ]
 }
