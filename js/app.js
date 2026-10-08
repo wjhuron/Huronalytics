@@ -111,7 +111,7 @@
   function enableMicroFilters() {
     var dateStartInput = document.getElementById('date-start');
     var dateEndInput = document.getElementById('date-end');
-    var vsHandSelect = document.getElementById('vs-hand-select');
+    var vsHandSelect = document.getElementById('vs-hand-filter');   // was 'vs-hand-select' (no such element) from 73049b39e until 2026-10-08: vs Hand never re-enabled
     if (Aggregator.loaded && Aggregator.data && Aggregator.data.lookups.dates.length > 0) {
       var dates = Aggregator.data.lookups.dates;
       if (dateStartInput) {
