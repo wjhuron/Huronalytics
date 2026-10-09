@@ -449,7 +449,7 @@ def compute_hitter_sd(pitches_by_hitter, table, lg_zone_w=None):
 
 
 def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
-                          min_n=MIN_HITTER_DECISIONS):
+                          min_n=MIN_HITTER_DECISIONS, extra_raw=None):
     """Ratio-to-league scaling, matching BB+ convention:
         sdPlus = 100 × hitter_raw_adj / league_mean_raw_adj
     where raw_sd_adj is the Bayesian-regressed per-hitter mean decision
@@ -459,10 +459,15 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
     league mean (~0.015), the ratio spread is wider than BB+'s. Hitters
     below league mean produce values below 100; hitters with negative
     raw_sd_adj produce negative sdPlus.
+
+    extra_raw (2026-10-08, hand splits): more hitter_raw entries scored on
+    the SEASON anchors (lg_raw, lg_mean) without entering the pool. Given,
+    the return is (eligible, extra_eligible); omitted, it is eligible alone,
+    exactly as before.
     """
     eligible = {k: v for k, v in hitter_raw.items() if v['n_decisions'] >= min_n}
     if not eligible:
-        return {}
+        return {} if extra_raw is None else ({}, {})
 
     # League anchors (lg_raw, lg_mean) use a de-duplicated POOL: for a multi-team
     # hitter, only the combined 2TM/3TM row represents them — their per-team stint
@@ -491,7 +496,14 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
             v['sdPlus'] = 100.0 * v['raw_sd_adj'] / lg_mean
         else:
             v['sdPlus'] = 100.0
-    return eligible
+    if extra_raw is None:
+        return eligible
+    extra = {k: v for k, v in extra_raw.items() if v['n_decisions'] >= min_n}
+    for v in extra.values():
+        n = v['n_decisions']
+        v['raw_sd_adj'] = (n * v['raw_sd'] + n_prior * lg_raw) / (n + n_prior)
+        v['sdPlus'] = 100.0 * v['raw_sd_adj'] / lg_mean if abs(lg_mean) > 1e-6 else 100.0
+    return eligible, extra
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -561,7 +573,8 @@ def team_extra_games(all_pitches, norm_date=None):
             if any(len(g) > 1 for g in by_date.values())}
 
 
-def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
+def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale,
+                    extra_groups=None):
     """Main entry point.
 
     Args:
@@ -574,6 +587,9 @@ def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
         normalized: dict[(hitter, team)] -> {sdPlus, raw_sd, raw_sd_adj,
             n_decisions, zone_dv, z}
         weight_table_json: dict for metadata output (audit/frontend)
+        extra_normalized (only when extra_groups is given): the extra groups
+            (hand splits, pipeline/splits.py) scored on the same cell table
+            and the SEASON anchors; they never enter the anchor pool.
     """
     # Cell weight tables stay MLB-baselined (translation framing); ROC
     # hitters are looked up against this MLB table by compute_hitter_sd.
@@ -595,6 +611,9 @@ def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale):
     lg_zone_w = {z: n / tot for z, n in zone_counts.items()} if tot else None
 
     hitter_raw = compute_hitter_sd(pitches_by_hitter, smoothed, lg_zone_w)
-    normalized = regress_and_normalize(hitter_raw)
-
-    return normalized, serialize_weight_table(smoothed)
+    if extra_groups is None:
+        normalized = regress_and_normalize(hitter_raw)
+        return normalized, serialize_weight_table(smoothed)
+    extra_raw = compute_hitter_sd(extra_groups, smoothed, lg_zone_w)
+    normalized, extra = regress_and_normalize(hitter_raw, extra_raw=extra_raw)
+    return normalized, serialize_weight_table(smoothed), extra

@@ -2626,6 +2626,18 @@ const Aggregator = {
     // pasting the SEASON wOBA into a row labelled "vs LHP" is not a missing
     // number, it's a wrong one.
     const hBoxYieldToMicro = { wOBA: true, xWRCplus: true };
+    // Hand splits (2026-10-08, pipeline/splits.py): under vs Hand these keys
+    // take the player's split value from splits.json.gz instead of the season
+    // value, BEFORE the percentile pass below, so they rank against the same
+    // split. No split value (too few pitches against that hand, or the file
+    // not loaded) leaves the cell blank: a season number in a "vs LHP" row is
+    // a wrong number, not a missing one. The *N / *Raw tooltip inputs have no
+    // split and blank too.
+    const HAND_SPLIT_KEYS = ['wRCplus', 'bbPlus', 'sdPlus', 'ctPlus', 'processPlus',
+                             'nCompSwings', 'batSpeed', 'swingLength', 'attackAngle', 'attackDirection',
+                             'swingPathTilt', 'squaredUpPct', 'blastPct', 'idealAAPct'];
+    const HAND_SPLIT_BLANK = ['sdPlusN', 'sdPlusRaw', 'ctPlusN', 'ctPlusRaw'];
+    const hSplits = (vsHand !== 'all' && window.HAND_SPLITS && window.HAND_SPLITS.hitters) || null;
     for (let hmi = 0; hmi < rows.length; hmi++) {
       const hKey = rows[hmi].hitter + '|' + rows[hmi].team;
       const hPre = hPreAggMap[hKey];
@@ -2639,6 +2651,14 @@ const Aggregator = {
         // row.pa stays as the filtered value used for display/computation; row.paAll
         // is what qualification logic (Q-filter, percentile coloring) reads.
         if (hPre.pa !== undefined) rows[hmi].paAll = hPre.pa;
+        if (vsHand !== 'all') {
+          const sp = hSplits && hSplits[hPre.mlbId + '|' + rows[hmi].team];
+          for (let hsk = 0; hsk < HAND_SPLIT_KEYS.length; hsk++) {
+            const sv = sp ? sp[HAND_SPLIT_KEYS[hsk] + '_vs' + vsHand] : undefined;
+            rows[hmi][HAND_SPLIT_KEYS[hsk]] = (sv === undefined) ? null : sv;
+          }
+          for (let hsb = 0; hsb < HAND_SPLIT_BLANK.length; hsb++) rows[hmi][HAND_SPLIT_BLANK[hsb]] = null;
+        }
         // Override PA/AB with boxscore values only when unfiltered
         if (!hasHitterContextFilter) {
           if (hPre.pa !== undefined) rows[hmi].pa = hPre.pa;
@@ -3091,6 +3111,8 @@ const Aggregator = {
       hpPreMap[hpk] = hpPreAgg[hpi];
     }
     const hpXKeys = ['wOBA', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'avgFbDist', 'avgHrDist', 'xwOBAsp'];
+    const hpVsHand = filters.vsHand || 'all';
+    const hpSplits = (hpVsHand !== 'all' && window.HAND_SPLITS && window.HAND_SPLITS.hitterPitch) || null;
     for (let hpmi = 0; hpmi < rows.length; hpmi++) {
       const hpmk = rows[hpmi].hitter + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType;
       const hpPre = hpPreMap[hpmk];
@@ -3099,6 +3121,19 @@ const Aggregator = {
           const hpxk = hpXKeys[hpxi];
           if (hpPre[hpxk] !== undefined) rows[hpmi][hpxk] = hpPre[hpxk];
           if (hpPre[hpxk + '_pctl'] !== undefined) rows[hpmi][hpxk + '_pctl'] = hpPre[hpxk + '_pctl'];
+        }
+        // Hand splits (pipeline/splits.py): under vs Hand these keys take the
+        // split value, or stay blank; never the season value. Their season
+        // _pctl goes too; the HITTER_PITCH_PCTL_KEYS pass below re-ranks the
+        // ones it covers within the same split.
+        if (hpVsHand !== 'all') {
+          const hsp = hpSplits && hpSplits[hpPre.mlbId + '|' + rows[hpmi].team + '|' + rows[hpmi].pitchType];
+          for (let hsx = 0; hsx < hpXKeys.length; hsx++) {
+            const k = hpXKeys[hsx];
+            const sv = hsp ? hsp[k + '_vs' + hpVsHand] : undefined;
+            rows[hpmi][k] = (sv === undefined) ? null : sv;
+            rows[hpmi][k + '_pctl'] = null;
+          }
         }
       }
       // Compute rv100 client-side if not in pre-agg data. Kept at full precision;

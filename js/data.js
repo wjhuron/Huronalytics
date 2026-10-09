@@ -28,6 +28,27 @@ const DataStore = {
   // every player under a "Free Agents" label.
   freeAgentIds: null,
   freeAgentInfo: null,
+
+  // Hand splits (pipeline/splits.py): the vs-L / vs-R values of the columns the
+  // site cannot rebuild from microData (wRC+, BB+, SD+, CT+, Process+, bat
+  // tracking). Loaded the first time vs Hand is used; Aggregator reads
+  // window.HAND_SPLITS. On failure the promise rejects and the caller keeps
+  // the split columns blank, never the season values.
+  handSplits: null,
+  _splitsPromise: null,
+  loadHandSplits: function () {
+    var self = this;
+    if (this._splitsPromise) return this._splitsPromise;
+    this._splitsPromise = this._fetchGz('splits.json.gz').then(function (d) {
+      self.handSplits = d || {};
+      window.HAND_SPLITS = self.handSplits;
+      return self.handSplits;
+    }).catch(function (e) {
+      self._splitsPromise = null;
+      throw e;
+    });
+    return this._splitsPromise;
+  },
   _faPromise: null,
   loadFreeAgents: function () {
     var self = this;

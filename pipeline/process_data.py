@@ -3168,6 +3168,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             pt_pitches = [p for p in hitter_pitches if p.get('Pitch Type') == pt]
         row['xwOBAsp'] = compute_xwobasp(pt_pitches)
 
+    # Hand splits for the vs Pitches rows (pipeline/splits.py): the season
+    # row's own functions on each hand's pitches; sampled self-check inside.
+    _hp_split = None
+    if not window_mode:
+        from pipeline.splits import hitter_pitch_splits
+        _hp_split = hitter_pitch_splits(
+            hitter_pitch_leaderboard, hitter_groups, PITCH_CATEGORIES, WOBA_WEIGHTS,
+            lambda sub: compute_xrv(sub, lg_woba=_xrv_lg, woba_scale=_xrv_scale,
+                                    count_offsets=XRV_COUNT_OFFSETS,
+                                    bip_count_means=XRV_BIP_COUNT_MEANS, negate=True),
+            compute_xwobasp)
+
     hitter_pitch_leaderboard.sort(key=lambda r: r.get('count', 0), reverse=True)
     print(f"Hitter pitch leaderboard: {len(hitter_pitch_leaderboard)} rows")
 
@@ -3548,11 +3560,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     sd_pitches_by_hitter = {
         k: [p for p in v if (p.get('Pitcher'), p.get('PTeam')) not in ep_pitchers]
         for k, v in hitter_groups.items()} if ep_pitchers else dict(hitter_groups)
-    sd_results, sd_weights = compute_sd_plus(
+    # Hand splits (2026-10-08, pipeline/splits.py): each hitter's vs-L / vs-R
+    # pitches (and an all-hands self-check group) are scored in the SAME
+    # calls below, on the season cells and anchors, outside the anchor pool.
+    # A window run writes no splits.
+    _split_rows = _sd_split = _ct_split = None
+    if not window_mode:
+        from pipeline.splits import hitter_split_groups, hitter_split_rows
+        _split_groups = hitter_split_groups(hitter_groups)
+        _split_groups_sd = hitter_split_groups(sd_pitches_by_hitter)
+        _split_rows = hitter_split_rows(_split_groups, _split_groups_sd, WOBA_WEIGHTS)
+    _sd_out = compute_sd_plus(
         _sd_league, sd_pitches_by_hitter,
         lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
         woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
+        extra_groups=None if window_mode else _split_groups_sd,
     )
+    sd_results, sd_weights = _sd_out[0], _sd_out[1]
+    if not window_mode:
+        _sd_split = _sd_out[2]
     for row in hitter_leaderboard:
         key = (row['hitter'], row['team'])
         r = sd_results.get(key)
@@ -3627,12 +3653,23 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             if _bs is not None and _nsw > 0:
                 _ct_bt_z[(r['hitter'], r['team'])] = (
                     (_bs - _ct_mbs) / _ct_sbs, _nsw)
-    ct_results, ct_weights = compute_ct_plus(
+    if _split_rows is not None and _ct_sbs > 0:
+        # split groups take the same prior on their OWN split bat speed and
+        # tracked-swing count, against the season anchors above
+        for _k, _r in _split_rows.items():
+            _bs, _nsw = _r.get('batSpeed'), _r.get('nCompSwings') or 0
+            if _bs is not None and _nsw > 0:
+                _ct_bt_z[_k] = ((_bs - _ct_mbs) / _ct_sbs, _nsw)
+    _ct_out = compute_ct_plus(
         _sd_league, sd_pitches_by_hitter,
         lg_woba=GUTS_EXTRA.get('lgWOBA') if GUTS_EXTRA else None,
         woba_scale=GUTS_EXTRA.get('wOBAScale') if GUTS_EXTRA else None,
         bt_z=_ct_bt_z, bt_beta=CT_BT_BETA, bt_k=CT_BT_K, bt_s0=CT_BT_S0,
+        extra_groups=None if window_mode else _split_groups_sd,
     )
+    ct_results, ct_weights = _ct_out[0], _ct_out[1]
+    if not window_mode:
+        _ct_split = _ct_out[2]
     # Degrade tell, same convention as the BB+ prior: "0 with bat
     # tracking" on an MLB run means the bat columns went missing.
     _ct_scored = [k for k in ct_results]
@@ -5108,7 +5145,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # never 0.2 + 0.6 = 0.8). Percentile ranks are unaffected: they are computed
     # earlier in the pipeline from exact values regardless of display precision.
 
+    # Hand splits: finished on the season metadata assembled above; None when
+    # the all-hands self-check fails (nothing is written, the log says why).
+    hand_splits = None
+    if _split_rows is not None:
+        from pipeline.splits import finish_hitter_splits
+        hand_splits = finish_hitter_splits(_split_rows, _sd_split or {}, _ct_split or {},
+                                           metadata, hitter_leaderboard)
+        # both halves or neither: a failed vs Pitches check keeps the prior file
+        if hand_splits is not None and _hp_split is None:
+            print('  hand splits NOT written: the vs Pitches self-check failed')
+            hand_splits = None
+        elif hand_splits is not None:
+            hand_splits['hitterPitch'] = _hp_split
+
     return {
+        'hand_splits': hand_splits,
         'pitcher_leaderboard': pitcher_leaderboard,
         'pitch_leaderboard': pitch_leaderboard,
         'hitter_leaderboard': hitter_leaderboard,
@@ -5421,6 +5473,15 @@ def write_embedded_js(rs_result):
         'hitterPitchDetails': rs_result['hitter_pitch_details'],
         'hitterSwingLocations': rs_result.get('hitter_swing_locations', {}),
     })
+
+    # Hand splits (pipeline/splits.py): fetched by the site only when vs Hand
+    # is used, so no visitor pays for it otherwise. A failed self-check returns
+    # None: the PRIOR file is kept, and both outcomes are logged.
+    if rs_result.get('hand_splits') is not None:
+        _write_gz('splits.json.gz', rs_result['hand_splits'])
+    else:
+        print("  splits.json.gz NOT rewritten (no hand splits this run); "
+              "the prior file, if any, is kept")
 
     # Remove legacy artifacts (the workflow's `git add data/` stages deletions).
     for legacy in ('data_embedded.js', 'data_embedded.json.gz'):

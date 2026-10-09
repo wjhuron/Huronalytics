@@ -183,20 +183,15 @@ def _season_mlb_id(season_rows, hitter_key):
     return None
 
 
-def score_window_against_season(hitter_key, window_pitches, all_pitches,
-                                season_rows, metadata, verbose=True,
-                                date_range=None, identity_mlb_id=None):
-    """The whole job: one hitter, one date range, season-ranked.
+# ── Shared finishing chains (2026-10-08): score_window_against_season and
+# pipeline/splits.py (hand splits) both call these, so a window and a split
+# are finished by ONE copy of the season chain, read from the metadata the
+# season run wrote. Bodies moved verbatim out of score_window_against_season.
 
-    hitter_key is (hitter, team). Returns the row, ready for the card.
-    """
-    row = build_window_hitter_row(
-        window_pitches, metadata,
-        {'hitter': hitter_key[0], 'team': hitter_key[1],
-         '_isROC': hitter_key[1] in AAA_TEAMS})
-
-    G = metadata.get('gutsConstants') or {}
-
+def bb_plus_chain(row, metadata):
+    """BB+ and the Process+ input _procBb from the row's own xwOBAcon, nBip,
+    ev95 and bat tracking, on SEASON anchors. Sets row['bbPlus'] and
+    row['_procBb'] (None when an ingredient is missing)."""
     # ── BB+ : the window's pitches through the FULL shipped chain, against
     # SEASON anchors (2026-08-21 — this block was two definitions stale:
     # pure-xwOBAcon with a dead metadata key falling to n0=60, feeding a
@@ -271,6 +266,90 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
         row['bbPlus'] = None
         row['_procBb'] = None
 
+
+def plus_post_chain(row, metadata):
+    """SD+ / CT+ post-chain: plusReanchor, then the plusWrcScale factor/shift."""
+    # Post-chain scaling (2026-08-27 audit): the season path multiplies by
+    # plusReanchor and applies the plusWrcScale factor/shift AFTER the raw
+    # computation; the window skipped both, so window SD+/CT+ read ~1.2
+    # points high and fed pre-chain values into the post-chain Process+
+    # anchors below. Same two stages the bbPlus block above applies.
+    for _pk in ('sdPlus', 'ctPlus'):
+        if row.get(_pk) is None:
+            continue
+        _v = row[_pk] * ((metadata.get('plusReanchor') or {}).get(_pk) or 1.0)
+        _wrc = (metadata.get('plusWrcScale') or {}).get(_pk) or {}
+        if _wrc.get('factor'):
+            _v = (100.0 + (_v - 100.0) * _wrc['factor']
+                  + (_wrc.get('shift') or 0.0))
+        row[_pk] = round(_v, 6)
+
+
+def process_plus_from_atoms(row, metadata):
+    """Process+ from the unshrunk atoms (_procBb / _procSd / _procCt) on the
+    SEASON standardization. Sets row['processPlus']."""
+    # ── Process+ : composite of the UNSHRUNK inputs on the SEASON
+    # standardization (metadata processPlusStandardization: bbRaw / sdRaw /
+    # ctRaw), so a window number sits on the same ruler as the season card
+    # and as every other window. A pre-Process+ artifact has no such block
+    # and the window reads None, never a number on a different ruler.
+    std = metadata.get('processPlusStandardization') or {}
+    wsm = std.get('wrcScaleMatch') or {}
+    ok = all(std.get(k, {}).get('sd') for k in ('bbRaw', 'sdRaw', 'ctRaw'))
+    if ok and all(row.get(k) is not None for k in ('_procBb', '_procSd', '_procCt')):
+        z = (PROCESS_PLUS_W_BB * (row['_procBb'] - std['bbRaw']['mean']) / std['bbRaw']['sd']
+             + PROCESS_PLUS_W_SD * (row['_procSd'] - std['sdRaw']['mean']) / std['sdRaw']['sd']
+             + PROCESS_PLUS_W_CT * (row['_procCt'] - std['ctRaw']['mean']) / std['ctRaw']['sd'])
+        v = 100.0 + (std.get('scale') or 40.0) * z
+        shift = (metadata.get('plusReanchor') or {}).get('processPlusShift') or 0.0
+        v += shift
+        if wsm.get('factor'):
+            v = 100.0 + (v - 100.0) * wsm['factor']
+        row['processPlus'] = round(v, 1)
+    else:
+        row['processPlus'] = None
+
+
+def wrc_plus_formula(row, team, metadata):
+    """wRC+ (formula, park-adjusted) and xWRC+ (run-truth capped) from the
+    row's wOBA / xwOBA on the SEASON Guts constants. Sets both keys."""
+    G = metadata.get('gutsConstants') or {}
+    pf = _load_park_factors().get(team, 1.0)
+    lgw, sc, rpa = G.get('lgWOBA'), G.get('wOBAScale'), G.get('lgRPA')
+    w = row.get('wOBA')
+    if lgw and sc and rpa and rpa > 0 and w is not None:
+        row['wRCplus'] = round(((w - lgw) / sc + rpa + (rpa - pf * rpa)) / rpa * 100)
+        xw = row.get('xwOBA')
+        row['xWRCplus'] = (round((((xw - lgw) / sc) + rpa) / rpa * 100)
+                           if xw is not None else None)
+        # Run-truth cap (2026-08-27 audit): the season path prints xWRC+ at
+        # the published factor/shift (plusWrcScale.xWRCplus); the window
+        # skipped it, printing ~27% too wide and then ranking that uncapped
+        # value inside the capped season pool.
+        _xf = (metadata.get('plusWrcScale') or {}).get('xWRCplus') or {}
+        if row.get('xWRCplus') is not None and _xf.get('factor'):
+            row['xWRCplus'] = round(100.0 + (row['xWRCplus'] - 100.0)
+                                    * _xf['factor'] + (_xf.get('shift') or 0.0))
+    else:
+        row['wRCplus'] = row['xWRCplus'] = None
+
+
+def score_window_against_season(hitter_key, window_pitches, all_pitches,
+                                season_rows, metadata, verbose=True,
+                                date_range=None, identity_mlb_id=None):
+    """The whole job: one hitter, one date range, season-ranked.
+
+    hitter_key is (hitter, team). Returns the row, ready for the card.
+    """
+    row = build_window_hitter_row(
+        window_pitches, metadata,
+        {'hitter': hitter_key[0], 'team': hitter_key[1],
+         '_isROC': hitter_key[1] in AAA_TEAMS})
+
+    G = metadata.get('gutsConstants') or {}
+
+    bb_plus_chain(row, metadata)
+
     # ── SD+ / CT+ : the hitter's WINDOW swings scored against the SEASON cell
     # tables. all_pitches builds the league table, so the tables and the
     # regression anchor are season-scoped; only this hitter's pitches are the
@@ -333,64 +412,15 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
     row['ctPlusRaw'] = round(c['raw_ct_adj'], 5) if c else None
     row['_procCt'] = c['raw_ct'] if c else None
     row['ctPlusN'] = c['n_swings'] if c else 0
-    # Post-chain scaling (2026-08-27 audit): the season path multiplies by
-    # plusReanchor and applies the plusWrcScale factor/shift AFTER the raw
-    # computation; the window skipped both, so window SD+/CT+ read ~1.2
-    # points high and fed pre-chain values into the post-chain Process+
-    # anchors below. Same two stages the bbPlus block above applies.
-    for _pk in ('sdPlus', 'ctPlus'):
-        if row.get(_pk) is None:
-            continue
-        _v = row[_pk] * ((metadata.get('plusReanchor') or {}).get(_pk) or 1.0)
-        _wrc = (metadata.get('plusWrcScale') or {}).get(_pk) or {}
-        if _wrc.get('factor'):
-            _v = (100.0 + (_v - 100.0) * _wrc['factor']
-                  + (_wrc.get('shift') or 0.0))
-        row[_pk] = round(_v, 6)
+    plus_post_chain(row, metadata)
 
-    # ── Process+ : composite of the UNSHRUNK inputs on the SEASON
-    # standardization (metadata processPlusStandardization: bbRaw / sdRaw /
-    # ctRaw), so a window number sits on the same ruler as the season card
-    # and as every other window. A pre-Process+ artifact has no such block
-    # and the window reads None, never a number on a different ruler.
-    std = metadata.get('processPlusStandardization') or {}
-    wsm = std.get('wrcScaleMatch') or {}
-    ok = all(std.get(k, {}).get('sd') for k in ('bbRaw', 'sdRaw', 'ctRaw'))
-    if ok and all(row.get(k) is not None for k in ('_procBb', '_procSd', '_procCt')):
-        z = (PROCESS_PLUS_W_BB * (row['_procBb'] - std['bbRaw']['mean']) / std['bbRaw']['sd']
-             + PROCESS_PLUS_W_SD * (row['_procSd'] - std['sdRaw']['mean']) / std['sdRaw']['sd']
-             + PROCESS_PLUS_W_CT * (row['_procCt'] - std['ctRaw']['mean']) / std['ctRaw']['sd'])
-        v = 100.0 + (std.get('scale') or 40.0) * z
-        shift = (metadata.get('plusReanchor') or {}).get('processPlusShift') or 0.0
-        v += shift
-        if wsm.get('factor'):
-            v = 100.0 + (v - 100.0) * wsm['factor']
-        row['processPlus'] = round(v, 1)
-    else:
-        row['processPlus'] = None
+    process_plus_from_atoms(row, metadata)
 
     # ── wRC+ : FanGraphs' own value FOR THIS DATE RANGE. FG serves custom
     # ranges (month=1000 + startdate/enddate), so there is no reason to
     # substitute our formula, which reads a couple of points different.
     # xWRC+ stays ours - FG does not publish it.
-    pf = _load_park_factors().get(hitter_key[1], 1.0)
-    lgw, sc, rpa = G.get('lgWOBA'), G.get('wOBAScale'), G.get('lgRPA')
-    w = row.get('wOBA')
-    if lgw and sc and rpa and rpa > 0 and w is not None:
-        row['wRCplus'] = round(((w - lgw) / sc + rpa + (rpa - pf * rpa)) / rpa * 100)
-        xw = row.get('xwOBA')
-        row['xWRCplus'] = (round((((xw - lgw) / sc) + rpa) / rpa * 100)
-                           if xw is not None else None)
-        # Run-truth cap (2026-08-27 audit): the season path prints xWRC+ at
-        # the published factor/shift (plusWrcScale.xWRCplus); the window
-        # skipped it, printing ~27% too wide and then ranking that uncapped
-        # value inside the capped season pool.
-        _xf = (metadata.get('plusWrcScale') or {}).get('xWRCplus') or {}
-        if row.get('xWRCplus') is not None and _xf.get('factor'):
-            row['xWRCplus'] = round(100.0 + (row['xWRCplus'] - 100.0)
-                                    * _xf['factor'] + (_xf.get('shift') or 0.0))
-    else:
-        row['wRCplus'] = row['xWRCplus'] = None
+    wrc_plus_formula(row, hitter_key[1], metadata)
 
     # ── OFFICIAL LINE for the range. Exactly the role the boxscore merge
     # plays for a season row, and for the same reason: a no-pitch intentional

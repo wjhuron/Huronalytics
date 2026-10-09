@@ -2109,7 +2109,9 @@ var PlayerPage = {
       this._platoonAggData = Aggregator.data;
     }
     if (!this._platoonAggCache) this._platoonAggCache = {};
-    var key = tab + '|' + hand;
+    // keyed on whether the hand splits are loaded: rows aggregated before
+    // splits.json.gz arrived carry blank split-only columns
+    var key = tab + '|' + hand + '|' + (window.HAND_SPLITS ? 's' : '-');
     if (!this._platoonAggCache[key]) {
       this._platoonAggCache[key] = Aggregator.aggregate(tab, this._platoonFilters(hand));
     }

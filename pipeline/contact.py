@@ -324,7 +324,7 @@ def compute_hitter_ct(pitches_by_hitter, table):
 
 def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
                           min_n=MIN_HITTER_SWINGS, bt_z=None,
-                          bt_beta=0.0, bt_k=0, bt_s0=0):
+                          bt_beta=0.0, bt_k=0, bt_s0=0, extra_raw=None):
     """Ratio-to-league scaling, matching BB+ convention:
         ctPlus = 100 × hitter_raw_adj / league_mean_raw_adj
     (raw_ct is the actual/expected contact ratio, league mean ≈ 1.0,
@@ -346,10 +346,15 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
     bt_z=None (or bt_k=0) reproduces the prior-free behavior EXACTLY.
     The league ruler (lg_raw and the ratio denominator) is computed from
     UNBLENDED values so the prior moves hitters, never the league.
+
+    extra_raw (2026-10-08, hand splits): more hitter_raw entries scored on
+    the SEASON anchors without entering the pool; their bt_z entries (if
+    any) apply the same prior. Given, the return is (eligible,
+    extra_eligible); omitted, it is eligible alone, exactly as before.
     """
     eligible = {k: v for k, v in hitter_raw.items() if v['n_swings'] >= min_n}
     if not eligible:
-        return {}
+        return {} if extra_raw is None else ({}, {})
 
     # League anchors (lg_raw, lg_mean) use a de-duplicated POOL, mirroring
     # pipeline_sdplus.regress_and_normalize: for a multi-team hitter, only the
@@ -363,7 +368,9 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
             if _is_combined(k[1]) or k[:1] not in combined_ids}
 
     lg_raw = sum(v['raw_ct'] for v in pool.values()) / len(pool)
-    for k_, v in eligible.items():
+    extra = ({} if extra_raw is None else
+             {k: v for k, v in extra_raw.items() if v['n_swings'] >= min_n})
+    for k_, v in list(eligible.items()) + list(extra.items()):
         n = v['n_swings']
         adj = (n * v['raw_ct'] + n_prior * lg_raw) / (n + n_prior)
         v['_adj_noprior'] = adj
@@ -381,14 +388,14 @@ def regress_and_normalize(hitter_raw, n_prior=HITTER_PRIOR_N,
     adj_vals = [pool[k]['_adj_noprior'] for k in pool]
     lg_mean = sum(adj_vals) / len(adj_vals)
 
-    for v in eligible.values():
+    for v in list(eligible.values()) + list(extra.values()):
         if abs(lg_mean) > 1e-6:
             # Unrounded on purpose — see the note in sdplus.py. Rounded
             # ONCE at the end of the chain (search: FINAL PRECISION PASS).
             v['ctPlus'] = 100.0 * v['raw_ct_adj'] / lg_mean
         else:
             v['ctPlus'] = 100.0
-    return eligible
+    return eligible if extra_raw is None else (eligible, extra)
 
 
 # ── Packaging ───────────────────────────────────────────────────────────
@@ -409,7 +416,7 @@ def serialize_weight_table(smoothed):
 
 
 def compute_ct_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale,
-                    bt_z=None, bt_beta=0.0, bt_k=0, bt_s0=0):
+                    bt_z=None, bt_beta=0.0, bt_k=0, bt_s0=0, extra_groups=None):
     """Main entry point. Returns (normalized_hitter_dict, weight_table_json).
 
     Matches compute_sd_plus signature for symmetric integration in
@@ -428,7 +435,14 @@ def compute_ct_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale,
     zone_means = zone_level_contact_means(swings, rv_fn)
     smoothed = shrink_contact_cells(raw, zone_means)
     hitter_raw = compute_hitter_ct(pitches_by_hitter, smoothed)
-    normalized = regress_and_normalize(hitter_raw, bt_z=bt_z,
-                                       bt_beta=bt_beta, bt_k=bt_k,
-                                       bt_s0=bt_s0)
-    return normalized, serialize_weight_table(smoothed)
+    if extra_groups is None:
+        normalized = regress_and_normalize(hitter_raw, bt_z=bt_z,
+                                           bt_beta=bt_beta, bt_k=bt_k,
+                                           bt_s0=bt_s0)
+        return normalized, serialize_weight_table(smoothed)
+    # extra_groups (hand splits): same cells, SEASON anchors, third value
+    extra_raw = compute_hitter_ct(extra_groups, smoothed)
+    normalized, extra = regress_and_normalize(hitter_raw, bt_z=bt_z,
+                                              bt_beta=bt_beta, bt_k=bt_k,
+                                              bt_s0=bt_s0, extra_raw=extra_raw)
+    return normalized, serialize_weight_table(smoothed), extra

@@ -137,6 +137,12 @@
       Aggregator.load(DataStore.active().microData).then(function () {
         enableMicroFilters();
         refresh();
+        // Hand splits ride behind the background data (small; never on the
+        // first-paint path), so vs Hand and the player-page platoon panels
+        // have them ready. A failure is logged; refresh() retries on vs Hand.
+        DataStore.loadHandSplits().catch(function (e) {
+          console.error('Hand splits prefetch failed:', e);
+        });
       }).catch(function (e) { console.error('Aggregator init failed:', e); });
     });
     DataStore.load().then(function () {
@@ -1050,6 +1056,18 @@
     // If on bat tracking tab and ROC selected, switch to hitterStats
     if (isROCTeam && currentTab === 'hitterBatTracking') {
       navigateToTab('hitterStats');
+      return;
+    }
+
+    // vs Hand needs the hand-split file (pipeline/splits.py) before the
+    // aggregation runs; load it once, then re-render. A failed load renders
+    // with the split-only columns blank (Aggregator), and says so.
+    if (filters.vsHand && filters.vsHand !== 'all' && !DataStore.handSplits) {
+      DataStore.loadHandSplits().then(function () { refresh(); }, function (e) {
+        console.error('Hand splits failed to load; split-only columns stay blank:', e);
+        DataStore.handSplits = {};
+        refresh();
+      });
       return;
     }
 
