@@ -2106,6 +2106,20 @@ var PlayerPage = {
              pitchTypes: this.PLATOON_PT_REQUEST, includeROC: true, keepStints: true };
   },
 
+  // The split-only columns (pipeline/splits.py) need splits.json.gz before the
+  // split rows are aggregated, and a player page opened straight from a link
+  // can render before it arrives. Run fn now if it is in, else after it loads;
+  // a failed load logs and runs fn with those columns blank, never the season
+  // values (the leaderboard's rule).
+  _withHandSplits: function (fn) {
+    if (window.HAND_SPLITS) { fn(); return; }
+    DataStore.loadHandSplits().then(function () { fn(); }, function (e) {
+      console.error('Hand splits failed to load; split-only columns stay blank:', e);
+      window.HAND_SPLITS = DataStore.handSplits = {};
+      fn();
+    });
+  },
+
   _platoonAggregate: function (tab, hand) {
     if (!Aggregator.loaded) return null;
     // Drop the cache if the aggregator was reloaded under us.
@@ -2187,8 +2201,10 @@ var PlayerPage = {
     if (!Aggregator.loaded) { section.style.display = 'none'; return; }
 
     // Cache warm: render synchronously so the panel doesn't flash a skeleton.
-    if (this._platoonAggData === Aggregator.data && this._platoonAggCache &&
-        this._platoonAggCache[cfg.tab + '|L'] && this._platoonAggCache[cfg.tab + '|R']) {
+    // (Keys carry the split-file suffix _platoonAggregate adds.)
+    var sfx = window.HAND_SPLITS ? '|s' : '|-';
+    if (window.HAND_SPLITS && this._platoonAggData === Aggregator.data && this._platoonAggCache &&
+        this._platoonAggCache[cfg.tab + '|L' + sfx] && this._platoonAggCache[cfg.tab + '|R' + sfx]) {
       this._renderPlatoonSplit(type, data);
       return;
     }
@@ -2202,7 +2218,11 @@ var PlayerPage = {
       if (token !== self._platoonSplitToken) return;
       var cur = self._currentData;
       if (!cur || cur[cfg.nameKey] !== data[cfg.nameKey] || cur.team !== data.team) return;
-      self._renderPlatoonSplit(type, data);
+      self._withHandSplits(function () {
+        // the page may have moved on while the file loaded
+        if (token !== self._platoonSplitToken) return;
+        self._renderPlatoonSplit(type, data);
+      });
     }, 50);
   },
 
@@ -3152,6 +3172,15 @@ var PlayerPage = {
       }
       this._platoonHand = 'all';
       this._resetPlatoonToggleUI(type === 'pitcher' ? 'pitcher-platoon-toggle' : 'hitter-platoon-toggle');
+      return;
+    }
+
+    // Split-only columns need the hand-split file first; re-enter once it is in.
+    if (!window.HAND_SPLITS) {
+      var selfH = this;
+      this._withHandSplits(function () {
+        if (selfH._platoonHand === hand && selfH._currentData === data) selfH._refreshPlatoonStats(type);
+      });
       return;
     }
 
