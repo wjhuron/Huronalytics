@@ -104,7 +104,13 @@ def run(label):
         new_rows = pickle.load(f)
 
     import copy
-    process_data.read_all_pitches_from_sheets = lambda: copy.deepcopy(rs_rows)
+    def _read_rs(include_no_pitch=False):
+        # mirrors pipeline.fetch.read_all_pitches_from_sheets: markers only on request
+        rows = copy.deepcopy(rs_rows)
+        if include_no_pitch:
+            return rows
+        return [r for r in rows if not str(r.get('PitchID') or '').endswith('_00')]
+    process_data.read_all_pitches_from_sheets = _read_rs
     process_data.read_new_tab_pitches = lambda: copy.deepcopy(new_rows)
     process_data.fetch_guts_constants = lambda year=2026: (
         {'BB': 0.69, 'HBP': 0.72, '1B': 0.88, '2B': 1.25, '3B': 1.59, 'HR': 2.05},

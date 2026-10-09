@@ -2033,6 +2033,26 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
         print('  eraplus SKIPPED: inject() called without mlb_pitches')
     sort_rows_default(pp)
 
+    # ── vs-hand splits of hdERA / hdERA+ / Pitcher+ (pipeline/splits.py), on the
+    # season scales set just above. Before the 6-decimal Stuff+ swap below, so
+    # the All-hands self-check reads the same 1-decimal Stuff+ Pitcher+ did.
+    if mlb_pitches is not None and _era_const:
+        from pipeline.splits import inject_pitcher_splits
+        _grade_dumps = []
+        for _gp in ('pitch_stuff_grades.json', 'pitch_loc_grades_rs.json'):
+            try:
+                _grade_dumps.append(json.load(open(os.path.join(DATA, _gp))))
+            except (OSError, ValueError) as _e:
+                _grade_dumps.append(None)
+                print(f'  inject hand splits: {_gp} unreadable ({_e})')
+        if None in _grade_dumps:
+            print('  inject hand splits SKIPPED: a grade dump is missing; the split '
+                  'file keeps no hdERA/Pitcher+ vs a hand (the site blanks them)')
+        else:
+            inject_pitcher_splits(pp, list(mlb_pitches) + list(roc_pitches or []),
+                                  _grade_dumps[0], _grade_dumps[1], _pp_base,
+                                  os.path.join(DATA, 'splits.json.gz'), aaa_teams=AAA_TEAMS)
+
     # LAST: store stuffScore at STUFF_STORE_DECIMALS. Everything above (the
     # ranks, Pitcher+, hdERA/hpERA) read the 1-decimal value and is unchanged.
     def write_exact_stuff(rows, exact, combo_pool, row_key, combo_key):

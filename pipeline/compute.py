@@ -318,6 +318,60 @@ def compute_stats(pitches):
     }
 
 
+def fip_family(outs, hr, bb, hbp, so, tbf, n_bip, fb_pct, pu_pct, gb_pct, gs, g,
+               lg_hr_fb, fip_constant):
+    """(FIP, xFIP, raw SIERA) from box components; the one home of the three
+    formulas (the season row and the hand splits in pipeline/splits.py both call it).
+
+    bb includes intentional walks (the boxscore's baseOnBalls). FB counts include
+    popups. Raw SIERA carries no constant: the caller adds the season's, which
+    makes league SIERA equal league ERA. FIP and xFIP are rounded to 2 places,
+    raw SIERA is not. Any piece that cannot be computed is None.
+    """
+    ip_float = outs / 3.0
+    # FIP = ((13*HR)+(3*(BB+HBP))-(2*K))/IP + constant
+    if ip_float > 0 and fip_constant is not None:
+        fip = round(((13 * hr + 3 * (bb + hbp) - 2 * so) / ip_float) + fip_constant, 2)
+    else:
+        fip = None
+    # xFIP: FB includes popups
+    n_bip = n_bip or 0
+    fb_count = round(((fb_pct or 0) + (pu_pct or 0)) * n_bip)  # fly balls + popups
+    if ip_float > 0 and fip_constant is not None:
+        expected_hr = fb_count * lg_hr_fb
+        xfip = round(((13 * expected_hr + 3 * (bb + hbp) - 2 * so) / ip_float) + fip_constant, 2)
+    else:
+        xfip = None
+    # SIERA (raw, without constant)
+    # netGB = GB - FB (where FB includes popups)
+    # -/+ 4.920 term: minus if GB >= FB, plus if FB > GB
+    gb_count = round((gb_pct or 0) * n_bip)
+    if tbf > 0 and ip_float > 0:
+        so_pa = so / tbf
+        bb_pa = bb / tbf
+        net_gb_pa = (gb_count - fb_count) / tbf
+        # SP/RP ratio: fraction of IP as starter
+        gs = gs or 0
+        g = g or 1
+        ip_sp_ratio = min(gs / g, 1.0) if g > 0 else 0.0
+        sign_4920 = -1.0 if gb_count >= fb_count else 1.0
+        siera_raw = (
+            - 15.518 * so_pa
+            + 9.146 * (so_pa ** 2)
+            + 8.648 * bb_pa
+            + 27.252 * (bb_pa ** 2)
+            - 2.298 * net_gb_pa
+            + sign_4920 * 4.920 * (net_gb_pa ** 2)
+            - 4.036 * so_pa * bb_pa
+            + 5.155 * so_pa * net_gb_pa
+            + 4.546 * bb_pa * net_gb_pa
+            + 0.367 * ip_sp_ratio
+        )
+    else:
+        siera_raw = None
+    return fip, xfip, siera_raw
+
+
 def compute_xrv(pitches, lg_woba=None, woba_scale=None, negate=False,
                 count_offsets=None, bip_count_means=None):
     """Compute expected run value (xRV).

@@ -435,6 +435,23 @@ def combined_park_map(rows, park, aaa_teams, is_combined_fn):
     return out
 
 
+# The season's hdERA scale, set by the last apply_era_plus call (unrounded),
+# so a hand split scores on the SAME pool, z statistics, shrink target and
+# anchor as the season row (hdera_from_xw).
+_HD_SCALE = {}
+
+
+def hdera_from_xw(xw, pa):
+    """Unrounded hdERA for an (xwOBA against, PA) pair on the season scale the
+    last apply_era_plus call set; None before that call, or without a sample.
+    pipeline/splits.py scores the vs-hand splits through it."""
+    st = _HD_SCALE
+    if not st or xw is None or not pa or pa <= 0:
+        return None
+    shr = (xw * pa + N0_XW * st['lg_xw']) / (pa + N0_XW)
+    return st['anchor'] + DH_B * (shr - st['m']) / st['sd']
+
+
 def _channels(row, xrv_map, park, is_combined, combined_park=None):
     """Raw channel values in ERA direction, or None where unavailable."""
     ch = {}
@@ -495,6 +512,7 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
     `league_rates` = metadata pitcherLeagueAverages (lgRA9/lgERA) for hWAR;
     without them hWAR is left as carried and the skip is logged."""
     aaa = set(aaa_teams)
+    _HD_SCALE.clear()     # set again below once the pool's z statistics exist
     if is_combined_fn is None:
         def is_combined_fn(team):
             return isinstance(team, str) and team.endswith('TM')
@@ -569,6 +587,11 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
             return None
         m, sd = mu_sd[c]
         return (val - m) / sd
+
+    _HD_SCALE.clear()
+    if mu_sd.get('xw') is not None:
+        _HD_SCALE.update(anchor=anchor, m=mu_sd['xw'][0], sd=mu_sd['xw'][1],
+                         lg_xw=_channels.lg_xw)
 
     # pool LHP share: the centering point of the hand term
     _lh = [raw[id(r)]['lhp'] for r in pool_rows if raw[id(r)]['lhp'] is not None]

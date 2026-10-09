@@ -781,29 +781,16 @@ const Aggregator = {
     for (let bi = 0; bi < preAgg.length; bi++) {
       preAggMap[preAgg[bi].pitcher + '|' + preAgg[bi].team] = preAgg[bi];
     }
-    // Fields that have per-hand splits (stored as field_vsL / field_vsR in PITCHER_DATA)
-    const handSplitFields = ['twoStrikeWhiffPct', 'fpsPct',
-      'strikePct', 'izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct',
-      'kPct', 'bbPct', 'kbbPct', 'babip', 'gbPct',
-      'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst',
-      'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
-      'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'];
-    const handSuffix = vsHand !== 'all' ? '_vs' + vsHand : '';
+    // Under vs Hand the season row is read through its split (_pitcherHandView):
+    // its own _vsL/_vsR fields plus the hand-split file's keys, ERA blank.
     for (let mi = 0; mi < rows.length; mi++) {
       const key2 = rows[mi].pitcher + '|' + rows[mi].team;
       const pre = preAggMap[key2];
       if (pre) {
+        const hv = (vsHand !== 'all') ? this._pitcherHandView(pre, vsHand) : pre;
         for (let fi = 0; fi < boxFields.length; fi++) {
           const bf = boxFields[fi];
-          // If filtering by hand and this field has per-hand split, use it
-          if (handSuffix && handSplitFields.indexOf(bf) >= 0) {
-            const handKey = bf + handSuffix;
-            if (pre[handKey] !== undefined) {
-              rows[mi][bf] = pre[handKey];
-              continue;
-            }
-          }
-          if (pre[bf] !== undefined) rows[mi][bf] = pre[bf];
+          if (hv[bf] !== undefined) rows[mi][bf] = hv[bf];
         }
         // Grade fallback for pre-atom embeds: no atoms in micro data means
         // _buildPitcherRow left these null — surface the season values.
@@ -841,6 +828,15 @@ const Aggregator = {
         if (filters.role === 'RP') return !isSP;
         return true;
       });
+    }
+    // Under vs Hand the merged split keys lost their season ranks; rank them
+    // inside the split, against every pitcher's value vs the same hand.
+    if (vsHand !== 'all') {
+      STAT_KEYS = STAT_KEYS.concat(['fip', 'xFIP', 'siera', 'runValue', 'rv100', 'xRunValue', 'xRv100',
+        'commandPlus', 'extension', 'twoStrikeWhiffPct', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon',
+        'hdERA', 'hdERAPlus', 'pitcherPlus']);
+      INVERT = Object.assign({}, INVERT, { fip: true, xFIP: true, siera: true, hdERA: true,
+        wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true });
     }
     // Compute percentiles with IP-based qualifying
     // Starter (GS/G > 0.5): 1.0 IP/team game. Reliever: 0.1 IP (⅓ inning)/team game.
@@ -975,6 +971,11 @@ const Aggregator = {
     const roleCache = this._ensureRoleCache();
     const pd = window.PITCHER_DATA || [];
     const acc = {};
+    // Under vs Hand each row is read through its split (_pitcherHandView);
+    // FIP/xFIP/SIERA then weight by the outs recorded against that hand, and
+    // a team TBF is blank when the split file carries no TBF at all.
+    const vsHand = filters.vsHand || 'all';
+    const tbfOk = vsHand === 'all' || this._pitcherSplitHas('tbf');
     const IP_W = ['fip', 'xFIP', 'siera'];
     const PA_W = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'];
 
@@ -985,11 +986,12 @@ const Aggregator = {
     }
 
     for (let i = 0; i < pd.length; i++) {
-      const p = pd[i];
-      if (this._isCombinedTeam(p.team)) continue;
-      if (filters.throws !== 'all' && p.throws !== filters.throws) continue;
+      const p0 = pd[i];
+      if (this._isCombinedTeam(p0.team)) continue;
+      if (filters.throws !== 'all' && p0.throws !== filters.throws) continue;
       if (filters.role && filters.role !== 'all' &&
-          (roleCache[p.pitcher + '|' + p.team] || 'RP') !== filters.role) continue;
+          (roleCache[p0.pitcher + '|' + p0.team] || 'RP') !== filters.role) continue;
+      const p = (vsHand !== 'all') ? this._pitcherHandView(p0, vsHand) : p0;
 
       let a = acc[p.team];
       if (!a) {
@@ -1008,7 +1010,8 @@ const Aggregator = {
       // hWAR is a counting stat: a team's value is the sum over its arms
       if (p.hWAR != null) a.hWAR = (a.hWAR || 0) + p.hWAR;
       if (p.fWAR != null) a.fWAR = (a.fWAR || 0) + p.fWAR;
-      for (let wi = 0; wi < IP_W.length; wi++) wadd(a, IP_W[wi], p[IP_W[wi]], ipF);
+      const ipW = (vsHand !== 'all') ? ((p._outs || 0) / 3) : ipF;
+      for (let wi = 0; wi < IP_W.length; wi++) wadd(a, IP_W[wi], p[IP_W[wi]], ipW);
       for (let pi = 0; pi < PA_W.length; pi++) wadd(a, PA_W[pi], p[PA_W[pi]], p.pa || p.tbf);
       wadd(a, 'twoStrikeWhiffPct', p.twoStrikeWhiffPct, p.nSwings);
       wadd(a, 'locPlus', p.locPlus, p.locPlusN);
@@ -1024,7 +1027,7 @@ const Aggregator = {
       const o = {
         ip: this._formatIPThirds(a.ipThirds),
         g: teamGames[team] || null,
-        gs: a.gs, w: a.w, l: a.l, sv: a.sv, hld: a.hld, tbf: a.tbf,
+        gs: a.gs, w: a.w, l: a.l, sv: a.sv, hld: a.hld, tbf: tbfOk ? a.tbf : null,
         era: (a.er != null && ipF > 0) ? a.er * 9 / ipF : null,
         hr9: (a.hrA != null && ipF > 0) ? a.hrA * 9 / ipF : null,
         runValue: a.runValue,
@@ -1049,10 +1052,13 @@ const Aggregator = {
   // percentiles over the team pool, invert lower-is-better, narrow the view.
   _finishPitcherTeamRows: function (rows, filters, STAT_KEYS, INVERT) {
     const box = this._teamPitcherBoxscore(filters);
+    // Under vs Hand, Loc+ stays the team row's micro-atom value (exact for the
+    // split); the box rollup carries the season Loc+.
+    const keepMicro = (filters.vsHand && filters.vsHand !== 'all') ? { locPlus: true, locPlusN: true } : {};
     for (let i = 0; i < rows.length; i++) {
       const b = box[rows[i].team];
       if (b) {
-        for (const k in b) rows[i][k] = b[k];
+        for (const k in b) if (!keepMicro[k]) rows[i][k] = b[k];
       }
     }
     this._flagTeamRows(rows);
@@ -1299,6 +1305,105 @@ const Aggregator = {
     return out;
   },
 
+  // Hand splits for pitchers (pipeline/splits.py, data/splits.json.gz). Under
+  // vs Hand a season row is read THROUGH its split: every key below takes the
+  // split value, or null when there is none (no pitches against that hand, the
+  // file not loaded, or a key group that failed the pipeline's self-check).
+  // Never the season value: a season number in a "vs LHH" row is a wrong
+  // number, not a missing one. Season percentiles go too; callers re-rank
+  // inside the split. WAR, the projections and G/GS/IP/W/L/SV/HLD keep their
+  // season values (per Wally 2026-10-08); ERA blanks.
+  PITCHER_HAND_SPLIT_KEYS: ['tbf', 'fip', 'xFIP', 'siera', 'runValue', 'xRunValue', 'rv100', 'xRv100',
+                            'commandPlus', 'armAngle', 'extension',
+                            // inject-time (stuff_plus/train_stuff.py)
+                            'hdERA', 'hdERAPlus', 'pitcherPlus', 'pitcherRuns100',
+                            'xrvoe100', 'rvoe100', 'rvoe', 'xrvoe'],
+  PITCHER_HAND_BLANK: ['era', 'hr9', 'commandPlusRaw', 'commandPlusN', 'xRv100ParkAdj'],
+  // Fields the season pitcher row already carries as <field>_vsL / _vsR.
+  PITCHER_ROW_HAND_FIELDS: ['twoStrikeWhiffPct', 'fpsPct',
+    'strikePct', 'izPct', 'swStrPct', 'cswPct', 'izWhiffPct', 'chasePct',
+    'kPct', 'bbPct', 'kbbPct', 'babip', 'gbPct',
+    'avgEVAgainst', 'maxEVAgainst', 'hardHitPct', 'barrelPctAgainst',
+    'gbPct_bb', 'ldPct', 'fbPct', 'puPct', 'hrFbPct',
+    'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'],
+  PITCH_HAND_SPLIT_KEYS: ['runValue', 'xRunValue', 'rv100', 'xRv100', 'maxVelo', 'strikePct',
+                          'twoStrikeWhiffPct', 'babip', 'releaseTilt', 'releaseTiltMinutes',
+                          // inject-time (stuff_plus/train_stuff.py)
+                          'xrvoe100', 'rvoe100', 'rvoe', 'xrvoe'],
+  // Fields the season pitch-type row carries per hand (no _vs value -> null).
+  PITCH_ROW_HAND_FIELDS: ['avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct',
+                          'fbPct', 'puPct', 'maxEVAgainst',
+                          'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp'],
+
+  // Whether the loaded split file carries a pitcher key group at all (a group
+  // that failed the pipeline's self-check is absent for everyone). Lets a team
+  // sum read a missing per-pitcher entry as zero only when the group exists.
+  _pitcherSplitHas: function (key) {
+    const sp = (window.HAND_SPLITS && window.HAND_SPLITS.pitchers) || null;
+    if (!sp) return false;
+    if (!this._splitHasCache || this._splitHasCache.src !== sp) this._splitHasCache = { src: sp };
+    const c = this._splitHasCache;
+    if (c[key] === undefined) {
+      c[key] = false;
+      for (const k in sp) {
+        if (sp[k][key + '_vsL'] !== undefined || sp[k][key + '_vsR'] !== undefined) { c[key] = true; break; }
+      }
+    }
+    return c[key];
+  },
+
+  // A PITCHER_DATA row seen through its vs-hand split (see above). count, pa
+  // and _outs become this hand's pitches, PA and outs, for the team rollups.
+  _pitcherHandView: function (p, vsHand) {
+    const sfx = '_vs' + vsHand;
+    const v = Object.assign({}, p);
+    const own = this.PITCHER_ROW_HAND_FIELDS;
+    for (let i = 0; i < own.length; i++) {
+      const x = p[own[i] + sfx];
+      v[own[i]] = (x === undefined) ? null : x;
+      v[own[i] + '_pctl'] = null;
+    }
+    const all = (window.HAND_SPLITS && window.HAND_SPLITS.pitchers) || {};
+    const sp = all[p.mlbId + '|' + p.team];
+    const keys = this.PITCHER_HAND_SPLIT_KEYS;
+    for (let i = 0; i < keys.length; i++) {
+      const x = sp ? sp[keys[i] + sfx] : undefined;
+      v[keys[i]] = (x === undefined) ? null : x;
+      v[keys[i] + '_pctl'] = null;
+    }
+    const blank = this.PITCHER_HAND_BLANK;
+    for (let i = 0; i < blank.length; i++) {
+      v[blank[i]] = null;
+      v[blank[i] + '_pctl'] = null;
+    }
+    v.count = (sp && sp['count' + sfx] != null) ? sp['count' + sfx] : 0;
+    v.pa = (sp && sp['pa' + sfx] != null) ? sp['pa' + sfx] : 0;
+    v._outs = (sp && sp['outs' + sfx] != null) ? sp['outs' + sfx] : null;
+    return v;
+  },
+
+  // A PITCH_DATA (pitch-type) row seen through its vs-hand split. Sets both the
+  // plain key and key_vsX so the existing hand-suffix readers pick the split.
+  _pitchHandView: function (p, vsHand) {
+    const sfx = '_vs' + vsHand;
+    const v = Object.assign({}, p);
+    const all = (window.HAND_SPLITS && window.HAND_SPLITS.pitches) || {};
+    const sp = all[p.mlbId + '|' + p.team + '|' + p.pitchType];
+    const keys = this.PITCH_HAND_SPLIT_KEYS;
+    for (let i = 0; i < keys.length; i++) {
+      const x = sp ? sp[keys[i] + sfx] : undefined;
+      v[keys[i]] = (x === undefined) ? null : x;
+      v[keys[i] + sfx] = v[keys[i]];
+      v[keys[i] + '_pctl'] = null;
+    }
+    const own = this.PITCH_ROW_HAND_FIELDS;
+    for (let i = 0; i < own.length; i++) {
+      if (p[own[i] + sfx] === undefined) v[own[i] + sfx] = null;
+    }
+    v.count = (sp && sp['count' + sfx] != null) ? sp['count' + sfx] : 0;
+    return v;
+  },
+
   // Accumulate one PITCH_DATA row into a (team|type) or (entity|category)
   // pre-agg bucket. RV sums stay full precision; rates weight by their
   // natural denominators.
@@ -1354,11 +1459,12 @@ const Aggregator = {
     const acc = {};
 
     for (let i = 0; i < pd.length; i++) {
-      const p = pd[i];
-      if (this._isCombinedTeam(p.team)) continue;
-      if (filters.throws !== 'all' && p.throws !== filters.throws) continue;
+      const p0 = pd[i];
+      if (this._isCombinedTeam(p0.team)) continue;
+      if (filters.throws !== 'all' && p0.throws !== filters.throws) continue;
       if (filters.role && filters.role !== 'all' &&
-          (roleCache[p.pitcher + '|' + p.team] || 'RP') !== filters.role) continue;
+          (roleCache[p0.pitcher + '|' + p0.team] || 'RP') !== filters.role) continue;
+      const p = handSfx ? this._pitchHandView(p0, vsHand) : p0;
 
       this._accumPitchPreAgg(acc, p.team + '|' + p.pitchType, p, handSfx, PITCH_BB_KEYS);
       // Selected category groups aggregate the same rows under the category key
@@ -1388,8 +1494,9 @@ const Aggregator = {
     const acc = {};
 
     for (let i = 0; i < pd.length; i++) {
-      const p = pd[i];
-      const cats = this._selectedCatsForType(selected, p.pitchType);
+      const cats = this._selectedCatsForType(selected, pd[i].pitchType);
+      if (!cats.length) continue;
+      const p = handSfx ? this._pitchHandView(pd[i], vsHand) : pd[i];
       for (let ci = 0; ci < cats.length; ci++) {
         this._accumPitchPreAgg(acc, p.pitcher + '|' + p.team + '|' + cats[ci], p, handSfx, PITCH_BB_KEYS);
       }
@@ -1434,8 +1541,9 @@ const Aggregator = {
     // value). strikePct/twoStrikeWhiffPct stay out in player mode: the micro
     // counters cannot rebuild them, so their season pctls merge via ppre.
     let PITCH_PCTL_KEYS = METRIC_PCTL_KEYS.concat(['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'stuffScore', 'locPlus', 'swStrRate']).concat(PITCH_STAT_KEYS).concat(PITCH_BB_KEYS).concat(PITCH_EXPECTED_KEYS);
-    if (teamMode) {
-      // Stats merged from pre-agg data carry no team-level _pctl — rank them here
+    if (teamMode || vsHand !== 'all') {
+      // Stats merged from pre-agg data carry no team-level _pctl, and under vs
+      // Hand the split values lost their season ranks — rank them here
       PITCH_PCTL_KEYS = PITCH_PCTL_KEYS.concat(['runValue', 'rv100', 'xRunValue', 'xRv100', 'strikePct', 'twoStrikeWhiffPct']);
     }
 
@@ -1701,9 +1809,11 @@ const Aggregator = {
     }
     for (let pmi = 0; pmi < rows.length; pmi++) {
       const pmk = rows[pmi].pitcher + '|' + rows[pmi].team + '|' + rows[pmi].pitchType;
-      const ppre = pitchPreMap[pmk];
+      // Under vs Hand the season row is read through its split (_pitchHandView)
+      const ppre0 = pitchPreMap[pmk];
+      const ppre = (ppre0 && vsHand !== 'all') ? this._pitchHandView(ppre0, vsHand) : ppre0;
       if (ppre) {
-        // Run value (always merge — not hand-dependent at pitch level)
+        // Run value (the split value under vs Hand, via _pitchHandView)
         if (ppre.runValue !== undefined) rows[pmi].runValue = ppre.runValue;
         if (ppre.runValue_pctl !== undefined) rows[pmi].runValue_pctl = ppre.runValue_pctl;
         if (ppre.rv100 !== undefined) rows[pmi].rv100 = ppre.rv100;

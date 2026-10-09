@@ -217,7 +217,7 @@ def fit_targets(pts):
 # ═════════════════════════════════════════════════════════════════════════
 #  SCORING + AGGREGATION
 # ═════════════════════════════════════════════════════════════════════════
-def build_cells(plist):
+def build_cells(plist, with_hand=False):
     """Scoring cells for one pitcher, with the thin-cell CASCADE.
 
     Primary cell = (pitch type, batter hand, count group). A cell that misses
@@ -229,15 +229,19 @@ def build_cells(plist):
     Returns [[(pitch_type, x_in, z_in), ...], ...] — one list per cell that
     cleared MIN_CELL at some level. Pitches that clear it at no level are
     dropped, which is now rare (mean coverage .972, was .914).
+
+    with_hand=True appends the batter hand to every tuple, (pitch_type, x_in,
+    z_in, bats), for score_misses_by_hand. The cells are the same either way.
     """
     lvl1 = defaultdict(list)
     for p in plist:
         if not is_eligible(p):
             continue
         pt = p.get('Pitch Type')
+        pt_xz = (pt, safe_float(p.get('PlateX')) * 12.0,
+                 safe_float(p.get('PlateZ')) * 12.0)
         lvl1[(pt, p.get('Bats'), count_group(p.get('Count')))].append(
-            (pt, safe_float(p.get('PlateX')) * 12.0,
-             safe_float(p.get('PlateZ')) * 12.0))
+            pt_xz + (p.get('Bats'),) if with_hand else pt_xz)
     cells, res2 = [], defaultdict(list)
     for (pt, bats, _cg), pts in lvl1.items():
         if len(pts) >= MIN_CELL:
@@ -284,6 +288,27 @@ def score_misses(pitches_by_key):
             'n_pitches': n_tot,
             'pt_miss': {pt: (s / n, n) for pt, (s, n) in pt_acc.items()},
         }
+    return out
+
+
+def score_misses_by_hand(pitches_by_key):
+    """Miss distance per batter hand on the SEASON cells: every target is fit on
+    all of the key's pitches exactly as score_misses does, and each pitch's miss
+    is then credited to its batter hand. The L and R totals therefore add up to
+    the season raw_miss, and a hand split sits on the season's ruler.
+
+    Returns dict[key] -> {hand: (sum of misses, n)}."""
+    out = {}
+    for key, plist in pitches_by_key.items():
+        acc = {h: [0.0, 0] for h in HANDS}
+        for pts in build_cells(plist, with_hand=True):
+            targets = fit_targets([(x, z) for _pt, x, z, _h in pts])
+            for _pt, x, z, h in pts:
+                d = min(math.hypot(x - tx, z - tz) for tx, tz in targets)
+                acc[h][0] += d
+                acc[h][1] += 1
+        if any(n for _s, n in acc.values()):
+            out[key] = {h: (sm, n) for h, (sm, n) in acc.items()}
     return out
 
 

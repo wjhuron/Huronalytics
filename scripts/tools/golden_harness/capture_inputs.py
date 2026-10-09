@@ -15,8 +15,11 @@ sys.path.insert(0, REPO)
 
 from pipeline.fetch import read_all_pitches_from_sheets, read_new_tab_pitches
 
-rs = read_all_pitches_from_sheets()
-print(f"captured {len(rs)} RS rows")
+# Frozen WITH the no-pitch PA markers (intentional walks, PitchID _00);
+# golden_run's stub drops them unless the caller passes include_no_pitch=True,
+# exactly like the real reader, so the pipeline sees the same rows either way.
+rs = read_all_pitches_from_sheets(include_no_pitch=True)
+print(f"captured {len(rs)} RS rows (incl. no-pitch PA markers)")
 with open(os.path.join(OUT, 'golden_input_rs.pkl'), 'wb') as f:
     pickle.dump(rs, f)
 

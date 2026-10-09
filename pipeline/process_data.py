@@ -18,6 +18,7 @@ from collections import defaultdict
 from pipeline.utils import (
     safe_float, normalize_date, _today_et, avg, median, round_metric,
     is_barrel, barrel_flag, spray_angle, spray_direction, duplicate_pa_events,
+    is_no_pitch, real_pitches,
     break_tilt_to_minutes, circular_mean_minutes, minutes_to_tilt_display,
     compute_in_zone, outs_to_ip_str, outs_to_ip_float, ip_str_to_float,
     DATA_DIR,
@@ -42,7 +43,7 @@ from pipeline.xmove import (fit_models as fit_xmove_models, score_all as score_x
 from pipeline.hwar import apply_batting_runs, apply_hitter_war, apply_hpwar
 from pipeline.eraplus import _load_park as load_park_factors_savant
 from pipeline.compute import (
-    compute_expected_stats, compute_stats, compute_xrv,
+    compute_expected_stats, compute_stats, compute_xrv, fip_family,
     compute_pitcher_batted_ball, compute_hitter_stats,
     compute_percentile_ranks, compute_percentile_ranks_with_aaa,
     METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
@@ -1330,12 +1331,15 @@ class _SkipSeasonOverride(Exception):
 
 
 def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
-                      scoring_only=None, window_mode=False):
+                      scoring_only=None, window_mode=False, no_pitch_pas=None):
     """Process a set of pitches into all leaderboard outputs.
 
     Args:
         all_pitches: list of pitch dicts
         label: 'ST' or 'RS' (for logging)
+        no_pitch_pas: the no-pitch intentional-walk marker rows (PitchID `_00`),
+            kept OUT of all_pitches. Only the pitcher hand-split box reads them
+            (TBF, BB and FIP vs a hand); None skips those keys.
         window_mode: True when all_pitches covers a DATE WINDOW rather than a
             whole season. Everything computed from all_pitches is already
             correct for the window, including the boxscore merge (its dates
@@ -1753,7 +1757,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         print(f"  Name-variant merge (id {mid}): "
               f"{sorted(names)} -> '{canonical}'")
     if rename_map:
-        for p in all_pitches:
+        for p in all_pitches + (no_pitch_pas or []):
             if p.get('Batter') in rename_map:
                 p['Batter'] = rename_map[p['Batter']]
             if p.get('Pitcher') in rename_map:
@@ -4718,61 +4722,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             continue
 
         ip_float = outs_to_ip_float(box['outs'])
-        hr = box['hr']
-        bb = box['bb']
-        hbp = box['hbp']
-        so = box['so']
-        tbf = box['tbf']
-
-        # FIP = ((13*HR)+(3*(BB+HBP))-(2*K))/IP + constant
-        if ip_float > 0 and FIP_CONSTANT is not None:
-            row['fip'] = round(((13 * hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
-        else:
-            row['fip'] = None
-
-        # xFIP: FB includes popups
-        n_bip = row.get('nBip', 0) or 0
-        fb_pct = row.get('fbPct') or 0
-        pu_pct = row.get('puPct') or 0
-        fb_count = round((fb_pct + pu_pct) * n_bip)  # fly balls + popups
-        if ip_float > 0 and FIP_CONSTANT is not None:
-            expected_hr = fb_count * lg_hr_fb
-            row['xFIP'] = round(((13 * expected_hr + 3 * (bb + hbp) - 2 * so) / ip_float) + FIP_CONSTANT, 2)
-        else:
-            row['xFIP'] = None
-
-        # SIERA (raw, without constant — constant calibrated below)
-        # netGB = GB - FB (where FB includes popups)
-        # -/+ 4.920 term: minus if GB >= FB, plus if FB > GB
-        gb_pct_val = row.get('gbPct') or 0
-        gb_count = round(gb_pct_val * n_bip)
-        if tbf > 0 and ip_float > 0:
-            so_pa = so / tbf
-            bb_pa = bb / tbf
-            net_gb_pa = (gb_count - fb_count) / tbf
-            # SP/RP ratio: fraction of IP as starter
-            gs = box.get('gs', 0) or 0
-            g = box.get('g', 1) or 1
-            ip_sp_ratio = min(gs / g, 1.0) if g > 0 else 0.0
-            # Sign for 4.920 term: minus if GB >= FB, plus if FB > GB
-            sign_4920 = -1.0 if gb_count >= fb_count else 1.0
-            raw_siera = (
-                - 15.518 * so_pa
-                + 9.146 * (so_pa ** 2)
-                + 8.648 * bb_pa
-                + 27.252 * (bb_pa ** 2)
-                - 2.298 * net_gb_pa
-                + sign_4920 * 4.920 * (net_gb_pa ** 2)
-                - 4.036 * so_pa * bb_pa
-                + 5.155 * so_pa * net_gb_pa
-                + 4.546 * bb_pa * net_gb_pa
-                + 0.367 * ip_sp_ratio
-            )
-            row['_siera_raw'] = raw_siera
-            if not row.get('_isROC') and not row.get('_isCombined'):
-                siera_ip_pairs.append((raw_siera, ip_float))
-        else:
-            row['_siera_raw'] = None
+        row['fip'], row['xFIP'], raw_siera = fip_family(
+            box['outs'], box['hr'], box['bb'], box['hbp'], box['so'], box['tbf'],
+            row.get('nBip', 0), row.get('fbPct'), row.get('puPct'), row.get('gbPct'),
+            box.get('gs', 0), box.get('g', 1), lg_hr_fb, FIP_CONSTANT)
+        row['_siera_raw'] = raw_siera
+        if raw_siera is not None and not row.get('_isROC') and not row.get('_isCombined'):
+            siera_ip_pairs.append((raw_siera, ip_float))
 
     # Calibrate SIERA constant so league-average SIERA = league-average ERA
     # (same principle as cFIP for FIP)
@@ -4814,6 +4770,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             '1B': WOBA_WEIGHTS.get('1B'), '2B': WOBA_WEIGHTS.get('2B'),
             '3B': WOBA_WEIGHTS.get('3B'), 'HR': WOBA_WEIGHTS.get('HR'),
         }
+
+    # Pitcher hand splits (pipeline/splits.py). Here because the rows still carry
+    # the official `_box` the self-check reads and FIP/xFIP still hold the formula
+    # value the FanGraphs override replaces below.
+    _pit_split = None
+    if not window_mode:
+        from pipeline.splits import pitcher_hand_box, pitcher_splits
+        _hbox, _hbox_unplaced = pitcher_hand_box(all_pitches, no_pitch_pas or [])
+        if _hbox_unplaced:
+            print(f"  hand-split box: {_hbox_unplaced} rows without a PitchID, Outs or batter hand")
+        if no_pitch_pas is None:
+            print("  hand-split box: no intentional-walk markers passed; TBF/BB vs a hand run short")
+        _pit_split = pitcher_splits(
+            pitcher_leaderboard, pitch_leaderboard, pitcher_groups, pitch_groups,
+            {k: sorted(v) for k, v in pitcher_mlb_teams.items()}, _hbox,
+            {'fip_constant': FIP_CONSTANT, 'lg_hr_fb': lg_hr_fb,
+             'siera_constant': siera_constant, 'cmd_mu': _cmd_mu,
+             'xrv_kwargs': {'lg_woba': _xrv_lg, 'woba_scale': _xrv_scale,
+                            'count_offsets': XRV_COUNT_OFFSETS,
+                            'bip_count_means': XRV_BIP_COUNT_MEANS},
+             'aaa_teams': AAA_TEAMS, 'is_combined': _is_combined_team})
 
     # Second pass: apply SIERA constant and clean up
     for row in pitcher_leaderboard:
@@ -5158,6 +5135,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             hand_splits = None
         elif hand_splits is not None:
             hand_splits['hitterPitch'] = _hp_split
+            if _pit_split is not None:
+                hand_splits.update(_pit_split)
 
     return {
         'hand_splits': hand_splits,
@@ -5666,8 +5645,14 @@ def main():
     # the huronalytics account). Pitcher2026 appends here and retagging happens
     # here, so this is the source of truth.
     print("\n=== Reading Regular Season data (Sheets) ===")
-    rs_pitches = read_all_pitches_from_sheets()
-    print(f"  Read {len(rs_pitches)} RS pitches from the 6 division workbooks")
+    # Read WITH the no-pitch intentional-walk markers, then split them off: every
+    # consumer still gets real pitches only (the reader's default), and the
+    # pitcher hand-split box gets the markers it needs for TBF and BB.
+    rs_pitches = read_all_pitches_from_sheets(include_no_pitch=True)
+    rs_no_pitch = [p for p in rs_pitches if is_no_pitch(p)]
+    rs_pitches = real_pitches(rs_pitches)
+    print(f"  Read {len(rs_pitches)} RS pitches from the 6 division workbooks "
+          f"(+{len(rs_no_pitch)} no-pitch intentional-walk markers, kept apart)")
 
     # Shape guard: exactly one pitch ends a plate appearance, so exactly one
     # row per at-bat may carry a PA Event. A second one double-counts the PA
@@ -5688,7 +5673,7 @@ def main():
     # leading space (e.g. "Lee, Hao-Yu ") doesn't fork one player into duplicate
     # rows. (Accents are already handled consistently upstream.)
     _name_fixed = 0
-    for _p in rs_pitches:
+    for _p in rs_pitches + rs_no_pitch:
         for _fld in ('Batter', 'Pitcher'):
             _v = _p.get(_fld)
             if isinstance(_v, str) and _v != _v.strip():
@@ -5729,7 +5714,8 @@ def main():
     print("=" * 60)
     rs_result = process_game_type(rs_pitches, 'RS', mlb_id_cache,
                                   mlb_id_cache_path,
-                                  scoring_only=new_tab_pitches)
+                                  scoring_only=new_tab_pitches,
+                                  no_pitch_pas=rs_no_pitch)
 
     # Save shared MLB ID cache
     save_mlb_id_cache(mlb_id_cache, mlb_id_cache_path)
