@@ -106,14 +106,12 @@ var PlayerPage = {
     { key: 'bbToK', label: 'BB/K', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   ],
 
-  // Shown in place of HITTER_STATS_COLS whenever a handedness is selected.
-  // G is meaningless per hand. wOBA and xWRC+ now split — the Guts linear
-  // weights ship in metadata and the hitter micro carries IBB, so the
-  // aggregator rebuilds both under the filter on the same scale as the season
-  // value. wRC+ and Process+ stay out: wRC+ is overwritten with the canonical
-  // FanGraphs number (which has no per-hand split, so a pipeline-formula
-  // version would read on a different scale), and Process+ needs the SD+/CT+
-  // weight tables, which are server-side only.
+  // Shown in place of HITTER_STATS_COLS whenever a handedness is selected:
+  // the season line minus G and the WAR columns (per Wally 2026-10-08, WAR
+  // and the projections do not split). wOBA and xWRC+ are rebuilt from the
+  // micro counters; wRC+ (the pipeline formula on the season's Guts and park
+  // constants, a couple of points off the FanGraphs season number) and
+  // Process+ come from the hand-split file (pipeline/splits.py).
   HITTER_PLATOON_STATS_COLS: [
     { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
     { key: 'ab', label: 'AB', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
@@ -128,7 +126,9 @@ var PlayerPage = {
     { key: 'babip', label: 'BABIP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
     { key: 'wOBA', label: 'wOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
     { key: 'xwOBA', label: 'xwOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
+    { key: 'wRCplus', label: 'wRC+', format: function(v) { return v != null ? v : '—'; } },
     { key: 'xWRCplus', label: 'xWRC+', format: function(v) { return v != null ? v : '—'; } },
+    { key: 'processPlus', label: 'Process+', format: function(v) { return v != null ? Math.round(v) : '—'; } },
     { key: 'xBA', label: 'xBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
     { key: 'xSLG', label: 'xSLG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
     { key: 'xwOBAcon', label: 'xwOBAcon', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
@@ -257,14 +257,15 @@ var PlayerPage = {
     { key: 'fWAR', label: 'fWAR', format: function(v) { return v != null ? v.toFixed(1) : '—'; } },
   ],
 
-  // Shown in place of STATS_COLS whenever a handedness is selected. The
-  // season line's counting stats (G/GS/IP/W/L/SV/HLD) and IP-denominated
-  // rates (ERA/FIP/xFIP/SIERA) have no per-hand split in the data — leaving
-  // them on screen made the toggle look inert. Every column here does split:
-  // TBF/AVG/OBP/BABIP/K%/BB%/Whiff% come from the micro counters, the
-  // expected stats from PITCHER_DATA's _vsL/_vsR fields.
+  // Shown in place of STATS_COLS whenever a handedness is selected. Every
+  // column here splits; G/GS/IP/W/L/SV/HLD keep season values and ERA is
+  // blank under a split (per Wally 2026-10-08), and WAR and hpERA do not
+  // split, so those stay off. AVG/OBP/BABIP/K%/BB%/Whiff% come from the micro
+  // counters, the expected stats from PITCHER_DATA's _vsL/_vsR fields, and
+  // TBF (official-box batters faced, intentional walks included), FIP, xFIP,
+  // SIERA and hdERA from the hand-split file (pipeline/splits.py).
   PLATOON_STATS_COLS: [
-    { key: 'pa', label: 'TBF', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
+    { key: 'tbf', label: 'TBF', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
     { key: 'avgAgainst', label: 'AVG', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
     { key: 'obpAgainst', label: 'OBP', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
     { key: 'wOBA', label: 'wOBA', format: function(v) { return v != null ? v.toFixed(3).replace(/^0/, '') : '—'; }, dec3: true },
@@ -278,6 +279,10 @@ var PlayerPage = {
     { key: 'swStrPct', label: 'Whiff%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'hardHitPct', label: 'Hard-Hit%', format: function(v) { return Utils.formatPct(v); } },
     { key: 'barrelPctAgainst', label: 'Barrel%', format: function(v) { return Utils.formatPct(v); } },
+    { key: 'fip', label: 'FIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'xFIP', label: 'xFIP', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'siera', label: 'SIERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+    { key: 'hdERA', label: 'hdERA', format: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   ],
 
   BATTED_BALL_COLS: [
@@ -2118,14 +2123,12 @@ var PlayerPage = {
     return this._platoonAggCache[key];
   },
 
-  // On the pitcher side wOBA/xwOBA/xBA/xSLG are boxscore-merged: the aggregator
-  // swaps in the _vsL/_vsR VALUE but carries the season _pctl alongside it, so
-  // coloring a split cell with that rank would paint the wrong number. Rank
-  // them within the same filtered pool instead, under a panel-local key so
-  // nothing else on the page changes. Pool is every player in the aggregation
-  // (house rule: all MLB defines the distribution, qualification gates color).
-  // Hitters pass an empty list — every column in their platoon set is computed
-  // from micro, so the aggregator's own _pctl already matches the value shown.
+  // Ranks keys within the same filtered pool under a panel-local key so
+  // nothing else on the page changes. Neither panel needs it since
+  // 2026-10-09: under vs Hand the aggregator itself ranks every split value
+  // inside the split (aggregator.js _pitcherHandView and the hitter merge),
+  // so both configs pass an empty list. Kept for a column the aggregator
+  // does not rank.
   _ensurePlatoonPctls: function (rows, keys) {
     if (!rows || !keys || !keys.length || rows._platoonPctlsDone) return;
     for (var ki = 0; ki < keys.length; ki++) {
@@ -2161,7 +2164,7 @@ var PlayerPage = {
       sectionId: 'player-platoon-split-section',
       tableId:   'player-platoon-split-table',
       tab: 'pitcher', nameKey: 'pitcher', colsKey: 'PLATOON_STATS_COLS',
-      rerank: ['wOBA', 'xwOBA', 'xBA', 'xSLG'],
+      rerank: [],
       labelL: 'vs LHH', labelR: 'vs RHH',
     },
     hitter: {
