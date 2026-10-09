@@ -81,20 +81,42 @@ def _get(url, pk):
         return {'_error': f'{type(e).__name__}: {e}'}
 
 
+def _marker_id(pk, ab):
+    """Marker PitchID for the no-pitch play at feed atBatIndex `ab`.
+
+    The scraper numbers every real pitch's at-bat atBatIndex + 1
+    (scrapers/pitcher2026.py), so the marker does too. Markers written before
+    2026-10-09 used the bare 0-based index and share their number with the
+    PREVIOUS plate appearance; write_missing_ibb.py treats that legacy ID as
+    present so a re-run does not duplicate them.
+    """
+    return f"{pk}_{ab + 1:03d}_00" if ab is not None else ''
+
+
 def _lastfirst(pid, fullname=None):
-    """Canonical "Last, First" for a player id. MiLB boxscores omit
-    lastFirstName, so fall back to the people API (cached)."""
+    """THE canonical "Last, First" for a player id.
+
+    Every name in the output goes through here. The two other sources both
+    lie: the boxscore's `name` naively splits on the last token, so
+    "Enyel De Los Santos" becomes "Santos, Enyel De Los" where the sheets say
+    "De Los Santos, Enyel"; and the feed's matchup.*.fullName is "First Last".
+    The Stats API's lastFirstName is what the pipeline itself canonicalizes to
+    (pipeline.fetch.fetch_canonical_last_first), so it is what joins.
+    """
     if pid in _NAME_CACHE:
         return _NAME_CACHE[pid]
     out = None
-    d = _get("https://statsapi.mlb.com/api/v1/people/{pk}", pid)
-    if not d.get('_error'):
-        people = d.get('people') or []
-        if people:
-            out = people[0].get('lastFirstName')
-    if not out and fullname and ' ' in fullname:
-        first, _, last = fullname.partition(' ')
-        out = f"{last}, {first}"
+    try:
+        from pipeline.fetch import fetch_canonical_last_first
+        out = fetch_canonical_last_first(pid)
+    except Exception:
+        out = None
+    if not out:
+        d = _get("https://statsapi.mlb.com/api/v1/people/{pk}", pid)
+        if not d.get('_error'):
+            people = d.get('people') or []
+            if people:
+                out = people[0].get('lastFirstName')
     _NAME_CACHE[pid] = out
     return out
 
@@ -142,7 +164,7 @@ def _roc_rows(have, verbose=True):
                 'gamePk': pk,
                 'gameDate': (about.get('startTime') or '')[:10] or None,
                 'atBatIndex': ab,
-                'PitchID': f"{pk}_{ab:03d}_00" if ab is not None else '',
+                'PitchID': _marker_id(pk, ab),
                 'sheetTab': team_of.get(pid),
                 'PTeam': team_of.get(pid),
                 'Pitcher': _lastfirst(pid, (m.get('pitcher') or {}).get('fullName')),
@@ -186,7 +208,11 @@ def main():
             pk = g.get('gamePk')
             for p in g.get('pitchers', []):
                 if p.get('mlbId'):
-                    pitcher_team[(pk, p['mlbId'])] = p.get('team')
+                    # name AND team from the boxscore: it already carries
+                    # "Last, First", which is the sheets' convention. The
+                    # feed's matchup.pitcher.fullName is "First Last" and
+                    # would write a name no downstream join can match.
+                    pitcher_team[(pk, p['mlbId'])] = (p.get('name'), p.get('team'))
             ibb_hitters = [h for h in g.get('hitters', []) if h.get('ibb')]
             if not ibb_hitters:
                 continue
@@ -235,20 +261,20 @@ def main():
                 bid = (m.get('batter') or {}).get('id')
                 pid = (m.get('pitcher') or {}).get('id')
                 bname, bteam = hitter_of.get((pk, bid), (None, None))
-                pteam = pitcher_team.get((pk, pid))
+                pname, pteam = pitcher_team.get((pk, pid), (None, None))
                 ab = about.get('atBatIndex')
                 rows.append({
                     'gamePk': pk,
                     'gameDate': date_of.get(pk),
                     'atBatIndex': ab,
-                    'PitchID': f"{pk}_{ab:03d}_00" if ab is not None else '',
+                    'PitchID': _marker_id(pk, ab),
                     'sheetTab': pteam,          # rows live in the pitcher's tab
                     'PTeam': pteam,
-                    'Pitcher': (m.get('pitcher') or {}).get('fullName'),
+                    'Pitcher': _lastfirst(pid),
                     'pitcherMlbId': pid,
                     'Throws': (m.get('pitchHand') or {}).get('code'),
                     'BTeam': bteam,
-                    'Batter': bname,
+                    'Batter': _lastfirst(bid) or bname,
                     'batterMlbId': bid,
                     'Bats': (m.get('batSide') or {}).get('code'),
                     'Outs': (play.get('count') or {}).get('outs'),

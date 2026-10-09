@@ -70,6 +70,12 @@ FIELD_MAP = {
 }
 
 
+def _legacy_id(pid):
+    """The pre-2026-10-09 marker ID for the same play: at-bat number - 1."""
+    pk, ab, n = str(pid).split('_')
+    return f"{pk}_{int(ab) - 1:03d}_{n}"
+
+
 def _load(csv_path):
     with open(csv_path) as f:
         rows = list(csv.DictReader(f))
@@ -128,7 +134,23 @@ def main():
         existing = set(_sheets_retry(
             lambda: ws.col_values(header.index('PitchID') + 1),
             label=f'{tab} PitchID read')[1:])
-        fresh = [r for r in by_tab[tab] if r['PitchID'] not in existing]
+        # A marker written before 2026-10-09 carries the feed's bare 0-based
+        # atBatIndex, one below the scraper's numbering the enumerator now
+        # uses, so it counts as present under that legacy ID too. Without
+        # this every legacy marker would be appended a second time. The
+        # check fails closed: a legacy ID that is really a different IBB's
+        # new ID (two no-pitch IBBs in a row, written under different
+        # numberings) skips the row, and the next enumerate shows it short.
+        fresh, legacy = [], 0
+        for r in by_tab[tab]:
+            if r['PitchID'] in existing:
+                continue
+            if _legacy_id(r['PitchID']) in existing:
+                legacy += 1
+                continue
+            fresh.append(r)
+        if legacy:
+            print(f"  {tab}: {legacy} present under the legacy at-bat number")
         total_present += len(by_tab[tab]) - len(fresh)
         total_new += len(fresh)
         if not fresh:
