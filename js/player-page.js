@@ -4767,6 +4767,14 @@ var PlayerPage = {
     container.innerHTML = '';
 
     section.style.display = '';
+    // The note says which pitchers the Overall row covers: under the toggle it
+    // is the hand split, and the pitch-category rows (season only) drop out.
+    var hand = this._platoonHand || 'all';
+    var note = section.querySelector('.section-note');
+    if (note) {
+      note.textContent = hand === 'all' ? 'Season totals, all pitchers'
+        : 'Overall vs ' + (hand === 'L' ? 'LHP' : 'RHP') + '; pitch types in the All view';
+    }
 
     var table = document.createElement('table');
     table.className = 'player-pitch-stats-table expanded-pitch-table';
@@ -4793,8 +4801,10 @@ var PlayerPage = {
     // read. Category rows come from the shipped HITTER_PITCH_LB; percentiles
     // rank within the same category across MLB. A category row colors only
     // with 10+ competitive swings, the same bar the bat-speed bubble uses.
-    // Platoon mode keeps the season Overall row only: the client aggregator
-    // does not rebuild bat tracking under a handedness filter.
+    // Platoon mode shows the Overall row only, and it is the hand split: the
+    // caller passes the vs-hand aggregator row, whose bat-tracking values come
+    // from the hand-split file (pipeline/splits.py). No per-category hand
+    // split exists, so the category rows stay in the All view.
     var sources = [{ label: 'Overall', row: data, colored: true }];
     if (!this._platoonHand || this._platoonHand === 'all') {
       var catRows = this._getHitterCategoryRows(data.hitter, data.team);
