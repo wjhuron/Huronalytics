@@ -94,3 +94,4 @@ Multi-team players: the combined 2TM/3TM row shows in the All Teams view and per
 - Check a qualified player, an unqualified player, and a ROC player after any coloring change. They are three different render paths.
 - Filters reshape team numbers, so check the filtered view as well as the unfiltered one.
 - Team stats are weighted true totals, not averages of player values.
+- Check a player page by opening its link DIRECTLY (`#player=<id>`, fresh reload), not only by clicking through from a leaderboard. The leaderboard loads lazy files (`splits.json.gz`) that a direct load has not fetched yet; on 2026-10-09 the platoon panels passed the click-through check and rendered wRC+/Process+ blank on a direct load.
