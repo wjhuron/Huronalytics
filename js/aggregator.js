@@ -834,7 +834,7 @@ const Aggregator = {
     if (vsHand !== 'all') {
       STAT_KEYS = STAT_KEYS.concat(['fip', 'xFIP', 'siera', 'runValue', 'rv100', 'xRunValue', 'xRv100',
         'commandPlus', 'extension', 'twoStrikeWhiffPct', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon',
-        'hdERA', 'hdERAPlus', 'pitcherPlus']);
+        'hdERA', 'hdERAPlus', 'pitcherPlus', 'xrvoe100', 'rvoe100', 'rvoe', 'xrvoe']);
       INVERT = Object.assign({}, INVERT, { fip: true, xFIP: true, siera: true, hdERA: true,
         wOBA: true, xBA: true, xSLG: true, xwOBA: true, xwOBAcon: true });
     }
@@ -1545,6 +1545,11 @@ const Aggregator = {
       // Stats merged from pre-agg data carry no team-level _pctl, and under vs
       // Hand the split values lost their season ranks — rank them here
       PITCH_PCTL_KEYS = PITCH_PCTL_KEYS.concat(['runValue', 'rv100', 'xRunValue', 'xRv100', 'strikePct', 'twoStrikeWhiffPct']);
+    }
+    if (!teamMode && vsHand !== 'all') {
+      // xRVOE family: season ranks are per pitch type in the pipeline; under
+      // vs Hand they rank inside the split the same way
+      PITCH_PCTL_KEYS = PITCH_PCTL_KEYS.concat(['xrvoe100', 'rvoe100', 'rvoe', 'xrvoe']);
     }
 
     const groups = {};

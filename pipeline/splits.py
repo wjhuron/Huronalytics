@@ -590,12 +590,17 @@ def write_splits(path, data):
 
 
 def inject_pitcher_splits(rows, pitches, stuff_grades, loc_grades, pp_base, path,
-                          aaa_teams=('ROC', 'AAA')):
+                          aaa_teams=('ROC', 'AAA'), xrvoe_hand=None, xrvoe_fields=None):
     """Add hdERA / hdERA+ / Pitcher+ / pitcherRuns100 vs each hand to the split
     file at `path`. rows = the injected pitcher leaderboard (Stuff+ still at its
     1-decimal value), pitches = MLB + ROC pitch dicts, *_grades = the per-pitch
     grade dumps keyed "tab\\trow", pp_base = apply_pitcher_plus's baseline.
-    Each key ships only if its All-hands rebuild reproduces the season row."""
+    Each key ships only if its All-hands rebuild reproduces the season row.
+
+    xrvoe_hand = (per pitch type, per pitcher) hand units from train_stuff's
+    compute_xrvoe(by_hand=True), self-checked there; xrvoe_fields maps the
+    leaderboard field to the unit key. Combined 2TM rows stay blank, as in the
+    season columns."""
     import os
     from collections import defaultdict
     from pipeline.pitcherplus import score_row, PRED_SLOPE, PARK_ADJ_KEY
@@ -694,7 +699,30 @@ def inject_pitcher_splits(rows, pitches, stuff_grades, loc_grades, pp_base, path
             if k.rsplit('_vs', 1)[0] in keys:
                 tgt[k] = v
                 n += 1
+    n_oe = 0
+    if xrvoe_hand and xrvoe_hand[0] is not None and xrvoe_fields:
+        pt_h, ov_h = xrvoe_hand
+        mid = {(r['pitcher'], r['team']): r.get('mlbId') for r in rows}
+        sec_pt = data.setdefault('pitches', {})
+        for (pitcher, team, *rest), rec in list(ov_h.items()) + list(pt_h.items()):
+            m = mid.get((pitcher, team))
+            if m is None:
+                continue
+            if len(rest) == 1:
+                tgt = pit.setdefault(f'{m}|{team}', {})
+            else:
+                tgt = sec_pt.setdefault(f'{m}|{team}|{rest[0]}', {})
+            h = rest[-1]
+            for f, src in xrvoe_fields.items():
+                v = rec.get(src)
+                if v is not None:
+                    tgt[f'{f}_vs{h}'] = round(v, 6) if isinstance(v, float) else v
+                    n_oe += 1
+    elif xrvoe_hand is not None:
+        print('  inject hand splits: no xRVOE hand units this run (the site blanks them)')
     write_splits(path, data)
+    if n_oe:
+        print(f'  inject hand splits: {n_oe} xRVOE values written')
     dropped = sorted(set(INJECT_SPLIT_KEYS) - keys)
     print(f'  inject hand splits: {n} values written'
           + (f"; NOT written: {', '.join(dropped)}" if dropped else ''))

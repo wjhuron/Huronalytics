@@ -1664,10 +1664,11 @@ def main():
     print(f'\n  saved bundle + pitcher_stuff.csv to {HERE}')
 
     if args.inject:
-        xrvoe_pt, xrvoe_ov = compute_xrvoe(df, pitches,
-                                           roc_df=roc_df, roc_pitches=roc_pitches)
+        xrvoe_pt, xrvoe_ov, xrvoe_pt_h, xrvoe_ov_h = compute_xrvoe(
+            df, pitches, roc_df=roc_df, roc_pitches=roc_pitches, by_hand=True)
         inject(agg, overall, league, xrvoe_pt=xrvoe_pt, xrvoe_ov=xrvoe_ov,
-               mlb_pitches=pitches, roc_pitches=roc_pitches)
+               mlb_pitches=pitches, roc_pitches=roc_pitches,
+               xrvoe_hand=(xrvoe_pt_h, xrvoe_ov_h))
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
@@ -1736,12 +1737,18 @@ XRVOE_FIELDS = {'xrvoe100': 'v', 'rvoe100': 'rvoe100',
                 'rvoe': 'rvoe', 'xrvoe': 'xrvoe'}
 
 
-def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None):
+def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None, by_hand=False):
     """Per-unit xRVOE/100 (pitcher-positive) from the OOF stuff predictions
     already in df['stuff_raw'] and per-pitch Loc ExpRV built here.
     Stacking is fit PER PITCH GROUP (fixes the loc-correlation calibration
     wrinkle found in feasibility). Returns (per_pitch_type, per_pitcher)
     dicts: key -> {'v': shrunk xRVOE/100, 'n': pitches}.
+
+    by_hand=True also returns the same two dicts per batter hand, keyed
+    (..., 'L'/'R'): every pitch keeps its season expectation (surfaces and
+    stacking betas fit on the whole season, the hand-split ruler), only the
+    grouping splits, and the same display floors apply to each hand's sample.
+    They are None when the hand sums do not reproduce the season units.
 
     ROC/AAA (2026-07-25): scored, never baseline — the same translation
     framing Stuff+ and Loc+ use. The Loc surfaces and the stacking betas are
@@ -1832,11 +1839,11 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None):
                 print(f'  xRVOE: {len(d_roc)} ROC/AAA pitches scored against '
                       f'the MLB expectation')
 
-    def _units(keys, min_n):
+    def _units(keys, min_n, frame=None):
         # v (xRVOE/100) is the shrunk skill estimate; xrvoe/rvoe/rvoe100 are
         # raw accounting (unshrunk, full precision — display layer rounds),
         # matching the site's RV/xRV convention.
-        g = d_all.groupby(keys).agg(resid=('resid', 'mean'), n=('resid', 'size'),
+        g = (d_all if frame is None else frame).groupby(keys).agg(resid=('resid', 'mean'), n=('resid', 'size'),
                                     resid_sum=('resid', 'sum'),
                                     raw_sum=('resid_raw', 'sum'),
                                     raw_n=('resid_raw', 'count'))
@@ -1852,12 +1859,37 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None):
                         'rvoe100': (-(r['raw_sum'] / r['raw_n']) * 100.0
                                     if has_raw else None)}
         return out
-    return (_units(['pitcher', 'team', 'pitch_type'], XRVOE_MIN_PT),
-            _units(['pitcher', 'team'], XRVOE_MIN_OV))
+    pt = _units(['pitcher', 'team', 'pitch_type'], XRVOE_MIN_PT)
+    ov = _units(['pitcher', 'team'], XRVOE_MIN_OV)
+    if not by_hand:
+        return pt, ov
+    from pipeline.splits import _check
+    bats = {p.get('PitchID'): p.get('Bats') for p in list(pitches) + list(roc_pitches or [])}
+    dh = d_all.assign(bats=d_all['pid'].map(bats))
+    dh = dh[dh['bats'].isin(['L', 'R'])]
+    # self-check: the raw sums of the two hands must add up to the season unit
+    ok = True
+    for keys in (['pitcher', 'team', 'pitch_type'], ['pitcher', 'team']):
+        season = _units(keys, 0)
+        hands = _units(keys + ['bats'], 0, dh)
+        for f in ('xrvoe', 'rvoe'):
+            pairs = []
+            for k, rec in season.items():
+                k = k if isinstance(k, tuple) else (k,)
+                parts = [hands.get(k + (h,)) for h in ('L', 'R')]
+                vals = [x[f] for x in parts if x is not None and x[f] is not None]
+                pairs.append((' '.join(map(str, k)), sum(vals) if vals else None, rec[f]))
+            ok &= _check(f'xRVOE {f} {len(keys)}-key', pairs, 1e-6)
+    if not ok:
+        print('  xRVOE hand splits NOT written: the hand sums do not reproduce the season units')
+        return pt, ov, None, None
+    return (pt, ov,
+            _units(['pitcher', 'team', 'pitch_type', 'bats'], XRVOE_MIN_PT, dh),
+            _units(['pitcher', 'team', 'bats'], XRVOE_MIN_OV, dh))
 
 
 def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
-           mlb_pitches=None, roc_pitches=None):
+           mlb_pitches=None, roc_pitches=None, xrvoe_hand=None):
     """Write stuffScore into BOTH leaderboards.
 
     Percentile convention (site standard, aligned 2026-07-02): the pool that
@@ -2051,7 +2083,8 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
         else:
             inject_pitcher_splits(pp, list(mlb_pitches) + list(roc_pitches or []),
                                   _grade_dumps[0], _grade_dumps[1], _pp_base,
-                                  os.path.join(DATA, 'splits.json.gz'), aaa_teams=AAA_TEAMS)
+                                  os.path.join(DATA, 'splits.json.gz'), aaa_teams=AAA_TEAMS,
+                                  xrvoe_hand=xrvoe_hand, xrvoe_fields=XRVOE_FIELDS)
 
     # LAST: store stuffScore at STUFF_STORE_DECIMALS. Everything above (the
     # ranks, Pitcher+, hdERA/hpERA) read the 1-decimal value and is unchanged.
