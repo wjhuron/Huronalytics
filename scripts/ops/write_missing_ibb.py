@@ -98,7 +98,7 @@ def _load(csv_path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--csv', default=os.path.join(DATA, '_missing_ibb_fresh.csv'))
+    ap.add_argument('--csv', default=os.path.join(DATA, '_missing_ibb.csv'))
     ap.add_argument('--apply', action='store_true',
                     help='append for real; without it nothing is written')
     a = ap.parse_args()

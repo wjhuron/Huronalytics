@@ -101,9 +101,17 @@ def duplicate_pa_events(rows):
     Returns {(gamePk, atBatIndex): [rows]}, groups of two or more, keyed as
     strings exactly as PitchID spells them. Repair with
     scripts/ops/fix_duplicate_pa_events.py.
+
+    No-pitch markers are skipped: a marker IS its plate appearance, never a
+    stale copy of one. Markers written before 2026-10-09 also share their
+    at-bat number with the PREVIOUS plate appearance, so grouping one in would
+    pair it with that PA's final pitch, and the repair tool, which keeps the
+    highest pitch number, would blank the marker's Event.
     """
     by_ab = defaultdict(list)
     for r in rows:
+        if is_no_pitch(r):
+            continue
         ev = r.get('Event')
         if not ev or ev in NON_PA_EVENTS:
             continue

@@ -106,11 +106,15 @@ def _lastfirst(pid, fullname=None):
     if pid in _NAME_CACHE:
         return _NAME_CACHE[pid]
     out = None
+    # fetch_canonical_last_first catches its own lookup errors, warns and
+    # returns None, so the only failure left to handle here is the import.
     try:
         from pipeline.fetch import fetch_canonical_last_first
+    except ImportError as e:
+        print(f"  pipeline.fetch import failed ({e}); falling back to the "
+              f"people API directly for id {pid}")
+    else:
         out = fetch_canonical_last_first(pid)
-    except Exception:
-        out = None
     if not out:
         d = _get("https://statsapi.mlb.com/api/v1/people/{pk}", pid)
         if not d.get('_error'):
