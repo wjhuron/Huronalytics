@@ -222,6 +222,30 @@ const Utils = {
     return g > 0 && (gs / g) > QUAL.SP_GS_RATIO;
   },
 
+  // SP/RP as a LABEL or a Role filter is the pitcher's bulk role over his
+  // whole MLB season, never per stint (per Wally 2026-10-09: David Peterson,
+  // 32 G / 23 GS, read RP on his 16 G / 8 GS stint). A traded pitcher's stint
+  // rows take the role of his combined 2TM.. row. A ROC row keeps its own: a
+  // ROC stint never resolves a combined row. The qualification thresholds
+  // (buildQualContext) keep their own rule and do not call this.
+  seasonIsStarter: function (row) {
+    var pd = window.PITCHER_DATA || [];
+    if (this._seasonRoleSrc !== pd) {
+      this._seasonRoleMap = {};
+      for (var i = 0; i < pd.length; i++) {
+        if (pd[i].mlbId != null && this.isCombinedTeam(pd[i].team)) {
+          this._seasonRoleMap[pd[i].mlbId] = this.isStarter(pd[i].g, pd[i].gs);
+        }
+      }
+      this._seasonRoleSrc = pd;
+    }
+    var isROC = typeof Aggregator !== 'undefined' && Aggregator._isROCTeam(row.team);
+    if (!isROC && row.mlbId != null && this._seasonRoleMap[row.mlbId] !== undefined) {
+      return this._seasonRoleMap[row.mlbId];
+    }
+    return this.isStarter(row.g, row.gs);
+  },
+
   // ── Canonical qualification multipliers ──────────────────────────────
   // Mirror of pipeline_utils.hitter_pa_per_game / pitcher_ip_per_game.
   // Callers resolve `isROC` themselves (Aggregator._isROCTeam(row.team))

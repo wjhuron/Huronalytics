@@ -443,7 +443,8 @@ const DataStore = {
           if (cached) { g = cached.g; gs = cached.gs; }
         }
         g = g || 0; gs = gs || 0;
-        const isStarter = g > 0 && (gs / g) > QUAL.SP_GS_RATIO;
+        // bulk season role, not the stint's own (Utils.seasonIsStarter)
+        const isStarter = Utils.seasonIsStarter({ mlbId: row.mlbId, team: row.team, g: g, gs: gs });
         if (filters.role === 'SP' && !isStarter) return false;
         if (filters.role === 'RP' && isStarter) return false;
       }

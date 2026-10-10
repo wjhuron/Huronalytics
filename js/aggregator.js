@@ -423,8 +423,8 @@ const Aggregator = {
     const pd = window.PITCHER_DATA || [];
     for (let i = 0; i < pd.length; i++) {
       const rKey = pd[i].pitcher + '|' + pd[i].team;
-      const g = pd[i].g || 0, gs = pd[i].gs || 0;
-      this._roleCache[rKey] = g > 0 && (gs / g) > QUAL.SP_GS_RATIO ? 'SP' : 'RP';
+      // bulk season role, not the stint's own (Utils.seasonIsStarter)
+      this._roleCache[rKey] = Utils.seasonIsStarter(pd[i]) ? 'SP' : 'RP';
     }
     return this._roleCache;
   },
@@ -822,8 +822,7 @@ const Aggregator = {
     // Apply role filter AFTER boxscore merge so G/GS are available
     if (filters.role && filters.role !== 'all') {
       rows = rows.filter(function (r) {
-        const pg = r.g || 0, pgs = r.gs || 0;
-        const isSP = pg > 0 && (pgs / pg) > QUAL.SP_GS_RATIO;
+        const isSP = Utils.seasonIsStarter(r);   // bulk season role, not the stint's
         if (filters.role === 'SP') return isSP;
         if (filters.role === 'RP') return !isSP;
         return true;

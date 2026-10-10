@@ -999,11 +999,10 @@
     if (info.fgStatus) src.push(FG_STATUS_LABEL[info.fgStatus] || info.fgStatus);
     if ((info.sources || []).indexOf('released') !== -1) src.push('Released');
     if ((info.sources || []).indexOf('elected') !== -1) src.push('Elected FA');
-    const g = r.g || 0;
     return Object.assign({}, r, {
       faAge: info.age != null ? info.age : null,
       faSource: src.join(' / ') || null,
-      faRole: r.pitcher ? (g > 0 && (r.gs || 0) / g >= 0.5 ? 'SP' : 'RP') : null,
+      faRole: r.pitcher ? (Utils.seasonIsStarter(r) ? 'SP' : 'RP') : null,
       position: r.hitter ? (r.position || faPosition(r.mlbId)) : r.position
     });
   }
