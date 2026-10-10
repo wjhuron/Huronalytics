@@ -12,10 +12,17 @@ Only players with a 2026 MLB leaderboard row are kept (pitcher or hitter,
 any MLB club or a 2TM..10TM combined row). A ROC-only player is dropped even
 though he has AAA data: the filter is for players who played in MLB.
 
-Names are matched to mlbId through the shipped leaderboard rows. A name that
-matches several MLB players is resolved by role (pitcher vs hitter) and then
-by the listed team; anything still ambiguous is printed and left out, never
-guessed. Each player also carries his baseball age (June 30) in the season after BASE_SEASON, from
+Players are matched by ID, never by name against the leaderboard (a name
+match put a released Double-A Jacob Webb and a Triple-A shortstop Edwin Díaz
+on the list as the MLB pitchers of the same names, 2026-10-09):
+
+  * FanGraphs rows carry the FanGraphs `playerid`; the season's MLB leaders
+    endpoint pairs it with the MLB id (xMLBAMID).
+  * the transaction lists carry no id, so each row is looked up in the MLB
+    transactions API on its own date, where the move names the person id.
+    The name only picks the move out of that one day's list.
+
+A row that gets no id is printed and left out, never guessed. Each player also carries his baseball age (June 30) in the season after BASE_SEASON, from
 the MLB season lines in data/_proj/ (lines_*_{year}.json, the projection inputs), for the hidden Free
 Agents page. Run it again after either Numbers file changes, then commit the JSON:
 
@@ -105,21 +112,59 @@ def baseball_age(birth, season):
     return season - y - (1 if (m, d) > (6, 30) else 0)
 
 
-def resolve(name, pos, team, idx, by_name):
-    """Return (mlbId, None) or (None, reason)."""
-    cands = by_name.get(norm_name(name), [])
-    if not cands:
-        return None, 'no 2026 MLB row'
-    if len(cands) > 1 and pos:
-        side = 'pitcher' if is_pitcher_pos(pos) else 'hitter'
-        narrowed = [c for c in cands if idx[c][side]]
-        cands = narrowed or cands
-    if len(cands) > 1 and team:
-        narrowed = [c for c in cands if team in idx[c]['teams']]
-        cands = narrowed or cands
-    if len(cands) > 1:
-        return None, 'ambiguous: ' + ', '.join(str(c) for c in cands)
-    return cands[0], None
+def fangraphs_ids(season):
+    """FanGraphs playerid (str) -> MLB id, from the season's MLB leaders rows."""
+    from pipeline import fg_overrides as F
+    out = {}
+    for stats in ('bat', 'pit'):
+        url = (f'{F.FG_API}?pos=all&stats={stats}&lg=all&qual=0&type=1'
+               f'&season={season}&seasonEnd={season}&ind=0&pageitems=5000&pagenum=1')
+        try:
+            rows = F._http_get_json(url).get('data', [])
+        except (OSError, ValueError) as e:
+            sys.exit(f'FanGraphs {stats} leaders fetch failed ({e}); nothing written. '
+                     f'The tracker rows cannot be matched by id without it.')
+        if len(rows) < 300:
+            sys.exit(f'FanGraphs {stats} leaders returned only {len(rows)} rows; nothing written.')
+        for r in rows:
+            if r.get('playerid') is not None and r.get('xMLBAMID') is not None:
+                out[str(r['playerid'])] = int(r['xMLBAMID'])
+    return out
+
+
+def transaction_ids(dates):
+    """{(date, normalized name): {person ids}} from the MLB transactions API for
+    the given yyyy-mm-dd dates (one request per month touched)."""
+    import urllib.request
+    out = {}
+    months = sorted({d[:7] for d in dates})
+    for m in months:
+        ds = sorted(d for d in dates if d[:7] == m)
+        url = ('https://statsapi.mlb.com/api/v1/transactions'
+               f'?startDate={ds[0]}&endDate={ds[-1]}')
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r:
+                tx = json.load(r).get('transactions', [])
+        except (OSError, ValueError) as e:
+            sys.exit(f'MLB transactions fetch failed for {m} ({e}); nothing written.')
+        for t in tx:
+            person = t.get('person') or {}
+            if person.get('id') is None:
+                continue
+            for d in {t.get('date'), t.get('effectiveDate')} - {None}:
+                out.setdefault((d, norm_name(person.get('fullName'))), set()).add(person['id'])
+    return out
+
+
+def resolve_transaction(row, tx_ids, idx):
+    """Return (mlbId, None) or (None, reason) for a released / elected row."""
+    ids = tx_ids.get((row['date'], norm_name(row['name'])))
+    if not ids:
+        return None, 'no transaction on that date'
+    if len(ids) > 1:
+        return None, 'ambiguous: ' + ', '.join(str(i) for i in sorted(ids))
+    mid = next(iter(ids))
+    return (mid, None) if mid in idx else (None, 'no 2026 MLB row')
 
 
 def read_fangraphs(path):
@@ -127,7 +172,7 @@ def read_fangraphs(path):
     ws = openpyxl.load_workbook(path, read_only=True, data_only=True).active
     rows = ws.iter_rows(values_only=True)
     hdr = list(next(rows))
-    need = ('Name', 'FA Likelihood', 'Pos', 'Prev Team')
+    need = ('Name', 'FA Likelihood', 'Pos', 'Prev Team', 'playerid')
     missing = [h for h in need if h not in hdr]
     if missing:
         sys.exit(f'{path}: missing column(s) {missing}. Re-export the FanGraphs tracker.')
@@ -137,7 +182,8 @@ def read_fangraphs(path):
         if not r[col['Name']]:
             continue
         out.append({'name': r[col['Name']], 'status': r[col['FA Likelihood']],
-                    'pos': r[col['Pos']], 'team': r[col['Prev Team']]})
+                    'pos': r[col['Pos']], 'team': r[col['Prev Team']],
+                    'fgId': str(r[col['playerid']]).strip() if r[col['playerid']] is not None else ''})
     return out
 
 
@@ -178,7 +224,7 @@ def main():
         if not p or not os.path.exists(p):
             sys.exit(f'{label} file not found: {p}')
 
-    idx, by_name = mlb_index()
+    idx, _by_name = mlb_index()
     players = {}   # mlbId -> entry
     dropped = []   # (source, name, reason)
 
@@ -190,23 +236,30 @@ def main():
             e['fgStatus'] = status
 
     fg = read_fangraphs(args.fangraphs)
+    fg_ids = fangraphs_ids(BASE_SEASON)
     n_fg_excl = 0
     for r in fg:
         if r['status'] in FG_EXCLUDE:
             n_fg_excl += 1
             continue
-        mid, why = resolve(r['name'], r['pos'], r['team'], idx, by_name)
-        if mid is None:
-            dropped.append(('fangraphs', r['name'], why))
+        mid = fg_ids.get(r['fgId'])
+        if mid is None or mid not in idx:
+            dropped.append(('fangraphs', r['name'], 'no 2026 MLB row'))
         else:
             add(mid, 'fangraphs', r['status'])
 
     with tempfile.TemporaryDirectory() as tmp:
         lists = (('released', read_numbers(args.released, tmp)),
                  ('elected', read_numbers(args.elected, tmp)))
+    bad_dates = [r for _s, rows in lists for r in rows
+                 if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', r['date'] or '')]
+    if bad_dates:
+        sys.exit(f"{len(bad_dates)} transaction row(s) have no yyyy-mm-dd Date "
+                 f"(first: {bad_dates[0]['name']!r} {bad_dates[0]['date']!r}); the id lookup needs it.")
+    tx_ids = transaction_ids({r['date'] for _s, rows in lists for r in rows})
     for source, rows in lists:
         for r in rows:
-            mid, why = resolve(r['name'], r['pos'], r['team'], idx, by_name)
+            mid, why = resolve_transaction(r, tx_ids, idx)
             if mid is None:
                 dropped.append((source, r['name'], why))
             else:
@@ -236,10 +289,14 @@ def main():
         print(f'  {v:4d}  {k}')
     print(f'Wrote {len(players)} players to {os.path.relpath(OUT, ROOT)} ({no_birth} without a birth date, age blank)')
     amb = [d for d in dropped if d[2].startswith('ambiguous')]
-    nomlb = [d for d in dropped if not d[2].startswith('ambiguous')]
-    print(f'Left out: {len(nomlb)} with no 2026 MLB row, {len(amb)} ambiguous')
+    notx = [d for d in dropped if d[2] == 'no transaction on that date']
+    nomlb = [d for d in dropped if d[2] == 'no 2026 MLB row']
+    print(f'Left out: {len(nomlb)} with no 2026 MLB row, {len(notx)} with no transaction '
+          f'on their date, {len(amb)} ambiguous')
     for s, n, why in amb:
         print(f'  AMBIGUOUS  {s:9s} {n}  ({why})')
+    for s, n, why in notx:
+        print(f'  NO TRANSACTION FOUND  {s:9s} {n}')
     if os.environ.get('FA_VERBOSE'):
         for s, n, why in nomlb:
             print(f'  no MLB row {s:9s} {n}')

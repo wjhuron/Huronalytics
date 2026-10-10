@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-08",
+ "generatedAt": "2026-10-09",
  "ageSeason": 2027,
  "players": [
   {
@@ -942,14 +942,6 @@
    "age": 32
   },
   {
-   "mlbId": 621242,
-   "name": "Díaz, Edwin",
-   "sources": [
-    "released"
-   ],
-   "age": 33
-  },
-  {
    "mlbId": 621345,
    "name": "Minter, A.J.",
    "sources": [
@@ -1172,6 +1164,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 36
+  },
+  {
+   "mlbId": 641656,
+   "name": "Hamilton, Ian",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
   },
   {
    "mlbId": 641680,
@@ -1592,14 +1592,6 @@
    ],
    "fgStatus": "IS_FA",
    "age": 35
-  },
-  {
-   "mlbId": 657097,
-   "name": "Webb, Jacob",
-   "sources": [
-    "released"
-   ],
-   "age": 33
   },
   {
    "mlbId": 657265,
