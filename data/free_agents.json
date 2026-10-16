@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-09",
+ "generatedAt": "2026-10-16",
  "ageSeason": 2027,
  "players": [
   {
@@ -337,7 +337,8 @@
    "mlbId": 571882,
    "name": "Law, Derek",
    "sources": [
-    "fangraphs"
+    "fangraphs",
+    "elected"
    ],
    "fgStatus": "IS_FA",
    "age": 36
@@ -732,6 +733,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
+  },
+  {
+   "mlbId": 606303,
+   "name": "Payamps, Joel",
+   "sources": [
+    "elected"
+   ],
+   "age": 33
   },
   {
    "mlbId": 607067,
@@ -1219,15 +1228,6 @@
    "age": 32
   },
   {
-   "mlbId": 641835,
-   "name": "Mayza, Tim",
-   "sources": [
-    "fangraphs"
-   ],
-   "fgStatus": "IS_FA",
-   "age": 35
-  },
-  {
    "mlbId": 641941,
    "name": "Pagán, Emilio",
    "sources": [
@@ -1639,6 +1639,14 @@
    "age": 32
   },
   {
+   "mlbId": 660644,
+   "name": "Bruján, Vidal",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 660761,
    "name": "Suarez, José",
    "sources": [
@@ -1776,6 +1784,14 @@
     "fangraphs"
    ],
    "fgStatus": "IS_FA",
+   "age": 30
+  },
+  {
+   "mlbId": 663897,
+   "name": "Williams, Luke",
+   "sources": [
+    "elected"
+   ],
    "age": 30
   },
   {
@@ -2029,6 +2045,14 @@
    "age": 33
   },
   {
+   "mlbId": 669004,
+   "name": "Melendez, MJ",
+   "sources": [
+    "elected"
+   ],
+   "age": 28
+  },
+  {
    "mlbId": 669087,
    "name": "Huff, Sam",
    "sources": [
@@ -2149,6 +2173,14 @@
    "age": 32
   },
   {
+   "mlbId": 670156,
+   "name": "Mastrobuoni, Miles",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
+  },
+  {
    "mlbId": 670167,
    "name": "Schreiber, John",
    "sources": [
@@ -2205,6 +2237,14 @@
    "name": "Rutledge, Jackson",
    "sources": [
     "released"
+   ],
+   "age": 28
+  },
+  {
+   "mlbId": 671289,
+   "name": "Freeman, Tyler",
+   "sources": [
+    "elected"
    ],
    "age": 28
   },

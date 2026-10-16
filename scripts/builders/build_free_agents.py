@@ -49,6 +49,11 @@ OUT = os.path.join(DATA, 'free_agents.json')
 DOWNLOADS = os.path.expanduser('~/Downloads')
 
 FG_EXCLUDE = {'NOT_HAPPENING', 'PROBABLY_NOT_FA'}
+# Players who signed before reaching the market, by MLB id. A source list can
+# still carry them (the FanGraphs tracker lags), so they are dropped by id.
+SIGNED = {
+    641835: 'Tim Mayza, extension with PHI (2026-10)',
+}
 BASE_SEASON = 2026          # the season just played; ages are for BASE_SEASON + 1
 PITCHER_POS = {'P', 'SP', 'RP', 'RHP', 'LHP'}
 SUFFIX = re.compile(r'\b(jr|sr|ii|iii|iv)\b')
@@ -229,6 +234,8 @@ def main():
     dropped = []   # (source, name, reason)
 
     def add(mid, source, status=None):
+        if mid in SIGNED:
+            return
         e = players.setdefault(mid, {'mlbId': mid, 'name': idx[mid]['name'], 'sources': []})
         if source not in e['sources']:
             e['sources'].append(source)
@@ -287,6 +294,7 @@ def main():
         by_src[' + '.join(e['sources'])] = by_src.get(' + '.join(e['sources']), 0) + 1
     for k, v in sorted(by_src.items()):
         print(f'  {v:4d}  {k}')
+    print(f'Left out as already signed (SIGNED): {len(SIGNED)}')
     print(f'Wrote {len(players)} players to {os.path.relpath(OUT, ROOT)} ({no_birth} without a birth date, age blank)')
     amb = [d for d in dropped if d[2].startswith('ambiguous')]
     notx = [d for d in dropped if d[2] == 'no transaction on that date']
