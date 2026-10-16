@@ -56,7 +56,8 @@ def main():
     for Y in cm.HELD:
         tr, te = mlb[mlb.Y != Y], mlb[mlb.Y == Y]
         m = cm.gbr(PARAMS['aav']).fit(tr[fa], tr.rel)
-        res.append(pd.DataFrame({'role': te.role, 'r': te.rel - m.predict(te[fa])}))
+        pt = m.predict(te[fa])
+        res.append(pd.DataFrame({'role': te.role, 'band': np.digitize(pt, BAND_CUTS), 'r': te.rel - pt}))
         if Y == 2026:
             p26 = m.predict(te[fa])
             band26 = pd.DataFrame({'band': np.digitize(p26, BAND_CUTS), 'r': te.rel.values - p26})
@@ -67,12 +68,18 @@ def main():
     # 2026 held-out mean residual of the player's band. Forward test 2023-2026: beats the single
     # level 4/4 on log error and 3/4 on dollar error; last 1 offseason beat last 2 and 3.
     band_off = band26.groupby('band').r.mean()
+    # Expected (mean) AAV: the typical AAV is a median-type value (exp of a log prediction); the mean
+    # is it times E[exp(residual)], per price band (smearing). Held out by offseason, band factors put
+    # predicted dollars at 1.02x the dollars paid (one factor 1.08, by role 1.06).
+    smear = res.groupby('band').r.apply(lambda x: np.exp(x).mean())
+    print('expected/typical factor by band:', smear.round(3).to_dict())
     print('2026 band offsets (log):', band_off.round(3).to_dict())
 
     live['p_mlb'] = m_deal.predict_proba(live[fd])[:, 1]
     prel = m_aav.predict(live[fa])
     off = np.array([band_off.get(b, 0.0) for b in np.digitize(prel, BAND_CUTS)])
     live['aav_pred'] = np.maximum(np.exp(prel + L + off), MIN_SAL)
+    live['aav_exp'] = np.maximum(np.exp(prel + L + off) * np.array([smear.get(b, 1.0) for b in np.digitize(prel, BAND_CUTS)]), MIN_SAL)
     live['aav_lo'] = np.maximum(live.aav_pred * np.exp(live.role.map(q[0.1])), MIN_SAL)
     live['aav_hi'] = live.aav_pred * np.exp(live.role.map(q[0.9]))
     live['yrs_mean'] = m_yrs.predict(live[fy]) + 1
@@ -103,12 +110,13 @@ def main():
         'P(MLB deal)': live.p_mlb.round(2), 'Deal': live.deal,
         'Years': live.years_pred, 'Years (model)': live.yrs_mean.round(2),
         'AAV $M': (live.aav_pred / 1e6).round(1),
+        'Expected AAV $M': (live.aav_exp / 1e6).round(1),
         'AAV low $M': (live.aav_lo / 1e6).round(1), 'AAV high $M': (live.aav_hi / 1e6).round(1),
         'Total $M': (live.aav_pred * live.years_pred / 1e6).round(1),
         'Comps (2027 $)': live.comps,
     })
     mask = out.Deal == 'MiLB'
-    for c in ('Years', 'Years (model)', 'AAV $M', 'AAV low $M', 'AAV high $M', 'Total $M'):
+    for c in ('Years', 'Years (model)', 'AAV $M', 'Expected AAV $M', 'AAV low $M', 'AAV high $M', 'Total $M'):
         out[c] = out[c].astype(object).where(~mask, '')
     out = out.sort_values(['Deal', 'Total $M'], ascending=[True, False], key=lambda s: pd.to_numeric(s, errors='coerce') if s.name == 'Total $M' else s)
     out.to_csv(OUT + '.tmp', index=False)
