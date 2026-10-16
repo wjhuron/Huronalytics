@@ -2,7 +2,7 @@
 
 Three hand-kept sources, all in ~/Downloads by default:
 
-  * the FanGraphs free-agent tracker (.xlsx). Every row counts EXCEPT the
+  * the FanGraphs free-agent tracker for BASE_SEASON + 1 ({year}-free-agent-tracker*.xlsx). Every row counts EXCEPT the
     FA Likelihood values NOT_HAPPENING and PROBABLY_NOT_FA.
   * released.numbers and "elected fa.numbers", the transaction lists kept
     from scrapers/transactions.py output. Every row counts; a player on more
@@ -220,7 +220,9 @@ def newest(pattern):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--fangraphs', default=newest('*free-agent-tracker*.xlsx'))
+    # The tracker for the class being built, by year: Downloads also holds past trackers
+    # (the contract model's history), and the newest file is not always this class.
+    ap.add_argument('--fangraphs', default=newest(f'{BASE_SEASON + 1}-free-agent-tracker*.xlsx'))
     ap.add_argument('--released', default=os.path.join(DOWNLOADS, 'released.numbers'))
     ap.add_argument('--elected', default=os.path.join(DOWNLOADS, 'elected fa.numbers'))
     args = ap.parse_args()
