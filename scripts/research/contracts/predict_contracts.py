@@ -28,6 +28,7 @@ import contract_model as cm
 
 OUT = os.path.expanduser('~/Downloads/fa_contract_predictions_2027.csv')
 MIN_SAL = 780_000
+BAND_CUTS = [np.log(2e6), np.log(8e6)]   # price bands in the 2020 market (conventions)
 PARAMS = json.load(open(os.path.join(cm.D, 'model_params.json')))
 FEATS_USED = {k: cm.FEATS[v] for k, v in PARAMS['feats'].items()}
 COMP_F = {'H': ['age', 'war0', 'war1', 'war2', 'stm_war', 'stm_rate', 'eff_pos'],
@@ -56,11 +57,22 @@ def main():
         tr, te = mlb[mlb.Y != Y], mlb[mlb.Y == Y]
         m = cm.gbr(PARAMS['aav']).fit(tr[fa], tr.rel)
         res.append(pd.DataFrame({'role': te.role, 'r': te.rel - m.predict(te[fa])}))
+        if Y == 2026:
+            p26 = m.predict(te[fa])
+            band26 = pd.DataFrame({'band': np.digitize(p26, BAND_CUTS), 'r': te.rel.values - p26})
     res = pd.concat(res)
     q = res.groupby('role').r.quantile([0.1, 0.9]).unstack()
+    # Band levels: the 2026 market moved the top and the bottom apart (held out, $8M+ deals ran 30
+    # log points above the single level and sub-$2M deals 30 below). The level for 2027 adds the
+    # 2026 held-out mean residual of the player's band. Forward test 2023-2026: beats the single
+    # level 4/4 on log error and 3/4 on dollar error; last 1 offseason beat last 2 and 3.
+    band_off = band26.groupby('band').r.mean()
+    print('2026 band offsets (log):', band_off.round(3).to_dict())
 
     live['p_mlb'] = m_deal.predict_proba(live[fd])[:, 1]
-    live['aav_pred'] = np.maximum(np.exp(m_aav.predict(live[fa]) + L), MIN_SAL)
+    prel = m_aav.predict(live[fa])
+    off = np.array([band_off.get(b, 0.0) for b in np.digitize(prel, BAND_CUTS)])
+    live['aav_pred'] = np.maximum(np.exp(prel + L + off), MIN_SAL)
     live['aav_lo'] = np.maximum(live.aav_pred * np.exp(live.role.map(q[0.1])), MIN_SAL)
     live['aav_hi'] = live.aav_pred * np.exp(live.role.map(q[0.9]))
     live['yrs_mean'] = m_yrs.predict(live[fy]) + 1

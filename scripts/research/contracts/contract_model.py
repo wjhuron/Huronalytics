@@ -36,9 +36,26 @@ UNIT = {'H': 600.0, 'SP': 180.0, 'RP': 65.0}
 def load():
     df = pd.read_csv(os.path.join(D, 'dataset.csv'), dtype={'fg': str})
     u = df.role.map(UNIT)
+    # the archived 2020 Steamer is the 60-game projection (Cole 2.2 WAR in 75 IP): restate to 162
+    s20 = np.where(df.Y == 2020, 162 / 60, 1.0)
+    df['stm_war'] = df.stm_war * s20
+    df['stm_pt'] = df.stm_pt * s20
     for k in range(3):
         df[f'ptn{k}'] = df[f'pt{k}'] / u
     df['stm_ptn'] = df.stm_pt / u
+    # Missing Steamer (the 2026 archive lacks 98 of that class, e.g. King, Díaz; a few 2020 rows)
+    # is IMPUTED from the WAR record, per role, by a linear fit on rows that have it. Left as NaN,
+    # the trees learned 'no projection' as a low-value sign and priced King's 3/75 at 3.9M.
+    df['stm_imputed'] = df.stm_war.isna().astype(int)
+    xs = ['age', 'war0', 'war1', 'war2', 'ptn0', 'ptn1', 'ptn2']
+    for role, g in df.groupby('role'):
+        have = g[g.stm_war.notna() & (g.ptn0 + g.ptn1 + g.ptn2 > 0)]
+        miss = g.index[g.stm_war.isna()]
+        if len(miss):
+            for col in ('stm_war', 'stm_ptn'):
+                lr_ = LinearRegression().fit(have[xs], have[col])
+                df.loc[miss, col] = lr_.predict(df.loc[miss, xs])
+            df.loc[miss, 'stm_pt'] = df.loc[miss, 'stm_ptn'] * UNIT[role]
     df['stm_rate'] = np.where(df.stm_pt > 0.15 * u, df.stm_war / df.stm_pt * u, np.nan)
     df['war3'] = df.war0 + df.war1 + df.war2
     df['is_sp'] = (df.role == 'SP').astype(int)
@@ -116,6 +133,31 @@ def loyo(df, feats, params, part):
             m = gbr(params, 'poisson').fit(tr[feats], tr.years - 1)
             out[Y] = float(np.mean(np.abs(m.predict(te[feats]) + 1 - te.years)))
     return out
+
+
+def aav_loyo(df, feats, params, mode):
+    """AAV variants, held out by offseason. mode 'level': log AAV minus the offseason level (shipped v1);
+    'yfeat': log AAV with the offseason as a feature (a held-out or future offseason is priced like
+    its nearest offseason, segment by segment); 'gamma': AAV in dollars with the offseason as a
+    feature, gamma loss (log link, predicts the MEAN). Returns per-year log RMSE, dollar ratio
+    sum(pred)/sum(actual), and the predictions."""
+    lev = market_level(df, FEATS['history'])
+    m = df[df.outcome == 'mlb'].assign(rel=lambda x: x.laav - x.Y.map(lev))
+    f = feats + (['Y'] if mode != 'level' else [])
+    out, preds = {}, []
+    for Y in HELD:
+        tr, te = m[m.Y != Y], m[m.Y == Y]
+        if mode == 'level':
+            p = np.exp(gbr(params).fit(tr[f], tr.rel).predict(te[f]) + lev[Y])
+        elif mode == 'yfeat':
+            p = np.exp(gbr(params).fit(tr[f], tr.laav).predict(te[f]))
+        else:
+            p = gbr(params, 'gamma').fit(tr[f], tr.aav / 1e6).predict(te[f]) * 1e6
+        out[Y] = {'rmse_log': float(np.sqrt(np.mean((np.log(p) - te.laav) ** 2))),
+                  'dollar_ratio': float(p.sum() / te.aav.sum()),
+                  'mae_m': float(np.mean(np.abs(p - te.aav)) / 1e6)}
+        preds.append(te.assign(pred=p))
+    return out, pd.concat(preds)
 
 
 BASE = {'it': 300, 'lr': 0.03, 'leaves': 8, 'msl': 20, 'l2': 0.0}
