@@ -47,6 +47,7 @@ TAKE_CODES = {"B": "ball", "*B": "ball", "C": "strike"}
 ZONE_HALF_WIDTH_IN = 8.5          # 17" plate width / 2
 KEEP_BAND_IN = 4.5                # keep takes within this |edge distance|
 CHALLENGES_PER_TEAM = 2
+EXTRA_INNING_REFILL = 1  # granted at each extra inning to a team with none left
 GHOST_RUNNER = -1        # sentinel for the extra-innings automatic runner
 DEFAULT_OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                            "data", "abs_challenges_2026.json")
@@ -213,6 +214,14 @@ def parse_game(feed):
             # moves -- without this the highest-leverage innings of the season
             # are recorded as bases empty.
             bases = {"2B": GHOST_RUNNER} if about["inning"] >= 10 else {}
+            # A team with no challenges left gets one at the start of each
+            # extra inning (not cumulative). The 2026 official totals show it:
+            # a third failure only ever happens in extras, a fourth only in a
+            # 12+ inning game, and never two failures in one extra inning.
+            if about["inning"] >= 10 and about["halfInning"] == "top":
+                for s in remaining:
+                    if remaining[s] == 0:
+                        remaining[s] = EXTRA_INNING_REFILL
             prev_half = half_key
         bat_side = "away" if about["halfInning"] == "top" else "home"
 
