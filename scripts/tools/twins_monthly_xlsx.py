@@ -564,11 +564,15 @@ def main():
         wall.cell(row=r, column=1, value=pretty(hname)).font = Font(bold=True)
         for j, (k, _, fmt, _) in enumerate(COLS):
             col = ad_col[k]
-            # INDEX of an empty cell returns 0 in Excel and Numbers, so test
-            # for empty first: a blank SD+ must stay blank, not read 0.
-            ix = (f"INDEX('All Data'!${col}$2:${col}${ad_last},"
-                  f"MATCH($A{r}&\"|\"&$B$3,'All Data'!${ad_key}$2:${ad_key}${ad_last},0))")
-            c = wall.cell(row=r, column=2 + j, value=f'=IFERROR(IF({ix}="","",{ix}),"")')
+            # A missing value must come back as a TRUE blank, not "": Sheets
+            # sorts text above numbers, so "" cells led every Z-to-A sort
+            # (Wally 2026-10-24). IF with an empty argument returns a real
+            # blank in Sheets, which sorts last; tested in a scratch Sheet.
+            # Excel shows that empty argument as 0. Both a hitter-month with
+            # no row (MATCH fails) and an empty source cell end up blank.
+            m = f"MATCH($A{r}&\"|\"&$B$3,'All Data'!${ad_key}$2:${ad_key}${ad_last},0)"
+            ix = f"INDEX('All Data'!${col}$2:${col}${ad_last},{m})"
+            c = wall.cell(row=r, column=2 + j, value=f'=IF(ISNA({m}),,IF({ix}="",,{ix}))')
             c.number_format, c.alignment = fmt, MID_ALIGN
             if k in RESULT_KEYS:
                 c.font = Font(color=NOISE_INK)
