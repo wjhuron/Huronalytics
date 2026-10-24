@@ -104,6 +104,9 @@
     // The Free Agents section rides the same link (per Wally 2026-10-08).
     const faTab = document.getElementById('fa-section-tab');
     if (faTab) faTab.style.display = '';
+    // Team by Month rides the same link (per Wally 2026-10-24).
+    const tmTab = document.getElementById('tm-section-tab');
+    if (tmTab) tmTab.style.display = '';
   }
 
   // Called once the heavy chunk + Aggregator are ready: undo the degraded
@@ -250,6 +253,10 @@
       showAbs(['leaders', 'matrix', 'film', 'zone'].indexOf(av) >= 0 ? av : 'leaders', true, parts[1]);
       return;
     }
+    if (rocMode && (routePart === 'team-months' || routePart.indexOf('team-months/') === 0)) {
+      showTeamMonths(routePart.split('/')[1] || 'stats', true, parts[1]);
+      return;
+    }
     let tab = ROUTE_TAB[routePart];
     if (tab && FA_TABS[tab] && !rocMode) tab = null;    // hidden without ?roc=1
     if (tab) {
@@ -310,6 +317,7 @@
     document.getElementById('hitter-subtabs').style.display = 'none';
     document.getElementById('fa-subtabs').style.display = 'none';
     hideAbs();
+    hideTeamMonths();
   }
 
   function hideAbs() {
@@ -317,6 +325,43 @@
     if (ap) ap.style.display = 'none';
     const as = document.getElementById('abs-subtabs');
     if (as) as.style.display = 'none';
+  }
+
+  function hideTeamMonths() {
+    const tp = document.getElementById('tm-page');
+    if (tp) tp.style.display = 'none';
+    const ts = document.getElementById('tm-subtabs');
+    if (ts) ts.style.display = 'none';
+  }
+
+  // Hidden Team by Month section (?roc=1 only): self-contained like ABS,
+  // rendered by js/team-months.js from data/team_months/.
+  function showTeamMonths(view, skipHash, query) {
+    currentSection = 'teammonths';
+    if (window.TeamMonths) TeamMonths.setView(view || 'stats', query);
+    view = (window.TeamMonths && TeamMonths.VIEWS[view]) ? view : 'stats';
+    if (!skipHash) window.location.hash = 'team-months/' + view + '?team=' + encodeURIComponent(window.TeamMonths ? TeamMonths.currentTeam() : 'MIN');
+    document.getElementById('home-page').style.display = 'none';
+    document.querySelector('.controls').style.display = 'none';
+    document.querySelector('.toolbar').style.display = 'none';
+    document.querySelector('.table-wrapper').style.display = 'none';
+    document.getElementById('pagination').style.display = 'none';
+    const banner = document.getElementById('tab-banner'); if (banner) banner.style.display = 'none';
+    const pctlLeg = document.getElementById('pctl-legend'); if (pctlLeg) pctlLeg.style.display = 'none';
+    document.getElementById('pitcher-subtabs').style.display = 'none';
+    document.getElementById('hitter-subtabs').style.display = 'none';
+    document.getElementById('fa-subtabs').style.display = 'none';
+    hideAbs();
+    document.getElementById('tm-page').style.display = '';
+    document.getElementById('tm-subtabs').style.display = '';
+    document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+    const sb = document.querySelector('.section-tab[data-section="teammonths"]');
+    if (sb) { sb.classList.add('active'); sb.setAttribute('aria-selected', 'true'); }
+    document.querySelectorAll('#tm-subtabs .tab').forEach(function (t) {
+      const on = t.getAttribute('data-tmview') === view;
+      t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (window.TeamMonths) TeamMonths.render();
   }
 
   function showAbs(view, skipHash, absQuery) {
@@ -333,6 +378,7 @@
     document.getElementById('pitcher-subtabs').style.display = 'none';
     document.getElementById('hitter-subtabs').style.display = 'none';
     document.getElementById('fa-subtabs').style.display = 'none';
+    hideTeamMonths();
     document.getElementById('abs-page').style.display = '';
     document.getElementById('abs-subtabs').style.display = '';
     document.querySelectorAll('.section-tab').forEach(function (t) { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
@@ -348,6 +394,7 @@
   function showLeaderboard() {
     document.getElementById('home-page').style.display = 'none';
     hideAbs();
+    hideTeamMonths();
     document.querySelector('.controls').style.display = '';
     document.querySelector('.toolbar').style.display = '';
     document.querySelector('.table-wrapper').style.display = '';
@@ -826,6 +873,8 @@
           showAbs('leaders');
         } else if (section === 'freeagents') {
           navigateToTab('faPitchers');
+        } else if (section === 'teammonths') {
+          showTeamMonths('stats');
         }
       });
     });
@@ -834,6 +883,8 @@
       tab.addEventListener('click', function () {
         const av = tab.getAttribute('data-absview');
         if (av) { showAbs(av); return; }
+        const tv = tab.getAttribute('data-tmview');
+        if (tv) { showTeamMonths(tv); return; }
         const tabKey = tab.getAttribute('data-tab');
         if (tabKey) navigateToTab(tabKey);
       });
@@ -1008,6 +1059,11 @@
   }
 
   function refresh() {
+    // Team by Month draws its own table; a background-data refresh here would
+    // re-render the hidden leaderboard and show its pagination bar under it.
+    // navigateToTab sets currentSection before it refreshes, so leaving the
+    // section still redraws the leaderboard.
+    if (currentSection === 'teammonths') return;
     const filters = getFilters();
     let dataTab = TAB_DATA[currentTab] || 'pitcher';
 
@@ -1852,6 +1908,9 @@
 
   function saveURLState() {
     if (PlayerPage.isOpen) return;
+    // The background-data refresh() would otherwise overwrite the Team by
+    // Month hash with the hidden leaderboard's route.
+    if (currentSection === 'teammonths') return;
     const route = TAB_ROUTE[currentTab] || 'pitchers/stats';
     const parts = [];
     if (viewMode === 'team') parts.push('view=team');
