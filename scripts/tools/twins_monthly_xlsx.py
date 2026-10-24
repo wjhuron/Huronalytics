@@ -87,6 +87,12 @@ SEASON_FROM_RAW = {'bbPlusU', 'ctPlusU', 'sdPlusU', 'wOBAcon'}   # season row re
 # Overview headline stats, most stable first.
 HEADLINE = ['batSpeed', 'ev95', 'whiffPct', 'chasePct', 'processPlus', 'xWRCplus', 'wRCplus']
 BLOCKS = '▁▂▃▄▅▆▇█'
+# Hitter-tab columns collapsed by default (outline groups); the rest fit one
+# screen: PA, bat tracking, Process+, K%, BB%, Chase%, Whiff%, EV95, Barrel%,
+# wRC+, xwRC+.
+COLLAPSED = {'bbPlusU', 'ctPlusU', 'sdPlusU', 'izSwingPct', 'izContactPct', 'firstPitchSwingPct',
+             'hardHitPct', 'airPullPct', 'gbPct', 'medLA', 'avg', 'obp', 'slg', 'hr',
+             'wOBAcon', 'xwOBAcon'}
 
 GOOD, MID, BAD = 'F4A582', 'FFFFFF', '92C5DE'
 GOOD_INK, BAD_INK, NEUTRAL_INK = 'B0402F', '3E6A94', '777777'
@@ -289,16 +295,16 @@ def main():
         ('Columns run from the most stable to the least: bat tracking (bat speed r .96), process, approach, contact, then results (wRC+ r .10), which are set in lighter ink.', None),
         ('', None),
         ('TABS', h2),
-        ('Overview: the 10-second view. Seven headline stats per hitter, most stable first: a trend across the months, the season value, the last month, and a change flag.', None),
-        ('One tab per hitter (most PA first): every stat by month, with his season line and the MLB average below.', None),
+        ('Overview: the 10-second view. Seven headline stats per hitter, most stable first: a trend across the months, the season value, the latest month, and the change. Hitters with the most real changes are listed first.', None),
+        (f'One tab per hitter (most PA first): every stat by month, with his season line and the MLB average below. {len(COLLAPSED)} secondary columns are collapsed; the + buttons above the header open them.', None),
         ('All Data: one row per hitter-month, with sample counts and filters, for sorting and pivots.', None),
         ('Definitions: what each stat is, where it comes from, its month-to-month r, and why it is in the sheet.', None),
         ('', None),
         ('HOW TO READ IT', h2),
-        ('Fill colour compares a value with the MLB average: red better, blue worse, white average. Uncoloured columns describe style, not quality.', None),
+        ('Hitter tabs: fill colour compares a value with the MLB average: red better, blue worse, white average. Uncoloured columns describe style, not quality.', None),
         ('The colour ends sit at the MLB average plus or minus two standard deviations of 2026 season values (hitters with 200+ PA).', None),
-        ('Trend (Overview): one block per month, Mar/Apr to Sep, taller = higher value on that stat\'s league scale. A dot is a month under 50 PA; a space is a month he did not bat.', None),
-        (f'Change flag (Overview): an arrow when his last month with {SMALL_PA}+ PA sits more than {FLAG_SD} standard deviations of normal monthly noise from his own season value. Red arrow = better, blue = worse, grey = a style stat. This is a convention: it flags about the outer 13% of ordinary months.', None),
+        (f'Trend (Overview): one mark per month under the letters A M J J A S (Mar/Apr to Sep); taller = higher value on that stat\'s league scale. A dot is a month with no data or under {SMALL_PA} PA.', None),
+        (f'Change (Overview): his latest month with {SMALL_PA}+ PA minus his season value. The Overview has only one colour code: a Change cell is filled when it is bigger than {FLAG_SD} standard deviations of normal monthly noise. Red = better, blue = worse. The cutoff is a convention: it flags about the outer 13% of ordinary months.', None),
         (f'Grey rows: fewer than {SMALL_PA} PA in the month. Too small to read; left uncoloured.', None),
         ('', None),
         ('NOTES', h2),
@@ -319,19 +325,22 @@ def main():
     ws.column_dimensions['A'].width = 150
 
     # ── Overview ─────────────────────────────────────────────────────────
+    # One colour meaning on this tab: only a Change cell that passes the flag
+    # cutoff is filled (red better, blue worse). Season and Latest are plain.
     wo = wb.create_sheet('Overview')
     wo.cell(row=1, column=1, value='Overview: who changed, and is it real?').font = Font(bold=True, size=14, color=NAVY)
     wo.cell(row=2, column=1, value=(
-        f'Stats run left to right from most to least stable month to month. Trend: Mar/Apr to Sep, one block per month '
-        f'(dot = under {SMALL_PA} PA). Flag: last month more than {FLAG_SD} SD of normal monthly noise from his season. '
-        f'Red = better, blue = worse.')).font = Font(italic=True, color='666666')
-    # Fixed columns, then 4 per headline stat: Trend, Season, Last, Flag.
-    fixed = [('Hitter', 22), ('PA', 6), ('Last Month', 9)]
+        f'Stats run left to right from most to least stable month to month. Trend: one mark per month, Mar/Apr to Sep '
+        f'(dot = no data or under {SMALL_PA} PA). Change = latest month minus his season. A coloured Change is bigger '
+        f'than {FLAG_SD} SD of normal monthly noise: red = better, blue = worse. Hitters with the most changes are first.'
+    )).font = Font(italic=True, color='666666')
+    fixed = [('Hitter', 22), ('PA', 6), ('Better', 7.5), ('Worse', 7.5), ('Latest Month', 9)]
     for j, (t, w) in enumerate(fixed, start=1):
         wo.merge_cells(start_row=4, start_column=j, end_row=6, end_column=j)
         c = wo.cell(row=4, column=j, value=t)
         c.fill, c.font, c.alignment = HEAD_FILL, WHITE_BOLD, CENTER
         wo.column_dimensions[get_column_letter(j)].width = w
+    month_letters = ' '.join(m[-3] if m == 'Mar/Apr' else m[0] for m in months)   # A M J J A S
     col = len(fixed) + 1
     starts = {}
     for k in HEADLINE:
@@ -342,73 +351,104 @@ def main():
         wo.merge_cells(start_row=5, start_column=col, end_row=5, end_column=col + 3)
         s = wo.cell(row=5, column=col, value=f'month-to-month {r_label(k)}')
         s.font, s.alignment = Font(italic=True, size=9, color='555555'), CENTER
-        for j, t in enumerate(['Trend', 'Season', 'Last', '']):
+        for j, t in enumerate([month_letters, 'Season', 'Latest', 'Change']):
             c = wo.cell(row=6, column=col + j, value=t)
-            c.fill, c.font, c.alignment = HEAD_FILL, WHITE_BOLD, CENTER
-        for j, w in enumerate([10, 7.5, 7.5, 3.5]):
+            c.fill, c.alignment = HEAD_FILL, CENTER
+            c.font = (Font(name='Courier New', bold=True, color='FFFFFF') if j == 0 else WHITE_BOLD)
+        for j, w in enumerate([14, 8, 8, 9]):
             wo.column_dimensions[get_column_letter(col + j)].width = w
-        # a thin left rule separates the stats
-        for rr in range(4, 7 + len(hitters) + 1):
-            wo.cell(row=rr, column=col).border = Border(left=Side(style='thin', color='B0B0B0'))
         col += 4
 
-    n_flags = 0
-    r = 7
+    def delta_text(v, fmt):
+        """Signed, parenthesised vs-season delta (the one place a + sign is
+        allowed). Written as text: Numbers double-prints the minus of a
+        '(+0.0);(-0.0)' number format, Excel and Sheets do not."""
+        if v is None:
+            return None
+        if fmt == PCT:
+            body = f'{abs(v) * 100:.1f}%'
+        elif fmt == INT:
+            body = f'{abs(v):.0f}'
+        else:
+            body = f'{abs(v):.1f}'
+        if body.strip('0.%') == '':
+            return f'({body})'
+        return f'({"+" if v > 0 else "-"}{body})'
+
+    entries = []
     for hname in hitters:
         s = season_rows[hname]
         qual = [m for m in months if (ours.get((hname, m)) or {}).get('pa', 0) >= SMALL_PA]
         last_m = qual[-1] if qual else None
-        wo.cell(row=r, column=1, value=pretty(hname)).font = Font(bold=True)
-        wo.cell(row=r, column=2, value=s['pa']).alignment = MID_ALIGN
-        wo.cell(row=r, column=3, value=last_m or '-').alignment = MID_ALIGN
         small_season = s['pa'] < SMALL_PA
+        cells, better, worse = {}, 0, 0
         for k in HEADLINE:
             _, fmt, dr = META[k]
-            c0 = starts[k]
             spread = spreads.get(k)
-            # Trend: one character per month on the stat's league scale.
-            chars = []
+            marks = []
             for m in months:
                 mr = ours.get((hname, m))
                 v = mr.get(k) if mr else None
-                if not mr or v is None:
-                    chars.append(' ' if not mr else '·')
-                elif (mr.get('pa') or 0) < SMALL_PA:
-                    chars.append('·')
+                if v is None or (mr.get('pa') or 0) < SMALL_PA:
+                    marks.append('·')
                 else:
                     t = (scale_t(v, spread) + 1) / 2 if spread else 0.5
-                    chars.append(BLOCKS[min(len(BLOCKS) - 1, int(t * len(BLOCKS)))])
-            tc = wo.cell(row=r, column=c0, value=''.join(chars))
-            tc.font, tc.alignment = Font(name='Courier New', size=12, color=NAVY), MID_ALIGN
+                    marks.append(BLOCKS[min(len(BLOCKS) - 1, int(t * len(BLOCKS)))])
             sv = season_value(hname, k)
-            sc = wo.cell(row=r, column=c0 + 1, value=sv)
-            sc.number_format, sc.alignment = fmt, MID_ALIGN
-            if small_season:
-                sc.font = GREY_FONT
-            elif sv is not None and dr:
-                sc.fill = fill_for(sv, spread, dr)
             lv = ours[(hname, last_m)].get(k) if last_m else None
-            lc = wo.cell(row=r, column=c0 + 2, value=lv)
-            lc.number_format, lc.alignment = fmt, MID_ALIGN
-            if lv is not None and dr:
-                lc.fill = fill_for(lv, spread, dr)
-            if lv is not None and sv is not None and k in noise and noise[k] > 0 and not small_season:
-                z = (lv - sv) / noise[k]
-                if abs(z) > FLAG_SD:
-                    arrow = '▲' if z > 0 else '▼'
-                    ink = NEUTRAL_INK if not dr else (GOOD_INK if z * dr > 0 else BAD_INK)
-                    fc = wo.cell(row=r, column=c0 + 3, value=arrow)
-                    fc.font, fc.alignment = Font(bold=True, color=ink, size=12), MID_ALIGN
-                    n_flags += 1
+            delta = (lv - sv) if (lv is not None and sv is not None) else None
+            flag = 0
+            if delta is not None and not small_season and noise.get(k, 0) > 0 and abs(delta) / noise[k] > FLAG_SD:
+                flag = 1 if delta * (dr or 1) > 0 else -1
+                better += flag > 0
+                worse += flag < 0
+            cells[k] = (' '.join(marks), sv, lv, delta, flag)
+        entries.append((hname, s, last_m, small_season, better, worse, cells))
+    entries.sort(key=lambda e: (e[3], -(e[4] + e[5]), -e[1]['pa'], e[0]))
+
+    n_flags = 0
+    r = 7
+    for hname, s, last_m, small_season, better, worse, cells in entries:
+        ink = GREY_FONT if small_season else None
+        wo.cell(row=r, column=1, value=pretty(hname)).font = ink or Font(bold=True)
+        wo.cell(row=r, column=2, value=s['pa']).alignment = MID_ALIGN
+        for cc, n, color in ((3, better, GOOD_INK), (4, worse, BAD_INK)):
+            c = wo.cell(row=r, column=cc, value=n)
+            c.alignment = MID_ALIGN
+            c.font = Font(bold=True, color=color) if n else Font(color='BBBBBB')
+        wo.cell(row=r, column=5, value=last_m or '-').alignment = MID_ALIGN
         if small_season:
-            for cc in (1, 2, 3):
+            for cc in (2, 5):
                 wo.cell(row=r, column=cc).font = GREY_FONT
+        for k in HEADLINE:
+            _, fmt, dr = META[k]
+            c0 = starts[k]
+            trend, sv, lv, delta, flag = cells[k]
+            tc = wo.cell(row=r, column=c0, value=trend)
+            tc.font, tc.alignment = Font(name='Courier New', size=11, color=NAVY), MID_ALIGN
+            tc.border = Border(left=Side(style='thin', color='B0B0B0'))
+            for j, v in ((1, sv), (2, lv)):
+                c = wo.cell(row=r, column=c0 + j, value=v)
+                c.number_format, c.alignment = fmt, MID_ALIGN
+                if small_season:
+                    c.font = GREY_FONT
+            dc = wo.cell(row=r, column=c0 + 3, value=delta_text(delta, fmt))
+            dc.alignment = MID_ALIGN
+            if flag:
+                dc.fill = PatternFill('solid', fgColor=GOOD if flag > 0 else BAD)
+                dc.font = Font(bold=True)
+                n_flags += 1
+            else:
+                dc.font = Font(color='9A9A9A')
         r += 1
     wo.cell(row=r, column=1, value='MLB Average').font = Font(italic=True)
     for k in HEADLINE:
         c = wo.cell(row=r, column=starts[k] + 1, value=lg_value(k))
         c.number_format, c.font, c.alignment = META[k][1], Font(italic=True, color='555555'), MID_ALIGN
-    wo.freeze_panes = 'D7'
+    for rr in range(4, 7):
+        for k in HEADLINE:
+            wo.cell(row=rr, column=starts[k]).border = Border(left=Side(style='thin', color='FFFFFF'))
+    wo.freeze_panes = 'F7'
     wo.row_dimensions[6].height = 18
     print(f'Overview: {n_flags} change flags')
 
@@ -425,7 +465,8 @@ def main():
                                        f"{s.get('wRCplus')} wRC+").font = Font(bold=True, size=14, color=NAVY)
         ws.cell(row=2, column=1, value=f'Columns run from most to least stable month to month (r under each header). '
                                        f'Grey rows: under {SMALL_PA} PA. Red = better than MLB average, blue = worse. '
-                                       'BB+, CT+, SD+ are raw (not regressed).').font = Font(italic=True, color='666666')
+                                       'BB+, CT+, SD+ are raw (not regressed). Click + above the header to open '
+                                       f'{len(COLLAPSED)} more stats.').font = Font(italic=True, color='666666')
         ws.cell(row=5, column=1, value='Month')
         end = header_band(ws, 4, 2, GROUPS)
         for c in range(1, end):
@@ -474,6 +515,16 @@ def main():
         ws.column_dimensions['A'].width = 15
         for j in range(len(COLS)):
             ws.column_dimensions[get_column_letter(2 + j)].width = 9.5
+        # Collapse the secondary columns into outline groups so the default
+        # view fits one screen; the +/- buttons above the header open them.
+        run = []
+        for j, (k, _, _, _) in enumerate(COLS + [(None, None, None, None)]):
+            if k in COLLAPSED:
+                run.append(2 + j)
+            elif run:
+                ws.column_dimensions.group(get_column_letter(run[0]), get_column_letter(run[-1]),
+                                           outline_level=1, hidden=True)
+                run = []
         ws.row_dimensions[5].height = 30
         ws.freeze_panes = 'B7'
 
