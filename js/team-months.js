@@ -39,19 +39,24 @@ window.TeamMonths = (function () {
     batSpeed: ['Bat Speed', F.d1], swingLength: ['Swing Length', F.d1], attackAngle: ['Attack Angle', F.d1],
     squaredUpPct: ['Squared-Up%', F.pct], blastPct: ['Blast%', F.pct]
   };
-  // Column groups per sub-tab; a group's first column gets a divider.
+  // Column groups per sub-tab; a group's first column gets a divider. Signal
+  // first (per Wally 2026-10-24): after the sample columns, blocks and the
+  // columns inside them run from the most to the least stable month to month
+  // (index.stability, printed under each header). Results go last. wOBA and
+  // xwOBA are left out: they move with wRC+ / xwRC+ at r .99 / 1.00 by month.
   const VIEWS = {
-    stats: { label: 'Stats', sort: 'wRCplus', groups: [
-      ['pa'], ['avg', 'obp', 'slg', 'hr', 'babip'], ['wOBA', 'xwOBA'], ['wRCplus', 'xWRCplus'],
-      ['wOBAcon', 'xwOBAcon'], ['processPlus', 'bbPlusU', 'ctPlusU', 'sdPlusU'], ['kPct', 'bbPct']] },
+    stats: { label: 'Stats', sort: 'processPlus', groups: [
+      ['pa'], ['processPlus', 'ctPlusU', 'sdPlusU', 'bbPlusU'], ['kPct', 'bbPct'],
+      ['avg', 'obp', 'slg', 'hr', 'babip'], ['wRCplus', 'xWRCplus'], ['wOBAcon', 'xwOBAcon']] },
     'plate-discipline': { label: 'Plate Discipline', sort: 'sdPlusU', groups: [
-      ['pa', 'count', 'nSwings'], ['sdPlusU', 'ctPlusU'], ['kPct', 'bbPct'],
-      ['izSwingPct', 'chasePct', 'izContactPct', 'whiffPct', 'twoStrikeWhiffPct', 'firstPitchSwingPct']] },
+      ['pa', 'count', 'nSwings'], ['ctPlusU', 'sdPlusU'],
+      ['whiffPct', 'chasePct', 'firstPitchSwingPct', 'kPct', 'izSwingPct', 'izContactPct',
+        'twoStrikeWhiffPct', 'bbPct']] },
     'batted-ball': { label: 'Batted Ball', sort: 'bbPlusU', groups: [
-      ['pa', 'nBip'], ['bbPlusU', 'wOBAcon', 'xwOBAcon'], ['avgEVAll', 'ev95', 'hardHitPct', 'barrelPct'],
-      ['medLA', 'gbPct', 'fbPct', 'pullPct', 'airPullPct']] },
+      ['pa', 'nBip'], ['ev95', 'hardHitPct', 'avgEVAll', 'barrelPct'], ['bbPlusU'],
+      ['medLA', 'airPullPct', 'gbPct', 'pullPct', 'fbPct'], ['xwOBAcon', 'wOBAcon']] },
     'bat-tracking': { label: 'Bat Tracking', sort: 'batSpeed', groups: [
-      ['pa', 'nCompSwings'], ['batSpeed', 'swingLength', 'attackAngle', 'squaredUpPct', 'blastPct']] }
+      ['pa', 'nCompSwings'], ['batSpeed', 'swingLength', 'attackAngle', 'blastPct', 'squaredUpPct']] }
   };
   const OWN_DESC = {
     bbPlusU: 'BB+ RAW: batted-ball quality (60% xwOBAcon, 40% 95th-percentile EV), NOT regressed toward 100, so a month shows what happened. The Hitters leaderboard shows the regressed value.',
@@ -102,6 +107,7 @@ window.TeamMonths = (function () {
 #tm-page table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
 #tm-page th{position:sticky;top:0;z-index:2;background:var(--bg-th);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-th);text-align:right;padding:9px 8px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap}
 #tm-page th.l,#tm-page td.l{text-align:left}
+#tm-page th .r{display:block;font-size:10px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text-muted);margin-top:2px}
 #tm-page th[aria-sort]:not([aria-sort="none"]){color:var(--accent)}
 #tm-page td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--border-light);font-size:13px;white-space:nowrap}
 #tm-page td.who{font-weight:600}
@@ -226,12 +232,19 @@ window.TeamMonths = (function () {
     // never moves it (per Wally 2026-10-24).
     body = lgRow(ix, cs) + body;
 
+    const stab = ix.stability || {};
     const head = '<tr><th class="l" data-k="hitter">Hitter</th><th class="l">Month</th>' +
       cs.map(function (c) {
         const on = state.sort === c.key;
+        const s = stab[c.key];
+        const rTxt = s ? 'r ' + s.r.toFixed(2).replace(/^0\./, '.') : '';
+        const tip = desc(c.key) + (s ? ' | Month-to-month r ' + s.r.toFixed(2) +
+          ': how well one month predicts the next (' + s.n + ' MLB hitter-month pairs, ' +
+          (ix.stabilityMinPa || 80) + '+ PA in both).' : '');
         return '<th data-k="' + c.key + '" class="' + (c.div ? 'div' : '') + '"' +
           ' aria-sort="' + (on ? (state.dir > 0 ? 'ascending' : 'descending') : 'none') + '"' +
-          ' title="' + esc(desc(c.key)) + '">' + esc(COL[c.key][0]) + '</th>';
+          ' title="' + esc(tip) + '">' + esc(COL[c.key][0]) +
+          '<span class="r">' + (rTxt || '&nbsp;') + '</span></th>';
       }).join('') + '</tr>';
 
     page.innerHTML =
@@ -239,6 +252,8 @@ window.TeamMonths = (function () {
       '<p class="tm-sub">Every hitter on one club, month by month (late-March games count in April). ' +
       'Values are the month\'s; colors rank each value inside the full-season pool of all MLB players. ' +
       'BB+, CT+ and SD+ are <b>raw</b> (not regressed toward 100), so they read wider than on the Hitters leaderboard. ' +
+      'The <b>r</b> under each header is month-to-month stability: how well one month of that stat predicts the next. ' +
+      'Columns run from the most stable to the least, so a real change shows before the noise. ' +
       'Rows under ' + SMALL_PA + ' PA are muted and uncolored.</p>' +
       '<div class="tm-bar">' +
         '<div class="tm-ctl"><label for="tm-team">Team</label><select id="tm-team">' +

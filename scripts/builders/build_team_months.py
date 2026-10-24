@@ -74,6 +74,7 @@ KEYS = ['pa', 'count', 'nSwings', 'nBip', 'nCompSwings',
 COUNT_KEYS = {'pa', 'count', 'nSwings', 'nBip', 'nCompSwings', 'hr'}
 RAW_POOL_KEYS = {'bbPlusU': 'bbPlusU', 'ctPlusU': 'ctPlusU', 'sdPlusU': 'sdPlusU', 'wOBAcon': 'wOBAcon'}
 STORE_DP = 5            # storage precision; display rounds further
+STABILITY_MIN_PA = 80   # both months, for the month-to-month r (a convention)
 
 
 def is_mlb_team(t):
@@ -105,6 +106,41 @@ class Pools:
         if k in HITTER_INVERT_PCTL:
             p = 100.0 - p
         return max(0, min(100, round(p)))
+
+
+def month_to_month_r(by_team):
+    """Pearson r of each stat in month m against the same stat in month m+1,
+    over a stint's consecutive months with STABILITY_MIN_PA in both. A
+    stability read, not a reliability coefficient: real change lowers it too.
+    The site prints it under each Team by Month header."""
+    order = [m for m, _, _ in MONTHS]
+    by = {}
+    for rows in by_team.values():
+        for r in rows:
+            if r['month'] in order:
+                by[(r['hitter'], r['team'], order.index(r['month']))] = r
+    out = {}
+    for k in KEYS:
+        if k in COUNT_KEYS:
+            continue
+        xs, ys = [], []
+        for (h, t, i), a in by.items():
+            b = by.get((h, t, i + 1))
+            if (b is None or (a.get('pa') or 0) < STABILITY_MIN_PA
+                    or (b.get('pa') or 0) < STABILITY_MIN_PA
+                    or a.get(k) is None or b.get(k) is None):
+                continue
+            xs.append(a[k])
+            ys.append(b[k])
+        if len(xs) < 50:
+            continue
+        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+        sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+        sxx = sum((x - mx) ** 2 for x in xs)
+        syy = sum((y - my) ** 2 for y in ys)
+        if sxx > 0 and syy > 0:
+            out[k] = {'r': round(sxy / (sxx * syy) ** 0.5, 3), 'n': len(xs)}
+    return out
 
 
 def store(v):
@@ -283,6 +319,9 @@ def main():
     lg['medLA'] = las[len(las) // 2]
     for k in ('processPlus', 'bbPlusU', 'ctPlusU', 'sdPlusU', 'wRCplus', 'xWRCplus'):
         lg[k] = 100
+    stability = month_to_month_r(by_team)
+    print('Month-to-month r: ' + ', '.join(f'{k} {v["r"]:.2f}' for k, v in
+                                            sorted(stability.items(), key=lambda kv: -kv[1]['r'])))
     index = {
         'generatedAt': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'dataThrough': max(dates),
@@ -290,6 +329,8 @@ def main():
         'monthRanges': {m: [lo, hi] for m, lo, hi in MONTHS},
         'teams': sorted(by_team),
         'leagueAverages': {k: store(lg.get(k)) for k in KEYS if lg.get(k) is not None},
+        'stability': stability,
+        'stabilityMinPa': STABILITY_MIN_PA,
     }
 
     tmp = tempfile.mkdtemp(prefix='team_months_', dir=DATA)
