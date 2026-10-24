@@ -110,7 +110,7 @@ window.TeamMonths = (function () {
 #tm-page tr.season td{font-weight:700;border-top:1px solid var(--text-muted)}
 #tm-page tr.grp-end td{border-bottom:2px solid var(--border)}
 #tm-page tr.small td{color:var(--text-muted);background:transparent !important}
-#tm-page tr.lg td{font-style:italic;color:var(--text-muted)}
+#tm-page tr.lg td{font-style:italic;color:var(--text-muted);position:sticky;z-index:1;background:var(--bg-card);border-bottom:2px solid var(--border)}
 #tm-page .tm-foot{color:var(--text-muted);font-size:12.5px;max-width:95ch;margin-top:14px;line-height:1.5}
 #tm-page .empty{padding:30px;text-align:center;color:var(--text-muted)}
 @media (max-width:640px){#tm-page .tm-count{margin-left:0}}
@@ -222,7 +222,9 @@ window.TeamMonths = (function () {
       nHitters = sorted.length;
       sorted.forEach(function (r) { body += rowHtml(r, cs, true, false); });
     }
-    body += lgRow(ix, cs);
+    // MLB Average leads the body and sticks under the header, so sorting
+    // never moves it (per Wally 2026-10-24).
+    body = lgRow(ix, cs) + body;
 
     const head = '<tr><th class="l" data-k="hitter">Hitter</th><th class="l">Month</th>' +
       cs.map(function (c) {
@@ -254,6 +256,9 @@ window.TeamMonths = (function () {
       'Season rows match the Hitters leaderboard except BB+ / CT+ / SD+ (raw here) and wOBAcon. ' +
       'Process+ needs both SD+ (190 decisions) and CT+ (65 swings), so it is blank in short months.</p>';
     wire(page);
+    // The pinned row sits right under the sticky header, whatever its height.
+    const hh = page.querySelector('thead tr').getBoundingClientRect().height;
+    page.querySelectorAll('tr.lg td').forEach(function (td) { td.style.top = hh + 'px'; });
   }
 
   function rowHtml(r, cs, first, last) {
