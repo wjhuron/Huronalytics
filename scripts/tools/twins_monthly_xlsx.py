@@ -108,10 +108,27 @@ SECTION_RULE = Side(style='medium', color=NAVY)   # left edge of each stat block
 ONE_LINE = Alignment(horizontal='center', vertical='center', wrap_text=False)   # column headers never wrap
 
 
-def fit_width(header):
-    """Column width that holds a bold header on one line and a 6-character
-    value such as 100.0% (per Wally 2026-10-24: no wrapped headers)."""
-    return max(7.5, round(len(header) * 1.15 + 2, 1))
+def shown(v, fmt):
+    """The text a cell displays for value v under number format fmt."""
+    if v is None or v == '':
+        return ''
+    if fmt == PCT:
+        return f'{v * 100:.1f}%'
+    if fmt == RATE:
+        t = f'{v:.3f}'
+        return t[1:] if t.startswith('0.') else t
+    if fmt == INT:
+        return f'{v:.0f}'
+    if fmt == DEC1:
+        return f'{v:.1f}'
+    return str(v)
+
+
+def fit_width(header, longest=0, bold_header=True):
+    """Column width that fits its contents on one line: the header (bold, so
+    ~15% wider per character) and the longest displayed value (per Wally
+    2026-10-24: headers never wrap, columns sized to their contents)."""
+    return round(max(len(header) * (1.15 if bold_header else 1.0), longest * 1.05) + 2.2, 1)
 
 DEFS = {
     'pa': ('Plate appearances. Official line from FanGraphs for the month.', 'FanGraphs', 'The sample size behind every rate. Read it first.'),
@@ -281,6 +298,17 @@ def main():
         if key in ('pa', 'count', 'nSwings', 'nBip', 'hr'):
             return None
         return lg.get(key)
+
+    # One width per stat for every tab: the header or the longest value the
+    # stat shows anywhere (any hitter, any month, the season, MLB average).
+    stat_width = {}
+    for k, h, fmt, _ in COLS:
+        vals = [shown(r.get(k), fmt) for r in ours.values()]
+        vals += [shown(season_value(hh, k), fmt) for hh in hitters] + [shown(lg_value(k), fmt)]
+        stat_width[k] = fit_width(h, max(len(v) for v in vals))
+    for gname, cs in GROUPS:          # a one-column block also holds its band label
+        if len(cs) == 1:
+            stat_width[cs[0][0]] = max(stat_width[cs[0][0]], fit_width(gname))
 
     wb = Workbook()
 
@@ -473,8 +501,6 @@ def main():
         """Title, the grouped header, then one row per spec (labels, hitter,
         month). month is a calendar month, 'Season' or 'MLB Average'."""
         ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=14, color=NAVY)
-        ws.cell(row=2, column=1, value=f'Grey rows: under {SMALL_PA} PA. Red = better than MLB average, blue = worse. '
-                                       'BB+, CT+, SD+ are raw (not regressed).').font = Font(italic=True, color='666666')
         c0 = len(label_heads) + 1
         for j, t in enumerate(label_heads, start=1):
             ws.cell(row=5, column=j, value=t)
@@ -491,7 +517,7 @@ def main():
             small = not is_lg and pa < SMALL_PA
             for j, lab in enumerate(labels, start=1):
                 lc = ws.cell(row=r, column=j, value=lab)
-                lc.font = Font(bold=not is_lg, italic=is_lg)
+                lc.font = Font(bold=True, italic=is_lg)
                 if small:
                     lc.fill, lc.font = GREY_FILL, GREY_FONT
                 if is_season:
@@ -506,7 +532,7 @@ def main():
                 c = ws.cell(row=r, column=c0 + j, value=v)
                 c.number_format, c.alignment = fmt, MID_ALIGN
                 if is_lg:
-                    c.font = Font(italic=True, color='555555')
+                    c.font = Font(bold=True, italic=True, color='555555')
                 elif small:
                     c.fill, c.font = GREY_FILL, GREY_FONT
                 else:
@@ -519,12 +545,13 @@ def main():
                     c.border = SEASON_BORDER
             r += 1
         section_barriers(ws, c0, 4, r - 1)
-        widths = {'Hitter': 20, 'Month': 15 if len(label_heads) == 1 else 10}
         for j, t in enumerate(label_heads, start=1):
-            ws.column_dimensions[get_column_letter(j)].width = widths.get(t, 12)
-        for j, (_, h, _, _) in enumerate(COLS):
-            ws.column_dimensions[get_column_letter(c0 + j)].width = fit_width(h)
-        ws.freeze_panes = ws.cell(row=6, column=c0)
+            longest = max(len(str(lab[j - 1] or '')) for lab, _, _ in specs)
+            ws.column_dimensions[get_column_letter(j)].width = fit_width(t, longest * 1.1)
+        for j, (k, _, _, _) in enumerate(COLS):
+            ws.column_dimensions[get_column_letter(c0 + j)].width = stat_width[k]
+        # Rows 1-6 stay put: title, band, header and MLB Average.
+        ws.freeze_panes = ws.cell(row=7, column=c0)
 
     # ── All Hitters: one row per hitter, Season or a month picked in B3 ──
     # Every stat cell is a lookup into All Data keyed on hitter|month, so one
@@ -598,9 +625,10 @@ def main():
     # The filter's header row is MLB Average (row 6), so a sort moves the
     # hitter rows only and the league row stays put under the header.
     wall.auto_filter.ref = f'A{lg_row}:{last_col}{last}'
-    wall.column_dimensions['A'].width = 20
-    for j, (_, h, _, _) in enumerate(COLS):
-        wall.column_dimensions[get_column_letter(2 + j)].width = fit_width(h)
+    wall.column_dimensions['A'].width = fit_width('Hitter', max(len('MLB Average (season)'),
+                                                                max(len(pretty(hh)) for hh in hitters)) * 1.1)
+    for j, (k, _, _, _) in enumerate(COLS):
+        wall.column_dimensions[get_column_letter(2 + j)].width = stat_width[k]
     wall.freeze_panes = 'B7'
 
     # ── One tab per hitter ───────────────────────────────────────────────
@@ -614,7 +642,7 @@ def main():
             wb.create_sheet(title),
             f"{pretty(hname)}  |  MIN  |  Bats {s.get('stands') or '-'}  |  "
             f"{s.get('position') or '-'}  |  2026: {s['pa']} PA, {s.get('wRCplus')} wRC+",
-            ['Month'], [([m], hname, m) for m in months + ['Season', 'MLB Average']])
+            ['Month'], [([m], hname, m) for m in ['MLB Average'] + months + ['Season']])
 
     # ── All Data ─────────────────────────────────────────────────────────
     wa = wb.create_sheet('All Data')
