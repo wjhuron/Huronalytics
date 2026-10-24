@@ -10,9 +10,12 @@ Layout, signal first (per Wally 2026-10-24):
   * Overview: one row per hitter, seven headline stats ordered from most to
     least stable month to month, each with a block-character trend over the
     months, the season value, the last month and a change flag.
-  * One tab per hitter: 30 columns ordered by block, most stable block first,
-    with each column's month-to-month r printed under its header. The results
-    block is set in a lighter ink because one month of it is mostly noise.
+  * All Hitters: one row per hitter; a dropdown picks Season or a month and
+    every cell follows it, so a sort ranks hitters for that window.
+  * One tab per hitter: every column by month, ordered by block, most stable
+    block first, with a navy rule between blocks. The results block is set in
+    a lighter ink because one month of it is mostly noise. (The measured r
+    lives in Definitions; headers no longer print it, per Wally 2026-10-24.)
   * All Data (with sample counts), Definitions, Read Me.
 
 Measured here, from every MLB hitter-month in data/team_months:
@@ -70,12 +73,11 @@ GROUPS = [
     ('Process', [('processPlus', 'Process+', INT, 1), ('bbPlusU', 'BB+', INT, 1),
                  ('ctPlusU', 'CT+', INT, 1), ('sdPlusU', 'SD+', INT, 1)]),
     ('Approach', [('kPct', 'K%', PCT, -1), ('bbPct', 'BB%', PCT, 1),
-                  ('izSwingPct', 'Z-Swing%', PCT, 0), ('izContactPct', 'Z-Contact%', PCT, 1),
-                  ('chasePct', 'Chase%', PCT, -1), ('whiffPct', 'Whiff%', PCT, -1),
-                  ('firstPitchSwingPct', 'FPSw%', PCT, 0)]),
+                  ('izSwingPct', 'Z-Swing%', PCT, 1), ('izContactPct', 'Z-Contact%', PCT, 1),
+                  ('chasePct', 'Chase%', PCT, -1), ('whiffPct', 'Whiff%', PCT, -1)]),
     ('Contact', [('ev95', 'EV95', DEC1, 1), ('hardHitPct', 'Hard-Hit%', PCT, 1),
                  ('barrelPct', 'Barrel%', PCT, 1), ('airPullPct', 'AirPull%', PCT, 1),
-                 ('gbPct', 'GB%', PCT, 0), ('medLA', 'Med LA', DEC1, 0)]),
+                 ('gbPct', 'GB%', PCT, -1), ('medLA', 'Med LA', DEC1, 0)]),
     ('Results', [
         ('avg', 'AVG', RATE, 1), ('obp', 'OBP', RATE, 1), ('slg', 'SLG', RATE, 1),
         ('hr', 'HR', INT, 0), ('wRCplus', 'wRC+', INT, 1), ('xWRCplus', 'xwRC+', INT, 1),
@@ -90,12 +92,6 @@ SEASON_FROM_RAW = {'bbPlusU', 'ctPlusU', 'sdPlusU', 'wOBAcon'}   # season row re
 # Overview headline stats, most stable first.
 HEADLINE = ['batSpeed', 'ev95', 'whiffPct', 'chasePct', 'processPlus', 'xWRCplus', 'wRCplus']
 BLOCKS = '▁▂▃▄▅▆▇█'
-# Hitter-tab columns collapsed by default (outline groups); the rest fit one
-# screen: PA, bat tracking, Process+, K%, BB%, Chase%, Whiff%, EV95, Barrel%,
-# wRC+, xwRC+.
-COLLAPSED = {'bbPlusU', 'ctPlusU', 'sdPlusU', 'izSwingPct', 'izContactPct', 'firstPitchSwingPct',
-             'hardHitPct', 'airPullPct', 'gbPct', 'medLA', 'avg', 'obp', 'slg', 'hr',
-             'wOBAcon', 'xwOBAcon'}
 
 GOOD, MID, BAD = 'F4A582', 'FFFFFF', '92C5DE'
 GOOD_INK, BAD_INK, NEUTRAL_INK = 'B0402F', '3E6A94', '777777'
@@ -108,6 +104,7 @@ GROUP_FILL = PatternFill('solid', fgColor='D9DEE8')
 WHITE_BOLD = Font(color='FFFFFF', bold=True)
 CENTER = Alignment(horizontal='center', vertical='center', wrap_text=True)
 MID_ALIGN = Alignment(horizontal='center')
+SECTION_RULE = Side(style='medium', color=NAVY)   # left edge of each stat block
 
 DEFS = {
     'pa': ('Plate appearances. Official line from FanGraphs for the month.', 'FanGraphs', 'The sample size behind every rate. Read it first.'),
@@ -124,16 +121,15 @@ DEFS = {
     'sdPlusU': ('Swing Decisions+: the run value of each swing or take for its location and count. RAW.', 'Huronalytics', 'Approach quality, independent of the umpire.'),
     'kPct': ('Strikeouts / PA.', 'FanGraphs', 'Stabilizes fast. An early sign of a change.'),
     'bbPct': ('Walks (including intentional) / PA.', 'FanGraphs', 'Plate discipline outcome.'),
-    'izSwingPct': ('Swing rate at pitches in the strike zone.', 'Statcast', 'Aggression on strikes. Style, not quality, so it is not coloured.'),
+    'izSwingPct': ('Swing rate at pitches in the strike zone.', 'Statcast', 'Aggression on strikes; higher is better.'),
     'izContactPct': ('Contact rate on swings at strikes.', 'Statcast', 'Bat-to-ball on the pitches he should hit.'),
     'chasePct': ('Swing rate at pitches outside the strike zone.', 'Statcast', 'The clearest discipline signal. Stable in one month.'),
     'whiffPct': ('Misses / swings, bunts excluded.', 'Statcast', 'Swing-and-miss. Moves with bat-speed and approach changes.'),
-    'firstPitchSwingPct': ('Share of PA with a swing at 0-0.', 'Statcast', 'Approach style. Not coloured.'),
     'ev95': ('95th-percentile exit velocity: his hardest regular contact.', 'Statcast', 'Steadier than max or average EV. A drop can flag fatigue or injury.'),
     'hardHitPct': ('Share of batted balls at 95+ mph.', 'Statcast', 'Contact quality.'),
     'barrelPct': ('Barrels / balls in play (official Statcast barrel).', 'Statcast', 'The best contact type for damage.'),
     'airPullPct': ('Share of batted balls hit in the air to the pull side.', 'Statcast', 'The most productive batted-ball direction.'),
-    'gbPct': ('Ground-ball share.', 'Statcast', 'Batted-ball profile. Not coloured.'),
+    'gbPct': ('Ground-ball share.', 'Statcast', 'Batted-ball profile; lower is better.'),
     'medLA': ('Median launch angle.', 'Statcast', 'Swing plane on contact. Not coloured.'),
     'avg': ('Batting average.', 'FanGraphs', 'Expected on any sheet; the least stable stat month to month.'),
     'obp': ('On-base percentage.', 'FanGraphs', 'Expected on any sheet.'),
@@ -279,9 +275,6 @@ def main():
             return None
         return lg.get(key)
 
-    def r_label(key):
-        return f'r {stab[key][0]:.2f}'.replace('0.', '.') if key in stab else ''
-
     wb = Workbook()
 
     # ── Read Me ──────────────────────────────────────────────────────────
@@ -294,13 +287,12 @@ def main():
         ('', None),
         ('THE IDEA', h2),
         ('A tracking sheet answers one question: who changed, and is the change real? One month is about 100 PA, and most results stats are noise at that size.', None),
-        (f'So every column carries its month-to-month r: how well one month of the stat predicts the next month (all MLB hitter-months, {STABILITY_MIN_PA}+ PA in both).', None),
-        ('Columns run from the most stable to the least: bat tracking (bat speed r .96), process, approach, contact, then results (wRC+ r .10), which are set in lighter ink.', None),
+        (f'So the columns run from the most stable month to month to the least: bat tracking (bat speed r .96), process, approach, contact, then results (wRC+ r .10), which are set in lighter ink. r is how well one month of a stat predicts the next month (all MLB hitter-months, {STABILITY_MIN_PA}+ PA in both); Definitions lists it for every stat.', None),
         ('', None),
         ('TABS', h2),
         ('Overview: the 10-second view. Seven headline stats per hitter, most stable first: a trend across the months, the season value, the latest month, and the change. Hitters with the most real changes are listed first.', None),
-        ('All Hitters: one row per hitter with every stat. Pick Season or a month in the yellow cell and the whole page follows; sort with the filter buttons. Colours on this tab are live rules: Excel and Google Sheets draw them, Numbers does not.', None),
-        (f'One tab per hitter (most PA first): every stat by month, with his season line and the MLB average below. {len(COLLAPSED)} secondary columns are collapsed; the + buttons above the header open them.', None),
+        ('All Hitters: one row per hitter with every stat. Pick Season or a month in the yellow cell and the whole page follows; sort with the filter buttons on the MLB Average row. Colours on this tab are live rules: Excel and Google Sheets draw them, Numbers does not.', None),
+        ('One tab per hitter (most PA first): every stat by month, with his season line and the MLB average below.', None),
         ('All Data: one row per hitter-month, with sample counts and filters, for sorting and pivots.', None),
         ('Definitions: what each stat is, where it comes from, its month-to-month r, and why it is in the sheet.', None),
         ('', None),
@@ -340,7 +332,7 @@ def main():
     )).font = Font(italic=True, color='666666')
     fixed = [('Hitter', 22), ('PA', 6), ('Better', 7.5), ('Worse', 7.5), ('Latest Month', 9)]
     for j, (t, w) in enumerate(fixed, start=1):
-        wo.merge_cells(start_row=4, start_column=j, end_row=6, end_column=j)
+        wo.merge_cells(start_row=4, start_column=j, end_row=5, end_column=j)
         c = wo.cell(row=4, column=j, value=t)
         c.fill, c.font, c.alignment = HEAD_FILL, WHITE_BOLD, CENTER
         wo.column_dimensions[get_column_letter(j)].width = w
@@ -352,11 +344,8 @@ def main():
         wo.merge_cells(start_row=4, start_column=col, end_row=4, end_column=col + 3)
         g = wo.cell(row=4, column=col, value=META[k][0])
         g.fill, g.font, g.alignment = GROUP_FILL, Font(bold=True, color=NAVY, size=12), CENTER
-        wo.merge_cells(start_row=5, start_column=col, end_row=5, end_column=col + 3)
-        s = wo.cell(row=5, column=col, value=f'month-to-month {r_label(k)}')
-        s.font, s.alignment = Font(italic=True, size=9, color='555555'), CENTER
         for j, t in enumerate([month_letters, 'Season', 'Latest', 'Change']):
-            c = wo.cell(row=6, column=col + j, value=t)
+            c = wo.cell(row=5, column=col + j, value=t)
             c.fill, c.alignment = HEAD_FILL, CENTER
             c.font = (Font(name='Courier New', bold=True, color='FFFFFF') if j == 0 else WHITE_BOLD)
         for j, w in enumerate([14, 8, 8, 9]):
@@ -411,7 +400,7 @@ def main():
     entries.sort(key=lambda e: (e[3], -(e[4] + e[5]), -e[1]['pa'], e[0]))
 
     n_flags = 0
-    r = 7
+    r = 6
     for hname, s, last_m, small_season, better, worse, cells in entries:
         ink = GREY_FONT if small_season else None
         wo.cell(row=r, column=1, value=pretty(hname)).font = ink or Font(bold=True)
@@ -449,40 +438,36 @@ def main():
     for k in HEADLINE:
         c = wo.cell(row=r, column=starts[k] + 1, value=lg_value(k))
         c.number_format, c.font, c.alignment = META[k][1], Font(italic=True, color='555555'), MID_ALIGN
-    for rr in range(4, 7):
+    for rr in range(4, 6):
         for k in HEADLINE:
             wo.cell(row=rr, column=starts[k]).border = Border(left=Side(style='thin', color='FFFFFF'))
-    wo.freeze_panes = 'F7'
-    wo.row_dimensions[6].height = 18
+    wo.freeze_panes = 'F6'
+    wo.row_dimensions[5].height = 18
     print(f'Overview: {n_flags} change flags')
 
     # ── Hitter tables: one writer for the per-hitter tabs and All Hitters ─
     # A Season row closes its hitter's block: thin rule above, navy rule below.
     SEASON_BORDER = Border(top=Side(style='thin', color='8A8A8A'), bottom=Side(style='medium', color=NAVY))
 
-    def collapse_groups(ws, c0):
-        """Collapse the secondary columns (COLLAPSED) into outline groups so
-        the default view fits one screen; the +/- buttons above the header
-        open them. c0 is the column of the first stat (PA)."""
-        run = []
-        for j, (k, _, _, _) in enumerate(COLS + [(None, None, None, None)]):
-            if k in COLLAPSED:
-                run.append(c0 + j)
-            elif run:
-                ws.column_dimensions.group(get_column_letter(run[0]), get_column_letter(run[-1]),
-                                           outline_level=1, hidden=True)
-                run = []
+    def section_barriers(ws, c0, r0, r1):
+        """A medium navy rule on the left edge of every block after the first
+        (Bat Tracking, Process, Approach, Contact, Results), rows r0..r1,
+        keeping each cell's top and bottom rules."""
+        col = c0
+        for i, (_, cs) in enumerate(GROUPS):
+            if i:
+                for rr in range(r0, r1 + 1):
+                    cell = ws.cell(row=rr, column=col)
+                    b = cell.border
+                    cell.border = Border(left=SECTION_RULE, right=b.right, top=b.top, bottom=b.bottom)
+            col += len(cs)
 
-    def write_month_table(ws, title, label_heads, specs, pin_first=False):
-        """Title, the grouped header, the month-to-month r row, then one row
-        per spec (labels, hitter, month). month is a calendar month, 'Season'
-        or 'MLB Average'. pin_first freezes the first data row (MLB Average)
-        under the header."""
+    def write_month_table(ws, title, label_heads, specs):
+        """Title, the grouped header, then one row per spec (labels, hitter,
+        month). month is a calendar month, 'Season' or 'MLB Average'."""
         ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=14, color=NAVY)
-        ws.cell(row=2, column=1, value=f'Columns run from most to least stable month to month (r under each header). '
-                                       f'Grey rows: under {SMALL_PA} PA. Red = better than MLB average, blue = worse. '
-                                       'BB+, CT+, SD+ are raw (not regressed). Click + above the header to open '
-                                       f'{len(COLLAPSED)} more stats.').font = Font(italic=True, color='666666')
+        ws.cell(row=2, column=1, value=f'Grey rows: under {SMALL_PA} PA. Red = better than MLB average, blue = worse. '
+                                       'BB+, CT+, SD+ are raw (not regressed).').font = Font(italic=True, color='666666')
         c0 = len(label_heads) + 1
         for j, t in enumerate(label_heads, start=1):
             ws.cell(row=5, column=j, value=t)
@@ -491,12 +476,7 @@ def main():
             ws.cell(row=5, column=c).fill = HEAD_FILL
             ws.cell(row=5, column=c).font = WHITE_BOLD
             ws.cell(row=5, column=c).alignment = CENTER
-        rl = ws.cell(row=6, column=1, value='Month-to-month r')
-        rl.font = Font(italic=True, size=9, color='555555')
-        for j, (k, _, _, _) in enumerate(COLS):
-            c = ws.cell(row=6, column=c0 + j, value=r_label(k))
-            c.font, c.alignment = Font(italic=True, size=9, color='555555'), MID_ALIGN
-        r = 7
+        r = 6
         for labels, hname, m in specs:
             is_season, is_lg = m == 'Season', m == 'MLB Average'
             row = ours.get((hname, m)) if not (is_season or is_lg) else None
@@ -531,32 +511,28 @@ def main():
                 if is_season:
                     c.border = SEASON_BORDER
             r += 1
+        section_barriers(ws, c0, 4, r - 1)
         widths = {'Hitter': 20, 'Month': 15 if len(label_heads) == 1 else 10}
         for j, t in enumerate(label_heads, start=1):
             ws.column_dimensions[get_column_letter(j)].width = widths.get(t, 12)
         for j in range(len(COLS)):
             ws.column_dimensions[get_column_letter(c0 + j)].width = 9.5
-        collapse_groups(ws, c0)
         ws.row_dimensions[5].height = 30
-        ws.freeze_panes = ws.cell(row=8 if pin_first else 7, column=c0)
+        ws.freeze_panes = ws.cell(row=6, column=c0)
 
     # ── All Hitters: one row per hitter, Season or a month picked in B3 ──
     # Every stat cell is a lookup into All Data keyed on hitter|month, so one
-    # dropdown switches the whole page and a sort (filter buttons on the
-    # header row) ranks hitters, not hitter-months. Colours and the grey-out
-    # are conditional-formatting rules so they follow the picked month:
-    # Excel and Google Sheets draw them, Numbers does not.
+    # dropdown switches the whole page and a sort ranks hitters, not
+    # hitter-months. Colours and the grey-out are conditional-formatting rules
+    # so they follow the picked month: Excel and Google Sheets draw them,
+    # Numbers does not. Layout per Wally (2026-10-24): row 2 empty, MLB
+    # Average in row 6 under the header, hitters from row 7.
     all_cols = [COLS[0]] + SAMPLE_COLS + COLS[1:]
     ad_col = {k: get_column_letter(6 + j) for j, (k, _, _, _) in enumerate(all_cols)}
     ad_key = get_column_letter(6 + len(all_cols))
     ad_last = 1 + sum(1 for h in hitters for m in months + ['Season'] if (h, m) in ours)
     wall = wb.create_sheet('All Hitters')
     wall.cell(row=1, column=1, value=f'All Twins hitters ({len(hitters)}), one row each').font = Font(bold=True, size=14, color=NAVY)
-    wall.cell(row=2, column=1, value=(
-        'Pick Season or a month in B3; every column follows it. Sort with the filter buttons on the header row. '
-        f'Columns run from most to least stable month to month (r under each name). Grey rows: under {SMALL_PA} PA '
-        'or no PA in that month. Red = better than MLB average, blue = worse. BB+, CT+, SD+ are raw. '
-        f'Click + above the header to open {len(COLLAPSED)} more stats.')).font = Font(italic=True, color='666666')
     wall.cell(row=3, column=1, value='Month').font = Font(bold=True, color=NAVY)
     pick = wall.cell(row=3, column=2, value='Season')
     pick.font, pick.alignment = Font(bold=True, size=12), MID_ALIGN
@@ -568,18 +544,14 @@ def main():
     wall.add_data_validation(dv)
     dv.add('B3')
     wall.cell(row=3, column=3, value='◀ pick a month').font = Font(italic=True, color='666666')
-    lg_row = 4
+    end = header_band(wall, 4, 2, GROUPS)
+    hc = wall.cell(row=5, column=1, value='Hitter')
+    hc.fill, hc.font, hc.alignment = HEAD_FILL, WHITE_BOLD, CENTER
+    lg_row = 6
     wall.cell(row=lg_row, column=1, value='MLB Average (season)').font = Font(italic=True)
     for j, (k, _, fmt, _) in enumerate(COLS):
         c = wall.cell(row=lg_row, column=2 + j, value=lg_value(k))
         c.number_format, c.font, c.alignment = fmt, Font(italic=True, color='555555'), MID_ALIGN
-    end = header_band(wall, 5, 2, GROUPS)
-    for j, (k, h, _, _) in enumerate(COLS):
-        wall.cell(row=6, column=2 + j, value=f'{h}\n{r_label(k)}' if r_label(k) else h)
-    for c in range(1, end):
-        hc = wall.cell(row=6, column=c)
-        hc.fill, hc.font, hc.alignment = HEAD_FILL, WHITE_BOLD, CENTER
-    wall.cell(row=6, column=1, value='Hitter')
     first = 7
     for i, hname in enumerate(hitters):
         r = first + i
@@ -612,12 +584,14 @@ def main():
             start_type='num', start_value=lo, start_color=lo_c,
             mid_type='num', mid_value=mid, mid_color=MID,
             end_type='num', end_value=hi, end_color=hi_c))
-    wall.auto_filter.ref = f'A6:{last_col}{last}'
+    section_barriers(wall, 2, 4, last)
+    # The filter's header row is MLB Average (row 6), so a sort moves the
+    # hitter rows only and the league row stays put under the header.
+    wall.auto_filter.ref = f'A{lg_row}:{last_col}{last}'
     wall.column_dimensions['A'].width = 20
     for j in range(len(COLS)):
         wall.column_dimensions[get_column_letter(2 + j)].width = 9.5
-    collapse_groups(wall, 2)
-    wall.row_dimensions[6].height = 42
+    wall.row_dimensions[5].height = 30
     wall.freeze_panes = 'B7'
 
     # ── One tab per hitter ───────────────────────────────────────────────
