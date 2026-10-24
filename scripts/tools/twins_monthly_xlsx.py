@@ -73,7 +73,7 @@ GROUPS = [
     ('Contact', [('ev95', 'EV95', DEC1, 1), ('hardHitPct', 'Hard-Hit%', PCT, 1),
                  ('barrelPct', 'Barrel%', PCT, 1), ('airPullPct', 'AirPull%', PCT, 1),
                  ('gbPct', 'GB%', PCT, 0), ('medLA', 'Med LA', DEC1, 0)]),
-    ('Results (one month is mostly noise)', [
+    ('Results', [
         ('avg', 'AVG', RATE, 1), ('obp', 'OBP', RATE, 1), ('slg', 'SLG', RATE, 1),
         ('hr', 'HR', INT, 0), ('wRCplus', 'wRC+', INT, 1), ('xWRCplus', 'xwRC+', INT, 1),
         ('wOBAcon', 'wOBAcon', RATE, 1), ('xwOBAcon', 'xwOBAcon', RATE, 1)]),
