@@ -105,6 +105,13 @@ WHITE_BOLD = Font(color='FFFFFF', bold=True)
 CENTER = Alignment(horizontal='center', vertical='center', wrap_text=True)
 MID_ALIGN = Alignment(horizontal='center')
 SECTION_RULE = Side(style='medium', color=NAVY)   # left edge of each stat block
+ONE_LINE = Alignment(horizontal='center', vertical='center', wrap_text=False)   # column headers never wrap
+
+
+def fit_width(header):
+    """Column width that holds a bold header on one line and a 6-character
+    value such as 100.0% (per Wally 2026-10-24: no wrapped headers)."""
+    return max(7.5, round(len(header) * 1.15 + 2, 1))
 
 DEFS = {
     'pa': ('Plate appearances. Official line from FanGraphs for the month.', 'FanGraphs', 'The sample size behind every rate. Read it first.'),
@@ -244,7 +251,7 @@ def header_band(ws, row, col, groups):
         g.fill, g.font, g.alignment = GROUP_FILL, Font(bold=True, color=NAVY), CENTER
         for _, h, _, _ in cs:
             cell = ws.cell(row=row + 1, column=col, value=h)
-            cell.fill, cell.font, cell.alignment = HEAD_FILL, WHITE_BOLD, CENTER
+            cell.fill, cell.font, cell.alignment = HEAD_FILL, WHITE_BOLD, ONE_LINE
             col += 1
     return col
 
@@ -475,7 +482,7 @@ def main():
         for c in range(1, end):
             ws.cell(row=5, column=c).fill = HEAD_FILL
             ws.cell(row=5, column=c).font = WHITE_BOLD
-            ws.cell(row=5, column=c).alignment = CENTER
+            ws.cell(row=5, column=c).alignment = ONE_LINE
         r = 6
         for labels, hname, m in specs:
             is_season, is_lg = m == 'Season', m == 'MLB Average'
@@ -515,9 +522,8 @@ def main():
         widths = {'Hitter': 20, 'Month': 15 if len(label_heads) == 1 else 10}
         for j, t in enumerate(label_heads, start=1):
             ws.column_dimensions[get_column_letter(j)].width = widths.get(t, 12)
-        for j in range(len(COLS)):
-            ws.column_dimensions[get_column_letter(c0 + j)].width = 9.5
-        ws.row_dimensions[5].height = 30
+        for j, (_, h, _, _) in enumerate(COLS):
+            ws.column_dimensions[get_column_letter(c0 + j)].width = fit_width(h)
         ws.freeze_panes = ws.cell(row=6, column=c0)
 
     # ── All Hitters: one row per hitter, Season or a month picked in B3 ──
@@ -532,7 +538,7 @@ def main():
     ad_key = get_column_letter(6 + len(all_cols))
     ad_last = 1 + sum(1 for h in hitters for m in months + ['Season'] if (h, m) in ours)
     wall = wb.create_sheet('All Hitters')
-    wall.cell(row=1, column=1, value=f'All Twins hitters ({len(hitters)}), one row each').font = Font(bold=True, size=14, color=NAVY)
+    wall.cell(row=1, column=1, value='Minnesota Twins').font = Font(bold=True, size=14, color=NAVY)
     wall.cell(row=3, column=1, value='Month').font = Font(bold=True, color=NAVY)
     pick = wall.cell(row=3, column=2, value='Season')
     pick.font, pick.alignment = Font(bold=True, size=12), MID_ALIGN
@@ -546,12 +552,12 @@ def main():
     wall.cell(row=3, column=3, value='◀ pick a month').font = Font(italic=True, color='666666')
     end = header_band(wall, 4, 2, GROUPS)
     hc = wall.cell(row=5, column=1, value='Hitter')
-    hc.fill, hc.font, hc.alignment = HEAD_FILL, WHITE_BOLD, CENTER
+    hc.fill, hc.font, hc.alignment = HEAD_FILL, WHITE_BOLD, ONE_LINE
     lg_row = 6
-    wall.cell(row=lg_row, column=1, value='MLB Average (season)').font = Font(italic=True)
+    wall.cell(row=lg_row, column=1, value='MLB Average (season)').font = Font(bold=True, italic=True)
     for j, (k, _, fmt, _) in enumerate(COLS):
         c = wall.cell(row=lg_row, column=2 + j, value=lg_value(k))
-        c.number_format, c.font, c.alignment = fmt, Font(italic=True, color='555555'), MID_ALIGN
+        c.number_format, c.font, c.alignment = fmt, Font(bold=True, italic=True, color='555555'), MID_ALIGN
     first = 7
     for i, hname in enumerate(hitters):
         r = first + i
@@ -589,9 +595,8 @@ def main():
     # hitter rows only and the league row stays put under the header.
     wall.auto_filter.ref = f'A{lg_row}:{last_col}{last}'
     wall.column_dimensions['A'].width = 20
-    for j in range(len(COLS)):
-        wall.column_dimensions[get_column_letter(2 + j)].width = 9.5
-    wall.row_dimensions[5].height = 30
+    for j, (_, h, _, _) in enumerate(COLS):
+        wall.column_dimensions[get_column_letter(2 + j)].width = fit_width(h)
     wall.freeze_panes = 'B7'
 
     # ── One tab per hitter ───────────────────────────────────────────────
