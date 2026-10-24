@@ -41,8 +41,11 @@ import statistics
 import sys
 
 from openpyxl import Workbook
+from openpyxl.formatting.rule import ColorScaleRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.properties import CalcProperties
+from openpyxl.worksheet.datavalidation import DataValidation
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO)
@@ -296,7 +299,7 @@ def main():
         ('', None),
         ('TABS', h2),
         ('Overview: the 10-second view. Seven headline stats per hitter, most stable first: a trend across the months, the season value, the latest month, and the change. Hitters with the most real changes are listed first.', None),
-        ('All Hitters: every hitter\'s tab stacked on one page, most PA first, with the MLB average pinned under the header. Each block lists the months he batted, then his season.', None),
+        ('All Hitters: one row per hitter with every stat. Pick Season or a month in the yellow cell and the whole page follows; sort with the filter buttons. Colours on this tab are live rules: Excel and Google Sheets draw them, Numbers does not.', None),
         (f'One tab per hitter (most PA first): every stat by month, with his season line and the MLB average below. {len(COLLAPSED)} secondary columns are collapsed; the + buttons above the header open them.', None),
         ('All Data: one row per hitter-month, with sample counts and filters, for sorting and pivots.', None),
         ('Definitions: what each stat is, where it comes from, its month-to-month r, and why it is in the sheet.', None),
@@ -457,6 +460,19 @@ def main():
     # A Season row closes its hitter's block: thin rule above, navy rule below.
     SEASON_BORDER = Border(top=Side(style='thin', color='8A8A8A'), bottom=Side(style='medium', color=NAVY))
 
+    def collapse_groups(ws, c0):
+        """Collapse the secondary columns (COLLAPSED) into outline groups so
+        the default view fits one screen; the +/- buttons above the header
+        open them. c0 is the column of the first stat (PA)."""
+        run = []
+        for j, (k, _, _, _) in enumerate(COLS + [(None, None, None, None)]):
+            if k in COLLAPSED:
+                run.append(c0 + j)
+            elif run:
+                ws.column_dimensions.group(get_column_letter(run[0]), get_column_letter(run[-1]),
+                                           outline_level=1, hidden=True)
+                run = []
+
     def write_month_table(ws, title, label_heads, specs, pin_first=False):
         """Title, the grouped header, the month-to-month r row, then one row
         per spec (labels, hitter, month). month is a calendar month, 'Season'
@@ -520,31 +536,89 @@ def main():
             ws.column_dimensions[get_column_letter(j)].width = widths.get(t, 12)
         for j in range(len(COLS)):
             ws.column_dimensions[get_column_letter(c0 + j)].width = 9.5
-        # Collapse the secondary columns into outline groups so the default
-        # view fits one screen; the +/- buttons above the header open them.
-        run = []
-        for j, (k, _, _, _) in enumerate(COLS + [(None, None, None, None)]):
-            if k in COLLAPSED:
-                run.append(c0 + j)
-            elif run:
-                ws.column_dimensions.group(get_column_letter(run[0]), get_column_letter(run[-1]),
-                                           outline_level=1, hidden=True)
-                run = []
+        collapse_groups(ws, c0)
         ws.row_dimensions[5].height = 30
         ws.freeze_panes = ws.cell(row=8 if pin_first else 7, column=c0)
 
-    # ── All Hitters: every hitter's tab stacked on one page ──────────────
-    # MLB Average is pinned under the header; each hitter's block lists the
-    # months he batted, then his Season row.
+    # ── All Hitters: one row per hitter, Season or a month picked in B3 ──
+    # Every stat cell is a lookup into All Data keyed on hitter|month, so one
+    # dropdown switches the whole page and a sort (filter buttons on the
+    # header row) ranks hitters, not hitter-months. Colours and the grey-out
+    # are conditional-formatting rules so they follow the picked month:
+    # Excel and Google Sheets draw them, Numbers does not.
+    all_cols = [COLS[0]] + SAMPLE_COLS + COLS[1:]
+    ad_col = {k: get_column_letter(6 + j) for j, (k, _, _, _) in enumerate(all_cols)}
+    ad_key = get_column_letter(6 + len(all_cols))
+    ad_last = 1 + sum(1 for h in hitters for m in months + ['Season'] if (h, m) in ours)
     wall = wb.create_sheet('All Hitters')
-    specs = [(['MLB Average', 'Season'], hitters[0], 'MLB Average')]
-    for hname in hitters:
-        played = [m for m in months if (hname, m) in ours]
-        for i, m in enumerate(played):
-            specs.append(([pretty(hname) if i == 0 else None, m], hname, m))
-        specs.append(([pretty(hname) if not played else None, 'Season'], hname, 'Season'))
-    write_month_table(wall, f'All Twins hitters, month by month ({len(hitters)} hitters, most PA first)',
-                      ['Hitter', 'Month'], specs, pin_first=True)
+    wall.cell(row=1, column=1, value=f'All Twins hitters ({len(hitters)}), one row each').font = Font(bold=True, size=14, color=NAVY)
+    wall.cell(row=2, column=1, value=(
+        'Pick Season or a month in B3; every column follows it. Sort with the filter buttons on the header row. '
+        f'Columns run from most to least stable month to month (r under each name). Grey rows: under {SMALL_PA} PA '
+        'or no PA in that month. Red = better than MLB average, blue = worse. BB+, CT+, SD+ are raw. '
+        f'Click + above the header to open {len(COLLAPSED)} more stats.')).font = Font(italic=True, color='666666')
+    wall.cell(row=3, column=1, value='Month').font = Font(bold=True, color=NAVY)
+    pick = wall.cell(row=3, column=2, value='Season')
+    pick.font, pick.alignment = Font(bold=True, size=12), MID_ALIGN
+    pick.fill = PatternFill('solid', fgColor='FFF2CC')
+    pick.border = Border(*(Side(style='medium', color=NAVY),) * 4)
+    dv = DataValidation(type='list', formula1='"' + ','.join(['Season'] + months) + '"', allow_blank=False,
+                        showDropDown=False)
+    dv.error, dv.errorTitle = 'Pick Season or a month from the list.', 'Month'
+    wall.add_data_validation(dv)
+    dv.add('B3')
+    wall.cell(row=3, column=3, value='◀ pick a month').font = Font(italic=True, color='666666')
+    lg_row = 4
+    wall.cell(row=lg_row, column=1, value='MLB Average (season)').font = Font(italic=True)
+    for j, (k, _, fmt, _) in enumerate(COLS):
+        c = wall.cell(row=lg_row, column=2 + j, value=lg_value(k))
+        c.number_format, c.font, c.alignment = fmt, Font(italic=True, color='555555'), MID_ALIGN
+    end = header_band(wall, 5, 2, GROUPS)
+    for j, (k, h, _, _) in enumerate(COLS):
+        wall.cell(row=6, column=2 + j, value=f'{h}\n{r_label(k)}' if r_label(k) else h)
+    for c in range(1, end):
+        hc = wall.cell(row=6, column=c)
+        hc.fill, hc.font, hc.alignment = HEAD_FILL, WHITE_BOLD, CENTER
+    wall.cell(row=6, column=1, value='Hitter')
+    first = 7
+    for i, hname in enumerate(hitters):
+        r = first + i
+        wall.cell(row=r, column=1, value=pretty(hname)).font = Font(bold=True)
+        for j, (k, _, fmt, _) in enumerate(COLS):
+            col = ad_col[k]
+            # INDEX of an empty cell returns 0 in Excel and Numbers, so test
+            # for empty first: a blank SD+ must stay blank, not read 0.
+            ix = (f"INDEX('All Data'!${col}$2:${col}${ad_last},"
+                  f"MATCH($A{r}&\"|\"&$B$3,'All Data'!${ad_key}$2:${ad_key}${ad_last},0))")
+            c = wall.cell(row=r, column=2 + j, value=f'=IFERROR(IF({ix}="","",{ix}),"")')
+            c.number_format, c.alignment = fmt, MID_ALIGN
+            if k in RESULT_KEYS:
+                c.font = Font(color=NOISE_INK)
+    last = first + len(hitters) - 1
+    last_col = get_column_letter(end - 1)
+    # Grey-out first, so it wins over the colour scales (Sheets applies the
+    # first matching rule; Excel honours stopIfTrue).
+    wall.conditional_formatting.add(
+        f'A{first}:{last_col}{last}',
+        FormulaRule(formula=[f'OR($B{first}="",$B{first}<{SMALL_PA})'], fill=GREY_FILL,
+                    font=Font(color='9A9A9A'), stopIfTrue=True))
+    for j, (k, _, _, dr) in enumerate(COLS):
+        if not dr or k not in spreads:
+            continue
+        lo, mid, hi = spreads[k]
+        lo_c, hi_c = (BAD, GOOD) if dr > 0 else (GOOD, BAD)
+        letter = get_column_letter(2 + j)
+        wall.conditional_formatting.add(f'{letter}{first}:{letter}{last}', ColorScaleRule(
+            start_type='num', start_value=lo, start_color=lo_c,
+            mid_type='num', mid_value=mid, mid_color=MID,
+            end_type='num', end_value=hi, end_color=hi_c))
+    wall.auto_filter.ref = f'A6:{last_col}{last}'
+    wall.column_dimensions['A'].width = 20
+    for j in range(len(COLS)):
+        wall.column_dimensions[get_column_letter(2 + j)].width = 9.5
+    collapse_groups(wall, 2)
+    wall.row_dimensions[6].height = 42
+    wall.freeze_panes = 'B7'
 
     # ── One tab per hitter ───────────────────────────────────────────────
     used = set()
@@ -561,8 +635,7 @@ def main():
 
     # ── All Data ─────────────────────────────────────────────────────────
     wa = wb.create_sheet('All Data')
-    all_cols = [COLS[0]] + SAMPLE_COLS + COLS[1:]
-    heads = ['Hitter', 'Bats', 'Pos', 'Month', 'Line Source'] + [h for _, h, _, _ in all_cols]
+    heads = ['Hitter', 'Bats', 'Pos', 'Month', 'Line Source'] + [h for _, h, _, _ in all_cols] + ['Key']
     for c, t in enumerate(heads, start=1):
         cell = wa.cell(row=1, column=c, value=t)
         cell.fill, cell.font, cell.alignment = HEAD_FILL, WHITE_BOLD, CENTER
@@ -580,7 +653,11 @@ def main():
                 v = season_value(hname, key) if m == 'Season' else row.get(key)
                 cell = wa.cell(row=r, column=6 + j, value=v)
                 cell.number_format = fmt
+            wa.cell(row=r, column=6 + len(all_cols), value=f'{pretty(hname)}|{m}')   # All Hitters lookup key
             r += 1
+    if r - 1 != ad_last:
+        raise SystemExit(f'All Data has {r - 2} rows but All Hitters looks up {ad_last - 1}; nothing was written.')
+    wa.column_dimensions[ad_key].hidden = True
     wa.auto_filter.ref = f'A1:{get_column_letter(len(heads))}{r - 1}'
     wa.freeze_panes = 'E2'
     wa.column_dimensions['A'].width = 22
@@ -616,6 +693,8 @@ def main():
         wd.column_dimensions[col].width = w
     wd.freeze_panes = 'A2'
 
+    # All Hitters is formulas with no cached values; make Excel compute them on open.
+    wb.calculation = CalcProperties(fullCalcOnLoad=True)
     tmp = OUT + '.tmp.xlsx'
     wb.save(tmp)
     os.replace(tmp, OUT)
