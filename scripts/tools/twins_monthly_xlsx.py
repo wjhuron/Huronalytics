@@ -296,6 +296,7 @@ def main():
         ('', None),
         ('TABS', h2),
         ('Overview: the 10-second view. Seven headline stats per hitter, most stable first: a trend across the months, the season value, the latest month, and the change. Hitters with the most real changes are listed first.', None),
+        ('All Hitters: every hitter\'s tab stacked on one page, most PA first, with the MLB average pinned under the header. Each block lists the months he batted, then his season.', None),
         (f'One tab per hitter (most PA first): every stat by month, with his season line and the MLB average below. {len(COLLAPSED)} secondary columns are collapsed; the + buttons above the header open them.', None),
         ('All Data: one row per hitter-month, with sample counts and filters, for sorting and pivots.', None),
         ('Definitions: what each stat is, where it comes from, its month-to-month r, and why it is in the sheet.', None),
@@ -452,23 +453,24 @@ def main():
     wo.row_dimensions[6].height = 18
     print(f'Overview: {n_flags} change flags')
 
-    # ── One tab per hitter ───────────────────────────────────────────────
-    used = set()
-    for hname in hitters:
-        s = season_rows[hname]
-        last = hname.split(',')[0][:28]
-        title = last if last not in used else pretty(hname)[:31]
-        used.add(title)
-        ws = wb.create_sheet(title)
-        ws.cell(row=1, column=1, value=f"{pretty(hname)}  |  MIN  |  Bats {s.get('stands') or '-'}  |  "
-                                       f"{s.get('position') or '-'}  |  2026: {s['pa']} PA, "
-                                       f"{s.get('wRCplus')} wRC+").font = Font(bold=True, size=14, color=NAVY)
+    # ── Hitter tables: one writer for the per-hitter tabs and All Hitters ─
+    # A Season row closes its hitter's block: thin rule above, navy rule below.
+    SEASON_BORDER = Border(top=Side(style='thin', color='8A8A8A'), bottom=Side(style='medium', color=NAVY))
+
+    def write_month_table(ws, title, label_heads, specs, pin_first=False):
+        """Title, the grouped header, the month-to-month r row, then one row
+        per spec (labels, hitter, month). month is a calendar month, 'Season'
+        or 'MLB Average'. pin_first freezes the first data row (MLB Average)
+        under the header."""
+        ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=14, color=NAVY)
         ws.cell(row=2, column=1, value=f'Columns run from most to least stable month to month (r under each header). '
                                        f'Grey rows: under {SMALL_PA} PA. Red = better than MLB average, blue = worse. '
                                        'BB+, CT+, SD+ are raw (not regressed). Click + above the header to open '
                                        f'{len(COLLAPSED)} more stats.').font = Font(italic=True, color='666666')
-        ws.cell(row=5, column=1, value='Month')
-        end = header_band(ws, 4, 2, GROUPS)
+        c0 = len(label_heads) + 1
+        for j, t in enumerate(label_heads, start=1):
+            ws.cell(row=5, column=j, value=t)
+        end = header_band(ws, 4, c0, GROUPS)
         for c in range(1, end):
             ws.cell(row=5, column=c).fill = HEAD_FILL
             ws.cell(row=5, column=c).font = WHITE_BOLD
@@ -476,16 +478,21 @@ def main():
         rl = ws.cell(row=6, column=1, value='Month-to-month r')
         rl.font = Font(italic=True, size=9, color='555555')
         for j, (k, _, _, _) in enumerate(COLS):
-            c = ws.cell(row=6, column=2 + j, value=r_label(k))
+            c = ws.cell(row=6, column=c0 + j, value=r_label(k))
             c.font, c.alignment = Font(italic=True, size=9, color='555555'), MID_ALIGN
         r = 7
-        for m in months + ['Season', 'MLB Average']:
+        for labels, hname, m in specs:
             is_season, is_lg = m == 'Season', m == 'MLB Average'
             row = ours.get((hname, m)) if not (is_season or is_lg) else None
-            pa = s['pa'] if is_season else ((row or {}).get('pa') or 0)
+            pa = season_rows[hname]['pa'] if is_season else ((row or {}).get('pa') or 0)
             small = not is_lg and pa < SMALL_PA
-            label = ws.cell(row=r, column=1, value=m)
-            label.font = Font(bold=not is_lg, italic=is_lg)
+            for j, lab in enumerate(labels, start=1):
+                lc = ws.cell(row=r, column=j, value=lab)
+                lc.font = Font(bold=not is_lg, italic=is_lg)
+                if small:
+                    lc.fill, lc.font = GREY_FILL, GREY_FONT
+                if is_season:
+                    lc.border = SEASON_BORDER
             for j, (k, _, fmt, dr) in enumerate(COLS):
                 if is_lg:
                     v = lg_value(k)
@@ -493,7 +500,7 @@ def main():
                     v = season_value(hname, k)
                 else:
                     v = row.get(k) if row else (0 if k == 'pa' else None)
-                c = ws.cell(row=r, column=2 + j, value=v)
+                c = ws.cell(row=r, column=c0 + j, value=v)
                 c.number_format, c.alignment = fmt, MID_ALIGN
                 if is_lg:
                     c.font = Font(italic=True, color='555555')
@@ -506,27 +513,51 @@ def main():
                     ink = NOISE_INK if k in RESULT_KEYS else '000000'
                     c.font = Font(bold=is_season, color=ink)
                 if is_season:
-                    c.border = Border(top=Side(style='medium', color=NAVY))
-            if small:
-                label.fill, label.font = GREY_FILL, GREY_FONT
-            if is_season:
-                label.border = Border(top=Side(style='medium', color=NAVY))
+                    c.border = SEASON_BORDER
             r += 1
-        ws.column_dimensions['A'].width = 15
+        widths = {'Hitter': 20, 'Month': 15 if len(label_heads) == 1 else 10}
+        for j, t in enumerate(label_heads, start=1):
+            ws.column_dimensions[get_column_letter(j)].width = widths.get(t, 12)
         for j in range(len(COLS)):
-            ws.column_dimensions[get_column_letter(2 + j)].width = 9.5
+            ws.column_dimensions[get_column_letter(c0 + j)].width = 9.5
         # Collapse the secondary columns into outline groups so the default
         # view fits one screen; the +/- buttons above the header open them.
         run = []
         for j, (k, _, _, _) in enumerate(COLS + [(None, None, None, None)]):
             if k in COLLAPSED:
-                run.append(2 + j)
+                run.append(c0 + j)
             elif run:
                 ws.column_dimensions.group(get_column_letter(run[0]), get_column_letter(run[-1]),
                                            outline_level=1, hidden=True)
                 run = []
         ws.row_dimensions[5].height = 30
-        ws.freeze_panes = 'B7'
+        ws.freeze_panes = ws.cell(row=8 if pin_first else 7, column=c0)
+
+    # ── All Hitters: every hitter's tab stacked on one page ──────────────
+    # MLB Average is pinned under the header; each hitter's block lists the
+    # months he batted, then his Season row.
+    wall = wb.create_sheet('All Hitters')
+    specs = [(['MLB Average', 'Season'], hitters[0], 'MLB Average')]
+    for hname in hitters:
+        played = [m for m in months if (hname, m) in ours]
+        for i, m in enumerate(played):
+            specs.append(([pretty(hname) if i == 0 else None, m], hname, m))
+        specs.append(([pretty(hname) if not played else None, 'Season'], hname, 'Season'))
+    write_month_table(wall, f'All Twins hitters, month by month ({len(hitters)} hitters, most PA first)',
+                      ['Hitter', 'Month'], specs, pin_first=True)
+
+    # ── One tab per hitter ───────────────────────────────────────────────
+    used = set()
+    for hname in hitters:
+        s = season_rows[hname]
+        last = hname.split(',')[0][:28]
+        title = last if last not in used else pretty(hname)[:31]
+        used.add(title)
+        write_month_table(
+            wb.create_sheet(title),
+            f"{pretty(hname)}  |  MIN  |  Bats {s.get('stands') or '-'}  |  "
+            f"{s.get('position') or '-'}  |  2026: {s['pa']} PA, {s.get('wRCplus')} wRC+",
+            ['Month'], [([m], hname, m) for m in months + ['Season', 'MLB Average']])
 
     # ── All Data ─────────────────────────────────────────────────────────
     wa = wb.create_sheet('All Data')
