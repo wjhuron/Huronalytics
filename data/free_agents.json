@@ -159,7 +159,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 36
   },
   {
@@ -178,7 +178,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 37
   },
   {
@@ -187,7 +187,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 37
   },
   {
@@ -285,7 +285,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 35
   },
   {
@@ -294,7 +294,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 36
   },
   {
@@ -376,7 +376,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 36
   },
   {
@@ -402,7 +402,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 40
   },
   {
@@ -449,7 +449,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 35
   },
   {
@@ -467,7 +467,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP",
+   "fgStatus": "IS_FA",
    "age": 35
   },
   {
@@ -549,7 +549,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -567,7 +567,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -596,7 +596,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -634,7 +634,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -677,7 +677,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -712,7 +712,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -747,7 +747,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 36
   },
   {
@@ -765,8 +765,17 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 36
+  },
+  {
+   "mlbId": 607455,
+   "name": "Banda, Anthony",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "IS_FA",
+   "age": 33
   },
   {
    "mlbId": 607481,
@@ -793,7 +802,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 34
   },
   {
@@ -802,7 +811,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 32
   },
   {
@@ -811,7 +820,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 32
   },
   {
@@ -891,7 +900,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 32
   },
   {
@@ -917,7 +926,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 33
   },
   {
@@ -1029,15 +1038,6 @@
    "age": 32
   },
   {
-   "mlbId": 622663,
-   "name": "Severino, Luis",
-   "sources": [
-    "fangraphs"
-   ],
-   "fgStatus": "TOSSUP",
-   "age": 33
-  },
-  {
    "mlbId": 622694,
    "name": "Hernández, Elieser",
    "sources": [
@@ -1070,6 +1070,23 @@
     "released"
    ],
    "age": 32
+  },
+  {
+   "mlbId": 623381,
+   "name": "Pannone, Thomas",
+   "sources": [
+    "elected"
+   ],
+   "age": 33
+  },
+  {
+   "mlbId": 623454,
+   "name": "Anderson, Drew",
+   "sources": [
+    "fangraphs"
+   ],
+   "fgStatus": "TOSSUP",
+   "age": 33
   },
   {
    "mlbId": 623465,
@@ -1132,7 +1149,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 32
   },
   {
@@ -1152,6 +1169,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 31
+  },
+  {
+   "mlbId": 641401,
+   "name": "Brogdon, Connor",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
   },
   {
    "mlbId": 641487,
@@ -1179,15 +1204,6 @@
     "released"
    ],
    "age": 32
-  },
-  {
-   "mlbId": 641598,
-   "name": "Garver, Mitch",
-   "sources": [
-    "fangraphs"
-   ],
-   "fgStatus": "IS_FA",
-   "age": 36
   },
   {
    "mlbId": 641656,
@@ -1248,7 +1264,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 36
   },
   {
@@ -1381,7 +1397,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 35
   },
   {
@@ -1390,7 +1406,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 30
   },
   {
@@ -1399,7 +1415,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 29
   },
   {
@@ -1454,7 +1470,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP",
+   "fgStatus": "IS_FA",
    "age": 32
   },
   {
@@ -1499,7 +1515,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 31
   },
   {
@@ -1561,7 +1577,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 32
   },
   {
@@ -1643,6 +1659,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
+  },
+  {
+   "mlbId": 657756,
+   "name": "Seabold, Connor",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
   },
   {
    "mlbId": 660162,
@@ -1754,7 +1778,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 30
   },
   {
@@ -1971,20 +1995,19 @@
    "age": 29
   },
   {
-   "mlbId": 666181,
-   "name": "Benson, Will",
+   "mlbId": 666163,
+   "name": "Rortvedt, Ben",
    "sources": [
     "elected"
    ],
    "age": 29
   },
   {
-   "mlbId": 666182,
-   "name": "Bichette, Bo",
+   "mlbId": 666181,
+   "name": "Benson, Will",
    "sources": [
-    "fangraphs"
+    "elected"
    ],
-   "fgStatus": "TOSSUP",
    "age": 29
   },
   {
@@ -2042,6 +2065,14 @@
    "age": 29
   },
   {
+   "mlbId": 668834,
+   "name": "McGee, Easton",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 668941,
    "name": "Romero, JoJo",
    "sources": [
@@ -2081,7 +2112,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 29
   },
   {
@@ -2248,6 +2279,14 @@
    "age": 28
   },
   {
+   "mlbId": 671111,
+   "name": "Peralta, Sammy",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 671131,
    "name": "Rutledge, Jackson",
    "sources": [
@@ -2264,6 +2303,14 @@
    "age": 28
   },
   {
+   "mlbId": 672578,
+   "name": "Hernández, Carlos",
+   "sources": [
+    "elected"
+   ],
+   "age": 30
+  },
+  {
    "mlbId": 672820,
    "name": "Sosa, Lenyn",
    "sources": [
@@ -2277,7 +2324,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "TOSSUP",
+   "fgStatus": "IS_FA",
    "age": 29
   },
   {
@@ -2287,15 +2334,6 @@
     "fangraphs"
    ],
    "fgStatus": "IS_FA",
-   "age": 31
-  },
-  {
-   "mlbId": 673513,
-   "name": "Matsui, Yuki",
-   "sources": [
-    "fangraphs"
-   ],
-   "fgStatus": "TOSSUP",
    "age": 31
   },
   {
@@ -2402,7 +2440,7 @@
    "sources": [
     "fangraphs"
    ],
-   "fgStatus": "PROBABLY_FA",
+   "fgStatus": "IS_FA",
    "age": 30
   },
   {
@@ -2440,6 +2478,14 @@
    "age": 33
   },
   {
+   "mlbId": 686554,
+   "name": "Dunn, Oliver",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 686747,
    "name": "La Sorsa, Joe",
    "sources": [
@@ -2452,6 +2498,14 @@
    "name": "Harris, Dustin",
    "sources": [
     "released"
+   ],
+   "age": 27
+  },
+  {
+   "mlbId": 694350,
+   "name": "Brzykcy, Zach",
+   "sources": [
+    "elected"
    ],
    "age": 27
   },
