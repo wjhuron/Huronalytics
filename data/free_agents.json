@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-16",
+ "generatedAt": "2026-11-02",
  "ageSeason": 2027,
  "players": [
   {
@@ -68,15 +68,6 @@
    ],
    "fgStatus": "IS_FA",
    "age": 40
-  },
-  {
-   "mlbId": 500743,
-   "name": "Rojas, Miguel",
-   "sources": [
-    "fangraphs"
-   ],
-   "fgStatus": "IS_FA",
-   "age": 38
   },
   {
    "mlbId": 500779,
@@ -690,6 +681,14 @@
    "age": 34
   },
   {
+   "mlbId": 605335,
+   "name": "Leibrandt, Brandon",
+   "sources": [
+    "mlbpa"
+   ],
+   "age": 34
+  },
+  {
    "mlbId": 605447,
    "name": "Romano, Jordan",
    "sources": [
@@ -905,6 +904,14 @@
    "age": 32
   },
   {
+   "mlbId": 621097,
+   "name": "Waguespack, Jacob",
+   "sources": [
+    "mlbpa"
+   ],
+   "age": 33
+  },
+  {
    "mlbId": 621107,
    "name": "Eflin, Zach",
    "sources": [
@@ -939,6 +946,14 @@
     "released"
    ],
    "fgStatus": "IS_FA",
+   "age": 33
+  },
+  {
+   "mlbId": 621139,
+   "name": "Kriske, Brooks",
+   "sources": [
+    "mlbpa"
+   ],
    "age": 33
   },
   {

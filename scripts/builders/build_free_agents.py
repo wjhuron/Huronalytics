@@ -27,6 +27,11 @@ the MLB season lines in data/_proj/ (lines_*_{year}.json, the projection inputs)
 Agents page. Run it again after either Numbers file changes, then commit the JSON:
 
     python3 scripts/builders/build_free_agents.py
+
+Hand decisions live by id in SIGNED, RETIRED and MLBPA_XXB. To apply them with no source list on hand, and so without any
+other list changes reaching the JSON:
+
+    python3 scripts/builders/build_free_agents.py --overrides-only
 """
 import argparse
 import glob
@@ -53,6 +58,18 @@ FG_EXCLUDE = {'NOT_HAPPENING', 'PROBABLY_NOT_FA'}
 # still carry them (the FanGraphs tracker lags), so they are dropped by id.
 SIGNED = {
     641835: 'Tim Mayza, extension with PHI (2026-10)',
+}
+# Retired, per Wally 2026-11-02. A source list can still carry them (the MLBPA XX(B) release did), so they are dropped by id.
+RETIRED = {
+    434378: 'Justin Verlander',
+    489446: 'Kirby Yates',
+    500743: 'Miguel Rojas',
+}
+# On the MLBPA XX(B) release of 2026-10-29 with a 2026 MLB row, added per Wally 2026-11-02. No source list above had them.
+MLBPA_XXB = {
+    621097: 'Jacob Waguespack',
+    621139: 'Brooks Kriske',
+    605335: 'Brandon Leibrandt',
 }
 BASE_SEASON = 2026          # the season just played; ages are for BASE_SEASON + 1
 PITCHER_POS = {'P', 'SP', 'RP', 'RHP', 'LHP'}
@@ -218,6 +235,43 @@ def newest(pattern):
     return hits[-1] if hits else None
 
 
+def write_out(players):
+    """Stamp ages and write the JSON atomically. Returns the count with no birth date."""
+    births = birth_dates()
+    no_birth = 0
+    for mid, e in players.items():
+        b = births.get(mid)
+        e['age'] = baseball_age(b, BASE_SEASON + 1) if b else None
+        no_birth += b is None
+    out = {'generatedAt': date.today().isoformat(), 'ageSeason': BASE_SEASON + 1,
+           'players': sorted(players.values(), key=lambda e: e['mlbId'])}
+    fd, tmp_path = tempfile.mkstemp(dir=DATA, suffix='.json')
+    with os.fdopen(fd, 'w') as f:
+        json.dump(out, f, indent=1, ensure_ascii=False)
+        f.write('\n')
+    os.replace(tmp_path, OUT)
+    return no_birth
+
+
+def overrides_only():
+    """Apply SIGNED, RETIRED and MLBPA_XXB to the current JSON, reading no source list."""
+    idx, _by_name = mlb_index()
+    with open(OUT) as f:
+        players = {e['mlbId']: e for e in json.load(f)['players']}
+    n0 = len(players)
+    for mid in list(players):
+        if mid in SIGNED or mid in RETIRED:
+            print(f'removed {players.pop(mid)["name"]} ({mid})')
+    for mid in MLBPA_XXB:
+        if mid not in idx:
+            sys.exit(f'MLBPA_XXB {MLBPA_XXB[mid]} ({mid}) has no 2026 MLB row; nothing written.')
+        if mid not in players:
+            players[mid] = {'mlbId': mid, 'name': idx[mid]['name'], 'sources': ['mlbpa']}
+            print(f'added {idx[mid]["name"]} ({mid})')
+    no_birth = write_out(players)
+    print(f'Wrote {len(players)} players (was {n0}), {no_birth} without a birth date')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     # The tracker for the class being built, by year: Downloads also holds past trackers
@@ -225,7 +279,12 @@ def main():
     ap.add_argument('--fangraphs', default=newest(f'{BASE_SEASON + 1}-free-agent-tracker*.xlsx'))
     ap.add_argument('--released', default=os.path.join(DOWNLOADS, 'released.numbers'))
     ap.add_argument('--elected', default=os.path.join(DOWNLOADS, 'elected fa.numbers'))
+    ap.add_argument('--overrides-only', action='store_true',
+                    help='apply SIGNED, RETIRED and MLBPA_XXB to the current JSON and stop; reads no source list')
     args = ap.parse_args()
+    if args.overrides_only:
+        overrides_only()
+        return
     for label, p in (('FanGraphs tracker', args.fangraphs), ('released', args.released),
                      ('elected FA', args.elected)):
         if not p or not os.path.exists(p):
@@ -236,7 +295,7 @@ def main():
     dropped = []   # (source, name, reason)
 
     def add(mid, source, status=None):
-        if mid in SIGNED:
+        if mid in SIGNED or mid in RETIRED:
             return
         e = players.setdefault(mid, {'mlbId': mid, 'name': idx[mid]['name'], 'sources': []})
         if source not in e['sources']:
@@ -274,19 +333,11 @@ def main():
             else:
                 add(mid, source)
 
-    births = birth_dates()
-    no_birth = 0
-    for mid, e in players.items():
-        b = births.get(mid)
-        e['age'] = baseball_age(b, BASE_SEASON + 1) if b else None
-        no_birth += b is None
-    out = {'generatedAt': date.today().isoformat(), 'ageSeason': BASE_SEASON + 1,
-           'players': sorted(players.values(), key=lambda e: e['mlbId'])}
-    fd, tmp_path = tempfile.mkstemp(dir=DATA, suffix='.json')
-    with os.fdopen(fd, 'w') as f:
-        json.dump(out, f, indent=1, ensure_ascii=False)
-        f.write('\n')
-    os.replace(tmp_path, OUT)
+    for mid in MLBPA_XXB:
+        if mid not in idx:
+            sys.exit(f'MLBPA_XXB {MLBPA_XXB[mid]} ({mid}) has no 2026 MLB row; nothing written.')
+        add(mid, 'mlbpa')
+    no_birth = write_out(players)
 
     print(f'FanGraphs: {len(fg)} rows, {n_fg_excl} excluded as NOT_HAPPENING / PROBABLY_NOT_FA')
     for source, rows in lists:
