@@ -13,7 +13,7 @@ demotion risk are inside it), over the unit's IP or PA. Next season only (per Wa
 
 Method, backtests and limits: scripts/research/projection/project_players.py and the methods doc
 (Google Doc "Huronalytics hWAR audit and projection model: methods (2026-10-02)"). In short: three
-seasons of history regressed to league (four for batting), xwOBA/wOBA 75/25 for batting, Stuff+ in the pitcher level,
+seasons of history regressed to league (four for batting), xwOBA/wOBA 75/25 for batting, Stuff+ and exit velocity allowed in the pitcher level,
 measured aging, a coherent 3/5-year chain; projections of ACTUAL results, conditional on the player
 still playing. Ages past the data's support (hitters 38+, pitchers 39+) are flagged per horizon.
 
@@ -24,6 +24,7 @@ Rebuild once a season is complete:
     python3 scripts/research/projection/pull_savant_history.py
     python3 scripts/research/projection/pull_frv_history.py
     python3 scripts/research/projection/pull_park_history.py
+    python3 scripts/research/projection/stuff_2026_sidecar.py    # the base season's held-out Stuff+; project_players stops without it
     python3 scripts/builders/build_hpwar.py          # runs project_players.py, then writes the JSON
 
 Usage: python3 scripts/builders/build_hpwar.py

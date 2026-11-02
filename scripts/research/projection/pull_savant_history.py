@@ -17,6 +17,7 @@ LIVE = 2026
 BOARDS = {
     'xstats_batter': 'https://baseballsavant.mlb.com/leaderboard/expected_statistics?type=batter&year={y}&position=&team=&filterType=pa&min=1&csv=true',
     'xstats_pitcher': 'https://baseballsavant.mlb.com/leaderboard/expected_statistics?type=pitcher&year={y}&position=&team=&filterType=pa&min=1&csv=true',
+    'ev_pitcher': 'https://baseballsavant.mlb.com/leaderboard/statcast?type=pitcher&year={y}&position=&team=&min=1&csv=true',
     'sprint': 'https://baseballsavant.mlb.com/leaderboard/sprint_speed?min_season={y}&max_season={y}&position=&team=&min=1&csv=true',
 }
 

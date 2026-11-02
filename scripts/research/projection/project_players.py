@@ -19,7 +19,8 @@ HITTERS, WAR per 600 PA (rate, per Wally 2026-10-02):
   replace.  metadata hwarConstants.replPerPa x 600.     WAR = sum / RPW (2026).
 PITCHERS, runs per 9 for a STARTER role (gs share 1) and a RELIEVER role (0):
   model     CHAIN (pit_chain_test.py): the 1-season-out level (pit_horizon_backtest h=1 settings, OLS on
-            every h=1 replicate with targets 2022-2026, plus the Stuff+ history channel at N0_S 250),
+            every h=1 replicate with targets 2022-2026, plus the Stuff+ history channel at N0_S 250 and
+            average exit velocity allowed at N0 100; pit_ev_addon.py, pit_fulldesign.py),
             then delta_T = R_h x level + the h=1 young-arm term to the target age; R = 1 / .70 / .40 at
             1 / 3 / 5 seasons out, no extra decline after the peak (fitted at its floor of 0 among arms
             who still pitch). Per-horizon direct fits scored the same (+.05 / -.08 percent) but were
@@ -47,6 +48,7 @@ import bat_rate_backtest as v1
 import pit_rate_backtest as pr
 import pit_horizon_backtest as ph
 import pit_stuff_addon as pst
+import pit_ev_addon as pev
 import aaa_hitter_bridge as hbr
 import bat_experience_test as bxt
 
@@ -236,6 +238,15 @@ def main():
     # ---------------- pitchers ----------------
     S = {y: pr.season(y) for y in range(2015, BASE + 1)}
     stuff = json.load(open(os.path.join(ROOT, 'data', '_era_internal_stuff.json')))
+    # The projection reads BASE's Stuff+, and a missing season scores as league with no error. 2026 lives in its
+    # own file because era_weights_final reads the main one (stuff_2026_sidecar.py).
+    if str(BASE) not in stuff:
+        side = os.path.join(P, f'stuff_{BASE}_loso.json')
+        if not os.path.exists(side):
+            raise SystemExit(f'No {BASE} Stuff+ for the pitcher projection. Build it: python3 scripts/research/projection/stuff_{BASE}_sidecar.py')
+        stuff[str(BASE)] = json.load(open(side))
+    if len(stuff[str(BASE)]) < 500:
+        raise SystemExit(f'{BASE} Stuff+ has {len(stuff[str(BASE)])} pitchers, expected 500+. Rebuild: python3 scripts/research/projection/stuff_{BASE}_sidecar.py')
     phb = json.load(open(os.path.join(P, '_pit_horizon_backtest.json')))
     plines = {y: {r['id']: r for r in json.load(open(os.path.join(P, f'lines_pitching_{y}.json')))} for y in range(BASE - 2, BASE + 1)}
     lg_ra9 = wc['lgRA9']
@@ -280,13 +291,30 @@ def main():
             out.append((num / den if den else 0.0, _peff(B + 1, _club[B + 1].get(pid)) if target_park else 0.0))
         return np.array(out)
 
+    # Exit velocity allowed (pit_ev_addon.py, pit_fulldesign.py, 2026-11-02): BBE-weighted history, delta from the league
+    # mean in mph, shrunk at N0_EV BBE. Full design RA9 +.45% (SE .16, 4/5); without Stuff+ +.25% (6/7), near zero on T 2020-2021.
+    # Flat for N0 0-400, so 100 is a convention.
+    N0_EV = 100
+    EV_T, EV_LG = pev.ev_table()
+
+    def x_ev(rows, B):
+        out = []
+        for pid, _, _ in rows:
+            num = den = 0.0
+            for k in range(3):
+                r = EV_T[B - k].get(int(pid))
+                if r:
+                    num += par[0] ** k * r[1] * (r[0] - EV_LG[B - k]); den += par[0] ** k * r[1]
+            out.append(num / (den + N0_EV) if den + N0_EV > 0 else 0.0)
+        return np.array(out)
+
     bases = [B for B in ph.HORIZONS[1] if B + 1 >= 2022]          # Stuff+ history exists from 2021
     R1 = {B: rows_all(B) for B in bases}
     tr = [ph.feats(R1[B], 1, *par) for B in bases]
     ch = [pst.stuff_channel(R1[B], B + 1, stuff, H1['d'], 250)[0] for B in bases]
     Xtr = np.column_stack([np.vstack([t[0][:, :-1] for t in tr]), np.concatenate(ch),
                            np.concatenate([x_exp(R1[B]) for B in bases]), np.vstack([x_park(R1[B], B, True) for B in bases]),
-                           np.concatenate([t[0][:, -1] for t in tr])])
+                           np.concatenate([x_ev(R1[B], B) for B in bases]), np.concatenate([t[0][:, -1] for t in tr])])
     ytr = np.concatenate([t[1] for t in tr]); wtr = np.concatenate([t[2] for t in tr])
     for role, gs in (('SP', 1.0), ('RP', 0.0)):
         fake = []
@@ -296,7 +324,7 @@ def main():
             fake.append((pid, {'age': hist[k0]['age'] + k0 + 1, 'gs': gs, 'ra9': 0.0, 'fip': 0.0, 'ip': 1.0}, hist))
         Xp, _, _ = ph.feats(fake, 1, *par)
         c, _ = pst.stuff_channel(fake, BASE + 1, stuff, H1['d'], 250)
-        lvl, _ = pr.fit_predict(Xtr, ytr, wtr, np.column_stack([Xp[:, :-1], c, x_exp(fake), x_park(fake, BASE, False), Xp[:, -1]]))
+        lvl, _ = pr.fit_predict(Xtr, ytr, wtr, np.column_stack([Xp[:, :-1], c, x_exp(fake), x_park(fake, BASE, False), x_ev(fake, BASE), Xp[:, -1]]))
         for (pid, t, _), l1 in zip(fake, lvl):
             for h in HORIZONS:
                 T = BASE + h
