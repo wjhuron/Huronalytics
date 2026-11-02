@@ -28,7 +28,7 @@ Agents page. Run it again after either Numbers file changes, then commit the JSO
 
     python3 scripts/builders/build_free_agents.py
 
-Hand decisions live by id in SIGNED, RETIRED and MLBPA_XXB. To apply them with no source list on hand, and so without any
+Hand decisions live by id in SIGNED, RETIRED, MLBPA_XXB and HAND_ADDED. To apply them with no source list on hand, and so without any
 other list changes reaching the JSON:
 
     python3 scripts/builders/build_free_agents.py --overrides-only
@@ -70,6 +70,26 @@ MLBPA_XXB = {
     621097: 'Jacob Waguespack',
     621139: 'Brooks Kriske',
     605335: 'Brandon Leibrandt',
+}
+# Added by hand per Wally 2026-11-02: id -> (name, source). The first 14 have a 2026 MLB row and show no later deal in
+# milb_transactions_master.csv, and the source is their last move there. The last two are his direct picks.
+HAND_ADDED = {
+    544150: ('Albert Suárez', 'elected'),
+    676480: ('José Barrero', 'elected'),
+    623437: ('Justin Topa', 'elected'),
+    642851: ('Austin Wynns', 'elected'),
+    666201: ('Alek Manoah', 'released'),
+    664068: ('Scott Kingery', 'released'),
+    669145: ('Bruce Zimmermann', 'elected'),
+    666185: ('Dylan Carlson', 'released'),
+    666619: ('Gregory Santos', 'elected'),
+    664192: ('Joey Lucchesi', 'released'),
+    663609: ('Luken Baker', 'released'),
+    605441: ('Yacksel Ríos', 'released'),
+    669288: ('Daniel Johnson', 'released'),
+    674370: ('Osvaldo Bido', 'released'),
+    665750: ('Leody Taveras', 'hand'),
+    596117: ('Garrett Stubbs', 'hand'),
 }
 BASE_SEASON = 2026          # the season just played; ages are for BASE_SEASON + 1
 PITCHER_POS = {'P', 'SP', 'RP', 'RHP', 'LHP'}
@@ -254,7 +274,7 @@ def write_out(players):
 
 
 def overrides_only():
-    """Apply SIGNED, RETIRED and MLBPA_XXB to the current JSON, reading no source list."""
+    """Apply SIGNED, RETIRED, MLBPA_XXB and HAND_ADDED to the current JSON, reading no source list."""
     idx, _by_name = mlb_index()
     with open(OUT) as f:
         players = {e['mlbId']: e for e in json.load(f)['players']}
@@ -268,6 +288,12 @@ def overrides_only():
         if mid not in players:
             players[mid] = {'mlbId': mid, 'name': idx[mid]['name'], 'sources': ['mlbpa']}
             print(f'added {idx[mid]["name"]} ({mid})')
+    for mid, (name, source) in HAND_ADDED.items():
+        if mid not in idx:
+            sys.exit(f'HAND_ADDED {name} ({mid}) has no 2026 MLB row; nothing written.')
+        if mid not in players:
+            players[mid] = {'mlbId': mid, 'name': idx[mid]['name'], 'sources': [source]}
+            print(f'added {idx[mid]["name"]} ({mid}, {source})')
     no_birth = write_out(players)
     print(f'Wrote {len(players)} players (was {n0}), {no_birth} without a birth date')
 
@@ -280,7 +306,7 @@ def main():
     ap.add_argument('--released', default=os.path.join(DOWNLOADS, 'released.numbers'))
     ap.add_argument('--elected', default=os.path.join(DOWNLOADS, 'elected fa.numbers'))
     ap.add_argument('--overrides-only', action='store_true',
-                    help='apply SIGNED, RETIRED and MLBPA_XXB to the current JSON and stop; reads no source list')
+                    help='apply SIGNED, RETIRED, MLBPA_XXB and HAND_ADDED to the current JSON and stop; reads no source list')
     args = ap.parse_args()
     if args.overrides_only:
         overrides_only()
@@ -337,6 +363,10 @@ def main():
         if mid not in idx:
             sys.exit(f'MLBPA_XXB {MLBPA_XXB[mid]} ({mid}) has no 2026 MLB row; nothing written.')
         add(mid, 'mlbpa')
+    for mid, (name, source) in HAND_ADDED.items():
+        if mid not in idx:
+            sys.exit(f'HAND_ADDED {name} ({mid}) has no 2026 MLB row; nothing written.')
+        add(mid, source)
     no_birth = write_out(players)
 
     print(f'FanGraphs: {len(fg)} rows, {n_fg_excl} excluded as NOT_HAPPENING / PROBABLY_NOT_FA')

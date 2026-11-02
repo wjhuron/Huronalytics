@@ -218,6 +218,14 @@
    "age": 36
   },
   {
+   "mlbId": 544150,
+   "name": "Suárez, Albert",
+   "sources": [
+    "elected"
+   ],
+   "age": 37
+  },
+  {
    "mlbId": 545121,
    "name": "Vargas, Ildemaro",
    "sources": [
@@ -562,6 +570,14 @@
    "age": 34
   },
   {
+   "mlbId": 596117,
+   "name": "Stubbs, Garrett",
+   "sources": [
+    "hand"
+   ],
+   "age": 34
+  },
+  {
    "mlbId": 596142,
    "name": "Sánchez, Gary",
    "sources": [
@@ -685,6 +701,14 @@
    "name": "Leibrandt, Brandon",
    "sources": [
     "mlbpa"
+   ],
+   "age": 34
+  },
+  {
+   "mlbId": 605441,
+   "name": "Ríos, Yacksel",
+   "sources": [
+    "released"
    ],
    "age": 34
   },
@@ -1080,6 +1104,14 @@
    "age": 33
   },
   {
+   "mlbId": 623437,
+   "name": "Topa, Justin",
+   "sources": [
+    "elected"
+   ],
+   "age": 36
+  },
+  {
    "mlbId": 623454,
    "name": "Anderson, Drew",
    "sources": [
@@ -1355,6 +1387,14 @@
     "released"
    ],
    "age": 31
+  },
+  {
+   "mlbId": 642851,
+   "name": "Wynns, Austin",
+   "sources": [
+    "elected"
+   ],
+   "age": 36
   },
   {
    "mlbId": 643289,
@@ -1773,6 +1813,14 @@
    "age": 30
   },
   {
+   "mlbId": 663609,
+   "name": "Baker, Luken",
+   "sources": [
+    "released"
+   ],
+   "age": 30
+  },
+  {
    "mlbId": 663624,
    "name": "Mountcastle, Ryan",
    "sources": [
@@ -1897,6 +1945,14 @@
    "age": 33
   },
   {
+   "mlbId": 664068,
+   "name": "Kingery, Scott",
+   "sources": [
+    "released"
+   ],
+   "age": 33
+  },
+  {
    "mlbId": 664126,
    "name": "Fairbanks, Pete",
    "sources": [
@@ -1913,6 +1969,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 33
+  },
+  {
+   "mlbId": 664192,
+   "name": "Lucchesi, Joey",
+   "sources": [
+    "released"
+   ],
+   "age": 34
   },
   {
    "mlbId": 664199,
@@ -1986,6 +2050,14 @@
    "age": 32
   },
   {
+   "mlbId": 665750,
+   "name": "Taveras, Leody",
+   "sources": [
+    "hand"
+   ],
+   "age": 28
+  },
+  {
    "mlbId": 665862,
    "name": "Chisholm Jr., Jazz",
    "sources": [
@@ -2009,6 +2081,30 @@
     "elected"
    ],
    "age": 29
+  },
+  {
+   "mlbId": 666185,
+   "name": "Carlson, Dylan",
+   "sources": [
+    "released"
+   ],
+   "age": 28
+  },
+  {
+   "mlbId": 666201,
+   "name": "Manoah, Alek",
+   "sources": [
+    "released"
+   ],
+   "age": 29
+  },
+  {
+   "mlbId": 666619,
+   "name": "Santos, Gregory",
+   "sources": [
+    "elected"
+   ],
+   "age": 27
   },
   {
    "mlbId": 666969,
@@ -2107,6 +2203,14 @@
    "age": 29
   },
   {
+   "mlbId": 669145,
+   "name": "Zimmermann, Bruce",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
+  },
+  {
    "mlbId": 669160,
    "name": "May, Dustin",
    "sources": [
@@ -2123,6 +2227,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
+  },
+  {
+   "mlbId": 669288,
+   "name": "Johnson, Daniel",
+   "sources": [
+    "released"
+   ],
+   "age": 31
   },
   {
    "mlbId": 669289,
@@ -2354,6 +2466,14 @@
    "age": 30
   },
   {
+   "mlbId": 674370,
+   "name": "Bido, Osvaldo",
+   "sources": [
+    "released"
+   ],
+   "age": 31
+  },
+  {
    "mlbId": 675448,
    "name": "Hunt, Blake",
    "sources": [
@@ -2376,6 +2496,14 @@
     "released"
    ],
    "age": 28
+  },
+  {
+   "mlbId": 676480,
+   "name": "Barrero, José",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
   },
   {
    "mlbId": 676568,
