@@ -1515,9 +1515,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                 if not corpus_player['mlb_only']:
                     _mc.add_ibb(h_row, hitter_pitches,
                                 _mc.ibb_count(corpus_player, hitter_pitches))
-                    # wRC+ is relative to a run environment. Against the MLB constants a minor
-                    # league line is not a wRC+, and FanGraphs has no tracked-games line.
-                    h_row['wRCplus'] = h_row['wRCplus_pctl'] = None
+                    # wRC+ is relative to a run environment, so FanGraphs' own minor league
+                    # line replaces the formula, which reads the MLB constants. A date window
+                    # has no such line.
+                    h_row['wRCplus'] = (None if date_filter is not None else
+                                        _mc.hitter_wrc_plus(corpus_player, hitter_pitches))
+                    h_row['wRCplus_pctl'] = None
                 elif date_filter is None:
                     # A pure MLB season: the shipped wRC+, as on the season card.
                     _mc.add_ibb(h_row, hitter_pitches,
@@ -3125,7 +3128,7 @@ def main():
     parser.add_argument('--milb-corpus', action='store_true',
                          help='Read pitches from the 2026 MiLB corpus (data/_milb2026). '
                               'Needs --hitters; --team is ignored. Percentiles rank '
-                              'against the MLB season pool; wRC+ reads blank.')
+                              'against the MLB season pool. wRC+ is the FanGraphs line per level.')
     parser.add_argument('--milb-scope', default=None, choices=['all', 'regular'],
                          help='Corpus games: all (spring and AFL included), or regular '
                               '(regular season + playoffs). Default: all')

@@ -17,6 +17,7 @@ tracked games, not the player's year. The MLB regular season is not in the corpu
 joins from data/all_pitches_rs_cache.pkl when the levels option names MLB.
 """
 import json
+import math
 import os
 import pickle
 import sys
@@ -40,6 +41,9 @@ LEVEL_LABELS = {'MLB': 'MLB', 'AAA': 'AAA', 'Single-A': 'A', 'MLB-spring': 'Spri
 SCOPES = ('all', 'regular')
 _REGULAR_TYPES = {'R', 'F', 'D', 'L', 'W', 'C'}
 _PLAYOFF_TYPES = _REGULAR_TYPES - {'R'}
+# wRC+ is relative to the player's own league, so it comes from FanGraphs per level.
+# Spring, the AFL and prospect events have no FanGraphs line.
+_FG_LEVELS = {'AAA': (1,), 'Single-A': (4,), 'Rookie': (7, 8)}
 _ROLE_COLS = {'pitcher': ('PTeam', 'Pitcher', 'pitcherId'),
               'batter': ('BTeam', 'Batter', 'batterId')}
 
@@ -233,6 +237,66 @@ def ibb_count(player, rows):
     elif player['mlb_ibb'] and n_mlb:
         print(f"  Date window: {player['mlb_ibb']} MLB no-pitch IBB left out, PA can run short.")
     return n
+
+
+def _fg_level(code):
+    """One FanGraphs level, cached on disk. Delete the file to refresh it."""
+    path = os.path.join(_OUT, f'fg_hitters_level{code}.json')
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    from pipeline.fg_overrides import fetch_milb_hitters
+    got = fetch_milb_hitters(code)
+    with open(path + '.tmp', 'w') as f:
+        json.dump(got, f)
+    os.replace(path + '.tmp', path)
+    return got
+
+
+def hitter_wrc_plus(player, rows):
+    """FanGraphs wRC+ for the card's levels, PA-weighted when there are two (FanGraphs builds
+    its own combined minor league row the same way), with the shipped value for MLB. None,
+    and a printed reason, when a level has no line or FanGraphs does not answer. The line
+    is the level's whole regular season, so a gap against the card's tracked PA is printed."""
+    from pipeline.utils import NON_PA_EVENTS
+    seen = set(player['levels'])
+    bad = seen - set(_FG_LEVELS) - {'MLB'}
+    if bad:
+        print(f'  wRC+ blank: FanGraphs has no line for {sorted(bad)}.')
+        return None
+    parts = []
+    for lv in seen - {'MLB'}:
+        card_pa = sum(1 for r in rows if r.get('_level') == lv and r.get('_gameType') == 'R'
+                      and r.get('Event') and r['Event'] not in NON_PA_EVENTS)
+        fg_pa = 0
+        for code in _FG_LEVELS[lv]:
+            try:
+                line = _fg_level(code).get(str(player['mlbId']))
+            except (OSError, ValueError, RuntimeError) as e:
+                print(f'  wRC+ blank: FanGraphs level {code} failed ({e}).')
+                return None
+            if line:
+                parts.append((line['wRCplus'], line['pa']))
+                fg_pa += line['pa']
+        if not fg_pa:
+            print(f'  wRC+ blank: no FanGraphs {lv} line for {player["mlbId"]}.')
+            return None
+        print(f'  FanGraphs {lv}: {fg_pa} PA in the wRC+ line, {card_pa} regular-season PA on the card'
+              + ('' if abs(fg_pa - card_pa) <= player_ibb_in(player, rows) else '  (samples differ)'))
+    if 'MLB' in seen:
+        official = player.get('official') or {}
+        if official.get('wRCplus') is None or not official.get('pa'):
+            print('  wRC+ blank: no shipped MLB wRC+.')
+            return None
+        parts.append((official['wRCplus'], official['pa']))
+    total = sum(pa for _, pa in parts)
+    return math.floor(sum(w * pa for w, pa in parts) / total + 0.5) if total else None
+
+
+def player_ibb_in(player, rows):
+    """The minor league no-pitch IBBs in these rows: real PA that leave no row."""
+    pks = {str(r['PitchID']).split('_')[0] for r in rows}
+    return sum(str(pk) in pks for pk in player['ibb_pks'])
 
 
 def file_slug(scope, levels):
