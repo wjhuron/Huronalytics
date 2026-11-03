@@ -37,7 +37,7 @@ PAIRS = B.PAIRS
 HP_W = B.HP_W
 OUT = os.path.join(ROOT, 'data', '_hitterplus_shrinkage_sweep.json')
 CSV = os.path.expanduser('~/Downloads/hitterplus_unshrunk_2026.csv')
-PA_QUAL = {Y: 502 for Y in SEASONS}; PA_QUAL[2026] = 430
+PA_QUAL = {Y: 502 for Y in SEASONS}   # 3.1 x 162; 2026 complete since 2026-10-30 (was 430 while partial)
 FLOORS = {'100': 100, '300': 300, 'qual': None}
 LAMS = [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0]
 # shipped pseudo-counts (single homes: process_data BB_PLUS_N0_CON, sdplus.HITTER_PRIOR_N, contact.HITTER_PRIOR_N)

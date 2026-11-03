@@ -104,7 +104,7 @@ from pipeline.sdplus import make_rv_xrv                 # noqa: E402
 CACHE = os.path.join(ROOT, 'data', '_loc_target_audit')
 OUT = os.path.join(CACHE, 'summary.json')
 MIN_NXT = 300            # convention: the Stuff+ gate's next-season floor
-PARTIAL_Y = 2025
+PARTIAL_Y = None   # 2026 complete since 2026-10-30 (was 2025 while partial)
 BOOT_B = 2000
 
 

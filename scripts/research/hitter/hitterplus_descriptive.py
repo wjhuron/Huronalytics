@@ -40,7 +40,7 @@ SEASONS = B.SEASONS
 OUT = os.path.join(ROOT, 'data', '_hitterplus_descriptive.json')
 CSV = os.path.expanduser('~/Downloads/hitterplus_descriptive_2026.csv')
 PA_FLOOR = 300
-PA_QUAL = {Y: 502 for Y in SEASONS}; PA_QUAL[2026] = 430   # 3.1 x games, 2026 partial
+PA_QUAL = {Y: 502 for Y in SEASONS}   # 3.1 x 162; 2026 complete since 2026-10-30 (was 430 while partial)
 HP_W = B.HP_W
 ATOMS3 = ('bb', 'sd', 'ct_all')
 CANDS = ['ct_iz', 'ct_oz', 'ct_heart', 'zcon', 'ocon', 'con']

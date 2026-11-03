@@ -37,7 +37,9 @@ feed = {}
 for g in sorted({r[jp].split('_')[0] for r in rows[1:] if r[jp] and '_' in r[jp]}):
     feed.update(bf.feed_rows(g, s))
 dts = {r[hdr.index('Game Date')] for r in rows[1:] if r[hdr.index('Game Date')]}
-sav = download_statcast(TAB, min(dts), max(dts), s) or {}
+# download_statcast returns (lookup, roster), or None.
+_fetched = download_statcast(TAB, min(dts), max(dts), s)
+sav = _fetched[0] if _fetched else {}
 led = bf.DecisionLedger.load()
 KINDS = {'new', 'drift', 'drift_sub', 'drift_small', 'precision',
          'zone_fix', 'zone_fix_nodonor'}

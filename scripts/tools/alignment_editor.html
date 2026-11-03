@@ -1,0 +1,531 @@
+<title>Wood Alignment Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working surface. The field is the instrument; the side rail
+   reads it out (scores first, then rules, positions, saving). */
+:root {
+  /* One deliberate light look on every theme (Wally 2026-10-28): white field,
+     black density, so the heaviest areas read at a glance. */
+  --paper: #ffffff;
+  --panel: #ffffff;
+  --ink: #111111;
+  --ink-2: #444444;
+  --ink-3: #767676;
+  --rule: #d4d4d4;
+  --grass: #ffffff;
+  --dirt: #f3f3f3;
+  --shade: 0, 0, 0;               /* rgb triplet for density fills */
+  --fielder: #ffffff;
+  --fielder-text: #111111;
+  --accent: #0072b2;              /* your alignment, Okabe-Ito blue */
+  --ok: #1e7a45;
+  --bad: #b3401a;
+  --display: "Bitter", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.75rem; margin: 0; text-wrap: balance; }
+.lede { color: var(--ink-2); margin: 4px 0 0; max-width: 70ch; line-height: 1.5; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.group > span { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-right: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-right: 1px solid var(--rule); border-radius: 0; }
+.seg button:last-child { border-right: 0; }
+button {
+  font: 500 0.85rem var(--body); color: var(--ink); background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 6px 11px; cursor: pointer;
+}
+button:hover { background: var(--grass); }
+button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.fieldbox { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 8px; min-width: 0; }
+svg#field { width: 100%; height: auto; display: block; touch-action: none; user-select: none; }
+/* A white outline keeps field labels readable over the darkest shading. */
+svg#field text { paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+.fieldnote { font-size: 0.8rem; color: var(--ink-3); padding: 4px 6px 2px; line-height: 1.45; }
+.rail { display: grid; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: grid; gap: 8px; }
+.card h2 { font: 600 0.72rem var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 0; }
+.big { font-family: var(--display); font-size: 2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.big small { font: 400 0.85rem var(--body); color: var(--ink-2); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+td, th { padding: 3px 0; text-align: right; font-size: 0.85rem; }
+td:first-child, th:first-child { text-align: left; }
+th { font-weight: 500; color: var(--ink-3); font-size: 0.75rem; }
+tr.you td { color: var(--accent); font-weight: 600; }
+.delta.pos { color: var(--ok); } .delta.neg { color: var(--bad); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-size: 0.78rem; padding: 3px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.info { color: var(--ink-3); }
+.mono { font-family: var(--mono); font-size: 0.8rem; }
+label { font-size: 0.8rem; color: var(--ink-2); display: grid; gap: 4px; }
+input[type=text], textarea {
+  font: 400 0.9rem var(--body); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box;
+}
+textarea { min-height: 56px; resize: vertical; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.status { font-size: 0.8rem; color: var(--ink-3); min-height: 1.2em; }
+.saved { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.saved .item { border-top: 1px solid var(--rule); padding-top: 6px; display: grid; gap: 2px; }
+.saved .item .row { justify-content: space-between; }
+.saved .meta { font-size: 0.75rem; color: var(--ink-3); }
+.foot { font-size: 0.78rem; color: var(--ink-3); line-height: 1.5; max-width: 95ch; }
+.fielder { cursor: grab; }
+.fielder.dragging { cursor: grabbing; }
+@media (prefers-reduced-motion: no-preference) { .fielder circle { transition: r 0.12s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>James Wood alignment editor</h1>
+    <p class="lede">Drag any fielder. The outfield score is expected outs on Wood's real line drives and fly balls, from the Statcast catch-probability table; the infield score is the average angle from his grounders to the nearest infielder. Save an alignment to send it to Claude.</p>
+  </header>
+
+  <div class="controls">
+    <div class="group"><span>Data</span>
+      <div class="seg" id="seg-data"></div></div>
+    <div class="group"><span>Pitcher</span>
+      <div class="seg" id="seg-hand"></div></div>
+    <div class="group"><span>Runners</span>
+      <div class="seg" id="seg-runner"></div></div>
+    <div class="group"><span>Load</span>
+      <button id="p-optimal" type="button">Optimal for this panel</button>
+      <button id="p-normal" type="button">Normal outfield</button>
+      <button id="p-fitted" type="button">Fitted outfield</button>
+      <button id="p-teams" type="button">Teams' average</button>
+      <button id="p-infield" type="button">Fitted infield</button>
+      <button id="p-infield_deep" type="button">Deep fitted infield</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="fieldbox">
+      <svg id="field" viewBox="-345 -448 690 478" role="img" aria-label="Baseball field with draggable fielders over James Wood's batted-ball shading"></svg>
+      <div class="fieldnote" id="fieldnote"></div>
+    </div>
+
+    <div class="rail">
+      <section class="card" aria-labelledby="h-of">
+        <h2 id="h-of">Outfield: expected outs</h2>
+        <div class="big" id="of-big">-</div>
+        <table><thead><tr><th>Alignment</th><th>Outs</th><th>vs yours</th></tr></thead><tbody id="of-table"></tbody></table>
+      </section>
+
+      <section class="card" aria-labelledby="h-if">
+        <h2 id="h-if">Infield: mean angle to nearest infielder</h2>
+        <div class="big" id="if-big">-</div>
+        <table><thead><tr><th>Alignment</th><th>Degrees</th><th>vs yours</th></tr></thead><tbody id="if-table"></tbody></table>
+        <div class="foot">Lower is better. Only the angle counts here, so an infielder's depth does not change this score.</div>
+      </section>
+
+      <section class="card" aria-labelledby="h-rules">
+        <h2 id="h-rules">Shift rule</h2>
+        <div class="pills" id="rules"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-pos">
+        <h2 id="h-pos">Your positions</h2>
+        <table><thead><tr><th>Fielder</th><th>Angle</th><th>Depth</th></tr></thead><tbody id="pos-table"></tbody></table>
+      </section>
+
+      <section class="card" aria-labelledby="h-save">
+        <h2 id="h-save">Save for Claude</h2>
+        <label for="save-name">Name<input type="text" id="save-name" maxlength="80" placeholder="e.g. Nola, LF on the line"></label>
+        <label for="save-note">What you changed and why<textarea id="save-note" maxlength="1000" placeholder="e.g. Moved LF toward the line because..."></textarea></label>
+        <div class="row">
+          <button type="button" id="save-btn">Save alignment</button>
+          <button type="button" id="copy-btn">Copy positions</button>
+        </div>
+        <div class="status" id="save-status" role="status"></div>
+        <div class="saved" id="saved"></div>
+      </section>
+    </div>
+  </div>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById('data').textContent);
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('field');
+  const OF = ['LF', 'CF', 'RF'], IF = ['3B', 'SS', '2B', '1B'], ALL = ['3B', 'SS', '2B', '1B', 'LF', 'CF', 'RF'];
+  const G = D.geometry, C = D.catch;
+  const DATA_KEYS = Object.keys(D.panels).map(k => k.split('|')[0]).filter((v, i, a) => a.indexOf(v) === i);
+  const HANDS = ['Total', 'vs RHP', 'vs LHP'];
+  const RUNNERS = [['all', 'All'], ['empty', 'Bases empty'], ['1b', 'Runner on 1B'], ['other', 'Runner on 2B/3B']];
+  const state = { data: DATA_KEYS[0], hand: 'vs RHP', runner: 'all', pos: {} };
+
+  // ---- geometry (feet; +x = right field, +y = toward center) ----
+  const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+  const fence = th => 330 + 70 * Math.cos(2 * th);
+  const dirtArc = th => G.mound_ft * Math.cos(th) + Math.sqrt(Math.max(0, G.arc_ft ** 2 - (G.mound_ft * Math.sin(th)) ** 2));
+  const baseLine = th => G.base_ft * Math.SQRT2 / (Math.abs(Math.sin(th)) + Math.cos(th));
+  const angOf = ([x, y]) => deg(Math.atan2(x, y));
+  const depthOf = ([x, y]) => Math.hypot(x, y);
+  const panel = () => D.panels[state.data + '|' + state.hand + '|' + state.runner];
+
+  // ---- catch table: identical lookup to catch_grid.lookup (numpy rint) ----
+  const rint = v => { const f = Math.floor(v), r = v - f; return r > 0.5 ? f + 1 : r < 0.5 ? f : (f % 2 === 0 ? f : f + 1); };
+  const ND = C.dmax + 1, COS150 = Math.cos(rad(150));
+  function catchP(back, wall, t, d) {
+    if (d > C.dmax) return 0;
+    const i = Math.min(Math.max(rint((t - C.t0) * 10), 0), C.nt - 1);
+    const j = Math.min(Math.max(rint(d), 0), C.dmax);
+    return C.values[((back * 2 + wall) * C.nt + i) * ND + j];
+  }
+  function outProb(f, b) {               // spray_advance_report.out_prob_matrix, one pair
+    const dx = b[0] - f[0], dy = b[1] - f[1], dist = Math.hypot(dx, dy);
+    const hx = -f[0], hy = -f[1];
+    const cos = (dx * hx + dy * hy) / Math.max(dist * Math.hypot(hx, hy), 1e-9);
+    const back = cos <= COS150 ? 1 : 0, w = b[3];
+    return (1 - w) * catchP(back, 0, b[2], dist) + w * catchP(back, 1, b[2], dist);
+  }
+  function ofScore(spots) {
+    let s = 0;
+    for (const b of panel().balls) s += Math.max(...OF.map(k => outProb(spots[k], b)));
+    return s;
+  }
+  function ifScore(spots) {
+    const a = IF.map(k => angOf(spots[k]));
+    const g = panel().grounders;
+    let s = 0;
+    for (const x of g) s += Math.min(...a.map(v => Math.abs(x - v)));
+    return s / g.length;
+  }
+
+  // ---- presets ----
+  const P = () => panel().presets;
+  const teams = () => D.teams_by[state.data + '|' + state.hand + '|' + state.runner];
+  const teamsEst = () => state.hand !== 'Total';
+  const teamsLabel = () => `Teams' ${teamsEst() ? 'estimate' : 'average'} (${state.data === 'career' ? 'career' : state.data})`;
+  function preset(name) {
+    const p = P(), out = {};
+    if (name === 'normal') OF.forEach(k => out[k] = p.normal[k]);
+    if (name === 'fitted') OF.forEach(k => out[k] = p.fitted[k]);
+    if (name === 'infield') IF.forEach(k => out[k] = p.infield[k]);
+    // Same angles, each infielder 1 ft inside the outer edge of the dirt (the
+    // rule wants both feet on it). The infield score reads angle only, so
+    // depth leaves it unchanged.
+    if (name === 'infield_deep') IF.forEach(k => {
+      const th = Math.atan2(p.infield[k][0], p.infield[k][1]), r = dirtArc(th) - 1;
+      out[k] = [r * Math.sin(th), r * Math.cos(th)];
+    });
+    if (name === 'teams') ALL.forEach(k => out[k] = teams()[k]);
+    if (name === 'optimal') { OF.forEach(k => out[k] = p.fitted[k]); IF.forEach(k => out[k] = p.infield[k]); }
+    return out;
+  }
+  function apply(name) {
+    Object.entries(preset(name)).forEach(([k, v]) => state.pos[k] = v.slice());
+    drawFielders(); score();
+  }
+  function loadOptimal() {
+    Object.entries(preset('optimal')).forEach(([k, v]) => state.pos[k] = v.slice());
+    drawFielders();
+  }
+  function full(name) {                   // a complete 7-man alignment for a comparison row
+    const base = Object.fromEntries(ALL.map(k => [k, state.pos[k]]));
+    return Object.assign(base, preset(name));
+  }
+
+  // ---- drawing ----
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; };
+  const P2 = (x, y) => `${x.toFixed(1)},${(-y).toFixed(1)}`;
+  let layerShade, layerZones, layerTeams, layerFielders;
+  const ZONES = [-45, -30, -15, 0, 15, 30, 45];   // the spray chart's 15 deg slices
+  function drawStatic() {
+    svg.textContent = '';
+    const css = getComputedStyle(document.documentElement);
+    const fair = [P2(0, 0)];
+    for (let a = -45; a <= 45; a += 1) fair.push(P2(fence(rad(a)) * Math.sin(rad(a)), fence(rad(a)) * Math.cos(rad(a))));
+    el('polygon', { points: fair.join(' '), fill: 'var(--grass)', stroke: 'var(--rule)', 'stroke-width': 1.5 });
+    layerShade = el('g', {});
+    const arc = [];
+    for (let a = -46; a <= 46; a += 1) { const r = dirtArc(rad(a)); arc.push(P2(r * Math.sin(rad(a)), r * Math.cos(rad(a)))); }
+    el('polyline', { points: arc.join(' '), fill: 'none', stroke: 'var(--rule)', 'stroke-width': 1.2 });
+    const h = G.base_ft / Math.SQRT2;
+    el('polygon', { points: [P2(0, 0), P2(h, h), P2(0, 2 * h), P2(-h, h)].join(' '), fill: 'var(--dirt)', stroke: 'var(--rule)', 'stroke-width': 1.2 });
+    [[h, h], [0, 2 * h], [-h, h], [0, 0]].forEach(([x, y]) => el('rect', { x: x - 3, y: -y - 3, width: 6, height: 6, fill: 'var(--panel)', stroke: 'var(--ink-3)', 'stroke-width': 0.8 }));
+    el('circle', { cx: 0, cy: -G.mound_ft, r: 9, fill: 'var(--dirt)', stroke: 'var(--rule)' });
+    [-45, 45].forEach(a => el('line', { x1: 0, y1: 0, x2: 345 * Math.sin(rad(a)), y2: -345 * Math.cos(rad(a)), stroke: 'var(--rule)', 'stroke-width': 1.5 }));
+    [100, 200, 300].forEach(r => {
+      const pts = []; for (let a = -45; a <= 45; a += 3) pts.push(P2(r * Math.sin(rad(a)), r * Math.cos(rad(a))));
+      el('polyline', { points: pts.join(' '), fill: 'none', stroke: 'var(--rule)', 'stroke-dasharray': '3 4', 'stroke-width': 0.8 });
+      const t = el('text', { x: -r * Math.sin(rad(45)) - 6, y: -r * Math.cos(rad(45)) - 4, 'text-anchor': 'end', 'font-size': 10, fill: 'var(--ink-3)', 'font-family': 'var(--body)' });
+      t.textContent = r + ' ft';
+    });
+    const pull = el('text', { x: 300 * Math.sin(rad(40)), y: -300 * Math.cos(rad(40)) - 40, 'font-size': 11, 'font-weight': 600, fill: 'var(--ink-3)', 'text-anchor': 'middle', 'font-family': 'var(--body)' }); pull.textContent = 'PULL';
+    const oppo = el('text', { x: -300 * Math.sin(rad(40)), y: -300 * Math.cos(rad(40)) - 40, 'font-size': 11, 'font-weight': 600, fill: 'var(--ink-3)', 'text-anchor': 'middle', 'font-family': 'var(--body)' }); oppo.textContent = 'OPPO';
+    layerZones = el('g', {});
+    layerTeams = el('g', {});
+    layerFielders = el('g', {});
+    drawShade();
+    drawZones();
+    drawTeams();
+    drawFielders();
+  }
+  function drawShade() {
+    layerShade.textContent = '';
+    const p = panel(), [x0, y0, step] = G.of_grid;
+    // One pixel per 10 ft cell, drawn as an image the browser smooths when it
+    // scales up; alpha runs straight from 0 (no balls) to 0.85 (the most).
+    const rows = p.shade_of, h = rows.length, w = rows[0].length;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const cx = cv.getContext('2d'), img = cx.createImageData(w, h);
+    rows.forEach((row, iy) => row.forEach((v, ix) => {
+      const o = ((h - 1 - iy) * w + ix) * 4;          // canvas rows run top-down, feet run up
+      img.data[o + 3] = v > 0 ? Math.round(255 * 0.85 * v / 100) : 0;
+    }));
+    cx.putImageData(img, 0, 0);
+    el('image', { href: cv.toDataURL(), x: x0 - step / 2, y: -(y0 + (h - 1) * step) - step / 2,
+                  width: w * step, height: h * step, preserveAspectRatio: 'none' }, layerShade);
+    p.shade_gb.forEach((v, i) => {
+      const a0 = rad(-45 + i - 0.5), a1 = rad(-45 + i + 0.5);
+      const pts = [a0, a1].map(a => P2(baseLine(a) * Math.sin(a), baseLine(a) * Math.cos(a)))
+        .concat([a1, a0].map(a => P2(dirtArc(a) * Math.sin(a), dirtArc(a) * Math.cos(a))));
+      el('polygon', { points: pts.join(' '), fill: 'rgb(var(--shade))', 'fill-opacity': (0.85 * v / 100).toFixed(3) }, layerShade);
+    });
+  }
+  // Zone lines across the dirt, from the base line to the outer arc, and the
+  // share of this panel's grounders in each slice (the outer slices include
+  // grounders fielded past the foul line, as on the chart).
+  function drawZones() {
+    layerZones.textContent = '';
+    ZONES.slice(1, -1).forEach(a => {
+      const t = rad(a), r0 = baseLine(t), r1 = dirtArc(t) + 12;
+      // White under-stroke: the 30 deg line (2B / 1B) runs through his
+      // darkest grounder shading and vanished as a plain dark dash.
+      const seg = { x1: r0 * Math.sin(t), y1: -r0 * Math.cos(t), x2: r1 * Math.sin(t), y2: -r1 * Math.cos(t) };
+      el('line', { ...seg, stroke: 'var(--paper)', 'stroke-width': 3.2 }, layerZones);
+      el('line', { ...seg, stroke: 'var(--ink)', 'stroke-width': 1.3, 'stroke-dasharray': '3 3' }, layerZones);
+    });
+    const g = panel().grounders, n = g.length;
+    for (let z = 0; z < ZONES.length - 1; z++) {
+      const lo = ZONES[z], hi = ZONES[z + 1];
+      const k = g.filter(x => (z === 0 || x >= lo) && (z === ZONES.length - 2 || x < hi)).length;
+      const t = rad((lo + hi) / 2), r = dirtArc(t) + 24;
+      const tx = el('text', { x: r * Math.sin(t), y: -r * Math.cos(t), 'text-anchor': 'middle', 'dominant-baseline': 'central',
+                              'font-size': 11, 'font-weight': 700, fill: 'var(--ink)', 'font-family': 'var(--body)',
+                              stroke: 'var(--grass)', 'stroke-width': 3, 'paint-order': 'stroke' }, layerZones);
+      tx.textContent = Math.round(100 * k / n) + '%';
+    }
+  }
+
+  // Where teams actually stood against him on average: a small gray diamond
+  // with the position, under the draggable fielders. Same for every pitcher
+  // hand (Savant's positioning data has no hand split).
+  function drawTeams() {
+    layerTeams.textContent = '';
+    ALL.forEach(k => {
+      const [x, y] = teams()[k];
+      el('rect', { x: x - 4.5, y: -y - 4.5, width: 9, height: 9, transform: `rotate(45 ${x.toFixed(1)} ${(-y).toFixed(1)})`,
+                   fill: 'var(--panel)', stroke: 'var(--ink-2)', 'stroke-width': 1.6 }, layerTeams);
+      const t = el('text', { x: x + 8, y: -y + 13, 'font-size': 8.5, 'font-weight': 600, fill: 'var(--ink-2)', 'font-family': 'var(--body)' }, layerTeams);
+      t.textContent = k;
+    });
+  }
+
+  const nodes = {};
+  function drawFielders() {
+    layerFielders.textContent = '';
+    ALL.forEach(k => {
+      const g = el('g', { class: 'fielder', tabindex: 0, role: 'button', 'aria-label': `${k}, drag to move` }, layerFielders);
+      el('circle', { r: 13, fill: 'var(--fielder)', stroke: 'var(--accent)', 'stroke-width': 2.5 }, g);
+      const t = el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 9.5, 'font-weight': 700, fill: 'var(--fielder-text)', 'font-family': 'var(--body)' }, g);
+      t.textContent = k;
+      nodes[k] = g; place(k); attachDrag(k, g);
+    });
+  }
+  function place(k) { const [x, y] = state.pos[k]; nodes[k].setAttribute('transform', `translate(${x.toFixed(1)},${(-y).toFixed(1)})`); }
+
+  // ---- dragging (pointer) and nudging (arrow keys, 1 ft; shift = 10 ft) ----
+  function toField(evt) {
+    const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return [Math.max(-340, Math.min(340, p.x)), Math.max(0, Math.min(440, -p.y))];
+  }
+  let frame = 0;
+  const rescore = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; score(); }); };
+  function attachDrag(k, g) {
+    g.addEventListener('pointerdown', e => { g.setPointerCapture(e.pointerId); g.classList.add('dragging'); e.preventDefault(); });
+    g.addEventListener('pointermove', e => { if (!g.hasPointerCapture(e.pointerId)) return; state.pos[k] = toField(e); place(k); rescore(); });
+    const end = e => { if (g.hasPointerCapture(e.pointerId)) g.releasePointerCapture(e.pointerId); g.classList.remove('dragging'); score(); };
+    g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+    g.addEventListener('keydown', e => {
+      const s = e.shiftKey ? 10 : 1, d = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, s], ArrowDown: [0, -s] }[e.key];
+      if (!d) return; e.preventDefault();
+      state.pos[k] = [state.pos[k][0] + d[0], Math.max(0, state.pos[k][1] + d[1])]; place(k); rescore();
+    });
+  }
+
+  // ---- scoring readout ----
+  const fmt = (v, n = 1) => (Math.round(v * 10 ** n) / 10 ** n).toFixed(n);
+  const signed = (v, n = 1) => (v > 0 ? '+' : v < 0 ? '-' : '') + fmt(Math.abs(v), n);  // a vs-yours delta, signed both ways
+  let last = {};
+  function score() {
+    const p = panel(), n = p.balls.length;
+    const you = ofScore(state.pos), youIf = ifScore(state.pos);
+    last = { of: you, inf: youIf, n };
+    document.getElementById('of-big').innerHTML = `${fmt(you)} <small>of ${n} balls (${fmt(100 * you / n, 0)}%)</small>`;
+    const ofRows = [['Yours', you, true], ['Normal', ofScore(full('normal'))],
+                    [p.fit.flat ? "No shift held up: teams' spots" : 'Fitted shift', ofScore(full('fitted'))],
+                    [teamsLabel(), ofScore(full('teams'))]];
+    document.getElementById('of-table').innerHTML = ofRows.map(([l, v, y]) =>
+      `<tr class="${y ? 'you' : ''}"><td>${l}</td><td>${fmt(v)}</td><td class="delta ${y ? '' : (you - v > 0.05 ? 'pos' : you - v < -0.05 ? 'neg' : '')}">${y ? '' : signed(you - v)}</td></tr>`).join('');
+    document.getElementById('if-big').innerHTML = `${fmt(youIf, 2)}° <small>on ${p.grounders.length} grounders</small>`;
+    const ifRows = [['Yours', youIf, true], ['Fitted infield', ifScore(full('infield'))], [teamsLabel(), ifScore(full('teams'))]];
+    document.getElementById('if-table').innerHTML = ifRows.map(([l, v, y]) =>
+      `<tr class="${y ? 'you' : ''}"><td>${l}</td><td>${fmt(v, 2)}</td><td class="delta ${y ? '' : (v - youIf > 0.005 ? 'pos' : v - youIf < -0.005 ? 'neg' : '')}">${y ? '' : signed(youIf - v, 2)}</td></tr>`).join('');
+    rules(); positions();
+  }
+  function rules() {
+    const left = IF.filter(k => state.pos[k][0] < 0).length, right = 4 - left;
+    const offDirt = IF.filter(k => { const th = Math.atan2(state.pos[k][0], state.pos[k][1]); return depthOf(state.pos[k]) > dirtArc(th) + 0.5; });
+    const ofIn = OF.filter(k => { const th = Math.atan2(state.pos[k][0], state.pos[k][1]); return depthOf(state.pos[k]) < dirtArc(th); });
+    const pills = [
+      [left === 2 && right === 2, left === 2 && right === 2 ? 'Two infielders each side of 2B' : `${left} infielders left of 2B, ${right} right`],
+      [offDirt.length === 0, offDirt.length ? `Off the dirt: ${offDirt.join(', ')}` : 'All infielders on the dirt'],
+    ];
+    let html = pills.map(([ok, t]) => `<span class="pill ${ok ? 'ok' : 'bad'}">${t}</span>`).join('');
+    if (ofIn.length) html += `<span class="pill info">On the infield: ${ofIn.join(', ')}</span>`;
+    document.getElementById('rules').innerHTML = html;
+  }
+  function positions() {
+    document.getElementById('pos-table').innerHTML = ALL.map(k =>
+      `<tr><td>${k}</td><td>${fmt(angOf(state.pos[k]), 1)}°</td><td>${fmt(depthOf(state.pos[k]), 0)} ft</td></tr>`).join('');
+  }
+
+  // ---- controls ----
+  function segs() {
+    const sd = document.getElementById('seg-data'), sh = document.getElementById('seg-hand');
+    sd.innerHTML = DATA_KEYS.map(k => `<button type="button" data-k="${k}" aria-pressed="${k === state.data}">${k === 'career' ? 'Career' : k}</button>`).join('');
+    sh.innerHTML = HANDS.map(h => `<button type="button" data-h="${h}" aria-pressed="${h === state.hand}">${h}</button>`).join('');
+    // Switching any panel loads that panel's optimal alignment (Wally
+    // 2026-10-28); a saved alignment's Load button restores its own spots.
+    sd.querySelectorAll('button').forEach(b => b.onclick = () => { state.data = b.dataset.k; segs(); loadOptimal(); changed(); });
+    sh.querySelectorAll('button').forEach(b => b.onclick = () => { state.hand = b.dataset.h; segs(); loadOptimal(); changed(); });
+    const sr = document.getElementById('seg-runner');
+    sr.innerHTML = RUNNERS.map(([k, l]) => `<button type="button" data-r="${k}" aria-pressed="${k === state.runner}">${l}</button>`).join('');
+    sr.querySelectorAll('button').forEach(b => b.onclick = () => { state.runner = b.dataset.r; segs(); loadOptimal(); changed(); });
+  }
+  function changed() {
+    drawShade(); drawZones(); drawTeams(); score();
+    document.getElementById('p-teams').textContent = teamsEst() ? "Teams' estimate" : "Teams' average";
+    const p = panel();
+    document.getElementById('fieldnote').textContent =
+      `${p.n_bip} batted balls, ${p.dates[0]} to ${p.dates[1]}. Shading: where his line drives and fly balls land (home runs out) and which way his grounders go. ` +
+      `Dashed lines split the infield into 15° zones; each % is his share of grounders in that zone. ` +
+      (teamsEst()
+        ? `Gray diamonds: an ESTIMATE of where teams stood ${state.hand}. Savant's positions have no pitcher-hand split, so they blend the shaded and unshaded average spots at his ${state.hand} shade rate (${Math.round(100 * D.shade_share[state.data + '|' + state.runner][state.hand])}% of plate appearances). Real hand differences may be larger. `
+        : `Gray diamonds: where teams actually stood against him on average (${D.teams_pa[state.data + '|' + state.runner]} plate appearances, all pitchers). `) +
+      (state.runner === 'all' ? '' :
+        `Runner view: his balls in play and the teams' spots are for this runner state only; teams' spots here are real Savant data. ` +
+        `"Optimal" stays the base alignment for this pitcher hand: alignments fitted per runner state lost on held-out seasons. ` +
+        (p.hold_1b ? 'With a runner on first, the optimal 1B is the teams\' average holding spot. ' : '')) +
+      (p.fit.flat ? `No outfield shift held up on this panel, so the optimal outfield is the teams' real spots against Wood. ` : '') +
+      `Switching data, pitcher or runners loads that panel's optimal alignment, so save an alignment first to keep it. ` +
+      `Drag a fielder, or focus one and use the arrow keys (Shift = 10 ft).`;
+  }
+  ['optimal', 'normal', 'fitted', 'teams', 'infield', 'infield_deep'].forEach(n => document.getElementById('p-' + n).onclick = () => apply(n));
+
+  document.getElementById('foot').textContent =
+    'Outfield: each ball scores the best catch chance among your three outfielders, from the distance he must run, the hang time (Savant where tracked, else a model) and whether he goes back or reaches the wall; the sum is expected outs. ' +
+    'Scores are in-sample: the fitted shift was chosen on these same balls, so it reads best here by construction. On seasons it never saw, the career vs RHP shift beat the normal outfield in 3 of 3; Total and vs LHP did not hold up. ' +
+    "Teams' average (Total) is the mean Savant start spot against Wood over the chosen seasons. The vs RHP and vs LHP marks are estimates from his shade rate against each hand. Each panel's fitted infield is fitted on that panel's grounders. The infield score ignores depth, range and ball speed.";
+
+  // ---- saving: db when available, clipboard always ----
+  const status = document.getElementById('save-status');
+  function payload() {
+    return {
+      name: document.getElementById('save-name').value.trim() || 'Untitled',
+      note: document.getElementById('save-note').value.trim(),
+      data: state.data, panel: state.hand, runner: state.runner,
+      positions: Object.fromEntries(ALL.map(k => [k, state.pos[k].map(v => Math.round(v * 10) / 10)])),
+      outfield_xouts: Math.round(last.of * 100) / 100, n_balls: last.n,
+      infield_mean_deg: Math.round(last.inf * 1000) / 1000,
+      savedAt: new Date().toISOString(),
+    };
+  }
+  document.getElementById('copy-btn').onclick = () => {
+    const text = JSON.stringify(payload());
+    navigator.clipboard.writeText(text).then(() => { status.textContent = 'Copied. Paste it into your chat with Claude.'; },
+      () => { status.textContent = 'Copy is blocked here. Select this text: ' + text; });
+  };
+  let col = null;
+  const saveBtn = document.getElementById('save-btn');
+  saveBtn.disabled = true; status.textContent = 'Connecting to saved alignments...';
+  (async () => {
+    const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+    if (!db) { status.textContent = 'Saving needs you signed in to claude.ai. Use Copy positions instead.'; return; }
+    col = db.collection('alignments');
+    saveBtn.disabled = false; status.textContent = '';
+    col.orderBy('savedAt', 'desc').limit(50).onSnapshot(snap => renderSaved(snap.docs),
+      e => { status.textContent = 'Saved list stopped updating (' + (e.code || 'error') + '). Reload the page.'; });
+  })();
+  saveBtn.onclick = async () => {
+    if (!col) return;
+    saveBtn.disabled = true; status.textContent = 'Saving...';
+    try { await col.add(payload()); status.textContent = 'Saved. Tell Claude to look at it.'; }
+    catch (e) { status.textContent = (e && e.code === 'not_granted') ? 'You can view but not save here. Use Copy positions.' : 'Could not save (' + ((e && e.code) || 'error') + '). Try again or use Copy positions.'; }
+    finally { saveBtn.disabled = false; }
+  };
+  function renderSaved(docs) {
+    const box = document.getElementById('saved');
+    if (!docs.length) { box.innerHTML = '<div class="meta">No saved alignments yet. Your first save appears here.</div>'; return; }
+    box.innerHTML = '';
+    docs.forEach(d => {
+      const v = d.data();
+      const item = document.createElement('div'); item.className = 'item';
+      const top = document.createElement('div'); top.className = 'row';
+      const name = document.createElement('strong'); name.textContent = v.name;
+      const btns = document.createElement('div'); btns.className = 'row';
+      const load = document.createElement('button'); load.type = 'button'; load.textContent = 'Load';
+      load.onclick = () => {
+        const r = v.runner || 'all';
+        if (D.panels[v.data + '|' + v.panel + '|' + r]) { state.data = v.data; state.hand = v.panel; state.runner = r; segs(); }
+        ALL.forEach(k => { if (v.positions && v.positions[k]) state.pos[k] = v.positions[k].slice(); });
+        drawFielders(); changed();
+      };
+      const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Remove';
+      del.onclick = async () => {
+        if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = 'Confirm remove'; return; }
+        try { await col.doc(d.id).delete(); } catch (e) { status.textContent = 'Could not remove (' + ((e && e.code) || 'error') + ').'; }
+      };
+      btns.append(load, del); top.append(name, btns);
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const rl = (RUNNERS.find(([k]) => k === (v.runner || 'all')) || [, 'All'])[1];
+      meta.textContent = `${v.data === 'career' ? 'Career' : v.data}, ${v.panel}, ${rl.toLowerCase()}: ${v.outfield_xouts} OF outs, infield ${v.infield_mean_deg}°`;
+      item.append(top, meta);
+      if (v.note) { const n = document.createElement('div'); n.className = 'meta'; n.textContent = v.note; item.append(n); }
+      box.append(item);
+    });
+  }
+
+  // ---- start: fitted outfield and fitted infield on the vs RHP panel ----
+  ALL.forEach(k => state.pos[k] = [0, 0]);
+  Object.entries(Object.assign(preset('normal'), preset('fitted'), preset('infield'))).forEach(([k, v]) => state.pos[k] = v.slice());
+  const t = teams(); ALL.forEach(k => { if (!state.pos[k] || (state.pos[k][0] === 0 && state.pos[k][1] === 0)) state.pos[k] = t[k].slice(); });
+  segs(); drawStatic(); changed();
+  window.__alignCheck = () => Object.fromEntries(Object.keys(D.panels).map(key => {
+    const [d, h, rr] = key.split('|'); const save = [state.data, state.hand, state.runner]; state.data = d; state.hand = h; state.runner = rr;
+    const r = [ofScore(full('normal')), D.panels[key].check.normal_xouts, ofScore(full('fitted')), D.panels[key].check.fitted_xouts];
+    state.data = save[0]; state.hand = save[1]; state.runner = save[2]; return [key, r.map(v => Math.round(v * 1000) / 1000)];
+  }));
+})();
+</script>

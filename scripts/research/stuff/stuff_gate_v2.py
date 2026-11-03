@@ -129,7 +129,7 @@ from pipeline.utils import get_count                    # noqa: E402
 
 SEASONS = (2021, 2022, 2023, 2024, 2025, 2026)
 PAIRS = [(y, y + 1) for y in (2021, 2022, 2023, 2024, 2025)]
-PARTIAL_Y = 2025          # the (2025, 2026) pair targets a partial season
+PARTIAL_Y = None          # 2026 complete since 2026-10-30 (was 2025: the (2025, 2026) pair targeted a partial season)
 # FanGraphs Guts per season (scripts/builders/build_historical_training_set.py
 # GUTS, copied because that module's imports are stale post-reorg)
 GUTS = {2021: (0.314, 1.209), 2022: (0.310, 1.259),
@@ -559,6 +559,11 @@ def prepare(d, slopes, anchor='true'):
     # platoon_same already in the design, this identifies all four matchup
     # cells (bats = platoon_same XOR throws).
     d['is_lhp'] = (d['throws'] == 'L').astype('float32')
+    # 2026-11-02 usage battery: this pitch type's share of the pitcher's pitches
+    # in this frame's season. A choice the pitcher makes, not pitch physics.
+    _n_pt = d.groupby(['pitcher', 'pitch_type'])['pitch_type'].transform('size')
+    _n_p = d.groupby('pitcher')['pitch_type'].transform('size')
+    d['use_share'] = (_n_pt / _n_p).astype('float32')
     # acceleration-equivalent movement (derived; priors carry no ax/az).
     # break = 0.5*a*t^2  ->  a ~ 2*break/t^2, t from release to plate at
     # release speed. Units: in/s^2 (scale irrelevant to a tree).
