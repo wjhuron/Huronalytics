@@ -2,7 +2,7 @@
 measured backtest settings. Research output, not a site metric.
 
 HITTERS, WAR per 600 PA (rate, per Wally 2026-10-02):
-  batting   wOBA delta, ONE level setting for every horizon (a .75, d .70, N0 450) with the measured
+  batting   wOBA delta, ONE level setting for every horizon (a .75, d .70, N0 450), a catcher-by-age term in the prior, with the measured
             aging (+.002 / -.0045 per year, peak 30 at 1 and 3 seasons out, 29 at 5): per-horizon
             optima made the chains incoherent (Judge rose from 2029 to 2031); the shared setting costs
             0 / .19 / .46 percent of held-out MSE against each horizon's own optimum. History park removed at m .375 x the blend pass (bat_park_test.py, 8/9).
@@ -86,6 +86,12 @@ def main():
     # Triple-A season in BASE or BASE-1 takes the box bridge at weight AAA_W. Held-out 13.74 vs 14.15
     # (8/9), better in every prior-PA bin; the league prior over-projected 1-50 PA by 20 wOBA points.
     EXP_C, EXP_K, AAA_W = -0.04, 200, 0.75
+    # Catcher term (bat_thin_prior_test.py, bat_thin_prior_followup.py, 2026-11-03), added to the prior after the Triple-A mix:
+    # CATCH_G0 + CATCH_G1 x (age - CATCH_A0), age clipped to [A0, A0 + CATCH_CAP], over (1 + E / CATCH_K). Held-out -.058 x1e-4
+    # (SE .026), 8/9; thin catchers aged 26-31 read 19-25 wOBA points too high without it (Blake Hunt, 3 PA, projected .305).
+    # A0 and K are interior optima. The cap is flat in sample, so a convention: past 29 the data is too sparse to extend the slope.
+    # Age is his age in the first projected season at every horizon: this is a level, and the aging curve carries it forward.
+    CATCH_G0, CATCH_G1, CATCH_A0, CATCH_CAP, CATCH_K = 0.0043, -0.0068, 24, 5, 800
     AAA_T, MLB_T = hbr.season_tables()
     bbeta = bxt.bridge_beta(AAA_T, MLB_T, leave_T=None)
     X = {y: v1.load_xstats(y) for y in range(BASE - 3, BASE + 1)}   # four seasons of batting history (2026-10-03: 6/8, ~.3%)
@@ -149,6 +155,7 @@ def main():
                'pa_2026': int((lines[BASE].get(pid) or {}).get('plateAppearances') or 0),
                'pa_2024_26': sum(int((lines[y].get(pid) or {}).get('plateAppearances') or 0) for y in X)}
         flags = []
+        hist_pos = next((L['pos'] for L in (lines[BASE - k].get(pid) for k in range(3)) if L and L.get('pos') and L['pos'] != 'P'), None)
         for h in HORIZONS:
             T = BASE + h
             age = baseball_age(rec['birth'], T)
@@ -183,6 +190,9 @@ def main():
                 if aa and aa['age'] is not None:
                     mu = AAA_W * float(np.array([1.0] + hbr.features(aa, MLB_T[ya][0].get(pid), 1000)) @ bbeta) + (1 - AAA_W) * mu
                     break
+            if hist_pos == 'C':
+                age_c = min(max(baseball_age(rec['birth'], BASE + 1) - CATCH_A0, 0), CATCH_CAP)
+                mu += (CATCH_G0 + CATCH_G1 * age_c) / (1 + E_raw / CATCH_K)
             delta = (num + n0 * mu) / (den + n0) + ys * lo - os_ * hi
             bat = delta / scale * 600
             bat_wsh = (delta + PARK_M * 1.0 * park_eff(BASE, WSH)) / scale * 600
