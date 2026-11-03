@@ -1956,6 +1956,47 @@ def _render_single_game_panel(fig, pitches, config=None):
 
 
 
+# Per-type league pools for the season social table's Strike% and Whiff% tints:
+# (pitcher hand, batter hand, pitch type) -> sorted MLB cell values, read once per run.
+# Season-card color gates (2026-11-03, per Wally), set near the k where half the visible
+# spread is signal (scripts/research/cards/social_stabilize.py): Strike% k 106 pitches,
+# Whiff% k 40 swings, Loc+ k 44 pitches. Stuff+ (k 1-2) has no gate, xwOBAcon (k about 336
+# BIP) no color. The .50 point is a convention, not an optimum.
+SOCIAL_STRIKE_MIN_PITCHES = 100
+SOCIAL_WHIFF_MIN_SWINGS = 40
+SOCIAL_LOC_MIN_PITCHES = 50
+_SOCIAL_TINT_POOLS = None
+
+
+def _social_tint_pools():
+    global _SOCIAL_TINT_POOLS
+    if _SOCIAL_TINT_POOLS is not None:
+        return _SOCIAL_TINT_POOLS
+    cells = defaultdict(lambda: [0, 0, 0, 0])   # pitches, strikes, swings, whiffs
+    for p in _load_mlb_pickle() or []:
+        if p.get('_source') != 'MLB' or not p.get('Pitch Type'):
+            continue
+        c = cells[(p.get('Pitcher'), p.get('PTeam'), p.get('Throws'), p.get('Bats'), p.get('Pitch Type'))]
+        d = p.get('Description')
+        c[0] += 1
+        c[1] += d in STRIKE_DESC
+        c[2] += d in SWING_DESC
+        c[3] += d == 'Swinging Strike'
+    pools = {}
+    for (_nm, _tm, th, bh, pt), (n, st, sw, wh) in cells.items():
+        q = pools.setdefault((th, bh, pt), {'strike': [], 'whiff': []})
+        if n >= SOCIAL_STRIKE_MIN_PITCHES:
+            q['strike'].append(st / n)
+        if sw >= SOCIAL_WHIFF_MIN_SWINGS:
+            q['whiff'].append(wh / sw)
+    for q in pools.values():
+        q['strike'].sort()
+        q['whiff'].sort()
+    _SOCIAL_TINT_POOLS = pools
+    print(f"  Social tint pools: {len(pools)} type x hand groups")
+    return pools
+
+
 def render_social_card(config, pitches, output_file):
     """Consolidated 1080x1350 social card (2026-08-27, per Wally). The full
     card stays on the website; this is the feed variant, one question per
@@ -1971,6 +2012,7 @@ def render_social_card(config, pitches, output_file):
     """
     import matplotlib.pyplot as plt
     from matplotlib.patches import FancyBboxPatch, Rectangle
+    from pipeline.compute import compute_expected_stats
 
     is_season = (config.get('stat_headers') or [''])[0] == 'G'
     _tbl = _spl = False
@@ -2056,7 +2098,8 @@ def render_social_card(config, pitches, output_file):
     # read ~1px inside the tiles, so every left-aligned element on the rail backs
     # off that half stroke and then subtracts its own ink bearing.
     _rail = L - (0.9 / 2.0) / (72.0 * fig.get_size_inches()[0])
-    kick = ('%s' % config.get('game_date', '')).upper()
+    # The social header carries no Through date (2026-11-03, per Wally).
+    kick = ('%s' % config.get('game_date', '')).split('  ·  Through')[0].upper()
     opp = config.get('opponent')
     if not is_season and opp:
         kick += '  ·  VS %s' % opp
@@ -2080,7 +2123,17 @@ def render_social_card(config, pitches, output_file):
     ax.text(_hx_name, 0.961, _nm, fontsize=_nsz, color=TEXT_PRIMARY,
             fontweight='black', fontfamily='Bitter', ha='left', va='top')
     hand_code = 'LHP' if config.get('hand') == 'L' else 'RHP'
-    meta = f"{hand_code}  |  {config.get('team','')}"
+    _club = config.get('team', '')
+    # A combined label names its clubs in the order he played for them
+    # (2026-11-03, per Wally): STL/MIL, not 2TM.
+    from pipeline.utils import is_combined_team as _is_combined_label
+    if _is_combined_label(_club):
+        _order = list(dict.fromkeys(
+            p.get('PTeam') for p in sorted(pitches, key=lambda q: str(q.get('Game Date') or ''))
+            if p.get('PTeam')))
+        if _order:
+            _club = '/'.join(_order)
+    meta = f"{hand_code}  |  {_club}"
     if is_season:
         sh, sv = config['stat_headers'], config['stat_values']
 
@@ -2089,7 +2142,7 @@ def render_social_card(config, pitches, output_file):
 
         # Appearances beside the team (2026-09-01, per Wally). GS only shows
         # when he actually started: a pure reliever reads '61 G', not
-        # '61 G · 0 GS'. IP left out on purpose, it is a tile now.
+        # '61 G · 0 GS'. IP follows them; its tile went to ERA (2026-11-03, per Wally).
         _bits = []
         _g, _gs = _sval('G'), _sval('GS')
         if _g is not None:
@@ -2100,6 +2153,8 @@ def render_social_card(config, pitches, output_file):
             _started = False
         if _started:
             _bits.append(f"{_gs} GS")
+        if _sval('IP') is not None:
+            _bits.append(f"{_sval('IP')} IP")
         if _bits:
             meta += "  |  " + "  |  ".join(_bits)
     else:
@@ -2123,9 +2178,16 @@ def render_social_card(config, pitches, output_file):
         if not is_season:
             txt(_hx_meta + _mw, 0.913, _dec, 11, _dc, 'black', ha='left')
 
+    def _ink_on(fc):
+        # White text unless it falls under the usual 3:1 minimum for a large mark on
+        # this fill (2026-11-03, per Wally): white failed on the pale near-league tints.
+        from matplotlib.colors import to_rgb
+        v = [x / 12.92 if x <= .03928 else ((x + .055) / 1.055) ** 2.4 for x in to_rgb(fc)]
+        lum = .2126 * v[0] + .7152 * v[1] + .0722 * v[2]
+        return '#ffffff' if 1.05 / (lum + .05) >= 3.0 else TEXT_PRIMARY
+
     def tile_row(y, h, cells, vsize=17, ksize=8.2, ssize=7.2):
-        # Ink rule (2026-08-28, per Wally): white text on TINTED tiles,
-        # dark text on the neutral beige ones.
+        # Ink follows _ink_on: the tile's own tint decides it.
         # OPTICAL right margin: the rounded last tile overshoots the plot
         # spine's extreme by ~3px so its flat face reads flush (rounded
         # shapes look short of a straight edge they mathematically touch).
@@ -2135,7 +2197,7 @@ def render_social_card(config, pitches, output_file):
         for i, c in enumerate(cells):
             x = L + i * (w + gap)
             fc = c.get('fc', DARK_CELL)
-            ink = TEXT_PRIMARY if fc is DARK_CELL or fc == DARK_CELL else '#ffffff'
+            ink = _ink_on(fc)
             rrect(x, y, w, h, fc)
             cy = y + h / 2
             has_sub = bool(c.get('sub'))
@@ -2226,9 +2288,9 @@ def render_social_card(config, pitches, output_file):
             return {'v': '—' if v is None else fmt(v), 'k': None,
                     'fc': _tint(prow.get(pctl_key or (key + '_pctl')))}
 
-        # Tiles read as a sentence: volume, then what HAPPENED (ERA), what he
-        # DESERVED (hdERA), what is COMING (hpERA), then the two raw inputs
-        # that explain it, then one overall verdict.
+        # Tiles read as a sentence: what HAPPENED (ERA), what he DESERVED (hdERA),
+        # what is COMING (hpERA), the two raw inputs, the two grades, one overall
+        # verdict. STUFF+/LOC+ joined and IP moved to the header on 2026-11-03, per Wally.
         #
         # K% and BB% rather than K-BB% and Whiff% (2026-09-01, per Wally, and
         # the data agrees): K% and Whiff% correlate +0.830 across 412 arms at
@@ -2238,16 +2300,11 @@ def render_social_card(config, pitches, output_file):
         # K-BB%+Whiff%. The card already carries four derived numbers; these
         # two are raw inputs, which is what it was short of.
         #
-        # STUFF+/LOC+ are NOT tiles: the split table below already prints both
-        # per pitch type, which is strictly more useful than one blended pair.
-        #
         # No percentile inversion here. bbPct_pctl and era_pctl already put the
         # GOOD end high (a 3.4% walk rate scores 96), so _percentile_color
         # tints them the right way round — verified 2026-09-01.
-        _ipv = sv[sh.index('IP')] if 'IP' in sh else '—'
         _erav = sv[sh.index('ERA')] if 'ERA' in sh else '—'
-        line = [{'v': _ipv, 'k': 'IP'},                       # neutral, like daily
-                {'v': _erav, 'k': 'ERA', 'fc': _tint(prow.get('era_pctl'))}]
+        line = [{'v': _erav, 'k': 'ERA', 'fc': _tint(prow.get('era_pctl'))}]
         # hdERA -> xFIP when the row has no hdERA. Gated on the DATA, never on
         # team == ROC: the bat-speed bubble and the rocHide arm angle both
         # encoded "this can never happen" and went stale silently, so if hdERA
@@ -2268,11 +2325,15 @@ def render_social_card(config, pitches, output_file):
                 ('hpERA',       'hpERA',    lambda v: f"{v:.2f}"),
                 ('kPct',        'K%',       lambda v: f"{v*100:.1f}%"),
                 ('bbPct',       'BB%',      lambda v: f"{v*100:.1f}%"),
+                ('stuffScore',  'STUFF+',   lambda v: f"{half_up(v)}"),
+                ('locPlus',     'LOC+',     lambda v: f"{half_up(v)}"),
                 ('pitcherPlus', 'PITCHER+', lambda v: f"{half_up(v)}")):
             cell = _num(key, fmt)
             cell['k'] = lab
             line.append(cell)
-        tile_row(0.835, 0.052, line, vsize=19)
+        # A stat with no value leaves the row, as on an AFL card (2026-11-03, per Wally).
+        line = [c for c in line if c['v'] != '—']
+        tile_row(0.835, 0.052, line, vsize=18)   # eight tiles: '23.2%' touched the edge at 19
         _tbl = _spl = True
         mv_top, mv_bot = 0.8175, 0.4355
 
@@ -2365,6 +2426,67 @@ def render_social_card(config, pitches, output_file):
     for _p, mh, mvv, n_ in _cents:
         _rx, _ry = _pts(0.5 * math.sqrt(_disc_s(n_)))
         _chip_boxes.append((mh - _rx, mh + _rx, mvv - _ry, mvv + _ry))
+
+    # Arm-angle ray (2026-11-03, per Wally): one dotted line at the pitcher's average
+    # arm angle, from the origin to the frame, on the arm side. One ray per type was
+    # tried the same day: neighbors sit a median 1.4 deg apart, so they read as a bundle.
+    # Hand comes from Throws, never from the sign of RelPosX. No arm angle (feed-only
+    # games, a game before the backfill) draws no ray and no label.
+    _aa_all = [v for v in (sf(p.get('ArmAngle')) for p in pitches) if v is not None]
+    _aa_sign = -1.0 if (pitches[0].get('Throws') == 'L') else 1.0
+    if _aa_all:
+        _a = math.radians(sum(_aa_all) / len(_aa_all))
+        # Long enough to leave the frame; the axes clip it at the edge.
+        mv.plot([0, _aa_sign * 2 * _lim * math.cos(_a)], [0, 2 * _lim * math.sin(_a)],
+                color=TEXT_PRIMARY, lw=1.1, ls=(0, (1.0, 2.6)), alpha=0.75, zorder=2.2,
+                solid_capstyle='round')
+
+    # Average arm angle over every pitch on the card, in the top corner on the ray's side
+    # (2026-11-03, per Wally). The ray crosses this spot at about 42-55 deg, so the text
+    # takes the same cream halo as the pitch labels and the ray passes behind it.
+    if _aa_all:
+        from matplotlib.patheffects import withStroke as _aa_stroke
+        mv.text(0.015 if _aa_sign < 0 else 0.985, 0.975,
+                f'ARM ANGLE {sum(_aa_all) / len(_aa_all):.1f}°', transform=mv.transAxes,
+                ha='left' if _aa_sign < 0 else 'right', va='top', fontsize=9,
+                fontweight='bold', color=TEXT_PRIMARY, fontfamily='IBM Plex Sans', zorder=7,
+                path_effects=[_aa_stroke(linewidth=3.0, foreground=PLOT_PANEL)])
+
+    # Expected movement (2026-11-03, per Wally): a small dotted ring at what a
+    # pitcher who looks like this usually throws (pipeline/xmove.py, the hitter
+    # basis), joined to the actual disc by a dotted line. Mean of the per-pitch
+    # expectations, the site's rule. A type with no model or input gets no ring.
+    from pipeline.xmove import score_all
+    _x_acc = {}
+    _x_rows = [dict(p) for p in pitches]   # score_all writes onto each dict
+    score_all(config.get('social_xmove') or {}, _x_rows)
+    for p in _x_rows:
+        if p.get('_xivb') is not None:
+            _x_acc.setdefault(p.get('Pitch Type'), []).append((p['_xhb'], p['_xivb']))
+    _expected = {k: (sum(q[0] for q in v) / len(v), sum(q[1] for q in v) / len(v))
+                 for k, v in _x_acc.items()}
+    _RING_S = 62.0     # pt^2 (about 8 pt across), a display convention
+    for _p, (_ex, _ey) in sorted(_expected.items()):
+        _lb = (config.get('pitch_lb') or {}).get(_p) or {}
+        print(f"  Expected {_p}: xHB {_ex:.1f}  xIVB {_ey:.1f}  (n {len(_x_acc[_p])} of "
+              f"{len(groups.get(_p, []))})")
+    for _p, mh, mvv, n_ in _cents:
+        if _p not in _expected:
+            continue
+        _ex, _ey = _expected[_p]
+        col = PITCH_COLORS.get(_p, '#777')
+        _rx, _ry = _pts(0.5 * math.sqrt(_RING_S))
+        _chip_boxes.append((_ex - _rx, _ex + _rx, _ey - _ry, _ey + _ry))
+        mv.plot([_ex, mh], [_ey, mvv], color=col, lw=1.3, ls=(0, (1.2, 1.6)),
+                zorder=3.5, solid_capstyle='round')
+        # A ring wholly inside its own disc would vanish in the same color, so
+        # it flips to the card color and sits on top: the pitch is as expected.
+        _dpt = math.hypot((_ex - mh) / _pts(1.0)[0], (_ey - mvv) / _pts(1.0)[1])
+        _inside = _dpt < 0.5 * (math.sqrt(_disc_s(n_)) - math.sqrt(_RING_S))
+        mv.scatter([_ex], [_ey], s=_RING_S, facecolors=col if _inside else BG,
+                   edgecolors=BG if _inside else col, linewidths=1.5,
+                   linestyles=[(0, (1.6, 1.1))],
+                   zorder=(5.5 + (_nmax - n_) * 1e-4) if _inside else 4)
 
     for pt_, mh, mvv, n_ in _cents:
         # Every thrown type gets a centroid + velo label (2026-08-28, per
@@ -2476,6 +2598,7 @@ def render_social_card(config, pitches, output_file):
                 'pt': label, 'n': len(pl), 'sw': len(sw),
                 'whiff': (wh / len(sw)) if sw else None,
                 'zone': (sum(izv) / len(izv)) if izv else None,
+                'strike': sum(1 for p in pl if p.get('Description') in STRIKE_DESC) / len(pl),
                 'csw': (wh + cs) / len(pl),
                 'stuff': sum(s_at) / len(s_at) if s_at else None,
                 'loc': sum(l_at) / len(l_at) if l_at else None,
@@ -2490,6 +2613,7 @@ def render_social_card(config, pitches, output_file):
                 # Actual RV, same denominator rule.
                 'rv': rv,
                 'rv100': (rv / len(pl) * 100) if rv is not None else None,
+                'xwobacon': compute_expected_stats(pl, None).get('xwOBAcon'),
             }
 
         def _stats(plist):
@@ -2512,6 +2636,10 @@ def render_social_card(config, pitches, output_file):
         # pitch type) grain: Whiff% .242, Zone% .183 (defined on every
         # pitch, r .35 with the Loc+ atoms so not a restatement), CSW%
         # .048 = the least reliable candidate measured.
+        # Strike% replaced Zone% on 2026-11-03, per Wally: within pitch type and
+        # hands it beats Zone% on next-season RV/100 (.13 against .04, 4/4 pairs) and
+        # on whole-pitcher next-season BB% (-.48 against -.35, 3/4), where Zone% is
+        # steadier (scripts/research/cards/social_table_columns.py).
         # Run value after Whiff% (2026-09-10, per Wally): runs on the daily
         # card, per 100 on the season card. xRV chosen over RV, RV/100 and xwOBAcon
         # on the 2026 cache: at the outing x type grain xRV is defined on
@@ -2535,20 +2663,28 @@ def render_social_card(config, pitches, output_file):
         # keeps xRV/100 alone, the measured pick above. social_rv forces a
         # slot set on either card. 'both' closes the numeral spacing from
         # 0.115 to 0.0925 for the fifth slot; the chips do not move.
-        _srv = config.get('social_rv') or ('xrv' if is_season else 'both')
+        # xwOBAcon replaces xRV/100 on the SEASON card (2026-11-03, per Wally):
+        # the measured pick above stays xRV/100, so this is a readability call.
+        _srv = config.get('social_rv') or ('xwobacon' if is_season else 'both')
         if _srv == 'both':
             _num_cols = [('USAGE', 0.310, 'r', 'usepct'),
-                         ('ZONE%', 0.4025, 'r', 'zone'),
+                         ('STRIKE%', 0.4025, 'r', 'strike'),
                          ('WHIFF%', 0.495, 'r', 'whiff'),
                          (_rv_lab, 0.5875, 'r', _rv_key),
                          (_xrv_lab, 0.680, 'r', _xrv_key)]
         else:
-            _rv_col = ((_rv_lab, 0.680, 'r', _rv_key) if _srv == 'rv'
-                       else (_xrv_lab, 0.680, 'r', _xrv_key))
+            _rv_col = {'rv': (_rv_lab, 0.680, 'r', _rv_key),
+                       'xwobacon': ('xwOBAcon', 0.680, 'r', 'xwobacon')
+                       }.get(_srv, (_xrv_lab, 0.680, 'r', _xrv_key))
             _num_cols = [('USAGE', 0.335, 'r', 'usepct'),
-                         ('ZONE%', 0.450, 'r', 'zone'),
+                         ('STRIKE%', 0.450, 'r', 'strike'),
                          ('WHIFF%', 0.565, 'r', 'whiff'),
                          _rv_col]
+        # A column with no value on any row leaves the table, as on an AFL card.
+        if _srv == 'xwobacon' and compute_expected_stats(pitches, None).get('xwOBAcon') is None:
+            _num_cols = [('USAGE', 0.370, 'r', 'usepct'),
+                         ('STRIKE%', 0.510, 'r', 'strike'),
+                         ('WHIFF%', 0.650, 'r', 'whiff')]
         SPLIT_COLS = _num_cols + [('STUFF+', 0.775, 'c', 'stuff'),
                                   # LOC+ chips: optical overshoot past the
                                   # spine (see tile_row) — flat face flush
@@ -2569,7 +2705,28 @@ def render_social_card(config, pitches, output_file):
                 txt(cx, hy, lab, 9.2, TEXT_PRIMARY, 'black',
                     ha='right' if al == 'r' else 'center')
 
-        def _table(y, title, plist, rh, fs, cols, header=True, total=False):
+        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs):
+            # Percentile tint behind Strike% and Whiff%, season card only, inside the
+            # pitcher's own type and hands. Lighter than the grade chips so those stay
+            # the main read. A cell under its gate gets no tint and is not in the pool.
+            pool = (_social_tint_pools().get((pitches[0].get('Throws'), bats, r_['pt'])) or {}).get(k)
+            _open = (r_['n'] >= SOCIAL_STRIKE_MIN_PITCHES if k == 'strike'
+                     else r_['sw'] >= SOCIAL_WHIFF_MIN_SWINGS)
+            if not pool or not _open or r_.get(k) is None:
+                return
+            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool))[0]
+            from matplotlib.colors import to_rgb
+            bg = to_rgb(BG)
+            fc = tuple(0.55 * fc[i] + 0.45 * bg[i] for i in range(3))
+            # The tint hugs the text, so '5%' has no empty colored digit slot
+            # (2026-11-03, per Wally). 0.006 is the side padding, a display convention.
+            _t = ax.text(cx, ry, label, fontsize=fs, fontweight='500', fontfamily='IBM Plex Sans', ha='right')
+            _tw = _t.get_window_extent(fig.canvas.get_renderer()).width / (fig.get_figwidth() * fig.dpi)
+            _t.remove()
+            rrect(cx - _tw - 0.006, ry - 0.5 * rh + 0.004, _tw + 0.012, rh - 0.008, fc,
+                  ec='none', lw=0, r=0.006)
+
+        def _table(y, title, plist, rh, fs, cols, header=True, total=False, bats=None):
             # The title shares its row with the column headers (first
             # section) and every line — header row, data rows, the second
             # section's title — sits on ONE uniform rh rhythm, so the
@@ -2578,6 +2735,10 @@ def render_social_card(config, pitches, output_file):
             # Wally).
             rows = _stats(plist)
             nsub = sum(r['n'] for r in rows) or 1
+            # A season row under 1% usage is noise (Gore: 100% strikes, .901 xwOBAcon on 2
+            # balls). The plot still shows the type (2026-11-03, per Wally).
+            if is_season:
+                rows = [r for r in rows if r['n'] / nsub >= 0.01]
             if title:
                 txt(_rail - _ink_left_pad(fig, title, 10.5, 'black'),
                     y, title, 10.5, TEXT_PRIMARY, 'black', ha='left')
@@ -2624,6 +2785,10 @@ def render_social_card(config, pitches, output_file):
                         # per Wally): every cell colors from its value.
                         g = r_[k]
                         fc = gtint(g)
+                        # A season Loc+ under its gate draws an open chip, not the
+                        # beige fill, which reads as a league-average grade.
+                        if k == 'loc' and is_season and r_['n'] < SOCIAL_LOC_MIN_PITCHES:
+                            fc = BG
                         # Chip HEIGHT already tracks the row, so on a dense
                         # arsenal the fixed 0.092 width stretched the chip to
                         # 5.1:1 as rendered (Lugo, 20 lines). Cap it and let the
@@ -2639,25 +2804,36 @@ def render_social_card(config, pitches, output_file):
                               _ch, fc, r=0.010)
                         # White ink on tinted chips; a valueless beige chip
                         # keeps dark ink (2026-08-28, per Wally).
-                        _ink = TEXT_PRIMARY if g is None else '#ffffff'
+                        _ink = TEXT_PRIMARY if g is None else _ink_on(fc)
                         txt(cx, ry, '—' if g is None else '%.0f' % g, fs,
                             _ink, 'black', family='Bitter')
                         continue
                     if k is None:
                         v, c_ = str(r_['n']), TEXT_PRIMARY
                     elif k == 'usepct':
-                        v, c_ = '%.0f%%' % (r_['n'] / nsub * 100), TEXT_PRIMARY
+                        # A thrown type is never 0% (2026-11-03, per Wally).
+                        _u = r_['n'] / nsub * 100
+                        v, c_ = ('< 1%' if round(_u) == 0 else '%.0f%%' % _u), TEXT_PRIMARY
                     elif k == 'csw':
                         v = '%.0f%%' % (r_['csw'] * 100)
                         c_ = TEXT_PRIMARY
-                    elif k == 'zone':
-                        v = ('—' if r_['zone'] is None
-                             else '%.0f%%' % (r_['zone'] * 100))
+                    elif k == 'strike':
+                        v = '%.0f%%' % (r_['strike'] * 100)
+                        if is_season and bats and not is_total:
+                            _tint_cell(cx, ry, rh, r_, 'strike', bats, v, fs)
                         c_ = TEXT_PRIMARY
                     elif k == 'whiff':
                         # No small-sample fade (2026-08-28, per Wally).
                         v = ('—' if r_['whiff'] is None
                              else '%.0f%%' % (r_['whiff'] * 100))
+                        if is_season and bats and not is_total:
+                            _tint_cell(cx, ry, rh, r_, 'whiff', bats, v, fs)
+                        c_ = TEXT_PRIMARY
+                    elif k == 'xwobacon':
+                        # Three-decimal rate: no leading zero (display rule).
+                        v = ('—' if r_[k] is None
+                             else ('%.3f' % r_[k]).replace('0.', '.', 1) if r_[k] < 1
+                             else '%.3f' % r_[k])
                         c_ = TEXT_PRIMARY
                     else:
                         # One decimal, no leading '+' (display rule); the
@@ -2703,8 +2879,11 @@ def render_social_card(config, pitches, output_file):
             # rh solves for the combined row count, and the font scales
             # with the row (~60% of row height, capped). A huge combined
             # arsenal shrinks; a two-pitch reliever gets the max size.
-            _nrows = sum(len({p.get('Pitch Type') for p in pl_ if p.get('Pitch Type')})
-                         for _nm2, pl_ in sections)
+            def _rows_of(pl_):
+                by_ = Counter(p.get('Pitch Type') for p in pl_ if p.get('Pitch Type'))
+                n_ = sum(by_.values()) or 1
+                return sum(1 for c_ in by_.values() if not is_season or c_ / n_ >= 0.01)
+            _nrows = sum(_rows_of(pl_) for _nm2, pl_ in sections)
             # Uniform rhythm: (nrows + one title row per section + the total
             # row) lines, last line's baseline stays >= 0.040 above the footer.
             # The header row and the rule hang a fixed distance under the
@@ -2733,10 +2912,11 @@ def render_social_card(config, pitches, output_file):
                     ax.plot([L, R], [_ly, _ly], color=SUBTLE_BORDER, lw=1.1,
                             transform=ax.transAxes, zorder=2,
                             solid_capstyle='butt')
-                _pw = 'PITCH' if len(pl_) == 1 else 'PITCHES'
-                _ttl = f'{name_}  ·  {len(pl_)} {_pw}' if name_ else ''
+                # Usage carries the share; the count left the title (2026-11-03, per Wally).
+                _ttl = name_
                 yb = _table(yb, _ttl, pl_, rh_, fs_, SPLIT_COLS,
-                            header=hdr, total=_total)
+                            header=hdr, total=_total,
+                            bats={'VS LHH': 'L', 'VS RHH': 'R'}.get(name_))
                 yb -= rh_ - rh_ * 0.6   # next title lands one rh below the
                 hdr = False             # last row (return already ate 0.6rh)
             if is_season and config.get('pitch_lb'):
@@ -2749,10 +2929,14 @@ def render_social_card(config, pitches, output_file):
                         _flag = '' if abs(_lb - r_['xrv100']) < 0.05 else '  <-- DIFFERS'
                         print(f"  xRV/100 parity {r_['pt']}: card {r_['xrv100']:.2f} "
                               f"vs leaderboard {_lb:.2f}{_flag}")
+                    _lbx = (config['pitch_lb'].get(r_['pt']) or {}).get('xwOBAcon')
+                    if _lbx is not None and r_['xwobacon'] is not None:
+                        print(f"  xwOBAcon parity {r_['pt']}: card {r_['xwobacon']:.3f} vs leaderboard {_lbx:.3f}")
         # Footer (2026-09-16, per Wally): the disc-size key replaces the
         # colour key, which the tinted chips carry on their own.
-        note_r = ('MLB gameday feed  ·  disc area = usage  ·  '
-                  '100 = league average')
+        note_r = ('Data: MLB, Baseball Savant  ·  disc area = usage  ·  '
+                  + ('ring = expected movement  ·  ' if _expected else '')
+                  + '100 = league avg')
 
     # Footer height, tuned by measured clearance from the card's bottom edge
     # (2026-09-01, per Wally). At the original 0.009 the 'y' descender in
@@ -5243,7 +5427,7 @@ def main():
     social          = True              # True = consolidated social card (daily/season by date mode) instead of the full card
     bats            = None               # Batter-handedness filter: "L", "R", or None for both
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
-    social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xrv"; force "xrv", "rv", or "both"
+    social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xwobacon"; force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
     milb_scope      = "all"              # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
@@ -5268,9 +5452,9 @@ def main():
                         help='Season-card RV columns: per-100 rates (default), cumulative '
                              'totals (PitchRV/xPitchRV), or both pairs. Single-game cards '
                              'always show cumulative xPitchRV.')
-    parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both'],
+    parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both', 'xwobacon'],
                         help='Social-table run-value slot(s); default: both (RV, xRV) on '
-                             'a daily card, xrv (xRV/100) on a season card')
+                             'a daily card, xwobacon (xwOBAcon) on a season card')
     parser.add_argument('--pitch-qual', type=int, default=None,
                         help='Min pitches for a pitch type\'s RV COLORING '
                              f'(default {CARD_COLOR_MIN_PITCHES}; values always render)')
@@ -6062,6 +6246,7 @@ def main():
                          else pitch_lb_by_pitcher.get((pitcher_name, eff_team), {})),
             'rv_mode': rv_mode,
             'social_rv': social_rv,
+            'social_xmove': xmove_models,
             'pitch_qual': pitch_qual,
             # DAILY ONLY — his own season baselines (see _season_pitch_lb_for).
             'season_pitch_lb': _season_pitch_lb_for(pitcher_name, eff_team,
