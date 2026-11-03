@@ -63,6 +63,7 @@ SIGNED = {
     660644: 'Vidal Bruján, ATL, MiLB deal',
     676369: 'Nelson Velázquez, Asia',
     675919: 'Nick Raquet, DET, MiLB deal',
+    687957: 'Dustin Harris, SDP 40-man (selected 2026-08-24)',
 }
 # Retired, per Wally 2026-11-02. A source list can still carry them (the MLBPA XX(B) release did), so they are dropped by id.
 RETIRED = {
