@@ -1451,12 +1451,21 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             a.set_title(f'{head}  ·  {len(mine)} BIP', fontsize=8.5, color=ink_dark, fontweight='bold', pad=2.5)
 
     ax.plot([L, R], [.3855, .3855], color=border, lw=1.1)
+    # The key: what each dot means, then the zones' color scale. The bar takes the zones'
+    # .70 alpha so its colors match the chart.
     yk = .3695
-    for xk, fc, ec, lab in ((L + .006, '#111111', 'none', 'Barrel'), (L + .086, '#ffffff', '#111111', 'Hard-Hit 95+'),
-                            (L + .205, MARKER_ACCENT, 'black', 'Median')):
-        ax.scatter([xk], [yk], s=38, c=fc, edgecolors=ec, zorder=4)
-        t(xk + .012, yk, lab, 8.2, muted, ha='left')
-    t(R, yk, 'Color: MLB wOBAcon, blue low, red high', 8.2, muted, ha='right')
+    for xk, fc, ec, lab in ((L + .006, '#111111', '#ffffff', 'Barrel'), (L + .092, '#ffffff', '#111111', 'Hard-Hit 95+'),
+                            (L + .228, MARKER_ACCENT, 'black', 'Median')):
+        ax.scatter([xk], [yk], s=52, c=fc, edgecolors=ec, linewidths=1.0, zorder=4)
+        t(xk + .014, yk, lab, 9.5, ink_dark, '600', ha='left')
+    t(.452, yk, 'MLB wOBAcon', 9.5, ink_dark, '600', ha='left')
+    t(.600, yk, '.000', 9, muted, '600', ha='left')
+    ax_scale = fig.add_axes([.642, yk - .0065, .245, .013])
+    ax_scale.imshow(np.linspace(0, 1, 256).reshape(1, -1), aspect='auto', cmap=WOBA_CMAP, vmin=0, vmax=1, alpha=.70)
+    ax_scale.set_xticks([]); ax_scale.set_yticks([])
+    for sp in ax_scale.spines.values():
+        sp.set_color(border)
+    t(R, yk, '1.000+', 9, muted, '600', ha='right')
     ax.plot([L, R], [.3525, .3525], color=border, lw=1.1)
     for (title, rows), x0 in zip(SOCIAL_HITTER_COLUMNS, (L, .525)):
         t(x0, .3345, title, 10.5, ink_dark, 'black', ha='left')
