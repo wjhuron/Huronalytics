@@ -538,6 +538,17 @@ def minutes_to_tilt_display(total_minutes):
 HALF_PLATE_FT = 8.5 / 12     # rulebook zone half-width (17" plate / 2)
 
 
+def batting_side(pitches):
+    """'L', 'R', 'S' or None. Pitches from a position player (Pitch Type EP) do not count:
+    a hitter who turned around against one is not a switch hitter (2026-11-03, per Wally;
+    Lipscomb 1,956 R and 1 L, Chourio 2,189 R and 1 L, both on an EP). A hitter who saw
+    nothing but EP pitches keeps the side he took them from."""
+    sides = {p.get('Bats') for p in pitches if p.get('Bats') and p.get('Pitch Type') != 'EP'}
+    if not sides:
+        sides = {p.get('Bats') for p in pitches if p.get('Bats')}
+    return 'S' if len(sides) > 1 else (sides.pop() if sides else None)
+
+
 def compute_in_zone(p):
     """'Yes' when any part of the ball intersects the rulebook strike zone.
 

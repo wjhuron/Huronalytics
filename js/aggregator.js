@@ -1294,6 +1294,17 @@ const Aggregator = {
    */
   // Categories (Hard/Breaking/Offspeed) containing the given pitch type that
   // are present in the user's selection.
+  // The shipped 'stands' for one (hitter, team) row, cached per HITTER_DATA array.
+  _shippedBatSide: function (hitter, team) {
+    const hd = window.HITTER_DATA || [];
+    if (this._batSideSrc !== hd) {
+      this._batSideSrc = hd;
+      this._batSideMap = {};
+      for (let i = 0; i < hd.length; i++) this._batSideMap[hd[i].hitter + '|' + hd[i].team] = hd[i].stands;
+    }
+    return this._batSideMap[hitter + '|' + team];
+  },
+
   _selectedCatsForType: function (selectedPitchTypes, pitchType) {
     const CATS = this.PITCH_CATEGORIES;
     const out = [];
@@ -2327,7 +2338,13 @@ const Aggregator = {
       const g = groups[gk2];
       const c = g.counts;
       const batsKeys = Object.keys(g.batsSet);
-      const stands = batsKeys.length > 1 ? 'S' : (batsKeys[0] || null);
+      let stands = batsKeys.length > 1 ? 'S' : (batsKeys[0] || null);
+      // Micro rows carry no pitch type, so they cannot drop position-player pitches;
+      // the shipped row (pipeline batting_side) settles a false switch hitter.
+      if (stands === 'S' && g.hitterIdx != null) {
+        const shippedSide = Aggregator._shippedBatSide(lookups.hitters[g.hitterIdx], lookups.teams[g.teamIdx]);
+        if (shippedSide && shippedSide !== 'S') stands = shippedSide;
+      }
 
       const n_total = c[0], pa = c[1], h = c[2], db = c[3], tp = c[4], hr = c[5];
       const bb = c[6], hbp = c[7], sf = c[8], sh = c[9], ci_v = c[10], k = c[11];
@@ -3078,7 +3095,11 @@ const Aggregator = {
       const ht = hitterTotals[hk2];
       const hTotal = ht ? ht.total : 1;
       const batsKeys = ht ? Object.keys(ht.batsSet) : [];
-      const stands = batsKeys.length > 1 ? 'S' : (batsKeys[0] || null);
+      let stands = batsKeys.length > 1 ? 'S' : (batsKeys[0] || null);
+      if (stands === 'S' && gg2.hitterIdx != null) {
+        const shippedSide = Aggregator._shippedBatSide(lookups.hitters[gg2.hitterIdx], lookups.teams[gg2.teamIdx]);
+        if (shippedSide && shippedSide !== 'S') stands = shippedSide;
+      }
 
       const n_total = c[0], pa = c[1], h = c[2], db = c[3], tp = c[4], hr = c[5];
       const bb = c[6], hbp = c[7], sf = c[8], sh = c[9], ci_v = c[10], k = c[11];

@@ -18,7 +18,7 @@ from collections import defaultdict
 from pipeline.utils import (
     safe_float, normalize_date, _today_et, avg, median, round_metric,
     is_barrel, barrel_flag, spray_angle, spray_direction, duplicate_pa_events,
-    is_no_pitch, real_pitches,
+    is_no_pitch, real_pitches, batting_side,
     break_tilt_to_minutes, circular_mean_minutes, minutes_to_tilt_display,
     compute_in_zone, outs_to_ip_str, outs_to_ip_float, ip_str_to_float,
     DATA_DIR,
@@ -2852,13 +2852,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
 
     hitter_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
-        stands_set = set(p.get('Bats') for p in pitches if p.get('Bats'))
-        if len(stands_set) > 1:
-            stands = 'S'
-        elif len(stands_set) == 1:
-            stands = stands_set.pop()
-        else:
-            stands = None
+        stands = batting_side(pitches)
 
         # Latest game date present in this hitter's pitch data. Used by
         # downstream consumers (e.g. card generator's "Through {date}" stamp)
@@ -3080,8 +3074,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     hitter_pitch_leaderboard = []
     for (hitter, team), pitches in hitter_groups.items():
         total_count = len(pitches)
-        stands_set = set(p.get('Bats') for p in pitches if p.get('Bats'))
-        stands = 'S' if len(stands_set) > 1 else (stands_set.pop() if stands_set else None)
+        stands = batting_side(pitches)
 
         pt_map = defaultdict(list)
         for p in pitches:
