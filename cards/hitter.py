@@ -9,7 +9,7 @@ a hitter audience. Sections, top to bottom:
    headline stats strip
    (PA, AVG, OBP, SLG, BB%, K%, wRC+, SD+, CT+, BB+, Process+).
 3. LA x Spray scatter (right): MLB wOBAcon zone heatmap, EV-colored dots,
-   purple Median Placement marker (median LA x median spray), xwOBAsp annotation.
+   purple Median Placement marker (median LA x median spray).
 4. BIP donut + per-pitch-group composition bars (Hard / Breaking / Offspeed).
 5. Per-pitch-group performance bars (vs RHP, vs LHP): bar length = usage,
    color = xwOBA performance.
@@ -154,7 +154,7 @@ def raw_cell_color(value_str, league_avg, scale, higher_is_better,
 # Avg Placement marker color — deep purple. Cyan washes on cream paper;
 # deep purple contrasts strongly without competing with the warm/red
 # palette. Theme wrappers override for dark themes (cyan reads better).
-MARKER_ACCENT = '#5d3b8e'
+MARKER_ACCENT = '#8e44ec'
 
 # ─────────────────────────────────────────────────────────────────────
 # Layout constants
@@ -1376,10 +1376,13 @@ def _build_window_hitter_row(season_row, window_pitches, metadata):
 # Card render
 # ─────────────────────────────────────────────────────────────────────
 def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
-                       output_dir=OUTPUT_DIR, layout='bubbles', la_view='damage',
+                       output_dir=OUTPUT_DIR, layout='bubbles', la_view='clean',
                        date_filter=None, date_display=None, date_slug=None,
                        show_notes=False, milb_corpus=False, milb_levels=None,
-                       milb_player_id=None, milb_scope='all'):
+                       milb_player_id=None, milb_scope='all',
+                       la_hard_dots='all', la_ellipse=None, la_heat='full',
+                       la_grid=True, la_heat_alpha=0.70, la_dot_style='mono',
+                       la_dot_scale=1.6):
     """Render a seasonal hitter card, or a card for one date window.
 
     date_filter:
@@ -1388,8 +1391,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         that window, then rebuilds every stat from those pitches. See
         _build_window_hitter_row for what a window cannot rebuild.
     date_display:
-        Label drawn under the player name. Replaces the season "Through
-        {date}" stamp when a window is set.
+        Label drawn under the player name. Replaces the season label when a
+        window is set.
     date_slug:
         Filename component. Replaces the year_label slug when set.
 
@@ -1659,34 +1662,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                   f"{position}  |  {bats}/{throws}  |  {team}  |  Age: {age}",
                   fontsize=16, fontfamily='IBM Plex Sans', color=TEXT_PRIMARY, va='top',
                   fontweight='600')
-    # Year label + "Through {date}" inline data freshness stamp.
-    # Resolution order:
-    #   1. h_row['lastGameDate'] — written by process_data.py from the JSON
-    #      leaderboard, always fresh (the JSON is git-tracked, the pickle
-    #      is not, so this is the most reliable source).
-    #   2. max Game Date in hitter_pitches — fallback when the leaderboard
-    #      row doesn't yet have lastGameDate (older pipeline run).
-    #   3. metadata.generatedAt — last-resort fallback.
-    # A window card already names its own span, so it takes no "Through"
-    # stamp — the stamp would repeat the window's end date.
-    _date_suffix = ''
-    if date_display is None:
-        try:
-            from datetime import datetime
-            _latest = h_row.get('lastGameDate')
-            if not _latest:
-                _hitter_dates = [p.get('Game Date') for p in hitter_pitches
-                                  if p.get('Game Date')]
-                _latest = max(_hitter_dates) if _hitter_dates else None
-            if not _latest:
-                _gen_at = metadata.get('generatedAt', '')
-                _latest = _gen_at[:10] if _gen_at else None
-            if _latest:
-                _dt = datetime.strptime(_latest[:10], '%Y-%m-%d')
-                _date_suffix = f"  ·  Through {_dt.strftime('%B %-d').lstrip('0')}"
-        except (ValueError, TypeError):
-            _date_suffix = ''
-    ax_main.text(text_x, photo_top - 1.80, (date_display or year_label) + _date_suffix,
+    ax_main.text(text_x, photo_top - 1.80, date_display or year_label,
                   fontsize=17, fontfamily='IBM Plex Sans', color=TEXT_SECONDARY,
                   va='top', fontweight='600')
 
@@ -1916,7 +1892,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         _bcol = barrel_flag(p.get('Barrel'))
         _brl = _bcol if _bcol is not None else bool(is_barrel(ev, la))
         _pside = p.get('Bats') if p.get('Bats') in ('L', 'R') else None
-        bip_pts.append((ang, max(-20, min(60, la)), ev, la, event, _brl, _pside))
+        bip_pts.append((ang, max(-20, min(60, la)), ev, la, event, _brl, _pside, bbt))
 
     # Outcome-based dot coloring (replaces the old EV gradient). Warm-paper
     # palette: gray for non-hits, amber for singles, purple for doubles,
@@ -1925,7 +1901,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     OUTCOME_COLORS = {
         'Out': '#6e6557',      # muted warm gray (Out/E/FC)
         '1B':  '#e0892b',      # rich amber
-        '2B':  '#9a4eaf',      # medium purple (distinct from #5d3b8e Avg Placement)
+        '2B':  '#9a4eaf',      # medium purple (the outcome view; Median Placement is #8e44ec)
         '3B':  '#188a8a',      # teal
         'HR':  '#a8261e',      # deep crimson (matches the warm-theme accent family)
     }
@@ -1986,7 +1962,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             bx = bounds[sd]
             ly = LA_RANGES[lb]
             lo = max(-20, ly[0]); hi = min(60, ly[1])
-            if la_view == 'damage':
+            if la_view == 'clean' and la_heat == 'full':
+                # Every zone, on the whole colormap. A thin zone stays faint,
+                # the same ratio the outcome view uses.
+                col = WOBA_CMAP(min(1.0, v / 1.0))
+                alpha = la_heat_alpha * (0.22 / 0.70 if z.get('count', 0) < 20 else 1.0)
+            elif la_view in ('damage', 'clean'):
                 if v < _DAMAGE_THRESH:
                     return
                 col = WOBA_CMAP(min(1.0, v / 1.0))
@@ -2009,15 +1990,55 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         # Zone-boundary grid overlay (matches the true zone edges)
         _GRID_LW, _GRID_ALPHA = 1.0, 0.75
         for _x in sorted({e for b in bounds.values() for e in b}):
-            if -50 < _x < 50:
+            if -50 < _x < 50 and (la_view != 'clean' or la_grid):
                 ax.axvline(_x, color=GRID_COLOR, linewidth=_GRID_LW,
                            alpha=_GRID_ALPHA, zorder=2)
         for _y in sorted({e for rng in LA_BINS for e in rng}):
-            if -20 < _y < 60:
+            if -20 < _y < 60 and (la_view != 'clean' or la_grid):
                 ax.axhline(_y, color=GRID_COLOR, linewidth=_GRID_LW,
                            alpha=_GRID_ALPHA, zorder=2)
 
-        if la_view == 'damage':
+        if la_view == 'clean':
+            # CLEAN VIEW: the league heat map, barrels and hard contact only.
+            # la_hard_dots 'air' drops hard grounders; 'all' keeps them.
+            _AIR_TYPES = {'fly_ball', 'line_drive', 'popup'}
+            _keep = [q for q in pts
+                     if q[5] or (q[2] is not None and q[2] >= 95
+                                 and (la_hard_dots == 'all' or q[7] in _AIR_TYPES))]
+            for x, y, ev, _real, event, _brl, _ps, _bbt in sorted(_keep, key=lambda r: bool(r[5])):
+                # Dots must read on every hue of the heat map. 'mono' uses black and white,
+                # which are not on the colormap; 'warm' keeps red and amber with a ring.
+                from matplotlib.patheffects import withStroke
+                _sz = (150 if _brl else 105) * la_dot_scale
+                if la_dot_style == 'mono':
+                    ax.scatter([x], [y], s=_sz, c=['#111111' if _brl else '#ffffff'],
+                               edgecolors='#ffffff' if _brl else '#111111',
+                               linewidths=1.6, zorder=5 if _brl else 4)
+                else:
+                    ax.scatter([x], [y], s=_sz, c=['#a8261e' if _brl else '#e0871e'],
+                               edgecolors='#f0e8d8', linewidths=1.0 + (la_dot_scale - 1.0),
+                               zorder=5 if _brl else 4,
+                               path_effects=([withStroke(linewidth=1.9 + (la_dot_scale - 1.0),
+                                                         foreground='#1a1612')]
+                                             if la_heat == 'full' else None))
+            # The ellipse covers ALL batted balls, the same set as the median marker.
+            if la_ellipse and len(pts) >= 6:
+                from matplotlib.patches import Ellipse as _Ellipse
+                _X = np.array([(q[0], q[1]) for q in pts])
+                _vals, _vecs = np.linalg.eigh(np.cov(_X.T))
+                _o = _vals.argsort()[::-1]
+                _vals, _vecs = _vals[_o], _vecs[:, _o]
+                if _vals[1] > 0:
+                    # k holds the stated share of a bivariate normal; see
+                    # scripts/research/cards/la_ellipse_size_sweep.py for the sizes.
+                    _k = np.sqrt(-2 * np.log(1 - la_ellipse / 100))
+                    _w, _h = 2.0 * _k * np.sqrt(_vals)
+                    ax.add_patch(_Ellipse(_X.mean(0), _w, _h,
+                                          angle=np.degrees(np.arctan2(_vecs[1, 0], _vecs[0, 0])),
+                                          facecolor='none', edgecolor='#9a3b1e', linewidth=2.0,
+                                          linestyle=(0, (5, 3)), zorder=2.6))
+                    _damage_ellipse_drawn['flag'] = True
+        elif la_view == 'damage':
             # DAMAGE VIEW: three contact tiers — barrel (crimson), hard-hit
             # 95+ non-barrel (amber), everything else gray.
             _BARREL_RED  = (0.659, 0.149, 0.118, 0.96)
@@ -2031,7 +2052,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                 return 0
             _TIER_STYLE = {2: (_BARREL_RED, 5), 1: (_HARDHIT_AMB, 4), 0: (_OTHER_GRAY, 3)}
             from matplotlib.patheffects import withStroke
-            for x, y, ev, _real, event, _brl, _ps in sorted(pts, key=lambda r: _tier(r[2], r[5])):
+            for x, y, ev, _real, event, _brl, _ps, _bbt in sorted(pts, key=lambda r: _tier(r[2], r[5])):
                 _c, _z = _TIER_STYLE[_tier(ev, _brl)]
                 ax.scatter([x], [y], s=ev_size(ev), c=[_c],
                            edgecolors='#f0e8d8', linewidths=1.1, zorder=_z,
@@ -2056,7 +2077,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         else:
             # OUTCOME VIEW: outs first (back), then hits by weight
             _OUTCOME_Z = {'Out': 0, '1B': 1, '2B': 2, '3B': 3, 'HR': 4}
-            for x, y, ev, _real, event, _brl, _ps in sorted(pts,
+            for x, y, ev, _real, event, _brl, _ps, _bbt in sorted(pts,
                                                   key=lambda r: _OUTCOME_Z[_outcome_category(r[4])]):
                 cat = _outcome_category(event)
                 ax.scatter([x], [y], s=ev_size(ev), c=[outcome_color(event)],
@@ -2103,32 +2124,6 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             ax.set_title(header, color=TEXT_MUTED, fontsize=12,
                          fontweight='700', fontfamily='IBM Plex Sans', pad=5)
 
-    def _xwobasp_of(pts, side):
-        """xwOBAsp for one panel's batted balls, scored in that side's zones.
-
-        Every point in `pts` already has Bats == side, so this is the same
-        arithmetic as the combined loop below with the side held fixed. The
-        two per-side values reblend to the combined value by qualifying-BIP
-        count. Verified on the four highest-PA switch hitters of 2026: each
-        side's pair reblended to the card's combined value exactly, and that
-        combined value matched the shipped leaderboard xwOBAsp to within
-        display rounding (max delta .0005).
-
-        There is no leaderboard equivalent to fall back on: the hitter rows
-        carry xwOBAsp and xwOBAsp_pctl only, with no per-side split. So this
-        is computed from the pickle, and it carries no percentile.
-        """
-        _sum = 0.0
-        _n = 0
-        for _ang, _yc2, _ev2, _la2, _evt2, _brl2, _ps2 in pts:
-            _sd2 = spray_direction(_ang, side)
-            _lb2 = la_bin_idx(_la2) if _la2 is not None else None
-            _v2 = sacq_lookups[side](_sd2, _lb2)
-            if _v2 is not None:
-                _sum += _v2
-                _n += 1
-        return (_sum / _n) if _n else None
-
     def _median_of(pts):
         if not pts:
             return (None, None)
@@ -2169,15 +2164,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         if is_switch:
             _pts2 = [q for q in bip_pts if q[6] == _s2]
             _med2 = _median_of(_pts2)
-            # Each panel carries its OWN xwOBAsp. The combined value in the
-            # top-left annotation blends the two sides, which can hide a wide
-            # split: Marte 2026 read .356 as LHH against .412 as RHH behind a
-            # blended .370. The value sits next to the BIP count it came from.
-            _sp2 = _xwobasp_of(_pts2, _s2)
             _side2 = 'AS LHH (VS RHP)' if _s2 == 'L' else 'AS RHH (VS LHP)'
-            _hdr2 = (f"{_side2}  ·  xwOBAsp {fmt_3dec(_sp2)}  ·  {len(_pts2)} BIP"
-                     if _sp2 is not None
-                     else f"{_side2}  ·  {len(_pts2)} BIP")
+            _hdr2 = f"{_side2}  ·  {len(_pts2)} BIP"
         else:
             _pts2 = bip_pts
             _med2 = (med_spray, med_la_real)
@@ -2185,87 +2173,14 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         _draw_spray_panel(_axp, _s2, _pts2, _hz2, _pz2, _med2,
                           first_panel=(_pi == 0), header=_hdr2)
 
-    # xwOBAsp (hitter overall, hand-specific zones with pooled fallback).
-    # Each BIP is scored by its ACTUAL side — matters for switch hitters.
-    xwobasp_sum = 0; xwobasp_n = 0; total_bip = 0
-    for ang, _yc, _ev, la_r, _event, _brl, _ps in bip_pts:
-        total_bip += 1
-        _b2 = _ps if (_ps and is_switch) else bats
-        sd = spray_direction(ang, _b2)
-        lb = la_bin_idx(la_r) if la_r is not None else None
-        v = (sacq_lookups[_b2] if is_switch and _ps else sacq_lookup)(sd, lb)
-        if v is not None:
-            xwobasp_sum += v
-            xwobasp_n += 1
-    xwobasp = xwobasp_sum / xwobasp_n if xwobasp_n else None
-
     # Annotations placed TOP-LEFT of chart panel (matches hitter page).
     # Each line is one consolidated fig.text() so spacing is correct regardless
     # of font metrics. Color emphasis applied via second-pass overlay.
     annot_x = spray_axes_left + 0.005   # left edge, just inside panel
-    # Use leaderboard's xwOBAsp value + percentile for consistency with website
-    xwobasp_display = h_row.get('xwOBAsp', xwobasp)
-    pctl = h_row.get('xwOBAsp_pctl')
-
-    # PRINT-IDENTITY annotation color. The light paper-blend percentile tint is
-    # a background color — unreadable as TEXT on cream — so this value/placement
-    # text instead blends from warm-gray ink toward a DEEP version of the
-    # percentile hue (deep terracotta for good, deep slate for bad). Stays
-    # readable on paper while carrying the same good/bad hue as the bubbles.
-    def _pctl_color_dark(p):
-        if p is None: return TEXT_MUTED
-        neutral = (0x6a, 0x5f, 0x55)                 # TEXT_MUTED (warm ink-gray)
-        target = (0x9f, 0x30, 0x26) if p >= 50 else (0x2f, 0x55, 0x73)
-        t = (abs(p - 50) / 50.0) ** 1.1
-        r = int(round(neutral[0] + (target[0] - neutral[0]) * t))
-        g = int(round(neutral[1] + (target[1] - neutral[1]) * t))
-        b = int(round(neutral[2] + (target[2] - neutral[2]) * t))
-        return f'#{r:02x}{g:02x}{b:02x}'
-
-    pctl_color = _pctl_color_dark(pctl)
-
-    if xwobasp_display is not None:
-        # Note format: "(95th percentile, 58 qualifying BIP)"
-        # If qualifying < total, show "X of Y qualifying BIP"
-        bip_str = (f"{xwobasp_n} of {total_bip} qualifying BIP"
-                   if total_bip > xwobasp_n else f"{xwobasp_n} qualifying BIP")
-        if pctl is not None:
-            pctl_int = int(round(pctl))
-            # Pick suffix (1st, 2nd, 3rd, 4th-9th, 10th-19th)
-            if 11 <= (pctl_int % 100) <= 13:
-                suffix = 'th'
-            else:
-                suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(pctl_int % 10, 'th')
-            bipnote = (f"({pctl_int}{suffix} percentile, both sides, {bip_str})"
-                       if is_switch
-                       else f"({pctl_int}{suffix} percentile, {bip_str})")
-        else:
-            bipnote = (f"(both sides, {bip_str})" if is_switch
-                       else f"({bip_str})")
-        l1_y = 0.955 - _LA_SHIFT
-        # Approach: render label first (gray), measure its width via the
-        # renderer, place value right after, measure that, place bipnote.
-        renderer = fig.canvas.get_renderer()
-        inv = fig.transFigure.inverted()
-
-        def _place_text(x, y, txt, fontsize, color, fontweight):
-            t = fig.text(x, y, txt, color=color, fontsize=fontsize,
-                          fontweight=fontweight, fontfamily='IBM Plex Sans',
-                          va='center', ha='left')
-            bbox = t.get_window_extent(renderer=renderer)
-            bbox_fig = bbox.transformed(inv)
-            return bbox_fig.x1  # right edge in figure fraction coords
-
-        right = _place_text(annot_x, l1_y, 'xwOBAsp: ', 18, TEXT_MUTED, '600')
-        # Value uses percentile-derived color (matches hitter page)
-        right = _place_text(right, l1_y, fmt_3dec(xwobasp_display), 18, pctl_color, '700')
-        right += 0.005  # tiny gap before bipnote
-        _place_text(right, l1_y, bipnote, 11, TEXT_FAINT, '600')
-
     if not is_switch and med_spray is not None and med_la_real is not None:
         sd = ('Pull' if med_spray > 0 else 'Oppo') if bats == 'L' else \
              ('Pull' if med_spray < 0 else 'Oppo')
-        l2_y = 0.930 - _LA_SHIFT
+        l2_y = 0.945 - _LA_SHIFT
         renderer = fig.canvas.get_renderer()
         inv = fig.transFigure.inverted()
 
@@ -2278,15 +2193,13 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             return bbox_fig.x1
 
         right = _place_text2(annot_x, l2_y, 'Median Placement: ', 14, TEXT_MUTED, '600')
-        # Both spray-direction value and LA value share xwOBAsp percentile color
-        # (matches hitter page — links Avg Placement visually to xwOBAsp)
         right = _place_text2(right, l2_y, f"{abs(med_spray):.1f}° {sd}",
-                              14, pctl_color, '700')
+                              14, TEXT_SECONDARY, '700')
         right += 0.006
         right = _place_text2(right, l2_y, '|', 13, TEXT_FAINT, '600')
         right += 0.006
         _place_text2(right, l2_y, f"{med_la_real:.1f}° LA",
-                       14, pctl_color, '700')
+                       14, TEXT_SECONDARY, '700')
 
     # Section title (centered ABOVE the annotation block, matches hitter page)
     # Editorial-style title: letterspaced uppercase, off-white, with thin
@@ -2333,7 +2246,14 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # palette as the BIP scatter above. Each tuple is (label, color, cat-key)
     # so we can filter out categories the hitter has zero of (e.g. no 3B for
     # a player with no triples) — no point listing what isn't on the chart.
-    if la_view == 'damage':
+    if la_view == 'clean':
+        _mono = la_dot_style == 'mono'
+        OUTCOME_LEGEND = [
+            ('Barrel',       '#111111' if _mono else '#a8261e', 'brl'),
+            ('Hard-Hit 95+' + (' in Air' if la_hard_dots == 'air' else ''),
+             '#ffffff' if _mono else '#e0871e', 'hh'),
+        ]
+    elif la_view == 'damage':
         OUTCOME_LEGEND = [
             ('Barrel',       '#a8261e', 'brl'),
             ('Hard-Hit 95+', '#e0871e', 'hh'),
@@ -2372,9 +2292,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         return t.get_window_extent(renderer=renderer_l).transformed(inv_l).x1
 
     def _draw_dot(x, y, color, radius=DOT_RADIUS):
+        # A white dot needs an edge to show on the cream legend band.
         c = Circle((x, y), radius,
-                    facecolor=color, edgecolor='none',
-                    transform=fig.transFigure, figure=fig)
+                    facecolor=color, edgecolor='#111111' if color == '#ffffff' else 'none',
+                    linewidth=1.2, transform=fig.transFigure, figure=fig)
         fig.add_artist(c)
 
     def _draw_outlined_dot(x, y, edge_color, edge_width, radius=DOT_RADIUS):
@@ -2402,6 +2323,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     DIV_W = 0.0012   # axis-x width of the divider (thin)
     DIV_HEIGHT = 0.018   # axis-y; matches roughly 1.5x the dot diameter
 
+    _ellipse_label = (f'About {la_ellipse}% of Batted Balls' if la_view == 'clean' else 'Damage Zone')
     row1_w = 0.0
     for label, _, _cat in OUTCOME_LEGEND:
         row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text(label, LEGEND_FONTSIZE) + ITEM_GAP
@@ -2409,12 +2331,13 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # half-gap + divider + half-gap pattern.
     row1_w -= ITEM_GAP
     row1_w += DIV_HALF_GAP + DIV_W + DIV_HALF_GAP
-    row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Size = EV', LEGEND_FONTSIZE) + ITEM_GAP
+    if la_view != 'clean':
+        row1_w += 2 * DOT_RADIUS + 0.006 + _measure_text('Size = EV', LEGEND_FONTSIZE) + ITEM_GAP
     row1_w += 2 * AVG_HALO_RADIUS + 0.006 + _measure_text('Median Placement', LEGEND_FONTSIZE)
     # Damage-zone swatch (dashed ring) — only when the chart drew the
     # concentration ellipse, so the key never lists an absent mark.
     if _damage_ellipse_drawn['flag']:
-        row1_w += ITEM_GAP + 2 * DOT_RADIUS + 0.006 + _measure_text('Damage Zone', LEGEND_FONTSIZE)
+        row1_w += ITEM_GAP + 2 * DOT_RADIUS + 0.006 + _measure_text(_ellipse_label, LEGEND_FONTSIZE)
     cur_x = legend_center_x - row1_w / 2
 
     for i, (label, hexcolor, _cat) in enumerate(OUTCOME_LEGEND):
@@ -2439,11 +2362,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     fig.add_artist(divider)
     cur_x += DIV_W + DIV_HALF_GAP
 
-    _draw_dot(cur_x + DOT_RADIUS * 0.85, legend_y_dots, TEXT_DIMMED,
-              radius=DOT_RADIUS * 0.85)
-    cur_x += 2 * DOT_RADIUS + 0.006
-    cur_x = _draw_text(cur_x, legend_y_dots, 'Size = EV', LEGEND_FONTSIZE, TEXT_DIMMED)
-    cur_x += ITEM_GAP
+    if la_view != 'clean':
+        _draw_dot(cur_x + DOT_RADIUS * 0.85, legend_y_dots, TEXT_DIMMED,
+                  radius=DOT_RADIUS * 0.85)
+        cur_x += 2 * DOT_RADIUS + 0.006
+        cur_x = _draw_text(cur_x, legend_y_dots, 'Size = EV', LEGEND_FONTSIZE, TEXT_DIMMED)
+        cur_x += ITEM_GAP
 
     # Avg Placement marker — two concentric circles matching the chart's
     # median marker: outer white halo with thin black edge, inner purple
@@ -2470,7 +2394,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                      figure=fig, zorder=10)
         fig.add_artist(_dz)
         cur_x += 2 * DOT_RADIUS + 0.006
-        _draw_text(cur_x, legend_y_dots, 'Damage Zone', LEGEND_FONTSIZE, TEXT_DIMMED)
+        _draw_text(cur_x, legend_y_dots, _ellipse_label, LEGEND_FONTSIZE, TEXT_DIMMED)
 
     # Row 2 — MLB wOBAcon gradient (label + .000 + bar + 1.000+)
     grad_label = 'MLB wOBAcon: '
@@ -3090,7 +3014,14 @@ def main():
     filter_hitters = ""       # Semicolon-separated "Last, First" names, or "" for all
     year_label     = "2026 Season"        # Display label on the card
     layout         = "bubbles"            # Card layout: "bubbles" or "classic"
-    la_view        = "damage"             # LA x spray coloring: "damage" or "outcome"
+    la_view        = "clean"              # LA x spray coloring: "clean", "damage", or "outcome"
+    la_hard_dots   = "all"                # Clean view: hard-hit dots "air" (no hard grounders) or "all"
+    la_ellipse     = None                 # Clean view: ellipse size, % of all batted balls (e.g. 60), or None for no ellipse
+    la_heat        = "full"               # Clean view: background "damage" (warm zones only) or "full" (whole colormap)
+    la_grid        = True                 # Clean view: True draws the zone grid lines
+    la_heat_alpha  = 0.70                 # Clean view, full heat: zone opacity, 0 to 1
+    la_dot_style   = "mono"               # Clean view: dots "warm" (red, amber) or "mono" (black, white)
+    la_dot_scale   = 1.6                  # Clean view: dot area multiplier
     show_notes     = False                # Reader's notes under the bubble grid: True or False
     milb_corpus    = False                # True = read data/_milb2026 for filter_hitters; team is ignored
     milb_scope     = "all"                # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
@@ -3117,8 +3048,22 @@ def main():
                          help="'bubbles' (default) = single-column percentile grid "
                               "(Result / QoC / Plate Discipline / Bat Tracking). "
                               "'classic' = legacy heat maps + contact profile + pitch group table.")
-    parser.add_argument('--la-view', default=None, choices=['damage', 'outcome'],
-                         help="LA x Spray mode: 'damage' (default) = softened damage-zone "
+    parser.add_argument('--la-dot-style', default=None, choices=['warm', 'mono'],
+                         help="Clean view: dots 'warm' (red, amber) or 'mono' (black, white).")
+    parser.add_argument('--la-dot-scale', default=None, type=float,
+                         help='Clean view: dot area multiplier.')
+    parser.add_argument('--la-heat', default=None, choices=['damage', 'full'],
+                         help="Clean view: background 'damage' (warm zones only) or 'full' (whole colormap).")
+    parser.add_argument('--la-grid', default=None, choices=['on', 'off'],
+                         help='Clean view: draw the zone grid lines.')
+    parser.add_argument('--la-heat-alpha', default=None, type=float,
+                         help='Clean view, full heat: zone opacity, 0 to 1.')
+    parser.add_argument('--la-hard-dots', default=None, choices=['air', 'all'],
+                         help="Clean view: hard-hit dots 'air' (no hard grounders) or 'all'.")
+    parser.add_argument('--la-ellipse', default=None,
+                         help="Clean view: ellipse size as a percent of all batted balls, or 'none'.")
+    parser.add_argument('--la-view', default=None, choices=['damage', 'outcome', 'clean'],
+                         help="LA x Spray mode: 'clean' (default) = full-color league zones + hard-hit and barrel dots; 'damage' = softened damage-zone "
                               "gradient + barrel/hard-hit/other dots + quality-contact "
                               "concentration ellipse; 'outcome' = full wOBAcon zones + "
                               "1B/2B/3B/HR/out dots.")
@@ -3148,6 +3093,13 @@ def main():
     if args.output_dir is not None: output_dir = args.output_dir
     if args.layout is not None: layout = args.layout
     if args.la_view is not None: la_view = args.la_view
+    if args.la_hard_dots is not None: la_hard_dots = args.la_hard_dots
+    if args.la_heat is not None: la_heat = args.la_heat
+    if args.la_dot_style is not None: la_dot_style = args.la_dot_style
+    if args.la_dot_scale is not None: la_dot_scale = args.la_dot_scale
+    if args.la_grid is not None: la_grid = (args.la_grid == 'on')
+    if args.la_heat_alpha is not None: la_heat_alpha = args.la_heat_alpha
+    if args.la_ellipse is not None: la_ellipse = None if args.la_ellipse == 'none' else int(args.la_ellipse)
     if args.notes is not None: show_notes = (args.notes == 'on')
     if args.milb_corpus: milb_corpus = True
     if args.milb_scope is not None: milb_scope = args.milb_scope
@@ -3213,7 +3165,10 @@ def main():
                                 date_display=date_display, date_slug=date_slug,
                                 show_notes=show_notes, milb_corpus=milb_corpus,
                                 milb_levels=milb_levels, milb_player_id=milb_player_id,
-                                milb_scope=milb_scope)
+                                milb_scope=milb_scope, la_hard_dots=la_hard_dots,
+                                la_ellipse=la_ellipse, la_heat=la_heat, la_grid=la_grid,
+                                la_heat_alpha=la_heat_alpha, la_dot_style=la_dot_style,
+                                la_dot_scale=la_dot_scale)
     else:
         # No specific names: render every (qualified) hitter, optionally filtered by team
         leaderboard = load_hitter_leaderboard()
@@ -3229,7 +3184,10 @@ def main():
                                 layout=layout, la_view=la_view,
                                 date_filter=date_filter,
                                 date_display=date_display, date_slug=date_slug,
-                                show_notes=show_notes)
+                                show_notes=show_notes, la_hard_dots=la_hard_dots,
+                                la_ellipse=la_ellipse, la_heat=la_heat, la_grid=la_grid,
+                                la_heat_alpha=la_heat_alpha, la_dot_style=la_dot_style,
+                                la_dot_scale=la_dot_scale)
 
 
 if __name__ == '__main__':
