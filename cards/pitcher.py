@@ -889,6 +889,8 @@ def compute_iz(p):
     return None if iz is None else iz == 'Yes'
 
 def luminance(hc):
+    if len(hc) == 4:   # the '#999' fallback for a pitch type with no palette entry
+        hc = '#' + ''.join(c * 2 for c in hc[1:])
     r, g, b = int(hc[1:3],16)/255, int(hc[3:5],16)/255, int(hc[5:7],16)/255
     r = r/12.92 if r<=0.03928 else ((r+0.055)/1.055)**2.4
     g = g/12.92 if g<=0.03928 else ((g+0.055)/1.055)**2.4
@@ -1014,6 +1016,7 @@ def fetch_player_metadata(mlb_id):
         return {
             'age': str(p.get('currentAge', '??')),
             'hand': p.get('pitchHand', {}).get('code', 'R'),
+            'position': p.get('primaryPosition', {}).get('abbreviation'),
         }
     except Exception:
         return {'age': '??', 'hand': 'R'}
@@ -2895,7 +2898,10 @@ def render_card(config, pitches, output_file):
     _opp = config.get('opponent')
     if _opp and not bool(config.get('xmove_models')):
         _date_txt = f"{_date_txt} vs. {_opp}"
-    ax_main.text(text_x, photo_top-1.5, _date_txt, fontsize=24, fontfamily='IBM Plex Sans', color=ACCENT, va='top')
+    # 36 characters is what fits at 24 pt with a margin before the movement plot. A MiLB corpus label can
+    # run longer ('2026 AAA + MLB Regular Season  ·  Through Sep 21').
+    ax_main.text(text_x, photo_top-1.5, _date_txt, fontsize=24 * min(1.0, 36 / max(len(_date_txt), 1)),
+                 fontfamily='IBM Plex Sans', color=ACCENT, va='top')
 
     # Stat line — season cards widen the 5-cell strip so it spans the bubble
     # column beneath it. Single-game cards have no bubble column, so they use
@@ -3088,7 +3094,7 @@ def render_card(config, pitches, output_file):
 
     for pt in PITCH_ORDER:
         if pt not in groups: continue
-        xs, ys = zip(*groups[pt]); color = PITCH_COLORS[pt]
+        xs, ys = zip(*groups[pt]); color = PITCH_COLORS.get(pt, '#999')
         ax_plot.scatter(xs, ys, c=color, s=65, alpha=1.0, edgecolors=PLOT_PANEL, linewidths=0.5, zorder=3)
         if len(groups[pt]) >= mv_ellipse_min:
             cov = np.cov(xs, ys); vals, vecs = np.linalg.eigh(cov)
@@ -3114,14 +3120,14 @@ def render_card(config, pitches, output_file):
                 continue
             _xs, _ys = zip(*groups[pt])
             _cx, _cy = float(np.mean(_xs)), float(np.mean(_ys))
-            _c = PITCH_COLORS[pt]
+            _c = PITCH_COLORS.get(pt, '#999')
             ax_plot.plot([sx, _cx], [sy, _cy], color=_c, linewidth=1.1,
                          linestyle=':', alpha=0.85, zorder=2)
             ax_plot.scatter([sx], [sy], s=110, facecolors='none', edgecolors=_c,
                             linewidths=1.8, zorder=4)
             _ghosted = True
 
-    legend_handles = [mpatches.Patch(color=PITCH_COLORS[pt], label=f'{pt} - {PITCH_NAMES[pt]}') for pt in sorted_types]
+    legend_handles = [mpatches.Patch(color=PITCH_COLORS.get(pt, '#999'), label=f'{pt} - {PITCH_NAMES[pt]}') for pt in sorted_types]
     if config.get('xmove_models'):
         # Season: legend rides just above the plot, under the title.
         leg = ax_plot.legend(handles=legend_handles, loc='lower center', bbox_to_anchor=(0.5, 1.004), ncol=min(len(sorted_types),5), fontsize=9, frameon=False, handlelength=1.2, columnspacing=1.2)
@@ -3263,7 +3269,7 @@ def render_card(config, pitches, output_file):
                 if vals[0] > 0 and vals[1] > 0:
                     angle = np.degrees(np.arctan2(vecs[1, 1], vecs[0, 1]))
                     mx, my = np.mean(xs), np.mean(ys)
-                    _pc = PITCH_COLORS[pt]
+                    _pc = PITCH_COLORS.get(pt, '#999')
                     # Outline-only ellipse; season panels add a center dot at
                     # the per-type mean. Daily cards layer per-pitch dots +
                     # W/B/H marks back on top (removed 2026-08-13, restored
@@ -3295,7 +3301,7 @@ def render_card(config, pitches, output_file):
         if not is_season:
             for pt in PITCH_ORDER:
                 if pt not in locations[hand]: continue
-                color = PITCH_COLORS[pt]
+                color = PITCH_COLORS.get(pt, '#999')
                 for px_val, pz_val, desc, barrel_flag, hh_flag in locations[hand][pt]:
                     if desc == 'Swinging Strike':
                         _mark = 'W'
@@ -5239,6 +5245,10 @@ def main():
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
     social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xrv"; force "xrv", "rv", or "both"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
+    milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
+    milb_scope      = "all"              # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
+    milb_levels     = None               # Levels, e.g. "AAA", "MLB", "AAA,MLB"; None = all corpus levels (AAA, Single-A, MLB-spring, Rookie, AFL, Prospect-event), no MLB
+    milb_player_id  = None               # Corpus only: the mlbId when one name is two players
     output_dir      = OUTPUT_DIR
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
@@ -5289,6 +5299,20 @@ def main():
                              'MLB+AAA. Shape grades (Stuff+/Loc+/velo/movement) are '
                              'competition-agnostic; outcome bubbles (K%%, xwOBA, '
                              'Whiff%%...) blend AAA and MLB hitters.')
+    parser.add_argument('--milb-corpus', action='store_true',
+                        help='Read pitches from the 2026 MiLB corpus (data/_milb2026) '
+                             'instead of Sheets. Needs --pitchers; --team is ignored. '
+                             'Grades and bubbles are computed from the pitches against '
+                             'the MLB pool, the scratch-tab path.')
+    parser.add_argument('--milb-scope', default=None, choices=['all', 'regular'],
+                        help='Corpus games: all (spring and AFL included), or regular '
+                             '(regular season + playoffs). Default: all')
+    parser.add_argument('--milb-levels', default=None,
+                        help='Levels to include, comma-separated: AAA, Single-A, MLB-spring, '
+                             'Rookie, AFL, Prospect-event, MLB. MLB is the regular season '
+                             'and joins only when named (default: every corpus level)')
+    parser.add_argument('--milb-player-id', default=None,
+                        help='Corpus only: the mlbId when one name is two players')
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -5304,6 +5328,10 @@ def main():
     if args.rv_mode is not None: rv_mode = args.rv_mode
     if args.social_rv is not None: social_rv = args.social_rv
     if args.pitch_qual is not None: pitch_qual = args.pitch_qual
+    if args.milb_corpus: milb_corpus = True
+    if args.milb_scope is not None: milb_scope = args.milb_scope
+    if args.milb_levels is not None: milb_levels = args.milb_levels
+    if args.milb_player_id is not None: milb_player_id = args.milb_player_id
 
     # Parse filter_pitchers string into list
     if filter_pitchers:
@@ -5317,6 +5345,13 @@ def main():
     # workbook (never read by the pipeline, so it cannot reach the site);
     # --tab overrides for other scratch tab names.
     scratch_tab = args.tab or ('NEW' if str(team).strip().upper() == 'NEW' else None)
+    # The corpus takes the scratch-tab path: pitches from outside the team tabs,
+    # boxscores by PitchID gamePk, grades computed against the MLB pool.
+    if milb_corpus:
+        if not filter_pitchers:
+            print("Error: the MiLB corpus needs filter_pitchers (--pitchers)")
+            sys.exit(1)
+        scratch_tab = 'MiLB'
     # Auto whole-season mode: pitchers given but no team. Resolve each
     # pitcher's stint team(s) from the leaderboard so multi-team arms combine
     # their full season automatically (see _resolve_pitcher_teams). Per-pitcher
@@ -5483,10 +5518,24 @@ def main():
     is_multi_game = (start_date is None) or (end_date is not None)
 
     # Step 1: Load pitch data from Google Sheets (one worksheet per team)
-    print("Step 1: Loading pitch data from Google Sheets...")
-    gc = gspread.service_account()
     all_rows = []
-    for t in teams:
+    corpus_players = {}
+    if milb_corpus:
+        print("Step 1: Loading pitch data from the MiLB corpus...")
+        from cards import milb_corpus as _mc
+        corpus_players = _mc.load_players(
+            'pitcher', filter_pitchers, _mc.parse_levels(milb_levels), milb_player_id,
+            milb_scope)
+        for _nm, _pl in corpus_players.items():
+            # A pure MLB card has a real park and a real line; everything else is neutral.
+            if _pl['mlb_only']:
+                pitcher_team_label[_nm] = _pl['club']
+        for _pl in corpus_players.values():
+            all_rows.extend(_mc.as_sheet_rows(_pl['rows']))
+    else:
+        print("Step 1: Loading pitch data from Google Sheets...")
+        gc = gspread.service_account()
+    for t in ([] if milb_corpus else teams):
         _NLE2026 = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
         ws = gc.open_by_key(_NLE2026 if scratch_tab else _workbook_id_for_team(t)).worksheet(t)
         for attempt in range(3):
@@ -5504,7 +5553,9 @@ def main():
         all_rows.extend(t_rows)
         print(f"  {t}: {len(t_rows)} rows")
 
-    _apply_runexp_currency(all_rows)
+    # The corpus rows are already in MLB currency, by level (cards/milb_corpus.py).
+    if not milb_corpus:
+        _apply_runexp_currency(all_rows)
 
     # Recompute InZone from the plate coordinates, exactly as process_data
     # does before any stat touches the rows. The sheet's InZone column is
@@ -5551,6 +5602,12 @@ def main():
                 game_dates_seen.add(row_date)
                 team_dates[row.get('_card_team', team)].add(row_date)
                 dates_by_pitcher[pitcher_name].add(row_date)
+
+    for _nm, _pl in corpus_players.items():
+        if _nm in pitches_by_pitcher:
+            ibb_by_pitcher[_nm] = _mc.ibb_count(_pl, pitches_by_pitcher[_nm])
+    if milb_corpus:
+        date_slug = f"{_mc.file_slug(milb_scope, _mc.parse_levels(milb_levels))}-{date_slug}"
 
     pitcher_names = sorted(pitches_by_pitcher.keys())
     print(f"  Found {len(pitcher_names)} pitchers across {len(game_dates_seen)} game dates: {', '.join(pitcher_names)}")
@@ -5698,6 +5755,11 @@ def main():
                 print(f"  [WARN] {pitcher_name}: unparseable Game Date "
                       f"{max(dates_by_pitcher[pitcher_name])!r} ({_e}); "
                       f"header carries no Through date")
+        if pitcher_name in corpus_players:
+            # The levels replace 'Season': the corpus is tracked games, not his year.
+            card_date = card_date.replace(
+                display_date, corpus_players[pitcher_name]['label']
+                + (f"  ·  {display_date}" if date_filter is not None else ''), 1)
         pitches = pitches_by_pitcher[pitcher_name]
         print(f"\n  --- {pitcher_name} ({len(pitches)} pitches) ---")
 
@@ -5710,7 +5772,8 @@ def main():
         hand = pitches[0].get('Throws', 'R') if pitches else 'R'
 
         # Look up MLB ID
-        mlb_id = lookup_mlb_id(pitcher_name, teams[0], mlb_cache)
+        mlb_id = (corpus_players[pitcher_name]['mlbId'] if pitcher_name in corpus_players
+                  else lookup_mlb_id(pitcher_name, teams[0], mlb_cache))
         print(f"  MLB ID: {mlb_id}")
 
         # Get age from MLB API
@@ -5797,7 +5860,15 @@ def main():
             # xFIP takes SIERA's slot. Gated on the DATA: an MLB arm on a scratch
             # tab has no FG minors row and keeps the box trio. Every fallback
             # announces itself.
-            if scratch_tab and mlb_id is not None:
+            # The corpus covers tracked games only, and the FG line covers his whole
+            # minor league year, so the two would share a strip with different
+            # samples. It shows ERA from the box and leaves FIP and SIERA blank.
+            if pitcher_name in corpus_players and corpus_players[pitcher_name]['mlb_only']:
+                pass
+            elif milb_corpus:
+                stat_headers = stat_headers[:4]
+                stat_values = stat_values[:4]
+            elif scratch_tab and mlb_id is not None:
                 from pipeline.fg_overrides import fetch_milb_pitcher_line
                 _yrs = [int(str(p.get('Game Date'))[:4]) for p in pitches
                         if str(p.get('Game Date', ''))[:4].isdigit()]
@@ -5920,6 +5991,10 @@ def main():
                     pctl_row,
                     scratch_ctx['norm_by_pitcher'].get(pitcher_name) or [],
                     box.get('g'), box.get('gs'), eff_team, _epc)
+                # The pipeline scores no hdERA on a ROC/AAA row: its xwOBA channel reads a
+                # level shift of +0.77 runs. Every card with minor league rows follows.
+                if pitcher_name in corpus_players and not corpus_players[pitcher_name]['mlb_only']:
+                    _dh = None
                 pctl_row['hdERA'] = _dh
                 pctl_row['hpERA'] = _ph
                 print(f"  Window context: hdERA {_dh} | hpERA {_ph}")
@@ -5955,7 +6030,8 @@ def main():
             'hand': hand,
             # display_team overrides the header label only; every data lookup
             # above stays keyed on eff_team (the tab/leaderboard identity).
-            'team': display_team or eff_team,
+            'team': display_team or (corpus_players[pitcher_name]['club']
+                                     if pitcher_name in corpus_players else eff_team),
             'age': age,
             'game_date': card_date,
             'stat_headers': stat_headers,

@@ -1297,6 +1297,16 @@ class _SkipFGOverride(Exception):
     """Sentinel: the FanGraphs season override does not apply to this card."""
 
 
+def _corpus_identity(hitter_name, player):
+    """The identity fields of a leaderboard row, for a hitter with no leaderboard row."""
+    from cards.pitcher import fetch_player_metadata
+    meta = fetch_player_metadata(player['mlbId'])
+    bats = {p.get('Bats') for p in player['rows'] if p.get('Bats') in ('L', 'R')}
+    return {'hitter': hitter_name, 'team': player['club'], 'mlbId': player['mlbId'],
+            'age': meta.get('age'), 'throws': meta.get('hand'), 'position': meta.get('position'),
+            'stands': 'S' if len(bats) > 1 else (bats.pop() if bats else 'R')}
+
+
 def _build_window_hitter_row(season_row, window_pitches, metadata):
     """Rebuild one hitter's leaderboard row from a date window's pitches."""
     from pipeline.compute import compute_hitter_stats, compute_expected_stats
@@ -1368,7 +1378,8 @@ def _build_window_hitter_row(season_row, window_pitches, metadata):
 def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                        output_dir=OUTPUT_DIR, layout='bubbles', la_view='damage',
                        date_filter=None, date_display=None, date_slug=None,
-                       show_notes=False):
+                       show_notes=False, milb_corpus=False, milb_levels=None,
+                       milb_player_id=None, milb_scope='all'):
     """Render a seasonal hitter card, or a card for one date window.
 
     date_filter:
@@ -1404,10 +1415,28 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     hitter_lb = load_hitter_leaderboard()
     metadata = load_metadata()
 
-    # Find hitter row
-    hitter_rows = [r for r in hitter_lb if r.get('hitter') == hitter_name]
-    if team_abbrev:
-        hitter_rows = [r for r in hitter_rows if r.get('team') == team_abbrev]
+    # Corpus card: no leaderboard row exists, so identity comes from the corpus
+    # and the MLB people endpoint, and the window path below scores the rest.
+    corpus_player = None
+    if milb_corpus:
+        from cards import milb_corpus as _mc
+        corpus_player = _mc.load_players(
+            'batter', [hitter_name], _mc.parse_levels(milb_levels), milb_player_id,
+            milb_scope, all_pitches).get(hitter_name)
+        if corpus_player is None:
+            return False
+        team_abbrev = None
+        hitter_rows = [_corpus_identity(hitter_name, corpus_player)]
+        # The levels replace 'Season': the corpus is tracked games, not his year.
+        year_label = corpus_player['label']
+        if date_display:
+            date_display = f"{year_label}  ·  {date_display}"
+        date_slug = f"{_mc.file_slug(milb_scope, _mc.parse_levels(milb_levels))}-{date_slug or '2026'}"
+    else:
+        # Find hitter row
+        hitter_rows = [r for r in hitter_lb if r.get('hitter') == hitter_name]
+        if team_abbrev:
+            hitter_rows = [r for r in hitter_rows if r.get('team') == team_abbrev]
     if not hitter_rows:
         print(f"  ERROR: {hitter_name} not found in leaderboard")
         return False
@@ -1425,7 +1454,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # is a physical tool (Statcast hardware is MLB-only), so an MLB reading
     # is valid context on an AAA card; nothing else from the MLB row is
     # merged. Rendered as its own "BAT TRACKING (MLB)" bubble section.
-    if team == 'ROC' and date_filter is None:
+    if team == 'ROC' and date_filter is None and not milb_corpus:
         _mid = h_row.get('mlbId')
         _mlb_rows = [r for r in hitter_lb
                      if r.get('hitter') == hitter_name
@@ -1441,9 +1470,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                   f"({_mlb.get('team')}, {_mlb.get('pa')} PA)")
 
     # Filter pitches to this hitter (and team if specified)
-    hitter_pitches = [p for p in all_pitches
-                      if p.get('Batter') == hitter_name
-                      and (not team_abbrev or p.get('BTeam') == team_abbrev)]
+    if milb_corpus:
+        hitter_pitches = _mc.as_pickle_rows(corpus_player['rows'], all_pitches)
+    else:
+        hitter_pitches = [p for p in all_pitches
+                          if p.get('Batter') == hitter_name
+                          and (not team_abbrev or p.get('BTeam') == team_abbrev)]
     if not hitter_pitches:
         print(f"  ERROR: no pitches found for {hitter_name}")
         return False
@@ -1463,6 +1495,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         print(f"  Date window {_lo} → {_hi}: "
               f"{len(hitter_pitches)} of {_season_n} season pitches")
 
+    if date_filter is not None or milb_corpus:
         # Values from the window; percentiles from the SEASON pool, for every
         # stat, with no sample-size gate. A hot three-week stretch is allowed
         # to read as an elite percentile — that is the whole point, and it is
@@ -1473,8 +1506,24 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             h_row = score_window_against_season(
                 (hitter_name, h_row.get('team') or team),
                 hitter_pitches, all_pitches, hitter_lb, metadata,
-                date_range=date_filter,
+                # None skips the FanGraphs range line, which is MLB only.
+                date_range=(date_filter if not milb_corpus or corpus_player['mlb_only']
+                            else None),
                 identity_mlb_id=_season_row.get('mlbId'))
+            if milb_corpus:
+                _official = corpus_player['official'] or {}
+                if not corpus_player['mlb_only']:
+                    _mc.add_ibb(h_row, hitter_pitches,
+                                _mc.ibb_count(corpus_player, hitter_pitches))
+                    # wRC+ is relative to a run environment. Against the MLB constants a minor
+                    # league line is not a wRC+, and FanGraphs has no tracked-games line.
+                    h_row['wRCplus'] = h_row['wRCplus_pctl'] = None
+                elif date_filter is None:
+                    # A pure MLB season: the shipped wRC+, as on the season card.
+                    _mc.add_ibb(h_row, hitter_pitches,
+                                _mc.ibb_count(corpus_player, hitter_pitches))
+                    h_row['wRCplus'] = _official.get('wRCplus')
+                    h_row['wRCplus_pctl'] = _official.get('wRCplus_pctl')
             h_row.update({k: v for k, v in _season_row.items()
                           if k in ('mlbId', 'age', 'throws', 'position',
                                    'stands', 'sprintSpeed', 'sprintSpeed_pctl')
@@ -1654,7 +1703,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     # season-scoped, so the override would put four SEASON values back onto a
     # window card. FanGraphs itself does serve custom date ranges.
     try:
-        if date_filter is not None:
+        if date_filter is not None or milb_corpus:
             # A window pool already ran with window_mode=True, which skipped
             # the FanGraphs override on purpose. A pitch-rebuilt row has no
             # season values to protect either. Both cases: stay off.
@@ -3040,6 +3089,10 @@ def main():
     layout         = "bubbles"            # Card layout: "bubbles" or "classic"
     la_view        = "damage"             # LA x spray coloring: "damage" or "outcome"
     show_notes     = False                # Reader's notes under the bubble grid: True or False
+    milb_corpus    = False                # True = read data/_milb2026 for filter_hitters; team is ignored
+    milb_scope     = "all"                # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
+    milb_levels    = None                 # Levels, e.g. "AAA", "MLB", "AAA,MLB"; None = all corpus levels (AAA, Single-A, MLB-spring, Rookie, AFL, Prospect-event), no MLB
+    milb_player_id = None                 # Corpus only: the mlbId when one name is two players
     output_dir     = OUTPUT_DIR
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
@@ -3069,6 +3122,19 @@ def main():
     parser.add_argument('--notes', default=None, choices=['on', 'off'],
                          help="'on' draws the reader's notes under the bubble grid; "
                               "'off' drops them and the grid takes the space.")
+    parser.add_argument('--milb-corpus', action='store_true',
+                         help='Read pitches from the 2026 MiLB corpus (data/_milb2026). '
+                              'Needs --hitters; --team is ignored. Percentiles rank '
+                              'against the MLB season pool; wRC+ reads blank.')
+    parser.add_argument('--milb-scope', default=None, choices=['all', 'regular'],
+                         help='Corpus games: all (spring and AFL included), or regular '
+                              '(regular season + playoffs). Default: all')
+    parser.add_argument('--milb-levels', default=None,
+                         help='Levels to include, comma-separated: AAA, Single-A, MLB-spring, '
+                              'Rookie, AFL, Prospect-event, MLB. MLB is the regular season '
+                              'and joins only when named (default: every corpus level)')
+    parser.add_argument('--milb-player-id', default=None,
+                         help='Corpus only: the mlbId when one name is two players')
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -3080,6 +3146,10 @@ def main():
     if args.layout is not None: layout = args.layout
     if args.la_view is not None: la_view = args.la_view
     if args.notes is not None: show_notes = (args.notes == 'on')
+    if args.milb_corpus: milb_corpus = True
+    if args.milb_scope is not None: milb_scope = args.milb_scope
+    if args.milb_levels is not None: milb_levels = args.milb_levels
+    if args.milb_player_id is not None: milb_player_id = args.milb_player_id
 
     # Parse filter_hitters string into a list (empty string → render all)
     if filter_hitters:
@@ -3125,6 +3195,9 @@ def main():
         print(f"Date window: {date_label}. Every stat is rebuilt from the "
               f"window's pitches; wRC+ and the + family read '—'.")
 
+    if milb_corpus and not hitter_names:
+        print("Error: the MiLB corpus needs filter_hitters (--hitters)")
+        sys.exit(1)
     if hitter_names:
         team_label = team if team else 'auto-resolve team'
         print(f"═══ Generating hitter cards for {', '.join(hitter_names)} "
@@ -3135,7 +3208,9 @@ def main():
                                 layout=layout, la_view=la_view,
                                 date_filter=date_filter,
                                 date_display=date_display, date_slug=date_slug,
-                                show_notes=show_notes)
+                                show_notes=show_notes, milb_corpus=milb_corpus,
+                                milb_levels=milb_levels, milb_player_id=milb_player_id,
+                                milb_scope=milb_scope)
     else:
         # No specific names: render every (qualified) hitter, optionally filtered by team
         leaderboard = load_hitter_leaderboard()
