@@ -28,7 +28,7 @@ Agents page. Run it again after either Numbers file changes, then commit the JSO
 
     python3 scripts/builders/build_free_agents.py
 
-Hand decisions live by id in SIGNED, RETIRED, MLBPA_XXB and HAND_ADDED. To apply them with no source list on hand, and so without any
+Hand decisions live by id in SIGNED, RETIRED, REMOVED, MLBPA_XXB and HAND_ADDED. To apply them with no source list on hand, and so without any
 other list changes reaching the JSON:
 
     python3 scripts/builders/build_free_agents.py --overrides-only
@@ -90,6 +90,51 @@ HAND_ADDED = {
     674370: ('Osvaldo Bido', 'released'),
     665750: ('Leody Taveras', 'hand'),
     596117: ('Garrett Stubbs', 'hand'),
+    # On the Elected MLB FA, Elected MiLB FA or MLB-level Released columns of Wally's 2026/27 MLB Offseason sheet, 2026-11-03.
+    656976: ('Pavin Smith', 'elected'),
+    683155: ('Joey Estes', 'elected'),
+    664129: ('Geoff Hartlieb', 'elected'),
+    671286: ('Johnathan Rodríguez', 'elected'),
+    661531: ('Brian Serven', 'elected'),
+    683021: ('Michael Stefanic', 'elected'),
+    680577: ('DaShawn Keirsey Jr.', 'elected'),
+    677008: ('Heston Kjerstad', 'released'),
+    650968: ('Yohel Pozo', 'elected'),
+    682769: ('Eiberson Castellano', 'elected'),
+    669298: ('TJ Shook', 'elected'),
+    677060: ('Chad Stevens', 'elected'),
+    667452: ('Corey Julks', 'elected'),
+    676694: ('Jake Meyers', 'elected'),
+    656638: ('Alex Lange', 'elected'),
+    665861: ('Sebastián Rivero', 'elected'),
+    640459: ('Brian Navarreto', 'elected'),
+    676604: ('Tyler Zuber', 'elected'),
+    687287: ('Patrick Monteverde', 'elected'),
+    657649: ('Jared Koenig', 'elected'),
+    669060: ('Bryse Wilson', 'elected'),
+    656484: ('Tristan Gray', 'elected'),
+    693306: ('Aaron Sabato', 'elected'),
+    665506: ('Cristian Pache', 'elected'),
+    676572: ('Eric Wagaman', 'elected'),
+    681006: ('Josh Simpson', 'elected'),
+    642215: ('Weston Wilson', 'elected'),
+    669717: ('Will Wilson', 'elected'),
+    621550: ('Patrick Wisdom', 'elected'),
+    671345: ('Jason Foley', 'elected'),
+    663941: ('Tristan Beck', 'released'),
+    657424: ('Matt Gage', 'elected'),
+    678545: ('Osleivis Basabe', 'elected'),
+    668800: ('Andrew Knizner', 'elected'),
+    669270: ('Joel Kuhnel', 'elected'),
+    663611: ('Nick Madrigal', 'elected'),
+    669169: ('Jonathan Heasley', 'elected'),
+    657675: ('Rudy Martin Jr.', 'elected'),
+    663992: ('Richard Lovelady', 'elected'),
+    676571: ('PJ Poulin', 'elected'),
+}
+# Removed by hand per Wally 2026-11-03. A source list can still carry them, so they are dropped by id.
+REMOVED = {
+    623454: 'Drew Anderson',
 }
 BASE_SEASON = 2026          # the season just played; ages are for BASE_SEASON + 1
 PITCHER_POS = {'P', 'SP', 'RP', 'RHP', 'LHP'}
@@ -274,13 +319,13 @@ def write_out(players):
 
 
 def overrides_only():
-    """Apply SIGNED, RETIRED, MLBPA_XXB and HAND_ADDED to the current JSON, reading no source list."""
+    """Apply SIGNED, RETIRED, REMOVED, MLBPA_XXB and HAND_ADDED to the current JSON, reading no source list."""
     idx, _by_name = mlb_index()
     with open(OUT) as f:
         players = {e['mlbId']: e for e in json.load(f)['players']}
     n0 = len(players)
     for mid in list(players):
-        if mid in SIGNED or mid in RETIRED:
+        if mid in SIGNED or mid in RETIRED or mid in REMOVED:
             print(f'removed {players.pop(mid)["name"]} ({mid})')
     for mid in MLBPA_XXB:
         if mid not in idx:
@@ -306,7 +351,7 @@ def main():
     ap.add_argument('--released', default=os.path.join(DOWNLOADS, 'released.numbers'))
     ap.add_argument('--elected', default=os.path.join(DOWNLOADS, 'elected fa.numbers'))
     ap.add_argument('--overrides-only', action='store_true',
-                    help='apply SIGNED, RETIRED, MLBPA_XXB and HAND_ADDED to the current JSON and stop; reads no source list')
+                    help='apply SIGNED, RETIRED, REMOVED, MLBPA_XXB and HAND_ADDED to the current JSON and stop; reads no source list')
     args = ap.parse_args()
     if args.overrides_only:
         overrides_only()
@@ -321,7 +366,7 @@ def main():
     dropped = []   # (source, name, reason)
 
     def add(mid, source, status=None):
-        if mid in SIGNED or mid in RETIRED:
+        if mid in SIGNED or mid in RETIRED or mid in REMOVED:
             return
         e = players.setdefault(mid, {'mlbId': mid, 'name': idx[mid]['name'], 'sources': []})
         if source not in e['sources']:

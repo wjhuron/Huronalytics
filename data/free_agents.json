@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-02",
+ "generatedAt": "2026-11-03",
  "ageSeason": 2027,
  "players": [
   {
@@ -1053,6 +1053,14 @@
    "age": 33
   },
   {
+   "mlbId": 621550,
+   "name": "Wisdom, Patrick",
+   "sources": [
+    "elected"
+   ],
+   "age": 35
+  },
+  {
    "mlbId": 622608,
    "name": "Senzatela, Antonio",
    "sources": [
@@ -1110,15 +1118,6 @@
     "elected"
    ],
    "age": 36
-  },
-  {
-   "mlbId": 623454,
-   "name": "Anderson, Drew",
-   "sources": [
-    "fangraphs"
-   ],
-   "fgStatus": "TOSSUP",
-   "age": 33
   },
   {
    "mlbId": 623465,
@@ -1182,6 +1181,14 @@
     "fangraphs"
    ],
    "fgStatus": "IS_FA",
+   "age": 32
+  },
+  {
+   "mlbId": 640459,
+   "name": "Navarreto, Brian",
+   "sources": [
+    "elected"
+   ],
    "age": 32
   },
   {
@@ -1325,6 +1332,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 35
+  },
+  {
+   "mlbId": 642215,
+   "name": "Wilson, Weston",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
   },
   {
    "mlbId": 642232,
@@ -1532,6 +1547,14 @@
    "age": 30
   },
   {
+   "mlbId": 650968,
+   "name": "Pozo, Yohel",
+   "sources": [
+    "elected"
+   ],
+   "age": 30
+  },
+  {
    "mlbId": 656222,
    "name": "Beeks, Jalen",
    "sources": [
@@ -1577,6 +1600,14 @@
    "age": 33
   },
   {
+   "mlbId": 656484,
+   "name": "Gray, Tristan",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
+  },
+  {
    "mlbId": 656492,
    "name": "Griffin, Foster",
    "sources": [
@@ -1593,6 +1624,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 34
+  },
+  {
+   "mlbId": 656638,
+   "name": "Lange, Alex",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
   },
   {
    "mlbId": 656686,
@@ -1647,6 +1686,14 @@
    "age": 31
   },
   {
+   "mlbId": 656976,
+   "name": "Smith, Pavin",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
+  },
+  {
    "mlbId": 657041,
    "name": "Thomas, Lane",
    "sources": [
@@ -1673,6 +1720,14 @@
    "age": 32
   },
   {
+   "mlbId": 657424,
+   "name": "Gage, Matt",
+   "sources": [
+    "elected"
+   ],
+   "age": 34
+  },
+  {
    "mlbId": 657571,
    "name": "Ferguson, Caleb",
    "sources": [
@@ -1692,6 +1747,14 @@
    "age": 37
   },
   {
+   "mlbId": 657649,
+   "name": "Koenig, Jared",
+   "sources": [
+    "elected"
+   ],
+   "age": 33
+  },
+  {
    "mlbId": 657656,
    "name": "Laureano, Ramón",
    "sources": [
@@ -1699,6 +1762,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
+  },
+  {
+   "mlbId": 657675,
+   "name": "Martin Jr., Rudy",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
   },
   {
    "mlbId": 657756,
@@ -1753,6 +1824,14 @@
   {
    "mlbId": 661527,
    "name": "Martinez, Seth",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
+  },
+  {
+   "mlbId": 661531,
+   "name": "Serven, Brian",
    "sources": [
     "elected"
    ],
@@ -1817,6 +1896,14 @@
    "name": "Baker, Luken",
    "sources": [
     "released"
+   ],
+   "age": 30
+  },
+  {
+   "mlbId": 663611,
+   "name": "Madrigal, Nick",
+   "sources": [
+    "elected"
    ],
    "age": 30
   },
@@ -1891,6 +1978,14 @@
    "age": 30
   },
   {
+   "mlbId": 663941,
+   "name": "Beck, Tristan",
+   "sources": [
+    "released"
+   ],
+   "age": 31
+  },
+  {
    "mlbId": 663978,
    "name": "Paddack, Chris",
    "sources": [
@@ -1898,6 +1993,14 @@
     "released"
    ],
    "fgStatus": "IS_FA",
+   "age": 31
+  },
+  {
+   "mlbId": 663992,
+   "name": "Lovelady, Richard",
+   "sources": [
+    "elected"
+   ],
    "age": 31
   },
   {
@@ -1959,6 +2062,14 @@
     "fangraphs"
    ],
    "fgStatus": "IS_FA",
+   "age": 33
+  },
+  {
+   "mlbId": 664129,
+   "name": "Hartlieb, Geoff",
+   "sources": [
+    "elected"
+   ],
    "age": 33
   },
   {
@@ -2050,10 +2161,26 @@
    "age": 32
   },
   {
+   "mlbId": 665506,
+   "name": "Pache, Cristian",
+   "sources": [
+    "elected"
+   ],
+   "age": 28
+  },
+  {
    "mlbId": 665750,
    "name": "Taveras, Leody",
    "sources": [
     "hand"
+   ],
+   "age": 28
+  },
+  {
+   "mlbId": 665861,
+   "name": "Rivero, Sebastián",
+   "sources": [
+    "elected"
    ],
    "age": 28
   },
@@ -2126,6 +2253,14 @@
    "age": 33
   },
   {
+   "mlbId": 667452,
+   "name": "Julks, Corey",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
+  },
+  {
    "mlbId": 668227,
    "name": "Arozarena, Randy",
    "sources": [
@@ -2151,6 +2286,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 31
+  },
+  {
+   "mlbId": 668800,
+   "name": "Knizner, Andrew",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
   },
   {
    "mlbId": 668820,
@@ -2195,6 +2338,14 @@
    "age": 28
   },
   {
+   "mlbId": 669060,
+   "name": "Wilson, Bryse",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 669087,
    "name": "Huff, Sam",
    "sources": [
@@ -2220,12 +2371,28 @@
    "age": 29
   },
   {
+   "mlbId": 669169,
+   "name": "Heasley, Jonathan",
+   "sources": [
+    "elected"
+   ],
+   "age": 30
+  },
+  {
    "mlbId": 669211,
    "name": "Akin, Keegan",
    "sources": [
     "fangraphs"
    ],
    "fgStatus": "IS_FA",
+   "age": 32
+  },
+  {
+   "mlbId": 669270,
+   "name": "Kuhnel, Joel",
+   "sources": [
+    "elected"
+   ],
    "age": 32
   },
   {
@@ -2244,6 +2411,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
+  },
+  {
+   "mlbId": 669298,
+   "name": "Shook, TJ",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
   },
   {
    "mlbId": 669371,
@@ -2279,6 +2454,14 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
+  },
+  {
+   "mlbId": 669717,
+   "name": "Wilson, Will",
+   "sources": [
+    "elected"
+   ],
+   "age": 28
   },
   {
    "mlbId": 669720,
@@ -2407,12 +2590,28 @@
    "age": 28
   },
   {
+   "mlbId": 671286,
+   "name": "Rodríguez, Johnathan",
+   "sources": [
+    "elected"
+   ],
+   "age": 27
+  },
+  {
    "mlbId": 671289,
    "name": "Freeman, Tyler",
    "sources": [
     "elected"
    ],
    "age": 28
+  },
+  {
+   "mlbId": 671345,
+   "name": "Foley, Jason",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
   },
   {
    "mlbId": 672578,
@@ -2514,6 +2713,54 @@
    "age": 28
   },
   {
+   "mlbId": 676571,
+   "name": "Poulin, PJ",
+   "sources": [
+    "elected"
+   ],
+   "age": 30
+  },
+  {
+   "mlbId": 676572,
+   "name": "Wagaman, Eric",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
+   "mlbId": 676604,
+   "name": "Zuber, Tyler",
+   "sources": [
+    "elected"
+   ],
+   "age": 32
+  },
+  {
+   "mlbId": 676694,
+   "name": "Meyers, Jake",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
+  },
+  {
+   "mlbId": 677008,
+   "name": "Kjerstad, Heston",
+   "sources": [
+    "released"
+   ],
+   "age": 28
+  },
+  {
+   "mlbId": 677060,
+   "name": "Stevens, Chad",
+   "sources": [
+    "elected"
+   ],
+   "age": 28
+  },
+  {
    "mlbId": 677870,
    "name": "Jiménez, Leo",
    "sources": [
@@ -2528,6 +2775,22 @@
     "elected"
    ],
    "age": 27
+  },
+  {
+   "mlbId": 678545,
+   "name": "Basabe, Osleivis",
+   "sources": [
+    "elected"
+   ],
+   "age": 26
+  },
+  {
+   "mlbId": 680577,
+   "name": "Keirsey Jr., DaShawn",
+   "sources": [
+    "elected"
+   ],
+   "age": 30
   },
   {
    "mlbId": 680689,
@@ -2572,6 +2835,14 @@
    "age": 30
   },
   {
+   "mlbId": 681006,
+   "name": "Simpson, Josh",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 681146,
    "name": "Bride, Jonah",
    "sources": [
@@ -2595,6 +2866,30 @@
    ],
    "fgStatus": "IS_FA",
    "age": 31
+  },
+  {
+   "mlbId": 682769,
+   "name": "Castellano, Eiberson",
+   "sources": [
+    "elected"
+   ],
+   "age": 26
+  },
+  {
+   "mlbId": 683021,
+   "name": "Stefanic, Michael",
+   "sources": [
+    "elected"
+   ],
+   "age": 31
+  },
+  {
+   "mlbId": 683155,
+   "name": "Estes, Joey",
+   "sources": [
+    "elected"
+   ],
+   "age": 25
   },
   {
    "mlbId": 684007,
@@ -2622,12 +2917,28 @@
    "age": 29
   },
   {
+   "mlbId": 687287,
+   "name": "Monteverde, Patrick",
+   "sources": [
+    "elected"
+   ],
+   "age": 29
+  },
+  {
    "mlbId": 687957,
    "name": "Harris, Dustin",
    "sources": [
     "released"
    ],
    "age": 27
+  },
+  {
+   "mlbId": 693306,
+   "name": "Sabato, Aaron",
+   "sources": [
+    "elected"
+   ],
+   "age": 28
   },
   {
    "mlbId": 694350,
