@@ -54,10 +54,15 @@ OUT = os.path.join(DATA, 'free_agents.json')
 DOWNLOADS = os.path.expanduser('~/Downloads')
 
 FG_EXCLUDE = {'NOT_HAPPENING', 'PROBABLY_NOT_FA'}
-# Players who signed before reaching the market, by MLB id. A source list can
-# still carry them (the FanGraphs tracker lags), so they are dropped by id.
+# Players who are signed, by MLB id: before reaching the market, or with a new team on the 2026/27 MLB Offseason
+# sheet (per Wally 2026-11-03). A source list can still carry them (the FanGraphs tracker lags), so they are dropped by id.
 SIGNED = {
     641835: 'Tim Mayza, extension with PHI (2026-10)',
+    621097: 'Jacob Waguespack, re-signed with DET, MLB deal',
+    605244: 'Aramis Garcia, re-signed with ARI, MiLB deal',
+    660644: 'Vidal Bruján, ATL, MiLB deal',
+    676369: 'Nelson Velázquez, Asia',
+    675919: 'Nick Raquet, DET, MiLB deal',
 }
 # Retired, per Wally 2026-11-02. A source list can still carry them (the MLBPA XX(B) release did), so they are dropped by id.
 RETIRED = {
@@ -67,7 +72,6 @@ RETIRED = {
 }
 # On the MLBPA XX(B) release of 2026-10-29 with a 2026 MLB row, added per Wally 2026-11-02. No source list above had them.
 MLBPA_XXB = {
-    621097: 'Jacob Waguespack',
     621139: 'Brooks Kriske',
     605335: 'Brandon Leibrandt',
 }

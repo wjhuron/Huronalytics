@@ -680,14 +680,6 @@
    "age": 34
   },
   {
-   "mlbId": 605244,
-   "name": "Garcia, Aramis",
-   "sources": [
-    "elected"
-   ],
-   "age": 34
-  },
-  {
    "mlbId": 605280,
    "name": "Holmes, Clay",
    "sources": [
@@ -935,14 +927,6 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
-  },
-  {
-   "mlbId": 621097,
-   "name": "Waguespack, Jacob",
-   "sources": [
-    "mlbpa"
-   ],
-   "age": 33
   },
   {
    "mlbId": 621107,
@@ -1787,14 +1771,6 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
-  },
-  {
-   "mlbId": 660644,
-   "name": "Bruján, Vidal",
-   "sources": [
-    "elected"
-   ],
-   "age": 29
   },
   {
    "mlbId": 660761,
@@ -2675,22 +2651,6 @@
   {
    "mlbId": 675448,
    "name": "Hunt, Blake",
-   "sources": [
-    "released"
-   ],
-   "age": 28
-  },
-  {
-   "mlbId": 675919,
-   "name": "Raquet, Nick",
-   "sources": [
-    "released"
-   ],
-   "age": 31
-  },
-  {
-   "mlbId": 676369,
-   "name": "Velázquez, Nelson",
    "sources": [
     "released"
    ],
