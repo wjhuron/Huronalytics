@@ -489,7 +489,7 @@ def apply_hpwar(pitcher_rows, hitter_rows, aaa_teams=('ROC', 'AAA')):
             if not rec:
                 continue
             for k in HPWAR_KEYS:
-                r[k] = rec.get(k)
+                r[k] = None if rec.get('low') else rec.get(k)   # below the sample minimums (build_hpwar.py): blank rate, total stays
             for k, src_k in HPWAR_EXTRA.items():
                 r[k] = rec.get(src_k)
             r['hpWAR_unit'] = rec.get('unit')

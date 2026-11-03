@@ -45,6 +45,11 @@ OUT = os.path.join(ROOT, 'data', 'hpwar_projections.json')
 HORIZONS = {1: 'hpWAR', 3: 'hpWAR3', 5: 'hpWAR5'}
 UNIT_PT = {'PA600': 600.0, 'SP180': 180.0, 'RP60': 60.0}
 SP_SHARE = 0.5     # role cut for the pitcher unit; a convention (a starter is a pitcher who mostly starts)
+# Below BOTH minimums the rate columns stay blank on the site and the total stays (per Wally 2026-11-03). A display convention,
+# not a measured result: a full-season rate reads as a forecast for a player with almost no sample (Blake Hunt, Joey Estes). The
+# second minimum keeps a hurt regular such as Corbin Burnes. The rates stay in this file, so the rundown tables can still read them.
+LOW_PA_BASE, LOW_PA_HIST = 100, 300      # hitters: PA in BASE, PA in the batting history (BASE-3..BASE)
+LOW_IP_BASE, LOW_IP_HIST = 30, 200       # pitchers: IP in BASE, IP in BASE-2..BASE
 
 
 def num(v):
@@ -72,6 +77,7 @@ def main():
         if all(v is None for v in rec.values()):
             continue
         rec['unit'] = 'PA600'
+        rec['low'] = num(r.get('pa_2026')) < LOW_PA_BASE and num(r.get('pa_2024_26')) < LOW_PA_HIST
         rec['thin'] = r.get('thin_age_support') or ''
         add_total(rec, pt['hitters'].get(int(r['mlbId'])))
         hitters[r['mlbId']] = rec
@@ -82,6 +88,7 @@ def main():
         sp = share >= SP_SHARE
         rec = {key: num(r.get(f'WAR180_SP_{base + h}' if sp else f'WAR60_RP_{base + h}')) for h, key in HORIZONS.items()}
         rec['unit'] = 'SP180' if sp else 'RP60'
+        rec['low'] = num(r.get('ip_2026')) < LOW_IP_BASE and num(r.get('ip_2024_26')) < LOW_IP_HIST
         rec['thin'] = r.get('thin_age_support') or ''
         add_total(rec, pt['pitchers'].get(int(r['mlbId'])))
         pitchers[r['mlbId']] = rec
@@ -98,6 +105,8 @@ def main():
     with open(tmp, 'w') as f:
         json.dump(out, f, separators=(',', ':'), sort_keys=True)
     os.replace(tmp, OUT)
+    print(f"rates hidden below the sample minimums: {sum(v['low'] for v in hitters.values())} of {len(hitters)} hitters, "
+          f"{sum(v['low'] for v in pitchers.values())} of {len(pitchers)} pitchers")
     print(f'wrote {os.path.relpath(OUT, ROOT)}: {len(hitters)} hitters, {len(pitchers)} pitchers '
           f'({sum(1 for v in pitchers.values() if v["unit"] == "SP180")} SP180)')
 
