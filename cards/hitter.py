@@ -1799,10 +1799,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     print(f"  {len(hitter_pitches)} pitches faced")
 
-    # xwRC+ runs on the MLB formula, while a minor league wRC+ is FanGraphs' own line
-    # against its own league, so the pair is not on one scale. Furman read 113 and 115,
-    # which says he deserved more; on one scale he is 127 and 115 (2026-11-04).
-    if team in ('ROC', 'AAA') or (milb_corpus and not corpus_player['mlb_only']):
+    # xwRC+ runs on the MLB formula. At AAA that is close to FanGraphs' wRC+ scale, because
+    # two level gaps nearly cancel (2026, 161 hitters: 101.1 against 105.0, r .853): the
+    # formula reads an AAA line 16.7 points high, and AAA xwOBA runs about .030 below AAA
+    # wOBA (.035, .032, .032, .031 in 2023-2026). No lower level is measured, so a corpus
+    # card holding one has no xwRC+.
+    if milb_corpus and not set(corpus_player['levels']) <= {'AAA', 'MLB'}:
         h_row = dict(h_row)
         h_row['xWRCplus'] = h_row['xWRCplus_pctl'] = None
 
