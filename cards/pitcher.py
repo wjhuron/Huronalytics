@@ -2941,7 +2941,8 @@ def render_social_card(config, pitches, output_file):
         # Footer (2026-09-16, per Wally): the disc-size key replaces the
         # colour key, which the tinted chips carry on their own.
         # xFIP stands in for hdERA on a ROC row, and FanGraphs' minor league line supplies it.
-        _fg_src = is_season and (config.get('pctl_row') or {}).get('hdERA') is None
+        _prow = config.get('pctl_row') or {}
+        _fg_src = is_season and _prow.get('hdERA') is None and _prow.get('xFIP') is not None
         note_r = (('Data: MLB, Baseball Savant, FanGraphs' if _fg_src else 'Data: MLB, Baseball Savant')
                   + '  ·  disc size = usage  ·  '
                   + ('ring = expected movement  ·  ' if _expected else '')
