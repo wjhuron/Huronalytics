@@ -1101,6 +1101,11 @@ def _render_percentile_bubbles(fig, h_row, show_notes=False):
             _columns.append((name, _m))
         else:
             _columns.append((name, metrics))
+    if h_row.get('frv') is not None:
+        _fp = h_row.get('_fieldPos')
+        _columns.append(('FIELDING', [('FRV', 'frv', 'frv_pctl', 'dec1')]
+                         + [(lab, 'frv_' + part, f'frv_{part}_pctl', 'dec1')
+                            for lab, part in FIELDING_ROWS.get(_fp, []) if h_row.get('frv_' + part) is not None]))
     # Sprint Speed with no value leaves the grid (a ROC or corpus row): no dead row.
     _columns = [(nm_, [sp for sp in ms_ if sp[1] != 'sprintSpeed' or h_row.get('sprintSpeed') is not None])
                 for nm_, ms_ in _columns]
@@ -1147,9 +1152,11 @@ def _render_percentile_bubbles(fig, h_row, show_notes=False):
     # tangent. Combined with the fill-extends-into-circle trick below, the
     # bar and circle read as one connected glyph instead of "bar, gap,
     # bubble, gap, value".
-    BAR_HEIGHT_IN  = 0.34
+    # A long grid (the fielding rows) shrinks the row pitch, so the bars and circles follow it
+    # or they touch. 0.78 is a display convention; a card with no fielding rows and no notes stays at the 0.34 cap.
+    BAR_HEIGHT_IN  = min(0.34, 0.78 * row_h * fig.get_size_inches()[1])
     bar_h_axis     = BAR_HEIGHT_IN / fig.get_size_inches()[1]
-    CIRCLE_DIAM_IN = 0.40
+    CIRCLE_DIAM_IN = BAR_HEIGHT_IN * 0.40 / 0.34
     ellipse_w = CIRCLE_DIAM_IN / fig.get_size_inches()[0]
     ellipse_h = CIRCLE_DIAM_IN / fig.get_size_inches()[1]
     CIRCLE_CLEARANCE_AXIS_X = (CIRCLE_DIAM_IN / fig.get_size_inches()[0]) * 0.55
@@ -1372,7 +1379,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
 
     # A stat with no value leaves the row (hWAR on a window or MiLB card).
     tiles = [('AVG', 'avg', '3dec'), ('OBP', 'obp', '3dec'), ('SLG', 'slg', '3dec'), ('wRC+', 'wRCplus', 'int'),
-             ('xwRC+', 'xWRCplus', 'int'), ('PROCESS+', 'processPlus', 'plus'), ('hWAR', 'hWAR', 'dec1')]
+             ('xwRC+', 'xWRCplus', 'int'), ('PROCESS+', 'processPlus', 'plus'), ('hWAR', 'hWAR', 'dec1'), ('FRV', 'frv', 'dec1')]
     tiles = [c for c in tiles if h_row.get(c[1]) is not None]
     gap = .012
     w = (R + .0028 - L - gap * (len(tiles) - 1)) / max(len(tiles), 1)
@@ -1487,6 +1494,48 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
     plt.close(fig)
     print(f'  Saved: {output_file}')
     return True
+
+
+# Fielding rows by position, all Savant Fielding Run Value parts (2026-11-03, per Wally;
+# scripts/research/fielding/position_metric_battery.py). Runs, so a negative keeps its sign.
+FIELDING_ROWS = {'C': [('Framing', 'framing'), ('Blocking', 'blocking'), ('Throwing', 'throwing')],
+                 '1B': [('Range', 'range'), ('Receiving', 'rec1b')]}
+for _p in ('2B', '3B', 'SS'):
+    FIELDING_ROWS[_p] = [('Range', 'range')]
+for _p in ('LF', 'CF', 'RF'):
+    FIELDING_ROWS[_p] = [('Range', 'range'), ('Arm', 'arm')]
+_POS_OUTS_KEY = {'C': '2', '1B': '3', '2B': '4', '3B': '5', 'SS': '6', 'LF': '7', 'CF': '8', 'RF': '9'}
+
+
+def add_fielding(h_row, position):
+    """h_row plus FRV and its parts for this position, with percentiles: FRV against every
+    listed fielder, a part against fielders whose most outs came at this position. Blank
+    when Savant does not list him, which leaves the fielding rows off the card."""
+    from cards.pitcher import _rank_in_mlb_pool
+    path = os.path.join(_REPO, 'data', 'fielding_runs_cache.json')
+    if not os.path.exists(path):
+        print('  WARNING: no data/fielding_runs_cache.json, so the card has no fielding rows. '
+              'Rebuild it: python3 -m pipeline.process_data')
+        return h_row
+    with open(path) as f:
+        cache = json.load(f)
+    me = cache.get(str(h_row.get('mlbId')))
+    if me is None or me.get('total') is None:
+        print(f"  No Savant fielding row for {h_row.get('hitter')}: no fielding rows.")
+        return h_row
+    row = dict(h_row)
+    row['frv'] = me['total']
+    row['frv_pctl'] = _rank_in_mlb_pool(me['total'], sorted(v['total'] for v in cache.values() if v.get('total') is not None))
+    key = _POS_OUTS_KEY.get(position)
+    peers = [v for v in cache.values() if key and v.get('outs_by_pos') and any(v['outs_by_pos'].values())
+             and max(v['outs_by_pos'], key=v['outs_by_pos'].get) == key]
+    for _lab, part in FIELDING_ROWS.get(position, []):
+        if me.get(part) is None:
+            continue
+        row['frv_' + part] = me[part]
+        row[f'frv_{part}_pctl'] = _rank_in_mlb_pool(me[part], sorted(v[part] for v in peers if v.get(part) is not None))
+    row['_fieldPos'] = position
+    return row
 
 
 def _corpus_identity(hitter_name, player):
@@ -1740,6 +1789,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             h_row = _build_window_hitter_row(_season_row, hitter_pitches, metadata)
 
     print(f"  {len(hitter_pitches)} pitches faced")
+
+    # FRV is an MLB full-season value: a date window, ROC or minor league card has none.
+    if date_filter is None and team not in ('ROC', 'AAA') and (not milb_corpus or corpus_player['mlb_only']):
+        h_row = add_fielding(h_row, position_override or h_row.get('position'))
 
     if social:
         _slug = date_slug or year_label.replace(' ', '_')

@@ -222,6 +222,7 @@ def fetch_fielding_runs(year=2026):
             out[str(int(pid))] = {
                 'name': r.get('name'), 'team_id': r.get('team_id'),
                 'range': f('range_runs'), 'arm': f('arm_runs'), 'dp': f('dp_runs'),
+                'rec1b': f('fielding_runs_prevented_on_rec1b'),
                 'catching': f('catching_runs'), 'framing': f('framing_runs'),
                 'throwing': f('throwing_runs'), 'blocking': f('blocking_runs'),
                 'total': f('total_runs'),
