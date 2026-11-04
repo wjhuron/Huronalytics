@@ -12,7 +12,7 @@ scikit-learn
 xgboost==3.4.1
 
 # Cards + report rendering (cards/pitcher.py, cards/hitter.py)
-matplotlib
+matplotlib==3.11.1
 Pillow
 
 # Scrapers + Savant/MLB API pulls (scrapers/pitcher2026.py,

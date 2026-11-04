@@ -221,7 +221,9 @@ def main():
             if not ibb_hitters:
                 continue
             total = sum(h['ibb'] for h in ibb_hitters)
-            if total > cand.get(pk, 0):
+            # On a tie the LATER date wins: a postponed game's copy sits on its original
+            # date, and a marker dated there made the card count the game twice.
+            if total > cand.get(pk, 0) or (total == cand.get(pk) and date > date_of[pk]):
                 cand[pk] = total
                 date_of[pk] = date
             for h in ibb_hitters:

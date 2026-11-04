@@ -1379,7 +1379,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
 
     # A stat with no value leaves the row (hWAR on a window or MiLB card).
     tiles = [('AVG', 'avg', '3dec'), ('OBP', 'obp', '3dec'), ('SLG', 'slg', '3dec'), ('wRC+', 'wRCplus', 'int'),
-             ('xwRC+', 'xWRCplus', 'int'), ('PROCESS+', 'processPlus', 'plus'), ('hWAR', 'hWAR', 'dec1'), ('FRV', 'frv', 'dec1')]
+             ('xwRC+', 'xWRCplus', 'int'), ('PROCESS+', 'processPlus', 'plus'), ('hdWAR', 'hWAR', 'dec1'), ('FRV', 'frv', 'dec1')]
     tiles = [c for c in tiles if h_row.get(c[1]) is not None]
     gap = .012
     w = (R + .0028 - L - gap * (len(tiles) - 1)) / max(len(tiles), 1)
@@ -1489,7 +1489,8 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             rr(x0 + .29, y - .0165, .088, .033, fc, r=.009)
             t(x0 + .334, y, '—' if pc is None else f'{pc:.0f}', 12, ink_on(fc), 'black', 'Bitter')
     t(L, .0123, 'huronalytics.vercel.app', 10.5, ink_dark, 'normal', ha='left')
-    t(R, .0123, 'Data: MLB, Baseball Savant  ·  chips = MLB percentile', 8.2, ink_dark, 'normal', ha='right')
+    _src = 'MLB, Baseball Savant, FanGraphs' if h_row.get('wRCplus') is not None else 'MLB, Baseball Savant'
+    t(R, .0123, f'Data: {_src}  ·  chips = MLB percentile', 8.2, ink_dark, 'normal', ha='right')
     fig.savefig(output_file, dpi=135, facecolor=BG)
     plt.close(fig)
     print(f'  Saved: {output_file}')
@@ -1649,6 +1650,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         'bubbles' layout only. True draws the reader's notes under the
         percentile grid. False drops them and the grid takes the space.
     """
+    from pipeline.utils import AAA_TEAMS as _AAA, is_combined_team as _is_comb
     _span = date_display or year_label
     print(f"Generating hitter card: {hitter_name} ({team_abbrev or 'auto'}) — {_span} [layout={layout}]")
 
@@ -1686,9 +1688,12 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         print(f"  ERROR: {hitter_name} not found in leaderboard")
         return False
     if len(hitter_rows) > 1:
-        # Prefer single-team row over multi-team aggregate
-        single = [r for r in hitter_rows if not (str(r.get('team', '')).endswith('TM'))]
-        hitter_rows = single or hitter_rows
+        # No team named: his whole MLB season. A traded hitter's combined row, else his
+        # MLB row, and a ROC row only when he has nothing else. The combined row never
+        # holds a ROC stint, so ROC stays reachable with team="ROC".
+        _comb = [r for r in hitter_rows if _is_comb(r.get('team'))]
+        _mlb = [r for r in hitter_rows if r.get('team') not in _AAA]
+        hitter_rows = _comb or sorted(_mlb or hitter_rows, key=lambda r: -(r.get('pa') or 0))
     h_row = hitter_rows[0]
     _season_row = dict(h_row)   # identity fields a window row cannot derive
     team = h_row.get('team') or team_abbrev or '???'
@@ -1718,9 +1723,13 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     if milb_corpus:
         hitter_pitches = _mc.as_pickle_rows(corpus_player['rows'], all_pitches)
     else:
+        # The pitches follow the row the card shows (2026-11-04): Arraez read SFG, 464 PA
+        # over a chart of all 655 PA, and team="2TM" found no pitches, because no pitch
+        # carries a combined label.
         hitter_pitches = [p for p in all_pitches
                           if p.get('Batter') == hitter_name
-                          and (not team_abbrev or p.get('BTeam') == team_abbrev)]
+                          and (p.get('BTeam') not in _AAA if _is_comb(team)
+                               else p.get('BTeam') == team)]
     if not hitter_pitches:
         print(f"  ERROR: no pitches found for {hitter_name}")
         return False
@@ -1790,8 +1799,25 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
 
     print(f"  {len(hitter_pitches)} pitches faced")
 
-    # FRV is an MLB full-season value: a date window, ROC or minor league card has none.
-    if date_filter is None and team not in ('ROC', 'AAA') and (not milb_corpus or corpus_player['mlb_only']):
+    # xwRC+ runs on the MLB formula, while a minor league wRC+ is FanGraphs' own line
+    # against its own league, so the pair is not on one scale. Furman read 113 and 115,
+    # which says he deserved more; on one scale he is 127 and 115 (2026-11-04).
+    if team in ('ROC', 'AAA') or (milb_corpus and not corpus_player['mlb_only']):
+        h_row = dict(h_row)
+        h_row['xWRCplus'] = h_row['xWRCplus_pctl'] = None
+
+    # One stint of a traded hitter: FanGraphs' wRC+ and Savant's FRV are his whole season,
+    # so neither belongs beside a stint line. Wynns read .077/.143/.077 with a 3TM wRC+.
+    _stint = (date_filter is None and not milb_corpus and team not in ('ROC', 'AAA')
+              and any(r.get('hitter') == hitter_name and _is_comb(r.get('team'))
+                      and r.get('mlbId') == h_row.get('mlbId') for r in hitter_lb))
+    if _stint and not _is_comb(team):
+        h_row = dict(h_row)
+        h_row['wRCplus'] = h_row['wRCplus_pctl'] = None
+
+    # FRV is an MLB full-season value: a date window, stint, ROC or minor league card has none.
+    if (date_filter is None and team not in ('ROC', 'AAA') and not (_stint and not _is_comb(team))
+            and (not milb_corpus or corpus_player['mlb_only'])):
         h_row = add_fielding(h_row, position_override or h_row.get('position'))
 
     if social:
@@ -2023,7 +2049,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         ax_main.add_patch(Rectangle((cur_x, stat_y_header), cw, cell_h,
                                      facecolor=DARKER, edgecolor=SUBTLE_BORDER,
                                      linewidth=0.8))
-        ax_main.text(cur_x + cw / 2, stat_y_header + cell_h / 2, k,
+        ax_main.text(cur_x + cw / 2, stat_y_header + cell_h / 2, 'hdWAR' if k == 'hWAR' else k,
                       fontsize=12, ha='center', va='center', color=TEXT_SECONDARY,
                       fontweight='bold', fontfamily='IBM Plex Sans Condensed')
         # Value cell — percentile-colored bg
@@ -3420,6 +3446,11 @@ def main():
         targets = [r for r in leaderboard if r.get('bipQual')]
         if team:
             targets = [r for r in targets if r.get('team') == team]
+        else:
+            # One card per player: stints of a traded hitter share the combined row's file.
+            from pipeline.utils import is_combined_team as _is_comb
+            _traded = {r.get('mlbId') for r in leaderboard if _is_comb(r.get('team'))}
+            targets = [r for r in targets if _is_comb(r.get('team')) or r.get('mlbId') not in _traded]
         team_label = team if team else 'all teams'
         print(f"═══ Generating hitter cards for {len(targets)} hitters "
               f"({team_label}) — {span_label} ═══\n")

@@ -1048,7 +1048,9 @@ def fetch_game_pks_for_date(date_str, include_live=False, sport_id=1, team_filte
         for date_data in data.get('dates', []):
             for game in date_data.get('games', []):
                 state = game.get('status', {}).get('abstractGameState', '')
-                if state == 'Final' or (include_live and state == 'Live'):
+                # A postponed game reads abstract 'Final' on its original date and the
+                # makeup reuses the gamePk, so the coded state decides (_game_is_completed).
+                if (state == 'Final' and game.get('status', {}).get('codedGameState') == 'F') or (include_live and state == 'Live'):
                     if team_filter:
                         away = game.get('teams',{}).get('away',{}).get('team',{}).get('name','')
                         home = game.get('teams',{}).get('home',{}).get('team',{}).get('name','')
@@ -1214,7 +1216,11 @@ def fetch_boxscores_for_team_dates(dates, team_abbrev, include_live=False):
                 continue
             for game in date_data.get('games', []):
                 state = game.get('status', {}).get('abstractGameState', '')
-                if state != 'Final' and not (include_live and state == 'Live'):
+                # Coded 'F' only: a postponed game is abstract 'Final' on its original
+                # date and its makeup reuses the gamePk, so one game counted twice
+                # (T. Rogers read 75 G, 72.0 IP against an official 74, 71.0, 2026-11-04).
+                _played = state == 'Final' and game.get('status', {}).get('codedGameState') == 'F'
+                if not _played and not (include_live and state == 'Live'):
                     continue
                 if milb_config:
                     away = game.get('teams', {}).get('away', {}).get('team', {}).get('name', '')
@@ -1222,7 +1228,7 @@ def fetch_boxscores_for_team_dates(dates, team_abbrev, include_live=False):
                     if milb_config['search_name'] not in away and milb_config['search_name'] not in home:
                         continue
                 games_by_date.setdefault(gd, []).append(
-                    (game['gamePk'], state == 'Final'))
+                    (game['gamePk'], _played))
     except Exception as e:
         print(f"  Error fetching ranged schedule: {e} — falling back to per-date fetch")
         return [g for gd in sorted(date_set)
@@ -2805,7 +2811,7 @@ def render_social_card(config, pitches, output_file):
                         # White ink on tinted chips; a valueless beige chip
                         # keeps dark ink (2026-08-28, per Wally).
                         _ink = TEXT_PRIMARY if g is None else _ink_on(fc)
-                        txt(cx, ry, '—' if g is None else '%.0f' % g, fs,
+                        txt(cx, ry, '—' if g is None else f'{half_up(g)}', fs,
                             _ink, 'black', family='Bitter')
                         continue
                     if k is None:
@@ -2934,7 +2940,10 @@ def render_social_card(config, pitches, output_file):
                         print(f"  xwOBAcon parity {r_['pt']}: card {r_['xwobacon']:.3f} vs leaderboard {_lbx:.3f}")
         # Footer (2026-09-16, per Wally): the disc-size key replaces the
         # colour key, which the tinted chips carry on their own.
-        note_r = ('Data: MLB, Baseball Savant  ·  disc area = usage  ·  '
+        # xFIP stands in for hdERA on a ROC row, and FanGraphs' minor league line supplies it.
+        _fg_src = is_season and (config.get('pctl_row') or {}).get('hdERA') is None
+        note_r = (('Data: MLB, Baseball Savant, FanGraphs' if _fg_src else 'Data: MLB, Baseball Savant')
+                  + '  ·  disc size = usage  ·  '
                   + ('ring = expected movement  ·  ' if _expected else '')
                   + '100 = league avg')
 
@@ -5794,6 +5803,10 @@ def main():
         date_slug = f"{_mc.file_slug(milb_scope, _mc.parse_levels(milb_levels))}-{date_slug}"
 
     pitcher_names = sorted(pitches_by_pitcher.keys())
+    # The season label reads the data's year, not today's: on 2027-01-01 a 2026 card
+    # would read 2027 SEASON.
+    if date_filter is None and game_dates_seen:
+        display_date = str(max(game_dates_seen))[:4] + display_date[4:]
     print(f"  Found {len(pitcher_names)} pitchers across {len(game_dates_seen)} game dates: {', '.join(pitcher_names)}")
 
     # Season per-hand usage for the daily usage-bar ticks: ALL of a card
