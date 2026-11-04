@@ -4942,6 +4942,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         # International League number.
         _fg_aaa_p = _fg_pit_cache.get('aaaPitchers', {})
         n_aaa_replaced = n_aaa = 0
+        _aaa_other = []
         for row in pitcher_leaderboard:
             if not row.get('_isROC') or row.get('_isCombined'):
                 continue
@@ -4952,6 +4953,16 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             if not fg_a:
                 continue
             n_aaa += 1
+            # FanGraphs' AAA line spans every AAA club. When it is not this row's
+            # sample, the value belongs to another line (Krook: 18.1 ROC IP, FIP from
+            # 47.1), and the formula value reads the MLB constant, so the pair goes
+            # blank. On 2026, 33 rows match exactly and 7 run 7.2 IP or more long; the
+            # tolerance only has to sit between them, a convention, not a fitted value.
+            _fg_ip, _row_ip = fg_a.get('ip'), ip_str_to_float(row.get('ip')) or 0
+            if _fg_ip is not None and abs(ip_str_to_float(str(_fg_ip)) - _row_ip) > max(1.0, 0.05 * _row_ip):
+                row['fip'] = row['xFIP'] = None
+                _aaa_other.append(f"{row.get('pitcher')} {row.get('ip')}/{_fg_ip} IP")
+                continue
             changed = False
             if fg_a.get('fip') is not None:
                 row['fip'] = fg_a['fip']
@@ -4963,6 +4974,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 n_aaa_replaced += 1
         print(f"  FG AAA FIP/xFIP override: replaced "
               f"{n_aaa_replaced}/{n_aaa} ROC/AAA pitchers with FanGraphs values")
+        if _aaa_other:
+            print(f"  ROC FIP/xFIP blank, FanGraphs' AAA line is not this row's sample: {', '.join(_aaa_other)}")
     except _SkipSeasonOverride:
         print("  FG pitcher override SKIPPED (window run — our FG cache is "
               "season-scoped)")
