@@ -1990,6 +1990,10 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                     ('xBA',     'xBA'),
                     ('xSLG',    'xSLG'),
                 ):
+                    # A wRC+ already blank stays blank: the pipeline or the stint rule
+                    # above found that this line is not this row's sample.
+                    if row_k == 'wRCplus' and h_row.get('wRCplus') is None:
+                        continue
                     if _fg_player.get(cache_k) is not None:
                         if not _h_row_modified:
                             h_row = dict(h_row); _h_row_modified = True
