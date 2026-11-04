@@ -1,10 +1,13 @@
 """pipeline_eraplus.py — hdERA and hpERA (+ their 100-scale twins).
 
 hdERA (deserved ERA, descriptive): what the pitcher's season deserves on
-the ERA scale, luck stripped. Single channel by measurement — every
-second channel was swept and rejected (FIP's gain is 95% its HR term,
-HR/FB self-r 0.12; freed K/BB/xwOBAcon weights LOSE to packaged xwOBA in
-every replicate season).
+the ERA scale, luck stripped. One channel because it is descriptive: no
+second channel adds same-season description (FIP's gain is 95% its HR term,
+HR/FB self-r 0.12). Forecasting is a different matter: with no gate on the
+target period, adding K% wins next season by .029 r (SE .009, 5/5) and rest
+of season by .018 (SE .007, 6/6; war_battery_honest.py, 2026-11-04). The
+earlier result that freed K/BB weights lose came from gated pools. Forecasts
+belong to hpERA and hpWAR.
 
     hdERA = poolERA + DH_B * z(xwOBA against, shrunk at N0_XW PA)
 
@@ -93,7 +96,9 @@ hWAR (2026-09-05): a deserved pitcher WAR on hdERA. One pitcher-season:
               and says so.
 
 Improvement battery (2026-09-05, scripts/research/era/war_improve_battery.py + _battery2.py,
-war_calibration_slope.py; data/_war_improve_battery*.json). The rate is at a plateau: the
+war_calibration_slope.py; data/_war_improve_battery*.json). Its next-season and rest-of-season
+tests gate the TARGET period, which selects on the outcome, so read this paragraph with the
+2026-11-04 re-test below it. The rate is at a plateau: the
 xwOBA shrink N0 0-1000 moves nothing outside noise (250 stays), the linear-weights form
 (xwRAA) and K%/BB% channels lose, an xRV blend wins two objectives narrowly but loses
 reliability. Per-pitch channels: framing runs RECEIVED are half-stable (rel .43) and carry
@@ -107,12 +112,25 @@ DH_B stays. Volume stays innings (TBF-based moves nobody more than .6 WAR and cr
 dominance less). Role variable stays start share: innings per appearance explains none
 of the within-pitcher change.
 
+Re-test with no target gate (2026-11-04; war_battery_honest.py, war_forecast_honest.py,
+war_framing_fix.py, war_xrv_wp_size.py; data/_war_honest/). K% adds forecast only (above). BB%, running
+game and pulled air add nothing. WP + BK passes the description test (club slope 2.12 +/- .93), but
+it moves a pitcher by .12 WAR at one sd and overlaps catcher blocking: left out. xRV passes too, but it moves toward
+results on non-contact pitches, so that test can be gamed: left out. N0_XW peaks at 150 next season and 250
+rest of season, inside .001: 250 stays. A velocity term has no optimum (r rises through k = 4): left out.
+Removing a pitcher's own framing received still loses (next season -.018, 0/5). KNOWN LIMIT: framing is
+counted twice at club level, in catcher fielding runs and in the pitcher's K and BB (club pitcher RAA on club
+Savant framing +1.25 +/- .42). Removing the club's framing fails the harm rule on one target and
+moves one pitcher .2 WAR or more, so it stays out, per Wally.
+
 Why hdERA: three WARs built under identical conventions on the 2021-2026 replicates
 (scripts/research/era/war_rate_validation.py, data/_war_rate_validation.json), differing only
-in the rate. hdERA vs FIP: half-season reliability .467 vs .407 (5/6), next-season RA9 at 60 IP
-.355 vs .342 (3/5), at 30 IP .263 vs .229 (5/5), rest-of-season .328 vs .303, and on the 50
-pitchers per season where FIP-WAR and RA9-WAR disagree most .310 vs .270. Actual RA9 loses
-every test (reliability .212). No leverage term, by decision: it credits the manager's
+in the rate. That script gates the target period. With no gate, innings-weighted
+(war_forecast_honest.py), hdERA vs FIP: next-season RA9 at 30 IP .278 vs .247 (+.032, SE .013, 5/5; a
+tie on the park-adjusted target), at 60 IP .322 vs .305 (tie), rest-of-season .275 vs .257 (tie),
+and with no weights the gap is 0. Rest-of-season reliability .451 vs .361 (6/6). So hdERA is more
+reliable than FIP and forecasts about as well, not better. Actual RA9 loses
+every forecast test (.177 at 30 IP, .184 rest of season). No leverage term, by decision: it credits the manager's
 deployment, the same job-versus-pitcher line Pitcher+ drew. No league correction (one MLB
 pool) and no opponent adjustment. Relievers are not credited for the job; the role split in
 replacement CORRECTS the rate inflation the job gives them (WAR_ROLE_GAP 0.85 runs/9,
