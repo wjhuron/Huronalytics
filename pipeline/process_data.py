@@ -4319,6 +4319,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         _fg_aaa_h = _fg.get('aaaHitters', {})
         n_mlb_wrc = n_mlb = 0
         n_aaa_wrc = n_aaa = 0
+        n_aaa_other = []
         # fWAR (2026-09-15): FanGraphs WAR beside hWAR as the results-based
         # reference. FG publishes ONE season row per player, so a combined
         # 2TM.. row carries it whole and a traded player's stint rows carry it
@@ -4340,8 +4341,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 n_aaa += 1
                 fg_player = _fg_aaa_h.get(mid_str)
                 if fg_player and fg_player.get('wRCplus') is not None:
-                    row['wRCplus'] = fg_player['wRCplus']
-                    n_aaa_wrc += 1
+                    # FanGraphs' AAA line spans every AAA club. When it is not this
+                    # row's sample, the value belongs to another line (Kennedy: 55 ROC
+                    # PA at wOBA .267, wRC+ 134 from 273 PA), and the pipeline's formula
+                    # value is on the MLB scale, so the row goes blank. On 2026 the rows
+                    # either match exactly (20) or run 3x long (2); the tolerance only
+                    # has to sit between them, a convention, not a fitted value.
+                    _fg_pa, _row_pa = fg_player.get('pa'), row.get('pa') or 0
+                    if _fg_pa is not None and abs(_fg_pa - _row_pa) > max(5, 0.05 * _row_pa):
+                        row['wRCplus'] = None
+                        n_aaa_other.append(f"{row.get('hitter')} {_row_pa}/{_fg_pa} PA")
+                    else:
+                        row['wRCplus'] = fg_player['wRCplus']
+                        n_aaa_wrc += 1
             else:
                 n_mlb += 1
                 fg_player = _fg_mlb_h.get(mid_str)
@@ -4364,6 +4376,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                     # it still comes from FanGraphs.
         print(f"  FG hitter override: wRC+ {n_mlb_wrc}/{n_mlb} MLB + {n_aaa_wrc}/{n_aaa} AAA; fWAR {n_mlb_war}/{n_mlb} MLB rows"
               + ("  WARNING: 0 fWAR values, the FG cache predates the field or the fetch fell back" if n_mlb and not n_mlb_war else ""))
+        if n_aaa_other:
+            print(f"  ROC wRC+ blank, FanGraphs' AAA line is not this row's sample: {', '.join(n_aaa_other)}")
     except _SkipSeasonOverride:
         pass
     except Exception as _e:
