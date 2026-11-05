@@ -1486,7 +1486,10 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
     t(R, yk, '1.000+', 9, muted, '600', ha='right')
     ax.plot([L, R], [.3525, .3525], color=border, lw=1.1)
     _mlb_row = not h_row.get('_milbCard') and team not in ('ROC', 'AAA')
-    for (title, rows), x0 in zip(SOCIAL_HITTER_COLUMNS, (L, .525)):
+    # A AAA card has five results-and-tools rows against six approach rows, so the full column
+    # leads on the left (2026-11-05, per Wally).
+    _cols = SOCIAL_HITTER_COLUMNS if _mlb_row else SOCIAL_HITTER_COLUMNS[::-1]
+    for (title, rows), x0 in zip(_cols, (L, .525)):
         t(x0, .3345, title, 10.5, ink_dark, 'black', ha='left')
         y = .3345
         for lab, key, spec in rows:
