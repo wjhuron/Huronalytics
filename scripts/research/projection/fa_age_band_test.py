@@ -74,3 +74,16 @@ for h in (3, 5):
     print(f'pool fit {h} seasons, n {len(use)}: ' + ' '.join(f'{x:.3f}' for x in out[f'H_{h}']['coef']['M2']))
 import json
 json.dump(out, open(os.path.join(B.P, '_fa_age_band_fit.json'), 'w'), indent=1)
+
+# Part 4 (same day): the B > .5 pool fit removes the age-31+ lean but underpredicts the B .5-.8 band by 15-34% (the linear form bends at the pool edge),
+# so it is NOT adopted. Adopted instead: BQA, fit on every hitter, M2 plus B^2, B^2 x a and B x max(a, 0)^2. Held out it ties M2 on r
+# (3y +.0047, SE .0023, 3/6; 5y +.0012, SE .0030, 3/4) and is calibrated across B bands (.90-1.03) and ages (31-34 .94 / .91, against .87 / .82 for M2).
+def XQ(R):
+    b = np.array([B.blend_rate(r, w) * r['pt'] for r in R]); u = np.array([B.blend_rate(r, w) * 600 for r in R]); a = np.array([r['age'] - 30.0 for r in R])
+    return np.column_stack([np.ones(len(R)), b, b * a, u, u * a, a, b * b, b * b * a, b * np.maximum(a, 0) ** 2])
+out = {}
+for h in (3, 5):
+    use = [r for r in G if r[f'y{h}'] is not None]
+    out[f'H_{h}'] = {'form': 'BQA', 'coef': np.linalg.lstsq(XQ(use), np.array([r[f'y{h}'] for r in use]), rcond=None)[0].tolist(), 'n': len(use)}
+    print(f'BQA fit {h} seasons, n {len(use)}: ' + ' '.join(f'{x:.4f}' for x in out[f'H_{h}']['coef']))
+json.dump(out, open(os.path.join(B.P, '_fa_age_band_fit.json'), 'w'), indent=1)
