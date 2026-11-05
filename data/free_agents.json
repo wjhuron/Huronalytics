@@ -1357,14 +1357,6 @@
    "age": 32
   },
   {
-   "mlbId": 641598,
-   "name": "Garver, Mitch",
-   "sources": [
-    "released"
-   ],
-   "age": 36
-  },
-  {
    "mlbId": 641656,
    "name": "Hamilton, Ian",
    "sources": [
@@ -1427,14 +1419,6 @@
    "age": 36
   },
   {
-   "mlbId": 642020,
-   "name": "Robinson, Chuckie",
-   "sources": [
-    "released"
-   ],
-   "age": 32
-  },
-  {
    "mlbId": 642086,
    "name": "Smith, Dominic",
    "sources": [
@@ -1495,14 +1479,6 @@
    ],
    "fgStatus": "IS_FA",
    "age": 32
-  },
-  {
-   "mlbId": 642546,
-   "name": "Hernández, Jonathan",
-   "sources": [
-    "elected"
-   ],
-   "age": 30
   },
   {
    "mlbId": 642547,
@@ -1677,14 +1653,6 @@
     "fangraphs"
    ],
    "fgStatus": "IS_FA",
-   "age": 30
-  },
-  {
-   "mlbId": 650559,
-   "name": "De La Cruz, Bryan",
-   "sources": [
-    "released"
-   ],
    "age": 30
   },
   {
@@ -2490,14 +2458,6 @@
    "age": 27
   },
   {
-   "mlbId": 666624,
-   "name": "Morel, Christopher",
-   "sources": [
-    "released"
-   ],
-   "age": 28
-  },
-  {
    "mlbId": 666931,
    "name": "Oliva, Jared",
    "sources": [
@@ -2608,14 +2568,6 @@
    ],
    "fgStatus": "IS_FA",
    "age": 33
-  },
-  {
-   "mlbId": 668974,
-   "name": "Handley, Maverick",
-   "sources": [
-    "released"
-   ],
-   "age": 29
   },
   {
    "mlbId": 669004,
@@ -2998,14 +2950,6 @@
    "age": 27
   },
   {
-   "mlbId": 672335,
-   "name": "Pérez, Cionel",
-   "sources": [
-    "elected"
-   ],
-   "age": 31
-  },
-  {
    "mlbId": 672578,
    "name": "Hernández, Carlos",
    "sources": [
@@ -3143,14 +3087,6 @@
     "elected"
    ],
    "age": 29
-  },
-  {
-   "mlbId": 676596,
-   "name": "Fleming, Josh",
-   "sources": [
-    "elected"
-   ],
-   "age": 31
   },
   {
    "mlbId": 676604,
@@ -3313,14 +3249,6 @@
    "age": 30
   },
   {
-   "mlbId": 680716,
-   "name": "Ornelas, Jonathan",
-   "sources": [
-    "elected"
-   ],
-   "age": 27
-  },
-  {
    "mlbId": 680737,
    "name": "Helman, Michael",
    "sources": [
@@ -3426,14 +3354,6 @@
     "elected"
    ],
    "age": 27
-  },
-  {
-   "mlbId": 682515,
-   "name": "Porter, Logan",
-   "sources": [
-    "elected"
-   ],
-   "age": 31
   },
   {
    "mlbId": 682641,
@@ -3571,14 +3491,6 @@
     "elected"
    ],
    "age": 28
-  },
-  {
-   "mlbId": 693459,
-   "name": "Fedko, Kyler",
-   "sources": [
-    "released"
-   ],
-   "age": 27
   },
   {
    "mlbId": 694350,
