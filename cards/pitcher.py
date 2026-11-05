@@ -1966,8 +1966,10 @@ def _render_single_game_panel(fig, pitches, config=None):
 # (pitcher hand, batter hand, pitch type) -> sorted MLB cell values, read once per run.
 # Season-card color gates (2026-11-03, per Wally), set near the k where half the visible
 # spread is signal (scripts/research/cards/social_stabilize.py): Strike% k 106 pitches,
-# Whiff% k 40 swings, Loc+ k 44 pitches. Stuff+ (k 1-2) has no gate, xwOBAcon (k about 336
-# BIP) no color. The .50 point is a convention, not an optimum.
+# Whiff% k 40 swings, Loc+ k 44 pitches. Stuff+ (k 1-2) has no gate. The .50 point is a
+# convention, not an optimum. xwOBAcon (k about 336 BIP) never reaches it: its tint gates at
+# the card's 25 BIP convention so the column matches the others (2026-11-05, per Wally), about
+# 7% signal at the gate, so read that color as description of the sample, not as skill.
 SOCIAL_STRIKE_MIN_PITCHES = 100
 SOCIAL_WHIFF_MIN_SWINGS = 40
 SOCIAL_LOC_MIN_PITCHES = 50
@@ -2000,6 +2002,36 @@ def _social_tint_pools():
         q['whiff'].sort()
     _SOCIAL_TINT_POOLS = pools
     print(f"  Social tint pools: {len(pools)} type x hand groups")
+    return pools
+
+
+# xwOBAcon pools on the same cells, gated at XWC_COLOR_MIN_BIP.
+_SOCIAL_XWC_POOLS = None
+
+
+def _social_xwc_pools():
+    global _SOCIAL_XWC_POOLS
+    if _SOCIAL_XWC_POOLS is not None:
+        return _SOCIAL_XWC_POOLS
+    from pipeline.compute import compute_expected_stats
+    cells = defaultdict(list)
+    for p in _load_mlb_pickle() or []:
+        if p.get('_source') == 'MLB' and p.get('Pitch Type') and p.get('Description') == 'In Play':
+            cells[(p.get('Pitcher'), p.get('PTeam'), p.get('Throws'), p.get('Bats'), p.get('Pitch Type'))].append(p)
+    pools, sizes = defaultdict(list), []
+    for (_nm, _tm, th, bh, pt), pl in cells.items():
+        sizes.append(len(pl))
+        if len(pl) >= XWC_COLOR_MIN_BIP:
+            v = compute_expected_stats(pl, None).get('xwOBAcon')
+            if v is not None:
+                pools[(th, bh, pt)].append(v)
+    for v in pools.values():
+        v.sort()
+    _SOCIAL_XWC_POOLS = pools
+    sizes.sort()
+    print(f"  xwOBAcon pools: {len(sizes)} cells, median {sizes[len(sizes) // 2]} BIP, "
+          f"{sum(1 for n in sizes if n >= XWC_COLOR_MIN_BIP)} at {XWC_COLOR_MIN_BIP}+ BIP, "
+          f"{sum(1 for n in sizes if n >= 100)} at 100+ BIP")
     return pools
 
 
@@ -2654,6 +2686,7 @@ def render_social_card(config, pitches, output_file):
                 'rv': rv,
                 'rv100': (rv / len(pl) * 100) if rv is not None else None,
                 'xwobacon': compute_expected_stats(pl, None).get('xwOBAcon'),
+                'bip': sum(1 for p in pl if p.get('Description') == 'In Play'),
             }
 
         def _stats(plist):
@@ -2750,16 +2783,18 @@ def render_social_card(config, pitches, output_file):
                 txt(cx, hy, lab, 9.2, TEXT_PRIMARY, 'black',
                     ha='right' if al == 'r' else 'center')
 
-        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs):
+        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs, pool=None, invert=False):
             # Percentile tint behind Strike% and Whiff%, season card only, inside the
             # pitcher's own type and hands. Lighter than the grade chips so those stay
             # the main read. A cell under its gate gets no tint and is not in the pool.
-            pool = (_social_tint_pools().get((pitches[0].get('Throws'), bats, r_['pt'])) or {}).get(k)
-            _open = (r_['n'] >= SOCIAL_STRIKE_MIN_PITCHES if k == 'strike'
+            if pool is None:
+                pool = (_social_tint_pools().get((pitches[0].get('Throws'), bats, r_['pt'])) or {}).get(k)
+            _open = (r_['bip'] >= XWC_COLOR_MIN_BIP if k == 'xwobacon'
+                     else r_['n'] >= SOCIAL_STRIKE_MIN_PITCHES if k == 'strike'
                      else r_['sw'] >= SOCIAL_WHIFF_MIN_SWINGS)
             if not pool or not _open or r_.get(k) is None:
                 return
-            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool))[0]
+            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool, invert=invert))[0]
             from matplotlib.colors import to_rgb
             bg = to_rgb(BG)
             fc = tuple(0.55 * fc[i] + 0.45 * bg[i] for i in range(3))
@@ -2903,6 +2938,13 @@ def render_social_card(config, pitches, output_file):
                         v = ('—' if r_[k] is None
                              else ('%.3f' % r_[k]).replace('0.', '.', 1) if r_[k] < 1
                              else '%.3f' % r_[k])
+                        if is_season and bats and r_[k] is not None:
+                            if r_['bip'] < XWC_COLOR_MIN_BIP:
+                                _faded_right(cx, ry, v, fs)
+                                continue
+                            _xp = _social_xwc_pools().get((pitches[0].get('Throws'), bats, r_['pt']))
+                            if _xp:
+                                _tint_cell(cx, ry, rh, r_, k, bats, v, fs, pool=_xp, invert=True)
                         c_ = TEXT_PRIMARY
                     else:
                         # One decimal, no leading '+' (display rule); the
