@@ -70,6 +70,7 @@ RETIRED = {
     434378: 'Justin Verlander',
     489446: 'Kirby Yates',
     500743: 'Miguel Rojas',
+    641820: 'Trey Mancini, per Wally 2026-11-05',
 }
 # On the MLBPA XX(B) release of 2026-10-29 with a 2026 MLB row, added per Wally 2026-11-02. No source list above had them.
 MLBPA_XXB = {
@@ -169,7 +170,6 @@ HAND_ADDED = {
     682515: ('Logan Porter', 'elected'),
     644433: ('Chadwick Tromp', 'elected'),
     647315: ('Zach Pop', 'elected'),
-    641820: ('Trey Mancini', 'elected'),
     669256: ('Nick Solak', 'elected'),
     685005: ('Christian Roa', 'elected'),
     656413: ('Stuart Fairchild', 'elected'),
