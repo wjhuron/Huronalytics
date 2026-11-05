@@ -1382,7 +1382,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
     # leaves the line (a MiLB row can have no steals).
     _slash = '/'.join(fmt(h_row.get(k), '3dec') for k in ('avg', 'obp', 'slg'))
     _bits = [position, f'{bats}/{throws}', club, f"{h_row.get('pa', '—')} PA", _slash]
-    _bits += [f'{h_row[k]} {lab}' for k, lab in (('doubles', '2B'), ('hr', 'HR'), ('sb', 'SB'))
+    _bits += [f'{h_row[k]} {lab}' for k, lab in (('hr', 'HR'), ('doubles', '2B'), ('sb', 'SB'))
               if h_row.get(k) is not None]
     t(L, .9125, '  |  '.join(_bits), 11, muted, ha='left')
 
