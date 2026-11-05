@@ -2342,6 +2342,9 @@ def render_social_card(config, pitches, output_file):
         tile_row(0.835, 0.052, line, vsize=18)   # eight tiles: '23.2%' touched the edge at 19
         _tbl = _spl = True
         mv_top, mv_bot = 0.8175, 0.4355
+        # The season plot gives the Stuff+ strip its height back (2026-11-05, per Wally).
+        if config.get('stuff_place') == 'strip':
+            mv_bot += 0.025
 
     # movement plot (faded cloud + labeled centroids; ticks every 5)
     # Inset from the left card edge so the y-axis label ('INDUCED
@@ -2507,6 +2510,15 @@ def render_social_card(config, pitches, output_file):
                    edgecolors=BG, linewidths=1.8,
                    zorder=5 + (_nmax - n_) * 1e-4)
 
+    # One Stuff+ per pitch, the mean of its atoms over all pitches: a number that moves with
+    # the batter's hand read as confusing (2026-11-05, per Wally).
+    _sp_place = config.get('stuff_place') == 'strip'
+    _sp_total = {}
+    if _sp_place:
+        for pt_ in groups:
+            _s = [v for v in (_atom_of(p, 'Stuff+', 'stuff') for p in pitches
+                              if p.get('Pitch Type') == pt_) if v is not None]
+            _sp_total[pt_] = sum(_s) / len(_s) if _s else None
     _placed = []             # label boxes already committed, in data units
     for _ci, (pt_, mh, mvv, n_) in enumerate(_cents):
         col = PITCH_COLORS.get(pt_, '#777')
@@ -2691,7 +2703,12 @@ def render_social_card(config, pitches, output_file):
             _num_cols = [('USAGE', 0.370, 'r', 'usepct'),
                          ('STRIKE%', 0.510, 'r', 'strike'),
                          ('WHIFF%', 0.650, 'r', 'whiff')]
-        SPLIT_COLS = _num_cols + [('STUFF+', 0.775, 'c', 'stuff'),
+        if _sp_place:
+            # The Stuff+ column leaves both tables; the numerals spread into its slot.
+            _xs = [0.355 + i * (0.775 - 0.355) / max(len(_num_cols) - 1, 1)
+                   for i in range(len(_num_cols))]
+            _num_cols = [(c_[0], x_, c_[2], c_[3]) for c_, x_ in zip(_num_cols, _xs)]
+        SPLIT_COLS = _num_cols + ([] if _sp_place else [('STUFF+', 0.775, 'c', 'stuff')]) + [
                                   # LOC+ chips: optical overshoot past the
                                   # spine (see tile_row) — flat face flush
                                   # at the right margin.
@@ -2774,7 +2791,11 @@ def render_social_card(config, pitches, output_file):
                     # already says "N pitches" (same day, per Wally).
                     pass
                 else:
-                    ax.scatter([_cx], [_cy], s=215, color=col, edgecolors='none',
+                    # With the strip the disc follows the row, so a dense table does not
+                    # stack touching discs. 0.88 is a display convention.
+                    _ds = (min(215.0, (0.88 * rh * fig.get_figheight() * 72.0) ** 2)
+                           if _sp_place else 215)
+                    ax.scatter([_cx], [_cy], s=_ds, color=col, edgecolors='none',
                                transform=ax.transAxes, zorder=4)
                     # Season/range discs are a pure colour swatch: a 3-digit
                     # count measures 22.0px against a 22.0px usable chord, and
@@ -2900,13 +2921,43 @@ def render_social_card(config, pitches, output_file):
             # the two hand sections shrink as before.
             _nlines = _nrows + len(sections) + (1 if _total else 0)
             yb, hdr = mv_bot - SOCIAL_XLABEL_STACK, True
+            if _sp_place:
+                # One line under the x-label rule: STUFF+, then disc + chip per pitch by usage.
+                _st_y = yb + 0.010   # no rule above the strip, so it sits closer to the x-label
+                txt(_rail - _ink_left_pad(fig, 'STUFF+', 10.5, 'black'), _st_y, 'STUFF+',
+                    10.5, TEXT_PRIMARY, 'black', ha='left')
+                # Display conventions: colored code then chip, 11 pt for a phone (the plot's
+                # label style), chip 0.021 tall, last chip flush at the right margin.
+                _st_x0, _st_x1 = L + 0.105, R
+                _st_h, _st_fs, _st_code = 0.021, 11.0, 0.034
+                _st_n = max(len(_cents), 1)
+                _st_cw = min(0.054, (_st_x1 - _st_x0) / _st_n - _st_code - 0.008)
+                _st_cell = _st_code + _st_cw
+                _st_step = min(0.150, (_st_x1 - _st_x0 - _st_cell) / max(_st_n - 1, 1))
+                for _i, (pt_, _h, _v, _n) in enumerate(_cents):
+                    _x = _st_x0 + _i * _st_step
+                    txt(_x, _st_y, pt_, _st_fs, PITCH_COLORS.get(pt_, '#777'), 'bold', ha='left')
+                    _g = _sp_total.get(pt_)
+                    _fc = gtint(_g)
+                    _cx = _x + _st_code + 0.5 * _st_cw
+                    rrect(_cx - 0.5 * _st_cw, _st_y - 0.5 * _st_h, _st_cw, _st_h, _fc, r=0.007)
+                    txt(_cx, _st_y, '—' if _g is None else f'{half_up(_g)}', _st_fs,
+                        _ink_on(_fc), 'black', family='Bitter')
+                yb = _st_y - 0.036
             rh_ = min(SOCIAL_ROW_H, (yb - 0.040) / max(_nlines - 1, 1))
+            if _sp_place:
+                # Same rule as the one between the two hand sections, centered between the
+                # STUFF+ text and the first section title (2026-11-05, per Wally).
+                _ly = 0.5 * (_st_y + yb)
+                ax.plot([L, R], [_ly, _ly], color=SUBTLE_BORDER, lw=1.1,
+                        transform=ax.transAxes, zorder=2, solid_capstyle='butt')
             fs_ = min(12.0, rh_ * 430.0)
             # Solid rule under the plot's x-label, above the header row
             # (2026-08-28, per Wally — Driveline-style section rules).
             _rule_y = mv_bot - 0.046
-            ax.plot([L, R], [_rule_y, _rule_y], color=SUBTLE_BORDER, lw=1.1,
-                    transform=ax.transAxes, zorder=2, solid_capstyle='butt')
+            if not _sp_place:
+                ax.plot([L, R], [_rule_y, _rule_y], color=SUBTLE_BORDER, lw=1.1,
+                        transform=ax.transAxes, zorder=2, solid_capstyle='butt')
             for name_, pl_ in sections:
                 if not hdr:
                     # Solid rule between the two handedness sections.
@@ -5437,6 +5488,7 @@ def main():
     social          = True              # True = consolidated social card (daily/season by date mode) instead of the full card
     bats            = None               # Batter-handedness filter: "L", "R", or None for both
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
+    stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
     social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xwobacon"; force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
@@ -5465,6 +5517,8 @@ def main():
     parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both', 'xwobacon'],
                         help='Social-table run-value slot(s); default: both (RV, xRV) on '
                              'a daily card, xwobacon (xwOBAcon) on a season card')
+    parser.add_argument('--stuff-place', default=None, choices=['strip', 'split'],
+                        help='Social Stuff+: once per pitch under the plot, or a column in each hand table')
     parser.add_argument('--pitch-qual', type=int, default=None,
                         help='Min pitches for a pitch type\'s RV COLORING '
                              f'(default {CARD_COLOR_MIN_PITCHES}; values always render)')
@@ -5521,6 +5575,7 @@ def main():
     bats_filter = bats
     if args.rv_mode is not None: rv_mode = args.rv_mode
     if args.social_rv is not None: social_rv = args.social_rv
+    if args.stuff_place: stuff_place = args.stuff_place
     if args.pitch_qual is not None: pitch_qual = args.pitch_qual
     if args.milb_corpus: milb_corpus = True
     if args.milb_scope is not None: milb_scope = args.milb_scope
@@ -6278,6 +6333,7 @@ def main():
             'rv_mode': rv_mode,
             'social_rv': social_rv,
             'social_xmove': xmove_models,
+            'stuff_place': stuff_place,
             'pitch_qual': pitch_qual,
             # DAILY ONLY — his own season baselines (see _season_pitch_lb_for).
             'season_pitch_lb': _season_pitch_lb_for(pitcher_name, eff_team,
