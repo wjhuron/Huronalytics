@@ -2004,7 +2004,8 @@ def _social_tint_pools():
 
 
 def render_social_card(config, pitches, output_file):
-    """Consolidated 1080x1350 social card (2026-08-27, per Wally). The full
+    """Consolidated 1080-wide social card (2026-08-27, per Wally; 1350 tall on a daily card,
+    height follows the rows on a season card). The full
     card stays on the website; this is the feed variant, one question per
     card — daily: "how did the start go"; season: "how good is he".
 
@@ -2038,7 +2039,7 @@ def render_social_card(config, pitches, output_file):
                 fontfamily=family, ha=ha, va=va, fontstyle=style)
 
     def ink_txt(x, y, t, size, color, weight='bold', family='IBM Plex Sans',
-                zorder=5, ax_=None):
+                zorder=5, ax_=None, skew=0.0):
         # Center a string on its GLYPH INK, not on the layout box. matplotlib's
         # ha/va='center' centers the advance box, which carries side bearings
         # and full font ascent/descent, so '1' and digits with no descender sit
@@ -2069,7 +2070,8 @@ def render_social_card(config, pitches, output_file):
         sx, sy = d1[0] - d0[0], d1[1] - d0[1]
         tr = (Affine2D()
               .translate(-0.5 * (bb.x0 + bb.x1), -0.5 * (bb.y0 + bb.y1))
-              .scale(sx, sy).translate(x, y))
+              # The card's fonts have no italic files, so a slant is a sheared path.
+              .skew_deg(skew, 0).scale(sx, sy).translate(x, y))
         a.add_patch(PathPatch(tr.transform_path(tp), facecolor=color,
                               edgecolor='none', zorder=zorder,
                               transform=a.transData, clip_on=False))
@@ -2345,11 +2347,31 @@ def render_social_card(config, pitches, output_file):
         # The season plot gives the Stuff+ strip its height back (2026-11-05, per Wally).
         if config.get('stuff_place') == 'strip':
             mv_bot += 0.025
+    # card_height "fit" (2026-11-05, per Wally) keeps every element at one size on a season
+    # card and lets the card's height follow the row count. The canvas axes stay a 1350 px
+    # box anchored at the top, so y below 0 is below that box. Rows use May's size, the
+    # 13-line table that fills 1350 px exactly; a display convention, not a measured value.
+    _fit_rh, _fit_vb = None, 0.0
+    if is_season and config.get('card_height') == 'fit' and config.get('stuff_place') == 'strip':
+        _fit_rh = 0.325 / 12.0
+        _fit_lines = 0
+        for _b in ('L', 'R'):
+            _c = Counter(p.get('Pitch Type') for p in pitches
+                         if p.get('Bats') == _b and p.get('Pitch Type'))
+            if _c:
+                _n = sum(_c.values())
+                _fit_lines += 1 + sum(1 for v in _c.values() if v / _n >= 0.01)
+        _fit_vb = (mv_bot - SOCIAL_XLABEL_STACK + 0.010 - 0.036) - (_fit_lines - 1) * _fit_rh - 0.040
+        _fit_in = round(1350 * (1 - _fit_vb)) / 135.0
+        fig.set_size_inches(8, _fit_in)
+        ax.set_position([0, 1 - 10.0 / _fit_in, 1, 10.0 / _fit_in])
+    _fig_b, _fig_h = ax.get_position().y0, ax.get_position().height
 
     # movement plot (faded cloud + labeled centroids; ticks every 5)
     # Inset from the left card edge so the y-axis label ('INDUCED
     # VERTICAL BREAK') renders fully instead of pressing the border.
-    mv = fig.add_axes([L + 0.018, mv_bot, R - L - 0.018, mv_top - mv_bot])
+    mv = fig.add_axes([L + 0.018, _fig_b + mv_bot * _fig_h, R - L - 0.018,
+                       (mv_top - mv_bot) * _fig_h])
     mv.set_facecolor(PLOT_PANEL)
     _lim = 25   # one frame for daily + season (daily was 20 until
                 # 2026-08-28, per Wally: big-run arsenals clipped at the edge)
@@ -2749,6 +2771,14 @@ def render_social_card(config, pitches, output_file):
             rrect(cx - _tw - 0.006, ry - 0.5 * rh + 0.004, _tw + 0.012, rh - 0.008, fc,
                   ec='none', lw=0, r=0.006)
 
+        def _faded_right(cx, ry, label, fs):
+            # An unqualified Strike% or Whiff%: the same faded slant as a Loc+ chip under its
+            # gate, right-aligned on the column edge (2026-11-05, per Wally).
+            _t = ax.text(cx, ry, label, fontsize=fs, fontweight='500', fontfamily='IBM Plex Sans', ha='right')
+            _tw = _t.get_window_extent(fig.canvas.get_renderer()).width / (fig.get_figwidth() * fig.dpi)
+            _t.remove()
+            ink_txt(cx - 0.5 * _tw, ry, label, fs, '#7F786B', weight='500', skew=12.0)
+
         def _table(y, title, plist, rh, fs, cols, header=True, total=False, bats=None):
             # The title shares its row with the column headers (first
             # section) and every line — header row, data rows, the second
@@ -2780,8 +2810,7 @@ def render_social_card(config, pitches, output_file):
                 # chip measures centered on its own, and the STACK still reads
                 # ragged. Snapping the pair to the same grid on every row makes
                 # all of them rasterize identically.
-                _cy = round(ry * fig.get_figheight() * fig.dpi) / (
-                    fig.get_figheight() * fig.dpi)
+                _cy = round(ry * 10.0 * fig.dpi) / (10.0 * fig.dpi)
                 _cx = round((L + 0.010) * fig.get_figwidth() * fig.dpi) / (
                     fig.get_figwidth() * fig.dpi)
                 if is_total:
@@ -2793,7 +2822,7 @@ def render_social_card(config, pitches, output_file):
                 else:
                     # With the strip the disc follows the row, so a dense table does not
                     # stack touching discs. 0.88 is a display convention.
-                    _ds = (min(215.0, (0.88 * rh * fig.get_figheight() * 72.0) ** 2)
+                    _ds = (min(215.0, (0.88 * rh * 10.0 * 72.0) ** 2)
                            if _sp_place else 215)
                     ax.scatter([_cx], [_cy], s=_ds, color=col, edgecolors='none',
                                transform=ax.transAxes, zorder=4)
@@ -2814,8 +2843,12 @@ def render_social_card(config, pitches, output_file):
                         fc = gtint(g)
                         # A season Loc+ under its gate draws an open chip, not the
                         # beige fill, which reads as a league-average grade.
-                        if k == 'loc' and is_season and r_['n'] < SOCIAL_LOC_MIN_PITCHES:
-                            fc = BG
+                        _gated = k == 'loc' and is_season and r_['n'] < SOCIAL_LOC_MIN_PITCHES
+                        # Faded and slanted, so an unqualified grade does not read as a blank
+                        # or a league-average cell (2026-11-05, per Wally).
+                        _gec, _gink = SUBTLE_BORDER, None
+                        if _gated:
+                            fc, _gink = BG, '#7F786B'
                         # Chip HEIGHT already tracks the row, so on a dense
                         # arsenal the fixed 0.092 width stretched the chip to
                         # 5.1:1 as rendered (Lugo, 20 lines). Cap it and let the
@@ -2826,12 +2859,15 @@ def render_social_card(config, pitches, output_file):
                         # pitch-type arsenals move. Lugo lands at 3.1:1.
                         _ch = rh - 0.006
                         _cw = min(0.092, CHIP_MAX_ASPECT * _ch
-                                  * fig.get_figheight() / fig.get_figwidth())
+                                  * 10.0 / fig.get_figwidth())
                         rrect(cx - 0.5 * _cw, ry - 0.5 * rh + 0.003, _cw,
-                              _ch, fc, r=0.010)
+                              _ch, fc, ec=_gec, r=0.010)
                         # White ink on tinted chips; a valueless beige chip
                         # keeps dark ink (2026-08-28, per Wally).
-                        _ink = TEXT_PRIMARY if g is None else _ink_on(fc)
+                        _ink = _gink or (TEXT_PRIMARY if g is None else _ink_on(fc))
+                        if _gated and g is not None:
+                            ink_txt(cx, ry, f'{half_up(g)}', fs, _ink, family='Bitter', skew=12.0)
+                            continue
                         txt(cx, ry, '—' if g is None else f'{half_up(g)}', fs,
                             _ink, 'black', family='Bitter')
                         continue
@@ -2847,6 +2883,9 @@ def render_social_card(config, pitches, output_file):
                     elif k == 'strike':
                         v = '%.0f%%' % (r_['strike'] * 100)
                         if is_season and bats and not is_total:
+                            if r_['n'] < SOCIAL_STRIKE_MIN_PITCHES:
+                                _faded_right(cx, ry, v, fs)
+                                continue
                             _tint_cell(cx, ry, rh, r_, 'strike', bats, v, fs)
                         c_ = TEXT_PRIMARY
                     elif k == 'whiff':
@@ -2854,6 +2893,9 @@ def render_social_card(config, pitches, output_file):
                         v = ('—' if r_['whiff'] is None
                              else '%.0f%%' % (r_['whiff'] * 100))
                         if is_season and bats and not is_total:
+                            if r_['whiff'] is not None and r_['sw'] < SOCIAL_WHIFF_MIN_SWINGS:
+                                _faded_right(cx, ry, v, fs)
+                                continue
                             _tint_cell(cx, ry, rh, r_, 'whiff', bats, v, fs)
                         c_ = TEXT_PRIMARY
                     elif k == 'xwobacon':
@@ -2944,7 +2986,7 @@ def render_social_card(config, pitches, output_file):
                     txt(_cx, _st_y, '—' if _g is None else f'{half_up(_g)}', _st_fs,
                         _ink_on(_fc), 'black', family='Bitter')
                 yb = _st_y - 0.036
-            rh_ = min(SOCIAL_ROW_H, (yb - 0.040) / max(_nlines - 1, 1))
+            rh_ = _fit_rh or min(SOCIAL_ROW_H, (yb - 0.040) / max(_nlines - 1, 1))
             if _sp_place:
                 # Same rule as the one between the two hand sections, centered between the
                 # STUFF+ text and the first section title (2026-11-05, per Wally).
@@ -3005,7 +3047,7 @@ def render_social_card(config, pitches, output_file):
     # 12px, which Wally called too much air. 0.0123 lands the descender 7px off
     # the edge. One value for every card type now that season and range share
     # the daily layout (they used to sit at 0.075 to clear the arsenal chips).
-    _fy = 0.0123
+    _fy = 0.0123 + _fit_vb
     txt(_rail - _ink_left_pad(fig, 'huronalytics.vercel.app', 10.5, 'normal'), _fy,
         'huronalytics.vercel.app', 10.5, TEXT_PRIMARY, 'normal', ha='left', style='italic')
     # Right rail is R itself: the tile row's ~3px overshoot exists only so its
@@ -3015,6 +3057,9 @@ def render_social_card(config, pitches, output_file):
     # the residual 1px is FreeType stem hinting at 8.2pt, not geometry.
     txt(R, _fy, note_r, 8.2, TEXT_PRIMARY, 'normal', ha='right')
 
+    if _fit_rh:
+        for _a in ax.get_children():   # rows below the 1350 px box must still draw
+            _a.set_clip_on(False)
     plt.savefig(output_file, dpi=135, facecolor=BG)
     plt.close(fig)
     return True
@@ -5488,6 +5533,7 @@ def main():
     social          = True              # True = consolidated social card (daily/season by date mode) instead of the full card
     bats            = None               # Batter-handedness filter: "L", "R", or None for both
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
+    card_height     = "fit"              # Season social card height: "fit" (follows the rows) or "fixed" (1350 px)
     stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
     social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xwobacon"; force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
@@ -5517,6 +5563,8 @@ def main():
     parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both', 'xwobacon'],
                         help='Social-table run-value slot(s); default: both (RV, xRV) on '
                              'a daily card, xwobacon (xwOBAcon) on a season card')
+    parser.add_argument('--card-height', default=None, choices=['fixed', 'fit'],
+                        help='Season social card height follows the row count, or stays 1350 px')
     parser.add_argument('--stuff-place', default=None, choices=['strip', 'split'],
                         help='Social Stuff+: once per pitch under the plot, or a column in each hand table')
     parser.add_argument('--pitch-qual', type=int, default=None,
@@ -5576,6 +5624,7 @@ def main():
     if args.rv_mode is not None: rv_mode = args.rv_mode
     if args.social_rv is not None: social_rv = args.social_rv
     if args.stuff_place: stuff_place = args.stuff_place
+    if args.card_height: card_height = args.card_height
     if args.pitch_qual is not None: pitch_qual = args.pitch_qual
     if args.milb_corpus: milb_corpus = True
     if args.milb_scope is not None: milb_scope = args.milb_scope
@@ -6334,6 +6383,7 @@ def main():
             'social_rv': social_rv,
             'social_xmove': xmove_models,
             'stuff_place': stuff_place,
+            'card_height': card_height,
             'pitch_qual': pitch_qual,
             # DAILY ONLY — his own season baselines (see _season_pitch_lb_for).
             'season_pitch_lb': _season_pitch_lb_for(pitcher_name, eff_team,
