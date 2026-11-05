@@ -262,14 +262,19 @@ DH_B = 0.917                # LOSO slope, 30+ IP display population
 # and reads -0.160 for the same channel. Previous set (2026-08-15, refit on
 # production-consistent shrinkage): stuff .297 loc .136 k .088 izwh .117
 # xrv .139 gb .162 gs .277 park .168.
-W_PH = {'stuff': 0.257, 'loc': 0.090, 'k': 0.149, 'izwh': 0.059,
-        'xrv': 0.131, 'gb': 0.143, 'gs': -0.029, 'park': 0.152}
+# Refit 2026-11-05 (scripts/research/era/hpera_leak_test.py): the NEXT objective read
+# full-season Stuff+ from models that had seen the target season; on gate values fit
+# without B and B+1 the weights below come out. Held out, refit still beats SIERA 5/5
+# NEXT and 6/6 ROS; hpERA moves sd .028, max .23. The 10-07 set: stuff .257 loc .090
+# k .149 izwh .059 xrv .131 gb .143 gs -.029 park .152, LHP -.207.
+W_PH = {'stuff': 0.224, 'loc': 0.090, 'k': 0.164, 'izwh': 0.062,
+        'xrv': 0.135, 'gb': 0.147, 'gs': -0.022, 'park': 0.154}
 # Pitcher-hand term (2026-09-05): ERA credit for a left-hander, applied to
 # the RAW indicator centered at the pool's LHP share, so the pool-mean
 # forecast does not move. Fold-mean -0.211 ROS-60; -0.254 NEXT-60 with SE
 # .013 across the five year-pairs. Kept outside the z-sum on purpose: an
 # indicator's z would tie the weight to the pool share.
-W_LHP = -0.207      # refit 2026-10-07 with W_PH; -0.211 before
+W_LHP = -0.186      # refit 2026-11-05 with W_PH; -0.207 on 10-07, -0.211 before
 # Scratch/window rows only, when the metadata bundle predates the term:
 # mean LHP share of the 2021-2026 60-IP replicate pools (.314 .269 .247
 # .276 .263 .301). The season path measures the live share.
