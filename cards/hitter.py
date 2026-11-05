@@ -1319,8 +1319,9 @@ def _half_up(x):
 # value leave the column.
 SOCIAL_HITTER_COLUMNS = [
     # BABIP and Swing Length swap by level in the renderer: Swing Length on an MLB row, per Wally.
-    ('RESULTS & TOOLS', [('wOBA', 'wOBA', '3dec'), ('xwOBA', 'xwOBA', '3dec'), ('BABIP', 'babip', '3dec'),
-                         ('EV95', 'ev95', 'dec1'), ('Barrel%', 'barrelPct', 'pct1'), ('Bat Speed', 'batSpeed', 'dec1'),
+    # Slot for slot with MLB: EV95 stands in for Bat Speed and BABIP for Sprint Speed on AAA.
+    ('RESULTS & TOOLS', [('wOBA', 'wOBA', '3dec'), ('xwOBA', 'xwOBA', '3dec'), ('Barrel%', 'barrelPct', 'pct1'),
+                         ('Bat Speed', 'batSpeed', 'dec1'), ('EV95', 'ev95', 'dec1'), ('BABIP', 'babip', '3dec'),
                          ('Sprint Speed', 'sprintSpeed', 'dec1')]),
     ('APPROACH', [('K%', 'kPct', 'pct1'), ('BB%', 'bbPct', 'pct1'), ('Z-Sw-Ch%', 'izSwChase', 'pct1'),
                   ('Z-Contact%', 'izContactPct', 'pct1'), ('Air Pull%', 'airPullPct', 'pct1')]),
