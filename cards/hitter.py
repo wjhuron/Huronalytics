@@ -1313,17 +1313,17 @@ def _half_up(x):
 
 
 # Social hitter card rows (2026-11-05, per Wally). BB+, CT+ and SD+ are tiles now. Whiff% and
-# xwOBAcon left for overlap (K% r .91, BB+ r .94, 384 hitters with 200+ PA in 2026). Rows
-# without a value leave the column.
+# xwOBAcon left for overlap (K% r .91, BB+ r .94, 384 hitters with 200+ PA in 2026), GB% for
+# Air Pull% (r -.74), and Swing Length because it is a style, not a skill (wRC+ r .08). Five
+# rows a column; a AAA card shows BABIP and EV95 where MLB shows Bat Speed. Rows without a
+# value leave the column.
 SOCIAL_HITTER_COLUMNS = [
     # BABIP and Swing Length swap by level in the renderer: Swing Length on an MLB row, per Wally.
     ('RESULTS & TOOLS', [('wOBA', 'wOBA', '3dec'), ('xwOBA', 'xwOBA', '3dec'), ('BABIP', 'babip', '3dec'),
                          ('EV95', 'ev95', 'dec1'), ('Barrel%', 'barrelPct', 'pct1'), ('Bat Speed', 'batSpeed', 'dec1'),
-                         ('Swing Length', 'swingLength', 'dec1'),
                          ('Sprint Speed', 'sprintSpeed', 'dec1')]),
     ('APPROACH', [('K%', 'kPct', 'pct1'), ('BB%', 'bbPct', 'pct1'), ('Z-Sw-Ch%', 'izSwChase', 'pct1'),
-                  ('Z-Contact%', 'izContactPct', 'pct1'), ('Air Pull%', 'airPullPct', 'pct1'),
-                  ('GB%', 'gbPct', 'pct1')]),
+                  ('Z-Contact%', 'izContactPct', 'pct1'), ('Air Pull%', 'airPullPct', 'pct1')]),
 ]
 
 
@@ -1486,9 +1486,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
     t(R, yk, '1.000+', 9, muted, '600', ha='right')
     ax.plot([L, R], [.3525, .3525], color=border, lw=1.1)
     _mlb_row = not h_row.get('_milbCard') and team not in ('ROC', 'AAA')
-    # A AAA card has five results-and-tools rows against six approach rows, so the full column
-    # leads on the left (2026-11-05, per Wally).
-    _cols = SOCIAL_HITTER_COLUMNS if _mlb_row else SOCIAL_HITTER_COLUMNS[::-1]
+    _cols = SOCIAL_HITTER_COLUMNS
     for (title, rows), x0 in zip(_cols, (L, .525)):
         t(x0, .3345, title, 10.5, ink_dark, 'black', ha='left')
         y = .3345
@@ -1496,10 +1494,10 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             v = h_row.get(key)
             # AAA bat speed covers 3.7% of swings against every swing in the MLB pool, so the row
             # leaves a non-MLB card (2026-11-05, per Wally).
-            if (v is None or key == ('babip' if _mlb_row else 'swingLength')
+            if (v is None or (key == 'babip' and _mlb_row)
                     or (key == 'batSpeed' and not _mlb_row) or (key == 'ev95' and _mlb_row)):
                 continue
-            y -= .0445
+            y -= .267 / 5   # five rows a column fill the band six used to
             pc = h_row.get(key + '_pctl')
             fc = _percentile_color(pc)[0] if pc is not None else DARK_CELL
             t(x0, y, lab, 12, ink_dark, 'bold', ha='left')
