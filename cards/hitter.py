@@ -969,7 +969,7 @@ def _format_bubble_value(v, spec):
     if spec == 'pct1':
         return f'{v * 100:.1f}%' if abs(v) <= 1 else f'{v:.1f}%'
     if spec == 'int':
-        return f'{int(round(v))}'
+        return f'{_half_up(v)}'
     if spec == 'dec1':
         return f'{v:.1f}'
     if spec == 'dec1+':
@@ -1306,13 +1306,19 @@ class _SkipFGOverride(Exception):
     """Sentinel: the FanGraphs season override does not apply to this card."""
 
 
+def _half_up(x):
+    """Half-up on the exact value, the repo's rule for whole-number + stats (cards/pitcher.py half_up)."""
+    import math
+    return int(math.floor(x + 0.5))
+
+
 # Social hitter card rows (2026-11-05, per Wally). BB+, CT+ and SD+ are tiles now. Whiff% and
 # xwOBAcon left for overlap (K% r .91, BB+ r .94, 384 hitters with 200+ PA in 2026). Rows
 # without a value leave the column.
 SOCIAL_HITTER_COLUMNS = [
     # BABIP and Swing Length swap by level in the renderer: Swing Length on an MLB row, per Wally.
     ('RESULTS & TOOLS', [('wOBA', 'wOBA', '3dec'), ('xwOBA', 'xwOBA', '3dec'), ('BABIP', 'babip', '3dec'),
-                         ('Barrel%', 'barrelPct', 'pct1'), ('Bat Speed', 'batSpeed', 'dec1'),
+                         ('EV95', 'ev95', 'dec1'), ('Barrel%', 'barrelPct', 'pct1'), ('Bat Speed', 'batSpeed', 'dec1'),
                          ('Swing Length', 'swingLength', 'dec1'),
                          ('Sprint Speed', 'sprintSpeed', 'dec1')]),
     ('APPROACH', [('K%', 'kPct', 'pct1'), ('BB%', 'bbPct', 'pct1'), ('Z-Sw-Ch%', 'izSwChase', 'pct1'),
@@ -1488,7 +1494,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             # AAA bat speed covers 3.7% of swings against every swing in the MLB pool, so the row
             # leaves a non-MLB card (2026-11-05, per Wally).
             if (v is None or key == ('babip' if _mlb_row else 'swingLength')
-                    or (key == 'batSpeed' and not _mlb_row)):
+                    or (key == 'batSpeed' and not _mlb_row) or (key == 'ev95' and _mlb_row)):
                 continue
             y -= .0445
             pc = h_row.get(key + '_pctl')
@@ -1823,11 +1829,16 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         h_row = dict(h_row)
         h_row['xWRCplus'] = h_row['xWRCplus_pctl'] = None
 
-    # A ROC team card reads against AAA, the same as a corpus card (2026-11-05, per Wally).
-    if team == 'ROC' and date_filter is None and not milb_corpus and h_row.get('mlbId'):
+    # A AAA card reads against AAA (2026-11-05, per Wally). A full corpus season already applied
+    # this with its FanGraphs line; a ROC team card, a date window and playoffs land here.
+    _aaa_mid = (corpus_player['mlbId'] if milb_corpus and corpus_player['levels'] == ['AAA']
+                else h_row.get('mlbId') if team == 'ROC' and not milb_corpus else None)
+    if _aaa_mid and not h_row.get('_aaaRuler'):
         from cards import milb_corpus as _mc_roc
         h_row = dict(h_row)
-        _mc_roc.apply_aaa_ruler(h_row, str(h_row['mlbId']))
+        _mc_roc.apply_aaa_ruler(h_row, str(_aaa_mid), window=bool(date_filter is not None or milb_corpus))
+    if team == 'ROC' and date_filter is None and not milb_corpus:
+        year_label = '2026 AAA Regular Season'
     if h_row.get('_aaaRuler'):
         from cards import milb_corpus as _mc_zones
         metadata = dict(metadata, sacqZones=_mc_zones.aaa_sacq_zones())

@@ -362,12 +362,13 @@ _AAA_RATE_KEYS = ('barrelPct', 'airPullPct', 'gbPct', 'izSwChase', 'izSwingPct',
 _AAA_GRADES = (('bbPlus', 'bbPlusNoBat'), ('ctPlus', 'ctPlus'), ('sdPlus', 'sdPlus'), ('processPlus', 'processPlus'))
 
 
-def apply_aaa_ruler(h_row, mid):
+def apply_aaa_ruler(h_row, mid, window=False):
     """Rank the row against AAA and center its grades at the AAA mean. A corpus card and a ROC
-    team card both land here. A row that is one stint of a traded hitter (its PA differ from his
-    AAA total) scores on the row's own grades and xwOBA; otherwise grades read the pool's
-    prior-free values, because AAA bat speed covers 3.7% of swings. No pool or no row for this
-    hitter leaves the MLB values and footer in place, and says so."""
+    team card both land here. A row that is part of a AAA season (a stint of a traded hitter, a
+    date window, playoffs) scores on the row's own grades and xwOBA against the season pool, the
+    window rule everywhere else; otherwise grades read the pool's prior-free values, because AAA
+    bat speed covers 3.7% of swings. No pool or no row for this hitter leaves the MLB values and
+    footer in place, and says so."""
     from cards.pitcher import _rank_in_mlb_pool
     from pipeline.compute import HITTER_INVERT_PCTL
     if not os.path.exists(HITTER_POOL_AAA):
@@ -380,7 +381,7 @@ def apply_aaa_ruler(h_row, mid):
     if me is None:
         print(f'  AAA ruler NOT applied: {mid} is not in the AAA pool.')
         return
-    stint = abs((me.get('pa') or 0) - (h_row.get('pa') or 0)) > 3
+    stint = window or abs((me.get('pa') or 0) - (h_row.get('pa') or 0)) > 3
     if stint:
         print(f"  AAA ruler: {h_row.get('pa')} PA on this row of {me.get('pa')} at AAA, scoring the row's own values.")
     # Official stats against FanGraphs' AAA line.
@@ -388,7 +389,9 @@ def apply_aaa_ruler(h_row, mid):
     for key, col, inv in (('avg', 'AVG', False), ('obp', 'OBP', False), ('slg', 'SLG', False),
                           ('wOBA', 'wOBA', False), ('wRCplus', 'wRC+', False), ('babip', 'BABIP', False),
                           ('bbPct', 'BB%', False), ('kPct', 'K%', True)):
-        vals = sorted(l[col] for l in lines if l.get(col) is not None)
+        # A window's wOBA has no FanGraphs line and reads MLB weights, as the pool's own wOBA does.
+        vals = sorted((v['wOBA'] for v in pool.values() if v.get('wOBA') is not None) if key == 'wOBA' and window
+                      else (l[col] for l in lines if l.get(col) is not None))
         h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row.get(key), vals, invert=inv)
     # xwOBA against the corpus. The pool is raw and the card prints the hitter basis, so a whole
     # AAA season ranks on its raw value: one definition on both sides, about .002 apart.
