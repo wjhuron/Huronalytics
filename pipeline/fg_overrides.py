@@ -194,7 +194,13 @@ def fetch_mlb_pitchers(year=2026):
     return out
 
 
-def fetch_aaa_pitchers(year=2026):
+# FanGraphs' org id for Washington, whose AAA affiliate is Rochester. Its splitTeam
+# parameter does nothing on this endpoint, so a player's line for one club comes from
+# the org filter (Kennedy: 273 PA across AAA, 55 for Rochester).
+ROC_FG_ORG = 24
+
+
+def fetch_aaa_pitchers(year=2026, org=''):
     """Returns dict keyed by xMLBAMID with FIP, xFIP, IP, name for AAA.
 
     The pitcher twin of fetch_aaa_hitters, on the same minor-league endpoint
@@ -213,7 +219,7 @@ def fetch_aaa_pitchers(year=2026):
     params = (
         f'pos=all&level=1&lg=&stats=pit&qual=0&type=1'
         f'&season={year}&seasonEnd={year}'
-        f'&org=&ind=0&splitTeam=false'
+        f'&org={org}&ind=0&splitTeam=false'
         f'&pageitems=5000&pagenum=1'
     )
     rows = _http_get_json(f'{FG_MILB_API}?{params}', timeout=30)
@@ -231,18 +237,22 @@ def fetch_aaa_pitchers(year=2026):
             'fip':  round(float(fip), 2) if fip is not None else None,
             'xfip': round(float(xfip), 2) if xfip is not None else None,
             'ip':   float(r.get('IP') or 0),
+            'bbPct':  round(float(r['BB%']), 4) if r.get('BB%') is not None else None,
+            'kbbPct': round(float(r['K-BB%']), 4) if r.get('K-BB%') is not None else None,
             'name': r.get('PlayerName') or r.get('Name'),
         }
     return out
 
 
-def fetch_aaa_hitters(year=2026):
+def fetch_aaa_hitters(year=2026, org=''):
     """Returns dict keyed by xMLBAMID with wRC+, PA, name. Uses the
-    minor-league endpoint with level=1 (AAA) and org= empty (all orgs)."""
+    minor-league endpoint with level=1 (AAA). org empty returns one line per
+    player across every AAA club; org=ROC_FG_ORG returns his line for that
+    affiliate alone, which is the line a ROC row must match."""
     params = (
         f'pos=all&level=1&lg=&stats=bat&qual=0&type=1'
         f'&season={year}&seasonEnd={year}'
-        f'&org=&ind=0&splitTeam=false'
+        f'&org={org}&ind=0&splitTeam=false'
         f'&pageitems=5000&pagenum=1'
     )
     rows = _http_get_json(f'{FG_MILB_API}?{params}', timeout=30)
@@ -257,6 +267,9 @@ def fetch_aaa_hitters(year=2026):
         out[str(int(mid))] = {
             'wRCplus': round(float(wrc)),
             'pa': int(r.get('PA') or 0),
+            'wOBA': round(float(r['wOBA']), 3) if r.get('wOBA') is not None else None,
+            'iso': round(float(r['ISO']), 3) if r.get('ISO') is not None else None,
+            'g': int(r['G']) if r.get('G') is not None else None,
             'name': r.get('PlayerName') or r.get('Name'),
         }
     return out
@@ -335,6 +348,10 @@ def build_cache(year=2026, verbose=False):
     aaa_p = fetch_aaa_pitchers(year)
     if verbose:
         print(f'  FG override: fetched {len(aaa_p)} AAA pitchers')
+    roc_h = fetch_aaa_hitters(year, org=ROC_FG_ORG)
+    roc_p = fetch_aaa_pitchers(year, org=ROC_FG_ORG)
+    if verbose:
+        print(f'  FG override: fetched {len(roc_h)} Rochester hitters, {len(roc_p)} pitchers')
     return {
         'fetchedAt': datetime.datetime.now().isoformat(timespec='seconds'),
         'season': year,
@@ -342,6 +359,8 @@ def build_cache(year=2026, verbose=False):
         'mlbPitchers': mlb_p,
         'aaaHitters': aaa_h,
         'aaaPitchers': aaa_p,
+        'rocHitters': roc_h,
+        'rocPitchers': roc_p,
     }
 
 
@@ -366,7 +385,7 @@ def is_stale(cache, max_age_hours=24):
     if not cache or 'fetchedAt' not in cache:
         return True
     # Also stale if any of the three groups is missing (older cache shape)
-    for k in ('mlbHitters', 'mlbPitchers', 'aaaHitters', 'aaaPitchers'):
+    for k in ('mlbHitters', 'mlbPitchers', 'aaaHitters', 'aaaPitchers', 'rocHitters', 'rocPitchers'):
         if k not in cache:
             return True
     try:
@@ -479,6 +498,8 @@ def refresh_if_stale(year=2026, max_age_hours=24, path=CACHE_PATH, verbose=False
                 'fetchedAt': '', 'season': year,
                 'mlbHitters': {}, 'mlbPitchers': {}, 'aaaHitters': {},
                 'aaaPitchers': {},
+                'rocHitters': {},
+                'rocPitchers': {},
             }
     return cache
 

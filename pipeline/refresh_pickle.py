@@ -38,7 +38,7 @@ import sys
 # Add script dir to path so we can import the shared pipeline modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pipeline.fetch import read_all_pitches_from_sheets
+from pipeline.fetch import read_all_pitches_from_sheets, aaa_postseason_game_pks, split_aaa_postseason
 from pipeline.utils import DATA_DIR, MLB_TEAMS, compute_in_zone
 
 
@@ -107,6 +107,7 @@ def _apply_pre_pickle_cleanup(all_pitches):
 def main():
     print("\n=== Reading Regular Season data (6 division workbooks) ===")
     rs_pitches = read_all_pitches_from_sheets()
+    rs_pitches = split_aaa_postseason(rs_pitches, aaa_postseason_game_pks())[0]
     print(f"  Read {len(rs_pitches)} RS pitches")
 
     print("\n=== Applying pre-pickle cleanup ===")

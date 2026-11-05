@@ -642,6 +642,52 @@ def read_new_tab_pitches(gc=None):
     return rows
 
 
+AAA_POSTSEASON_PATH = os.path.join(DATA_DIR, 'aaa_postseason_game_pks.json')
+
+
+def aaa_postseason_game_pks(season=2026):
+    """gamePks of Triple-A postseason games, from the schedule. The ROC and AAA tabs hold
+    them, and FanGraphs and the official boxscore line count the regular season only. A
+    failed pull reads the last good list and says so; with no list it returns empty and
+    says so, and ROC rows then carry the playoff games."""
+    url = (f'https://statsapi.mlb.com/api/v1/schedule?sportId=11&season={season}'
+           f'&gameType=F,D,L,W,C')
+    try:
+        data = json.loads(_fetch_with_retry(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20))
+        pks = sorted({str(g['gamePk']) for d in data.get('dates', []) for g in d.get('games', [])})
+        tmp = AAA_POSTSEASON_PATH + '.tmp'
+        with open(tmp, 'w') as f:
+            json.dump(pks, f)
+        os.replace(tmp, AAA_POSTSEASON_PATH)
+        return set(pks)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        try:
+            with open(AAA_POSTSEASON_PATH) as f:
+                pks = set(json.load(f))
+            print(f'  WARNING: AAA postseason schedule failed ({e}); using the cached {len(pks)} games')
+            return pks
+        except (OSError, ValueError):
+            print(f'  WARNING: AAA postseason schedule failed ({e}) and no cache exists: '
+                  f'ROC rows carry any playoff games this run')
+            return set()
+
+
+def split_aaa_postseason(pitches, pks):
+    """(regular, postseason). A postseason pitch takes the NEW tab's treatment: it is
+    graded and written back to its Sheets row, and it never reaches a leaderboard, micro
+    data or a pool. The retag is what keeps it out of the ROC row in train_stuff."""
+    regular, post = [], []
+    for p in pitches:
+        if str(p.get('PitchID') or '').split('_')[0] in pks and p.get('_source') in ('ROC', 'AAA'):
+            p['_source'] = 'NEW'
+            p['_sheetPTeam'] = p.get('PTeam')
+            p['PTeam'] = 'NEW'
+            post.append(p)
+        else:
+            regular.append(p)
+    return regular, post
+
+
 def read_all_pitches_from_sheets(include_no_pitch=False):
     """Read all RS pitches from the six 2026 division workbooks (the Sheets the
     site reads). NLE2026's ROC/AAA tabs come in via extra_tabs; FCL is skipped

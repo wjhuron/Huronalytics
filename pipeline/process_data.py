@@ -33,6 +33,7 @@ from pipeline.fetch import (
     fetch_guts_constants, fetch_sprint_speed, fetch_park_factors,
     fetch_hitter_positions,
     read_pitches_from_sheet, read_all_pitches_from_sheets, read_new_tab_pitches,
+    aaa_postseason_game_pks, split_aaa_postseason,
     lookup_mlb_id, load_mlb_id_cache, save_mlb_id_cache, fetch_canonical_last_first,
     fetch_and_aggregate_boxscores, fetch_and_aggregate_milb_boxscores,
     SPREADSHEET_IDS, SERVICE_ACCOUNT_FILE,
@@ -4317,6 +4318,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         _fg = _fg_refresh(max_age_hours=24, verbose=True)
         _fg_mlb_h = _fg.get('mlbHitters', {})
         _fg_aaa_h = _fg.get('aaaHitters', {})
+        # FanGraphs' Rochester line is the one a ROC row must match. The all-club line
+        # stays as the fallback for an older cache, where the PA check below guards it.
+        _fg_roc_h = _fg.get('rocHitters', {})
         n_mlb_wrc = n_mlb = 0
         n_aaa_wrc = n_aaa = 0
         n_aaa_other = []
@@ -4339,7 +4343,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             mid_str = str(int(mid))
             if row.get('_isROC'):
                 n_aaa += 1
-                fg_player = _fg_aaa_h.get(mid_str)
+                fg_player = _fg_roc_h.get(mid_str) or _fg_aaa_h.get(mid_str)
                 if fg_player and fg_player.get('wRCplus') is not None:
                     # FanGraphs' AAA line spans every AAA club. When it is not this
                     # row's sample, the value belongs to another line (Kennedy: 55 ROC
@@ -4354,6 +4358,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                     else:
                         row['wRCplus'] = fg_player['wRCplus']
                         n_aaa_wrc += 1
+                        # FanGraphs' AAA wOBA runs its own weights; ours are MLB's.
+                        for _fgk, _rk in (('wOBA', 'wOBA'), ('iso', 'iso'), ('g', 'g')):
+                            if fg_player.get(_fgk) is not None:
+                                row[_rk] = fg_player[_fgk]
             else:
                 n_mlb += 1
                 fg_player = _fg_mlb_h.get(mid_str)
@@ -4941,6 +4949,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         # FIP/xFIP override just removed. Do not read a ROC SIERA as an
         # International League number.
         _fg_aaa_p = _fg_pit_cache.get('aaaPitchers', {})
+        _fg_roc_p = _fg_pit_cache.get('rocPitchers', {})
         n_aaa_replaced = n_aaa = 0
         _aaa_other = []
         for row in pitcher_leaderboard:
@@ -4949,7 +4958,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             mid = row.get('mlbId')
             if mid is None:
                 continue
-            fg_a = _fg_aaa_p.get(str(int(mid)))
+            fg_a = _fg_roc_p.get(str(int(mid))) or _fg_aaa_p.get(str(int(mid)))
             if not fg_a:
                 continue
             n_aaa += 1
@@ -4970,6 +4979,11 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             if fg_a.get('xfip') is not None:
                 row['xFIP'] = fg_a['xfip']
                 changed = True
+            # ROC BB% counts every walk, as FanGraphs does (2026-11-04, per Wally). MLB
+            # rows keep the unintentional rule.
+            for _fgk in ('bbPct', 'kbbPct'):
+                if fg_a.get(_fgk) is not None:
+                    row[_fgk] = fg_a[_fgk]
             if changed:
                 n_aaa_replaced += 1
         print(f"  FG AAA FIP/xFIP override: replaced "
@@ -5671,6 +5685,13 @@ def main():
     rs_pitches = read_all_pitches_from_sheets(include_no_pitch=True)
     rs_no_pitch = [p for p in rs_pitches if is_no_pitch(p)]
     rs_pitches = real_pitches(rs_pitches)
+    # Triple-A playoff games live on the ROC and AAA tabs. They are graded and never
+    # published, so a ROC row is the regular season FanGraphs and the box report.
+    _aaa_post_pks = aaa_postseason_game_pks()
+    rs_pitches, _aaa_post = split_aaa_postseason(rs_pitches, _aaa_post_pks)
+    rs_no_pitch = [p for p in rs_no_pitch if str(p.get('PitchID') or '').split('_')[0] not in _aaa_post_pks
+                   or p.get('_source') not in ('ROC', 'AAA')]
+    print(f"  {len(_aaa_post)} Triple-A postseason pitches set aside, graded and not published")
     print(f"  Read {len(rs_pitches)} RS pitches from the 6 division workbooks "
           f"(+{len(rs_no_pitch)} no-pitch intentional-walk markers, kept apart)")
 
@@ -5723,6 +5744,8 @@ def main():
         print(f"  {len(new_tab_pitches)} scoring-only pitches "
               f"({_before - len(new_tab_pitches)} dropped as duplicates of "
               f"rows already read from a team/ROC/AAA tab)")
+
+    new_tab_pitches += _aaa_post
 
     # Shared MLB ID cache
     mlb_id_cache_path = os.path.join(DATA_DIR, 'mlb_id_cache.json')

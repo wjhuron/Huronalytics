@@ -5761,6 +5761,14 @@ def main():
     for _r in all_rows:
         _r['InZone'] = _ciz_all(_r)
 
+    # A season card is the regular season, as FanGraphs and the leaderboard report it. The
+    # ROC tab also holds Triple-A playoff games. A date card still reads them.
+    from pipeline.utils import AAA_TEAMS as _AAA_T
+    if date_filter is None and any(t in _AAA_T for t in teams):
+        from pipeline.fetch import aaa_postseason_game_pks
+        _aaa_post = aaa_postseason_game_pks()
+        all_rows = [r for r in all_rows if str(r.get('PitchID') or '').split('_')[0] not in _aaa_post]
+
     # Filter by date range (and optionally by pitcher name)
     from pipeline.utils import is_no_pitch as _is_no_pitch
     pitches_by_pitcher = defaultdict(list)
@@ -6066,6 +6074,15 @@ def main():
             elif milb_corpus:
                 stat_headers = stat_headers[:4]
                 stat_values = stat_values[:4]
+            elif date_filter is None and eff_team in _AAA_T:
+                # ROC season: FanGraphs' Rochester FIP and xFIP from the row. The box
+                # formula above reads the MLB constant, and FanGraphs has no minor
+                # league SIERA.
+                _rocr = pctl_by_name.get((pitcher_name, eff_team)) or {}
+                if _rocr.get('fip') is not None and _rocr.get('xFIP') is not None:
+                    stat_headers = ['G', 'GS', 'IP', 'ERA', 'FIP', 'xFIP']
+                    stat_values[4] = f"{_rocr['fip']:.2f}"
+                    stat_values[5] = f"{_rocr['xFIP']:.2f}"
             elif scratch_tab and mlb_id is not None:
                 from pipeline.fg_overrides import fetch_milb_pitcher_line
                 _yrs = [int(str(p.get('Game Date'))[:4]) for p in pitches
