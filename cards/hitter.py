@@ -1081,19 +1081,15 @@ def _render_percentile_bubbles(fig, h_row, show_notes=False):
     _is_roc = (h_row.get('team') == 'ROC')
     _columns = []
     for name, metrics in BUBBLE_COLUMNS:
-        if _is_roc and name == 'OVERALL':
+        if (_is_roc or h_row.get('_milbCard')) and name == 'OVERALL':
             _m = []
             for spec in metrics:
                 if spec[1] != 'batSpeed':
                     _m.append(spec)
-                elif h_row.get('batSpeed') is not None:
-                    # AAA bat speed exists for ROC hitters as of 2026-08-21
-                    # (Savant MiLB event-pitch values, applied to the AAA
-                    # tab's BatSpeed column). Show it like any other row.
-                    _m.append(spec)
                 elif h_row.get('_mlbBatSpeed') is not None:
-                    # No AAA reading but an MLB stint: show that bat speed,
-                    # labeled as MLB-sourced (injected by render_hitter_card —
+                    # The AAA reading leaves the card (2026-11-05, per Wally): it covers 3.7%
+                    # of swings against every swing in the MLB pool. An MLB stint still shows
+                    # its bat speed, labeled as MLB-sourced (injected by render_hitter_card,
                     # the only MLB field allowed onto a ROC card).
                     _m.append(('Bat Speed (MLB)', '_mlbBatSpeed',
                                '_mlbBatSpeed_pctl', 'mph'))
@@ -1474,7 +1470,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
                             (L + .228, MARKER_ACCENT, 'black', 'Median')):
         ax.scatter([xk], [yk], s=52, c=fc, edgecolors=ec, linewidths=1.0, zorder=4)
         t(xk + .014, yk, lab, 9.5, ink_dark, '600', ha='left')
-    t(.452, yk, 'MLB wOBAcon', 9.5, ink_dark, '600', ha='left')
+    t(.452, yk, 'AAA wOBAcon' if h_row.get('_aaaRuler') else 'MLB wOBAcon', 9.5, ink_dark, '600', ha='left')
     t(.600, yk, '.000', 9, muted, '600', ha='left')
     ax_scale = fig.add_axes([.642, yk - .0065, .245, .013])
     ax_scale.imshow(np.linspace(0, 1, 256).reshape(1, -1), aspect='auto', cmap=WOBA_CMAP, vmin=0, vmax=1, alpha=.70)
@@ -1489,7 +1485,10 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
         y = .3345
         for lab, key, spec in rows:
             v = h_row.get(key)
-            if v is None or key == ('babip' if _mlb_row else 'swingLength'):
+            # AAA bat speed covers 3.7% of swings against every swing in the MLB pool, so the row
+            # leaves a non-MLB card (2026-11-05, per Wally).
+            if (v is None or key == ('babip' if _mlb_row else 'swingLength')
+                    or (key == 'batSpeed' and not _mlb_row)):
                 continue
             y -= .0445
             pc = h_row.get(key + '_pctl')
@@ -1500,9 +1499,8 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             t(x0 + .334, y, '—' if pc is None else f'{pc:.0f}', 12, ink_on(fc), 'black', 'Bitter')
     t(L, .0123, 'huronalytics.vercel.app', 10.5, ink_dark, 'normal', ha='left')
     _src = 'MLB, Baseball Savant, FanGraphs' if h_row.get('wRCplus') is not None else 'MLB, Baseball Savant'
-    _lvl = h_row.get('_pctlLevel')
     # On a MiLB card the source list gives way to the note on which chips use which pool.
-    _foot = (f'chips = MLB percentile, except wRC+, {'xwRC+, ' if _lvl == 'AAA' else ''}wOBA, xwOBA, BABIP, K%, BB% = {_lvl}' if _lvl
+    _foot = ('Everything relative to AAA:  100 = AAA average  ·  chips = AAA percentile' if h_row.get('_aaaRuler')
              else f'Data: {_src}  ·  chips = MLB percentile')
     t(R, .0123, _foot, 8.2, ink_dark, 'normal', ha='right')
     fig.savefig(output_file, dpi=135, facecolor=BG)
@@ -1824,6 +1822,15 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
     if milb_corpus and not set(corpus_player['levels']) <= {'AAA', 'MLB'}:
         h_row = dict(h_row)
         h_row['xWRCplus'] = h_row['xWRCplus_pctl'] = None
+
+    # A ROC team card reads against AAA, the same as a corpus card (2026-11-05, per Wally).
+    if team == 'ROC' and date_filter is None and not milb_corpus and h_row.get('mlbId'):
+        from cards import milb_corpus as _mc_roc
+        h_row = dict(h_row)
+        _mc_roc.apply_aaa_ruler(h_row, str(h_row['mlbId']))
+    if h_row.get('_aaaRuler'):
+        from cards import milb_corpus as _mc_zones
+        metadata = dict(metadata, sacqZones=_mc_zones.aaa_sacq_zones())
 
     # One stint of a traded hitter: FanGraphs' wRC+ and Savant's FRV are his whole season,
     # so neither belongs beside a stint line. Wynns read .077/.143/.077 with a 3TM wRC+.
@@ -2683,7 +2690,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         _draw_text(cur_x, legend_y_dots, _ellipse_label, LEGEND_FONTSIZE, TEXT_DIMMED)
 
     # Row 2 — MLB wOBAcon gradient (label + .000 + bar + 1.000+)
-    grad_label = 'MLB wOBAcon: '
+    grad_label = 'AAA wOBAcon: ' if h_row.get('_aaaRuler') else 'MLB wOBAcon: '
     grad_low = '.000'
     grad_high = '1.000+'
     grad_bar_w = 0.22

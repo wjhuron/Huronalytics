@@ -345,48 +345,142 @@ def apply_fg_line(h_row, player, rows):
     h_row['babip'] = (tot['H'] - tot['HR']) / _bip if _bip else None
     h_row['bbPct'] = tot['BB'] / pa if pa else None   # fractions, as on the row
     h_row['kPct'] = tot['SO'] / pa if pa else None
-    # A one-level card (2026-11-05, per Wally) ranks its official stats inside that level, because
-    # a AAA number against the MLB pool reads high (Furman's .364 wOBA: 92nd in MLB, 68th in AAA).
-    # xwOBA joins them from the corpus, so wOBA and xwOBA share one ruler. The other Statcast stats
-    # and our grades stay on the MLB pool. Every player at the level is in the pool,
-    # the MLB pool's rule; his rank is flat across 0, 100 and 200 PA gates.
-    if len(player['levels']) == 1:
-        from cards.pitcher import _rank_in_mlb_pool
-        lv = player['levels'][0]
-        pool = [got['line'] for code in _FG_LEVELS[lv] for got in _fg_level(code).values() if got.get('line')]
-        for key, col, inv in (('avg', 'AVG', False), ('obp', 'OBP', False), ('slg', 'SLG', False),
-                              ('wOBA', 'wOBA', False), ('wRCplus', 'wRC+', False), ('babip', 'BABIP', False),
-                              ('bbPct', 'BB%', False), ('kPct', 'K%', True)):
-            vals = sorted(l[col] for l in pool if l.get(col) is not None)
-            h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row.get(key), vals, invert=inv)
-        _xp = _xwoba_pool(lv)
-        # The pool is raw xwOBA and the card prints the hitter basis (pulled-air adjusted), so
-        # he ranks on his own raw value: one definition on both sides. They differ by about .002.
-        _raw = _xp.get(str(player['mlbId']))
-        print(f"  xwOBA: raw {_raw} ranks in the {lv} pool, card prints {h_row.get('xwOBA')}")
-        h_row['xwOBA_pctl'] = (_rank_in_mlb_pool(_raw, sorted(_xp.values())) if _raw is not None else None)
-        h_row['_pctlLevel'] = lv if lv == 'Single-A' else LEVEL_LABELS.get(lv, lv)
-        if lv == 'AAA' and _raw is not None:
-            # xwRC+ on the AAA scale (2026-11-05, per Wally). FanGraphs' own wRC+-per-wOBA slope at
-            # the level (100+ PA, PA weighted; Furman moves 1.5 points from 1 to 400 PA) times his xwOBA against the level's
-            # mean xwOBA, so AAA averages 100. The same method on MLB reproduces shipped xwRC+
-            # at r .9998, mean gap .23. It ranks exactly as xwOBA does.
-            import numpy as np
-            fit = [l for l in pool if l.get('PA', 0) >= 100 and l.get('wOBA') is not None and l.get('wRC+') is not None]
-            _b = np.polyfit([l['wOBA'] for l in fit], [l['wRC+'] for l in fit], 1,
-                            w=np.sqrt([l['PA'] for l in fit]))[0]
-            _pa = {str(int(l['xMLBAMID'])): l['PA'] for l in pool if l.get('xMLBAMID') and l.get('PA')}
-            _both = [(v, _pa[m]) for m, v in _xp.items() if m in _pa]
-            _lgx = sum(v * n for v, n in _both) / sum(n for _v, n in _both)
-            _was = h_row.get('xWRCplus')
-            h_row['xWRCplus'] = round(100 + _b * (_raw - _lgx))
-            h_row['xWRCplus_pctl'] = h_row['xwOBA_pctl']
-            print(f"  xwRC+: {_was} on the MLB formula -> {h_row['xWRCplus']} on the AAA scale "
-                  f"(slope {_b:.0f}, AAA xwOBA {_lgx:.3f})")
+    if player['levels'] == ['AAA']:
+        apply_aaa_ruler(h_row, str(player['mlbId']))
     print('  FanGraphs line applied: ' + ', '.join(
         f'{k} {before[k]} -> {h_row[k]:.3f}' for k in before
         if before[k] is not None and h_row[k] is not None and abs(float(before[k]) - h_row[k]) >= .0005))
     return True
+
+
+# Everything on a AAA card reads against AAA (2026-11-05, per Wally): every chip is a AAA
+# percentile, every grade is 100 = AAA average, and the heat map is AAA wOBAcon. HITTER_POOL_AAA is built by
+# scripts/research/cards/aaa_relative_grades.py, about 20 minutes, one season.
+HITTER_POOL_AAA = os.path.join(_OUT, 'hitter_pool_AAA.json')
+_AAA_RATE_KEYS = ('barrelPct', 'airPullPct', 'gbPct', 'izSwChase', 'izSwingPct', 'chasePct', 'izContactPct',
+                  'contactPct', 'whiffPct', 'hardHitPct', 'ev95', 'xwOBAcon')
+_AAA_GRADES = (('bbPlus', 'bbPlusNoBat'), ('ctPlus', 'ctPlus'), ('sdPlus', 'sdPlus'), ('processPlus', 'processPlus'))
+
+
+def apply_aaa_ruler(h_row, mid):
+    """Rank the row against AAA and center its grades at the AAA mean. A corpus card and a ROC
+    team card both land here. A row that is one stint of a traded hitter (its PA differ from his
+    AAA total) scores on the row's own grades and xwOBA; otherwise grades read the pool's
+    prior-free values, because AAA bat speed covers 3.7% of swings. No pool or no row for this
+    hitter leaves the MLB values and footer in place, and says so."""
+    from cards.pitcher import _rank_in_mlb_pool
+    from pipeline.compute import HITTER_INVERT_PCTL
+    if not os.path.exists(HITTER_POOL_AAA):
+        print(f'  AAA ruler NOT applied: {HITTER_POOL_AAA} is missing. '
+              'Build it: scripts/research/cards/aaa_relative_grades.py')
+        return
+    with open(HITTER_POOL_AAA) as f:
+        pool = json.load(f)
+    me = pool.get(mid)
+    if me is None:
+        print(f'  AAA ruler NOT applied: {mid} is not in the AAA pool.')
+        return
+    stint = abs((me.get('pa') or 0) - (h_row.get('pa') or 0)) > 3
+    if stint:
+        print(f"  AAA ruler: {h_row.get('pa')} PA on this row of {me.get('pa')} at AAA, scoring the row's own values.")
+    # Official stats against FanGraphs' AAA line.
+    lines = [got['line'] for code in _FG_LEVELS['AAA'] for got in _fg_level(code).values() if got.get('line')]
+    for key, col, inv in (('avg', 'AVG', False), ('obp', 'OBP', False), ('slg', 'SLG', False),
+                          ('wOBA', 'wOBA', False), ('wRCplus', 'wRC+', False), ('babip', 'BABIP', False),
+                          ('bbPct', 'BB%', False), ('kPct', 'K%', True)):
+        vals = sorted(l[col] for l in lines if l.get(col) is not None)
+        h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row.get(key), vals, invert=inv)
+    # xwOBA against the corpus. The pool is raw and the card prints the hitter basis, so a whole
+    # AAA season ranks on its raw value: one definition on both sides, about .002 apart.
+    xw = _xwoba_pool('AAA')
+    raw = h_row.get('xwOBA') if stint else xw.get(mid)
+    h_row['xwOBA_pctl'] = _rank_in_mlb_pool(raw, sorted(xw.values())) if raw is not None else None
+    if raw is not None:
+        # xwRC+ on the AAA scale. FanGraphs' own wRC+-per-wOBA slope at the level (100+ PA, PA
+        # weighted; Furman moves 1.5 points from 1 to 400 PA) times his xwOBA against the level's
+        # mean xwOBA, so AAA averages 100. The same method on MLB reproduces shipped xwRC+ at
+        # r .9998, mean gap .23. It ranks exactly as xwOBA does.
+        import numpy as np
+        fit = [l for l in lines if l.get('PA', 0) >= 100 and l.get('wOBA') is not None and l.get('wRC+') is not None]
+        slope = np.polyfit([l['wOBA'] for l in fit], [l['wRC+'] for l in fit], 1,
+                           w=np.sqrt([l['PA'] for l in fit]))[0]
+        pa_of = {str(int(l['xMLBAMID'])): l['PA'] for l in lines if l.get('xMLBAMID') and l.get('PA')}
+        both = [(v, pa_of[m]) for m, v in xw.items() if m in pa_of]
+        lg = sum(v * n for v, n in both) / sum(n for _v, n in both)
+        was = h_row.get('xWRCplus')
+        h_row['xWRCplus'] = round(100 + slope * (raw - lg))
+        h_row['xWRCplus_pctl'] = h_row['xwOBA_pctl']
+        print(f"  xwRC+: {was} on the MLB formula -> {h_row['xWRCplus']} on the AAA scale "
+              f"(slope {slope:.0f}, AAA xwOBA {lg:.3f})")
+    # Statcast rates against the pool.
+    for key in _AAA_RATE_KEYS:
+        vals = sorted(v[key] for v in pool.values() if v.get(key) is not None)
+        if h_row.get(key) is not None and vals:
+            h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row[key], vals, invert=key in HITTER_INVERT_PCTL)
+    # Grades: 100 = AAA average.
+    for key, src in _AAA_GRADES:
+        both = [(v[src], v.get('pa') or 0) for v in pool.values() if v.get(src) is not None]
+        total = sum(n for _v, n in both)
+        val = h_row.get(key) if stint else me.get(src)
+        if val is None or not total:
+            h_row[key] = h_row[key + '_pctl'] = None
+            continue
+        mean = sum(v * n for v, n in both) / total
+        h_row[key + '_pctl'] = _rank_in_mlb_pool(val, sorted(v for v, _n in both))
+        h_row[key] = val / mean * 100
+        print(f'  {key}: {val:.1f} on the MLB scale / AAA mean {mean:.1f} -> {h_row[key]:.1f}')
+    h_row['_aaaRuler'] = True
+
+
+def aaa_sacq_zones():
+    """The heat map's zone table on AAA balls in play, in metadata['sacqZones'] form, cached on
+    disk. Same bins, weights and 20-BIP rule as process_data. Delete the file after a corpus
+    rebuild."""
+    path = os.path.join(_OUT, 'sacq_zones_AAA.json')
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    from pipeline.process_data import _bip_woba_value
+    from pipeline.utils import BUNT_BB_TYPES, safe_float, spray_angle, spray_direction
+    edges = [(-999, -10), (-10, 0), (0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, 30), (30, 35),
+             (35, 40), (40, 50), (50, 999)]
+    man = pd.read_csv(MANIFEST_PATH, usecols=['game_pk', 'level', 'gameType'])
+    pks = set(man[(man.level == 'AAA') & (man.gameType == 'R')].game_pk)
+    cells = {}
+    for chunk in pd.read_csv(CORPUS_PATH, dtype=str, keep_default_na=False, chunksize=100_000,
+                             usecols=['PitchID', 'Bats', 'BBType', 'HC_X', 'HC_Y', 'LaunchAngle', 'Event', 'xwOBA']):
+        chunk = chunk[(chunk.BBType != '') & (chunk.Bats != '')]
+        for p in chunk.to_dict('records'):
+            if int(p['PitchID'].split('_')[0]) not in pks or p['BBType'] in BUNT_BB_TYPES:
+                continue
+            la, hx, hy = safe_float(p['LaunchAngle']), safe_float(p['HC_X']), safe_float(p['HC_Y'])
+            if la is None or hx is None or hy is None:
+                continue
+            spray = spray_direction(spray_angle(hx, hy), p['Bats'])
+            lb = next((i for i, (lo, hi) in enumerate(edges) if lo <= la < hi), None)
+            if not spray or lb is None:
+                continue
+            v, x = _bip_woba_value(p['Event']), safe_float(p['xwOBA'])
+            for key in ((spray, lb, p['Bats']), (spray, lb, None)):
+                c = cells.setdefault(key, [0, 0.0, 0, 0.0, 0])
+                c[0] += 1
+                if v is not None:
+                    c[1] += v
+                    c[2] += 1
+                if x is not None:
+                    c[3] += x
+                    c[4] += 1
+    got = [{'spray': s, 'laBin': lb, 'bats': b, 'count': c[0],
+            'woba': round(c[1] / c[2], 3) if c[2] else None, 'wobacon': round(c[1] / c[2], 3) if c[2] else None,
+            'xwobacon': round(c[3] / c[4], 3) if c[4] else None}
+           for (s, lb, b), c in cells.items()]
+    if not got:
+        sys.exit(f'AAA heat map zones came back empty. Check {CORPUS_PATH}.')
+    with open(path + '.tmp', 'w') as f:
+        json.dump(got, f)
+    os.replace(path + '.tmp', path)
+    print(f'  AAA heat map: {len(got)} zones from {sum(c[0] for k, c in cells.items() if k[2] is None)} balls in play.')
+    return got
 
 
 def hitter_sb(player):
