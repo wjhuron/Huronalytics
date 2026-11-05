@@ -242,15 +242,183 @@ def ibb_count(player, rows):
 def _fg_level(code):
     """One FanGraphs level, cached on disk. Delete the file to refresh it."""
     path = os.path.join(_OUT, f'fg_hitters_level{code}.json')
+    cached = None
     if os.path.exists(path):
         with open(path) as f:
-            return json.load(f)
+            cached = json.load(f)
+        # A file from before the full line was kept is refreshed once; it still serves wRC+
+        # if FanGraphs does not answer.
+        if all('line' in line for line in cached.values()):
+            return cached
     from pipeline.fg_overrides import fetch_milb_hitters
-    got = fetch_milb_hitters(code)
+    try:
+        got = fetch_milb_hitters(code)
+    except (OSError, ValueError, RuntimeError) as e:
+        if cached is None:
+            raise
+        print(f'  FanGraphs level {code} refresh failed ({e}); the official line stays blank.')
+        return cached
     with open(path + '.tmp', 'w') as f:
         json.dump(got, f)
     os.replace(path + '.tmp', path)
     return got
+
+
+def _xwoba_pool(level):
+    """{mlbId: xwOBA} for every hitter's regular season at one corpus level, through the card's
+    own compute_expected_stats, cached on disk. FanGraphs has no xwOBA, so this pool comes from
+    the corpus. Delete the file after a corpus rebuild."""
+    path = os.path.join(_OUT, f'xwoba_pool_{level}.json')
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    from pipeline.compute import compute_expected_stats
+    man = pd.read_csv(MANIFEST_PATH, usecols=['game_pk', 'level', 'gameType'])
+    pks = set(man[(man.level == level) & (man.gameType == 'R')].game_pk)
+    players = pd.read_csv(PLAYERS_PATH, keep_default_na=False)
+    ids = {(r.game_pk, r.team, r.name): str(r.mlbId) for r in players.itertuples()}
+    rows = {}
+    for chunk in pd.read_csv(CORPUS_PATH, dtype=str, keep_default_na=False, chunksize=100_000,
+                             usecols=['PitchID', 'BTeam', 'Batter', 'Event', 'BBType', 'xBA', 'xSLG', 'xwOBA']):
+        chunk = chunk[chunk.Event != '']
+        for p in chunk.to_dict('records'):
+            pk = int(p['PitchID'].split('_')[0])
+            if pk in pks:
+                mid = ids.get((pk, p['BTeam'], p['Batter']))
+                if mid:
+                    rows.setdefault(mid, []).append(p)
+    got = {mid: v for mid, v in ((m, compute_expected_stats(pl, None).get('xwOBA')) for m, pl in rows.items())
+           if v is not None}
+    if not got:
+        sys.exit(f'xwOBA pool for {level} came back empty. Check {CORPUS_PATH}.')
+    with open(path + '.tmp', 'w') as f:
+        json.dump(got, f)
+    os.replace(path + '.tmp', path)
+    print(f'  xwOBA pool {level}: {len(got)} hitters, built from {sum(map(len, rows.values()))} plate appearances.')
+    return got
+
+
+# Official-line stats a MiLB card takes from FanGraphs, per Wally 2026-11-05: a stat with no model
+# of ours must match the public number. Statcast and our grades keep their own values.
+_FG_COUNTS = {'pa': 'PA', 'ab': 'AB', 'h': 'H', 'doubles': '2B', 'triples': '3B', 'hr': 'HR', 'sb': 'SB',
+              'cs': 'CS'}
+
+
+def apply_fg_line(h_row, player, rows):
+    """Put the FanGraphs line on a pure minor league regular-season card. Returns True if it
+    applied; a card with playoffs, spring or MLB rows is a different sample, so it keeps its own
+    numbers and says so. Two levels sum their counts and PA-weight wOBA."""
+    if 'MLB' in player['levels'] or any(r.get('_gameType') != 'R' for r in rows):
+        print('  FanGraphs line not applied: this card is not one minor league regular season.')
+        return False
+    lines = []
+    for lv in player['levels']:
+        if lv not in _FG_LEVELS:
+            print(f'  FanGraphs line not applied: no level code for {lv}.')
+            return False
+        for code in _FG_LEVELS[lv]:
+            try:
+                got = _fg_level(code).get(str(player['mlbId']))
+            except (OSError, ValueError, RuntimeError) as e:
+                print(f'  FanGraphs line not applied: level {code} failed ({e}).')
+                return False
+            if got and got.get('line'):
+                lines.append(got['line'])
+    if not lines:
+        print(f'  FanGraphs line not applied: no line for {player["mlbId"]}.')
+        return False
+    tot = {k: sum(int(l.get(k) or 0) for l in lines)
+           for k in ('PA', 'AB', 'H', '2B', '3B', 'HR', 'SB', 'CS', 'BB', 'SO', 'HBP', 'SF')}
+    before = {k: h_row.get(k) for k in ('pa', 'avg', 'obp', 'slg', 'wOBA', 'babip', 'bbPct', 'kPct')}
+    for key, col in _FG_COUNTS.items():
+        h_row[key] = tot[col]
+    ab, pa = tot['AB'], tot['PA']
+    tb = tot['H'] + tot['2B'] + 2 * tot['3B'] + 3 * tot['HR']
+    obp_d = ab + tot['BB'] + tot['HBP'] + tot['SF']
+    h_row['avg'] = tot['H'] / ab if ab else None
+    h_row['obp'] = (tot['H'] + tot['BB'] + tot['HBP']) / obp_d if obp_d else None
+    h_row['slg'] = tb / ab if ab else None
+    if h_row['obp'] is not None and h_row['slg'] is not None:
+        h_row['ops'] = h_row['obp'] + h_row['slg']
+    h_row['wOBA'] = (sum(l['wOBA'] * l['PA'] for l in lines) / pa if pa else None)
+    _bip = ab - tot['SO'] - tot['HR'] + tot['SF']
+    h_row['babip'] = (tot['H'] - tot['HR']) / _bip if _bip else None
+    h_row['bbPct'] = tot['BB'] / pa if pa else None   # fractions, as on the row
+    h_row['kPct'] = tot['SO'] / pa if pa else None
+    # A one-level card (2026-11-05, per Wally) ranks its official stats inside that level, because
+    # a AAA number against the MLB pool reads high (Furman's .364 wOBA: 92nd in MLB, 68th in AAA).
+    # xwOBA joins them from the corpus, so wOBA and xwOBA share one ruler. The other Statcast stats
+    # and our grades stay on the MLB pool. Every player at the level is in the pool,
+    # the MLB pool's rule; his rank is flat across 0, 100 and 200 PA gates.
+    if len(player['levels']) == 1:
+        from cards.pitcher import _rank_in_mlb_pool
+        lv = player['levels'][0]
+        pool = [got['line'] for code in _FG_LEVELS[lv] for got in _fg_level(code).values() if got.get('line')]
+        for key, col, inv in (('avg', 'AVG', False), ('obp', 'OBP', False), ('slg', 'SLG', False),
+                              ('wOBA', 'wOBA', False), ('wRCplus', 'wRC+', False), ('babip', 'BABIP', False),
+                              ('bbPct', 'BB%', False), ('kPct', 'K%', True)):
+            vals = sorted(l[col] for l in pool if l.get(col) is not None)
+            h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row.get(key), vals, invert=inv)
+        _xp = _xwoba_pool(lv)
+        # The pool is raw xwOBA and the card prints the hitter basis (pulled-air adjusted), so
+        # he ranks on his own raw value: one definition on both sides. They differ by about .002.
+        _raw = _xp.get(str(player['mlbId']))
+        print(f"  xwOBA: raw {_raw} ranks in the {lv} pool, card prints {h_row.get('xwOBA')}")
+        h_row['xwOBA_pctl'] = (_rank_in_mlb_pool(_raw, sorted(_xp.values())) if _raw is not None else None)
+        h_row['_pctlLevel'] = lv if lv == 'Single-A' else LEVEL_LABELS.get(lv, lv)
+        if lv == 'AAA' and _raw is not None:
+            # xwRC+ on the AAA scale (2026-11-05, per Wally). FanGraphs' own wRC+-per-wOBA slope at
+            # the level (100+ PA, PA weighted; Furman moves 1.5 points from 1 to 400 PA) times his xwOBA against the level's
+            # mean xwOBA, so AAA averages 100. The same method on MLB reproduces shipped xwRC+
+            # at r .9998, mean gap .23. It ranks exactly as xwOBA does.
+            import numpy as np
+            fit = [l for l in pool if l.get('PA', 0) >= 100 and l.get('wOBA') is not None and l.get('wRC+') is not None]
+            _b = np.polyfit([l['wOBA'] for l in fit], [l['wRC+'] for l in fit], 1,
+                            w=np.sqrt([l['PA'] for l in fit]))[0]
+            _pa = {str(int(l['xMLBAMID'])): l['PA'] for l in pool if l.get('xMLBAMID') and l.get('PA')}
+            _both = [(v, _pa[m]) for m, v in _xp.items() if m in _pa]
+            _lgx = sum(v * n for v, n in _both) / sum(n for _v, n in _both)
+            _was = h_row.get('xWRCplus')
+            h_row['xWRCplus'] = round(100 + _b * (_raw - _lgx))
+            h_row['xWRCplus_pctl'] = h_row['xwOBA_pctl']
+            print(f"  xwRC+: {_was} on the MLB formula -> {h_row['xWRCplus']} on the AAA scale "
+                  f"(slope {_b:.0f}, AAA xwOBA {_lgx:.3f})")
+    print('  FanGraphs line applied: ' + ', '.join(
+        f'{k} {before[k]} -> {h_row[k]:.3f}' for k in before
+        if before[k] is not None and h_row[k] is not None and abs(float(before[k]) - h_row[k]) >= .0005))
+    return True
+
+
+def hitter_sb(player):
+    """Stolen bases for the card's levels. A steal leaves no pitch row, so this reads the
+    official lines: FanGraphs per minor league level, the shipped row for MLB. None, and a
+    printed reason, when a level has no line, so the count leaves the card."""
+    seen = set(player['levels'])
+    total = 0
+    if 'MLB' in seen:
+        sb = (player.get('official') or {}).get('sb')
+        if sb is None:
+            print('  SB blank: no MLB line.')
+            return None
+        total += int(sb)
+    for lv in seen - {'MLB'}:
+        if lv not in _FG_LEVELS:
+            print(f'  SB blank: FanGraphs has no line for {lv}.')
+            return None
+        found = False
+        for code in _FG_LEVELS[lv]:
+            try:
+                line = _fg_level(code).get(str(player['mlbId']))
+            except (OSError, ValueError, RuntimeError) as e:
+                print(f'  SB blank: FanGraphs level {code} failed ({e}).')
+                return None
+            if line and line.get('sb') is not None:
+                total += line['sb']
+                found = True
+        if not found:
+            print(f'  SB blank: no FanGraphs {lv} line for {player["mlbId"]}.')
+            return None
+    return total
 
 
 def hitter_wrc_plus(player, rows):

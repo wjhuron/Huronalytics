@@ -1310,24 +1310,26 @@ class _SkipFGOverride(Exception):
     """Sentinel: the FanGraphs season override does not apply to this card."""
 
 
-# Social hitter card rows (2026-11-03, per Wally). EV95 left: BB+ and xwOBAcon give it at
-# R2 .99 on 259 2026 hitters (scripts/research/cards/social_hitter_rows.py). Sprint Speed
-# left at his call. Rows without a value leave the column.
+# Social hitter card rows (2026-11-05, per Wally). BB+, CT+ and SD+ are tiles now. Whiff% and
+# xwOBAcon left for overlap (K% r .91, BB+ r .94, 384 hitters with 200+ PA in 2026). Rows
+# without a value leave the column.
 SOCIAL_HITTER_COLUMNS = [
-    ('BATTED BALL', [('Batted Ball+', 'bbPlus', 'plus'), ('Bat Speed', 'batSpeed', 'dec1'),
-                     ('Barrel%', 'barrelPct', 'pct1'), ('xwOBAcon', 'xwOBAcon', '3dec'),
-                     ('Air Pull%', 'airPullPct', 'pct1'), ('GB%', 'gbPct', 'pct1')]),
-    ('SWING', [('Swing Decisions+', 'sdPlus', 'plus'), ('Contact+', 'ctPlus', 'plus'),
-               ('BB%', 'bbPct', 'pct1'), ('K%', 'kPct', 'pct1'),
-               ('Chase%', 'chasePct', 'pct1'), ('Whiff%', 'whiffPct', 'pct1')]),
+    # BABIP and Swing Length swap by level in the renderer: Swing Length on an MLB row, per Wally.
+    ('RESULTS & TOOLS', [('wOBA', 'wOBA', '3dec'), ('xwOBA', 'xwOBA', '3dec'), ('BABIP', 'babip', '3dec'),
+                         ('Barrel%', 'barrelPct', 'pct1'), ('Bat Speed', 'batSpeed', 'dec1'),
+                         ('Swing Length', 'swingLength', 'dec1'),
+                         ('Sprint Speed', 'sprintSpeed', 'dec1')]),
+    ('APPROACH', [('K%', 'kPct', 'pct1'), ('BB%', 'bbPct', 'pct1'), ('Z-Sw-Ch%', 'izSwChase', 'pct1'),
+                  ('Z-Contact%', 'izContactPct', 'pct1'), ('Air Pull%', 'airPullPct', 'pct1'),
+                  ('GB%', 'gbPct', 'pct1')]),
 ]
 
 
 def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats, span, output_file,
                               position):
     """1080x1350 feed card, the hitter twin of cards/pitcher.py render_social_card: the line,
-    the LA x spray chart, then one grade and five stats per column. A date-window or MiLB
-    row keeps whatever it can score; a stat with no value leaves the card."""
+    the LA x spray chart, then six rows per column. A date-window or MiLB row keeps whatever
+    it can score; a stat with no value leaves the card."""
     from matplotlib.colors import to_rgb
     from cards.pitcher import fetch_player_metadata, half_up, is_barrel as _ib
     from pipeline.utils import is_combined_team
@@ -1374,12 +1376,19 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
         club = '/'.join(dict.fromkeys(p.get('BTeam') for p in sorted(pitches, key=lambda q: str(q.get('Game Date') or ''))
                                       if p.get('BTeam'))) or team
     throws = h_row.get('throws') or fetch_player_metadata(h_row.get('mlbId')).get('hand', 'R')
-    t(L, .9125, f"{position}  |  {bats}/{throws}  |  {club}  |  {h_row.get('pa', '—')} PA  |  "
-                f"{h_row.get('hr', '—')} HR", 11, muted, ha='left')
+    # The line reads through PA, then the slash and the counting stats. A count with no value
+    # leaves the line (a MiLB row can have no steals).
+    _slash = '/'.join(fmt(h_row.get(k), '3dec') for k in ('avg', 'obp', 'slg'))
+    _bits = [position, f'{bats}/{throws}', club, f"{h_row.get('pa', '—')} PA", _slash]
+    _bits += [f'{h_row[k]} {lab}' for k, lab in (('doubles', '2B'), ('hr', 'HR'), ('sb', 'SB'))
+              if h_row.get(k) is not None]
+    t(L, .9125, '  |  '.join(_bits), 11, muted, ha='left')
 
     # A stat with no value leaves the row (hWAR on a window or MiLB card).
-    tiles = [('AVG', 'avg', '3dec'), ('OBP', 'obp', '3dec'), ('SLG', 'slg', '3dec'), ('wRC+', 'wRCplus', 'int'),
-             ('xwRC+', 'xWRCplus', 'int'), ('PROCESS+', 'processPlus', 'plus'), ('hdWAR', 'hWAR', 'dec1'), ('FRV', 'frv', 'dec1')]
+    # Process+ then its parts by weight (BB 52, CT 31, SD 17), then the results and value.
+    tiles = [('PROCESS+', 'processPlus', 'plus'), ('BB+', 'bbPlus', 'plus'), ('CT+', 'ctPlus', 'plus'),
+             ('SD+', 'sdPlus', 'plus'), ('wRC+', 'wRCplus', 'int'), ('xwRC+', 'xWRCplus', 'int'),
+             ('FRV', 'frv', 'dec1'), ('hdWAR', 'hWAR', 'dec1')]
     tiles = [c for c in tiles if h_row.get(c[1]) is not None]
     gap = .012
     w = (R + .0028 - L - gap * (len(tiles) - 1)) / max(len(tiles), 1)
@@ -1474,12 +1483,13 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
         sp.set_color(border)
     t(R, yk, '1.000+', 9, muted, '600', ha='right')
     ax.plot([L, R], [.3525, .3525], color=border, lw=1.1)
+    _mlb_row = not h_row.get('_milbCard') and team not in ('ROC', 'AAA')
     for (title, rows), x0 in zip(SOCIAL_HITTER_COLUMNS, (L, .525)):
         t(x0, .3345, title, 10.5, ink_dark, 'black', ha='left')
         y = .3345
         for lab, key, spec in rows:
             v = h_row.get(key)
-            if v is None:
+            if v is None or key == ('babip' if _mlb_row else 'swingLength'):
                 continue
             y -= .0445
             pc = h_row.get(key + '_pctl')
@@ -1490,7 +1500,11 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             t(x0 + .334, y, '—' if pc is None else f'{pc:.0f}', 12, ink_on(fc), 'black', 'Bitter')
     t(L, .0123, 'huronalytics.vercel.app', 10.5, ink_dark, 'normal', ha='left')
     _src = 'MLB, Baseball Savant, FanGraphs' if h_row.get('wRCplus') is not None else 'MLB, Baseball Savant'
-    t(R, .0123, f'Data: {_src}  ·  chips = MLB percentile', 8.2, ink_dark, 'normal', ha='right')
+    _lvl = h_row.get('_pctlLevel')
+    # On a MiLB card the source list gives way to the note on which chips use which pool.
+    _foot = (f'chips = MLB percentile, except wRC+, {'xwRC+, ' if _lvl == 'AAA' else ''}wOBA, xwOBA, BABIP, K%, BB% = {_lvl}' if _lvl
+             else f'Data: {_src}  ·  chips = MLB percentile')
+    t(R, .0123, _foot, 8.2, ink_dark, 'normal', ha='right')
     fig.savefig(output_file, dpi=135, facecolor=BG)
     plt.close(fig)
     print(f'  Saved: {output_file}')
@@ -1775,6 +1789,9 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                     h_row['wRCplus'] = (None if date_filter is not None else
                                         _mc.hitter_wrc_plus(corpus_player, hitter_pitches))
                     h_row['wRCplus_pctl'] = None
+                    h_row['_milbCard'] = True
+                    if date_filter is None and not _mc.apply_fg_line(h_row, corpus_player, hitter_pitches):
+                        h_row['sb'] = _mc.hitter_sb(corpus_player)
                 elif date_filter is None:
                     # A pure MLB season: the shipped wRC+, as on the season card.
                     _mc.add_ibb(h_row, hitter_pitches,

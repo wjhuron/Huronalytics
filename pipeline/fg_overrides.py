@@ -276,14 +276,18 @@ def fetch_aaa_hitters(year=2026, org=''):
 
 
 def fetch_milb_hitters(level, year=2026):
-    """One minor league level, keyed by xMLBAMID: {'wRCplus' (unrounded), 'pa'}. FanGraphs
+    """One minor league level, keyed by xMLBAMID: {'wRCplus' (unrounded), 'pa', 'sb', 'line' (every
+    numeric column FanGraphs serves, under its own name, so a card can match it)}. FanGraphs
     level codes: 1 AAA, 2 AA, 3 A+, 4 A, 7 and 8 the two rookie complexes."""
     params = (f'pos=all&level={level}&lg=&stats=bat&qual=0&type=1&season={year}&seasonEnd={year}'
               f'&org=&ind=0&splitTeam=false&pageitems=5000&pagenum=1')
     rows = _http_get_json(f'{FG_MILB_API}?{params}', timeout=30)
     if not isinstance(rows, list):
         raise RuntimeError(f'Unexpected response from FG minor-league API: {type(rows).__name__}')
-    return {str(int(r['xMLBAMID'])): {'wRCplus': float(r['wRC+']), 'pa': int(r.get('PA') or 0)}
+    return {str(int(r['xMLBAMID'])): {'wRCplus': float(r['wRC+']), 'pa': int(r.get('PA') or 0),
+                                      'sb': int(r.get('SB') or 0),
+                                      'line': {k: v for k, v in r.items()
+                                               if isinstance(v, (int, float)) and not isinstance(v, bool)}}
             for r in rows if r.get('xMLBAMID') is not None and r.get('wRC+') is not None}
 
 
