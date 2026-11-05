@@ -321,7 +321,18 @@ def main():
     bases = [B for B in ph.HORIZONS[1] if B + 1 >= 2022]          # Stuff+ history exists from 2021
     R1 = {B: rows_all(B) for B in bases}
     tr = [ph.feats(R1[B], 1, *par) for B in bases]
-    ch = [pst.stuff_channel(R1[B], B + 1, stuff, H1['d'], 250)[0] for B in bases]
+    # Training channel: Stuff+ history with the target season out of every model (pit_stuff_clean_build.py). The file above fits each season on
+    # the others, later ones included, so a training row's channel has seen its own target; that inflated the coefficient from -41 to -55 and the
+    # held-out gain from .42% to .80% of RA9 MSE. Scoring 2027 still reads `stuff`: none of those models saw 2027. N0 250 stands: 50 v 250 ties on clean history.
+    clean_path = os.path.join(P, '_stuff_clean.json')
+    if not os.path.exists(clean_path):
+        raise SystemExit('No target-free Stuff+ history for the pitcher fit. Build it: python3 scripts/research/projection/pit_stuff_clean_build.py')
+    clean = json.load(open(clean_path))
+    missing_t = [B + 1 for B in bases if str(B + 1) not in clean]
+    if missing_t:
+        raise SystemExit(f'_stuff_clean.json has no target season {missing_t}. Rebuild: python3 scripts/research/projection/pit_stuff_clean_build.py')
+    clean_tab = {B + 1: {y: {pid: {'stuff_full': r['s'], 'n_full': r['n']} for pid, r in d.items()} for y, d in clean[str(B + 1)].items()} for B in bases}
+    ch = [pst.stuff_channel(R1[B], B + 1, clean_tab[B + 1], H1['d'], 250)[0] for B in bases]
     Xtr = np.column_stack([np.vstack([t[0][:, :-1] for t in tr]), np.concatenate(ch),
                            np.concatenate([x_exp(R1[B]) for B in bases]), np.vstack([x_park(R1[B], B, True) for B in bases]),
                            np.concatenate([x_ev(R1[B], B) for B in bases]), np.concatenate([t[0][:, -1] for t in tr])])

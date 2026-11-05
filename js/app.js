@@ -1146,6 +1146,10 @@
       }
       const faIds = DataStore.freeAgentIds;
       data = data.filter(function (r) { return faIds[r.mlbId] === true; });
+      if (currentTab === 'faHitters') {
+        // A pitcher who batted has a hitter row but no hitter projection (Mikolas, 1 PA).
+        data = data.filter(function (r) { return r.hpWAR_unit != null; });
+      }
       if (FA_TABS[currentTab]) data = data.map(faProfile);
     }
 

@@ -81,8 +81,8 @@ def main():
     print(f'pitcher WAR conversion vs shipped hpWAR: n {len(dd)} max |d| {max(dd):.3f} rows > .02: {sum(x > .02 for x in dd)}')
     if max(dd) > 0.02:
         raise SystemExit('conversion does not reproduce shipped hpWAR: stop')
-    dt = [abs(v['hpWAR'] * v['pt'] / UNIT[v['unit']] - v['tot']) for s in ('hitters', 'pitchers') for v in hp[s].values() if v.get('pt') is not None and v.get('hpWAR') is not None]
-    print(f'total = rate x PT / unit vs shipped: n {len(dt)} max |d| {max(dt):.3f}')
+    dt = [abs(v['hpWAR'] * v['pt'] / UNIT[v['unit']] - v['tot']) for v in hp['hitters'].values() if v.get('pt') is not None and v.get('hpWAR') is not None]
+    print(f'hitter total = rate x PT / unit vs shipped: n {len(dt)} max |d| {max(dt):.3f}')
 
     H, Pi = [], []
     for r in fa:
@@ -116,10 +116,15 @@ def main():
                 g = float(s_.get('G') or 0); gs = float(s_.get('GS') or 0)
                 st_role = 'SP' if g and gs / g >= 0.5 else 'RP'
                 ipt = v.get('pt')
+                # the total reads his start share, as build_hpwar.py does; the rate keeps the unit
+                sh = v.get('share', 1.0 if role == 'SP' else 0.0)
+                ra_sh = float(pp[i]['RA9_RP_2027']) + sh * (float(pp[i]['RA9_SP_2027']) - float(pp[i]['RA9_RP_2027']))
+                rep_sh = wc['replRp'] + sh * (wc['replSp'] - wc['replRp'])
+                bl_sh = 0.5 * ra_sh + 0.5 * (st + d_p) if st is not None else None
                 row.update(unit=v['unit'], RA9_site=num(r0), RA9_blend=num(bl),
                            IP_site=num(ipt, 0), hpWAR_unit_site=num(v['hpWAR']), hpWAR_unit_blend=num(war(bl) if bl is not None else None),
                            total_site=num(v.get('tot')),
-                           total_blend=num(war(bl) * ipt / ip if bl is not None and ipt is not None else None),
+                           total_blend=num(((lg_ra9 - bl_sh) / rpw + rep_sh) * ipt / 9 if bl_sh is not None and ipt is not None else None),
                            role_differs_from_steamer='yes' if st_role != role else '', thin_age=v.get('thin') or '')
             else:
                 row['note'] = 'no projection of ours: Steamer only'

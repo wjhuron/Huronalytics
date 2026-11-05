@@ -10,6 +10,9 @@ Rochester and other Triple-A rows get nothing (per Wally 2026-10-02): the Triple
 hpWARtot (2026-10-07) is the one-season TOTAL: hpWAR times projected playing time (hpWAR_pt, IP or PA
 in 2027, from scripts/research/projection/pt_backtest.py; zero playing time counts, so injury and
 demotion risk are inside it), over the unit's IP or PA. Next season only (per Wally).
+A pitcher's total reads his BASE start share, not the unit (2026-11-05, pit_role_rep_test.py): RA9 and replacement interpolate between
+the reliever and starter roles. Start-share totals beat the cut on swingmen, r +.09 (SE .03, 4/4), and halve the cut's bias, which ran
+-.43 WAR at share .2-.5 and +.17 at .5-.8. The rate and the unit keep the .5 cut.
 
 Method, backtests and limits: scripts/research/projection/project_players.py and the methods doc
 (Google Doc "Huronalytics hWAR audit and projection model: methods (2026-10-02)"). In short: three
@@ -71,6 +74,8 @@ def main():
     base = project_players.BASE
     P = project_players.P
     hitters, pitchers = {}, {}
+    meta = json.load(open(os.path.join(ROOT, 'data', 'metadata_rs.json')))
+    war, rpw = meta['eraPlusConstants']['war'], meta['hwarConstants']['rpw']
     pt = {'hitters': pt_backtest.project('hit', base), 'pitchers': pt_backtest.project('pit', base)}
     for r in csv.DictReader(open(os.path.join(P, 'projections_hitters.csv'))):
         rec = {key: num(r.get(f'WAR600_{base + h}')) for h, key in HORIZONS.items()}
@@ -91,6 +96,11 @@ def main():
         rec['low'] = num(r.get('ip_2026')) < LOW_IP_BASE and num(r.get('ip_2024_26')) < LOW_IP_HIST
         rec['thin'] = r.get('thin_age_support') or ''
         add_total(rec, pt['pitchers'].get(int(r['mlbId'])))
+        if rec['pt'] is not None and rec['hpWAR'] is not None:
+            ra = num(r['RA9_RP_2027']) + share * (num(r['RA9_SP_2027']) - num(r['RA9_RP_2027']))
+            repl = war['replRp'] + share * (war['replSp'] - war['replRp'])
+            rec['share'] = round(share, 3)
+            rec['tot'] = round(((war['lgRA9'] - ra) / rpw + repl) * pt['pitchers'][int(r['mlbId'])] / 9, 2)
         pitchers[r['mlbId']] = rec
     n_tot = {s: sum(v['tot'] is not None for v in d.values()) for s, d in (('hitters', hitters), ('pitchers', pitchers))}
     if n_tot['hitters'] < 0.9 * len(hitters) or n_tot['pitchers'] < 0.9 * len(pitchers):
