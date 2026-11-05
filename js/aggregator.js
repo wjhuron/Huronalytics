@@ -301,6 +301,20 @@ const Aggregator = {
   },
 
   // Compute percentile for a value against a sorted MLB array using binary search
+  // Percentile of val against 101 quantiles. Mirrors pipeline/compute.py rank_in_quantiles
+  // exactly (linear interpolation, ties at the middle of a flat run, half up).
+  _rankInQuantiles: function (q, val) {
+    if (val === null || val === undefined || val !== val || !q || !q.length) return null;
+    const lo = this._bisectLeft(q, val);
+    const hi = this._bisectRight(q, val);
+    let pos;
+    if (hi > lo) pos = (lo + hi - 1) / 2;
+    else if (lo === 0) pos = 0;
+    else if (lo >= q.length) pos = q.length - 1;
+    else pos = lo - 1 + (val - q[lo - 1]) / (q[lo] - q[lo - 1]);
+    return Math.floor(pos * 100 / (q.length - 1) + 0.5);
+  },
+
   _percentileFromSorted: function (sortedMlb, val, isPool) {
     const n = sortedMlb.length;
     const below = this._bisectLeft(sortedMlb, val);
@@ -2833,6 +2847,20 @@ const Aggregator = {
     HITTER_STAT_KEYS.forEach(function (key) {
       self._computePercentiles(rows, key);
     });
+
+    // ROC hitters rank inside AAA (2026-11-05, per Wally), the pipeline's rule in
+    // process_data: metadata.aaaHitterQuantiles, raw direction, before the inversion
+    // below. A stat with no AAA quantiles gets no rank; xwRC+ ranks as xwOBA does.
+    var aaaQ = DataStore.metadata && DataStore.metadata.aaaHitterQuantiles;
+    if (aaaQ) {
+      for (let rq = 0; rq < rows.length; rq++) {
+        if (rows[rq].team !== 'ROC') continue;
+        HITTER_STAT_KEYS.forEach(function (key) {
+          const src = key === 'xWRCplus' ? 'xwOBA' : key;
+          rows[rq][key + '_pctl'] = aaaQ[src] ? self._rankInQuantiles(aaaQ[src], rows[rq][src]) : null;
+        });
+      }
+    }
 
     // Set bipQual flag for each hitter
     for (let bqi = 0; bqi < rows.length; bqi++) {

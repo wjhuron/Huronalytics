@@ -855,6 +855,26 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
             row[pctl_key] = _pctl_interp(val)
 
 
+def rank_in_quantiles(q, val):
+    """Percentile of val against 101 quantiles (0th to 100th) by linear interpolation, ties at
+    the middle of a flat run, rounded half up. js/aggregator.js _rankInQuantiles mirrors it
+    exactly; the two must move together."""
+    import bisect
+    import math
+    if val is None or not q:
+        return None
+    lo, hi = bisect.bisect_left(q, val), bisect.bisect_right(q, val)
+    if hi > lo:
+        pos = (lo + hi - 1) / 2.0
+    elif lo == 0:
+        pos = 0.0
+    elif lo >= len(q):
+        pos = float(len(q) - 1)
+    else:
+        pos = lo - 1 + (val - q[lo - 1]) / (q[lo] - q[lo - 1])
+    return int(math.floor(pos * 100.0 / (len(q) - 1) + 0.5))
+
+
 def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False):
     """Compute percentiles from an MLB pool of one row per player (combined 2TM/3TM
     rows replace their per-team rows), then interpolate AAA rows and the per-team

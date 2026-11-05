@@ -2097,7 +2097,7 @@ var PlayerPage = {
 
   _platoonFilters: function (hand) {
     // includeROC keeps ROC hitters in the returned rows (their percentiles
-    // interpolate vs the MLB pool inside the aggregator), so ROC hitter pages
+    // rank inside AAA, metadata.aaaHitterQuantiles, in the aggregator), so ROC hitter pages
     // can platoon-split. Pitcher/pitch narrowings ignore the flag, so pitcher
     // pages are unchanged. Cache stays shared across MLB and ROC pages.
     // keepStints keeps per-team rows of multi-team players in the result so

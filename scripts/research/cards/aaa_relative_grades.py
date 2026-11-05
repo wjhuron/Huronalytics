@@ -31,9 +31,8 @@ from pipeline.window_pool import (  # noqa: E402
 
 OUT = os.path.join(ROOT, 'data', '_milb2026')
 N_BATCH = 8
-KEEP = ('pa', 'wOBA', 'xwOBA', 'barrelPct', 'airPullPct', 'gbPct', 'kPct', 'bbPct', 'izSwChase', 'izSwingPct',
-        'chasePct', 'izContactPct', 'contactPct', 'whiffPct', 'hardHitPct', 'ev95', 'xwOBAcon', 'batSpeed',
-        'nCompSwings', 'bbPlus', 'sdPlus', 'ctPlus', 'processPlus', 'sdPlusN', 'ctPlusN')
+# Every numeric column the row builder writes, so the site's ROC ranks can read this pool too.
+KEEP_ALSO = ('bbPlus', 'sdPlus', 'ctPlus', 'processPlus', 'sdPlusN', 'ctPlusN')
 
 
 def split_batches():
@@ -107,7 +106,9 @@ def main():
             plus_post_chain(row, metadata)
             process_plus_from_atoms(row, metadata)
             out[mid] = {'name': name, 'club': club, 'bbPlusNoBat': row['_bbPlusNoBat'],
-                        **{k: row.get(k) for k in KEEP}}
+                        **{k: v for k, v in row.items() if not k.startswith('_') and not k.endswith('_pctl')
+                           and isinstance(v, (int, float)) and not isinstance(v, bool)},
+                        **{k: row.get(k) for k in KEEP_ALSO}}
         print(f'batch {i + 1}/{N_BATCH}: {len(recs)} hitters, {len(out)} so far', flush=True)
         del groups, recs
 

@@ -46,7 +46,7 @@ from pipeline.eraplus import _load_park as load_park_factors_savant
 from pipeline.compute import (
     compute_expected_stats, compute_stats, compute_xrv, fip_family,
     compute_pitcher_batted_ball, compute_hitter_stats,
-    compute_percentile_ranks, compute_percentile_ranks_with_aaa,
+    compute_percentile_ranks, compute_percentile_ranks_with_aaa, rank_in_quantiles,
     METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
     PITCH_PCTL_KEYS, PITCH_BB_PCTL_KEYS, PITCH_BB_INVERT,
     PITCHER_INVERT_PCTL,
@@ -5131,6 +5131,30 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             pctl_key = stat + '_pctl'
             if row.get(pctl_key) is not None:
                 row[pctl_key] = 100 - row[pctl_key]
+
+    # ROC hitters rank inside AAA, the AAA cards' rule (2026-11-05, per Wally): every stored
+    # percentile is replaced from data/aaa_hitter_quantiles_rs.json (scripts/builders/
+    # build_aaa_hitter_quantiles.py), raw direction, before the inversion pass below. A stat with
+    # no AAA quantiles has no AAA rank, so it is blanked, never left on the MLB pool. xwRC+ ranks
+    # as xwOBA does. js/aggregator.js repeats this for the re-aggregated leaderboard.
+    _aaa_q_path = os.path.join(DATA_DIR, 'aaa_hitter_quantiles_rs.json')
+    if os.path.exists(_aaa_q_path):
+        with open(_aaa_q_path) as _f:
+            _aaa_q = json.load(_f)['quantiles']
+        metadata['aaaHitterQuantiles'] = _aaa_q
+        _n_roc = 0
+        for row in hitter_leaderboard:
+            if row.get('team') != 'ROC':
+                continue
+            _n_roc += 1
+            for pk in [k for k in row if k.endswith('_pctl')]:
+                stat = pk[:-5]
+                src = 'xwOBA' if stat == 'xWRCplus' else stat
+                row[pk] = rank_in_quantiles(_aaa_q.get(src), row.get(src)) if src in _aaa_q else None
+        print(f"  ROC hitters ranked inside AAA: {_n_roc} rows, {len(_aaa_q)} stats.")
+    else:
+        print(f"  WARNING: {_aaa_q_path} missing: ROC hitters stay on the MLB pool. "
+              "Build it: scripts/builders/build_aaa_hitter_quantiles.py")
 
     # Hitter inversions
     for row in hitter_leaderboard:

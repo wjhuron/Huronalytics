@@ -64,7 +64,7 @@ Values from different levels are not on the same scale, and mixing them silently
 
 Three different things get confused constantly:
 
-- **The percentile pool is all MLB players.** Every row gets a stored rank. Qualification does not filter the pool.
+- **The percentile pool is all MLB players.** Every row gets a stored rank. Qualification does not filter the pool. ROC hitter rows are the exception: `process_data` re-ranks them inside AAA from `data/aaa_hitter_quantiles_rs.json` just before the inversion pass.
 - **Qualification is a render-time coloring gate**, applied in the site layer, not here. Hitters: 3.1 PA times team games (2.7 for ROC). The constants are the `QUAL_*` block in `utils.py`.
 - **A computation floor is neither.** `MIN_HITTER_SWINGS = 65`, `MIN_CELL = 20`, `MIN_POOL = 300` in `commandplus` and `50` in `pitcherplus` are floors below which a value is not computed at all. Note that the two `MIN_POOL` values count different units: pitches in one file, qualified pitchers in the other.
 
