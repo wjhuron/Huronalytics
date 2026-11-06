@@ -479,7 +479,8 @@ def apply_pitcher_plus(rows, aaa_teams=('ROC', 'AAA'), data_dir=None,
         pool = [r[key] for r in rows
                 if r.get(key) is not None and _is_baseline(r, aaa)]
         for r in rows:
-            r[key + '_pctl'] = _pctl(r.get(key), pool)
+            # split at the league average, 100 by definition (pipeline.compute.split_at_league)
+            r[key + '_pctl'] = _pctl(r.get(key), pool, 100.0)
     if base is not None:
         base['_projPriorSeason'] = prior_season
         base['_projNPrior'] = n_prior

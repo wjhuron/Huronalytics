@@ -786,7 +786,68 @@ def compute_hitter_stats(pitches):
 
 # ── Percentile computation ───────────────────────────────────────────────
 
-def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False):
+# The league average a percentile splits at (split_at_league). Counting stats have none and keep
+# the plain rank; a + stat's is 100 by definition, a run-value total's 0 (PCTL_ZERO). Every other stat takes the shipped League Avg
+# value, or, where none ships, the same weighted mean that block uses, weighted by the stat's own
+# denominator (pctl_weight_key). process_data, train_stuff and the AAA quantile builder all read
+# these; js/aggregator.js reads the resulting values from metadata.pctlLeague.
+PCTL_NO_LEAGUE = {'hr', 'sb', 'hWAR', 'fWAR'}
+# Run value is measured against the average outcome, so the league average is 0 by construction
+# (MLB hitter rows total +2 runs over 183,849 PA, 2026-11-05). The League Avg row's 3.5 is a
+# PA-weighted mean of season TOTALS and is not a league average; do not split at it.
+PCTL_ZERO = {'runValue', 'xRunValue'}
+PCTL_PLUS_100 = {'wRCplus', 'xWRCplus', 'bbPlus', 'sdPlus', 'ctPlus', 'processPlus',
+                 'commandPlus', 'stuffScore', 'pitcherPlus', 'hdERAPlus', 'hpERAPlus'}
+PCTL_BIP_STATS = {'avgEVAll', 'ev50', 'medEV', 'ev95', 'maxEV', 'hardHitPct', 'barrelPct', 'xwOBAcon',
+                  'xwOBAsp', 'sprayVal', 'gbPct', 'ldPct', 'fbPct', 'puPct', 'pullPct', 'middlePct',
+                  'oppoPct', 'airPullPct'}
+PCTL_COMP_SWING_STATS = {'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt',
+                         'blastPct', 'squaredUpPct', 'idealAAPct'}
+PCTL_PA_STATS = {'kPct', 'bbPct', 'kbbPct', 'babip', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'avg', 'obp', 'slg',
+                 'ops', 'iso', 'bbToK', 'hrFbPct', 'rv100', 'xRv100'}
+
+
+def pctl_weight_key(stat, side, bip_extra=()):
+    """Row field that weights stat's league mean: nCompSwings, nBip, pa, or (pitch-side) count."""
+    if stat in PCTL_COMP_SWING_STATS:
+        return 'nCompSwings'
+    if (stat in PCTL_BIP_STATS or stat in bip_extra) and stat != 'hrFbPct':
+        return 'nBip'
+    if side == 'hitter' or stat in PCTL_PA_STATS:
+        return 'pa'
+    return 'count'
+
+
+def pool_fraction(sorted_vals, val):
+    """Share of a sorted pool below val, ties at the middle: (below + 0.5 * equal) / n."""
+    import bisect
+    n = len(sorted_vals)
+    below = bisect.bisect_left(sorted_vals, val)
+    equal = bisect.bisect_right(sorted_vals, val) - below
+    return (below + 0.5 * equal) / n
+
+
+def split_at_league(frac, frac_league):
+    """Percentile (0-100, unrounded) split at the league average (2026-11-05, per Wally).
+
+    frac is the player's share of the pool below him, frac_league the league average's share.
+    A player at the league average reads exactly 50. Below it he is ranked only among the
+    players below the league average, scaled 0-50; above it only among the players above,
+    scaled 50-100. The league average is the shipped one (metadata *LeagueAverages, the site's
+    League Avg row), never one derived from the pool, so a below-average player can never read
+    above 50. js/aggregator.js _splitAtLeague mirrors this exactly; the two move together."""
+    if frac <= frac_league:
+        return 0.0 if frac_league <= 0 else 50.0 * frac / frac_league
+    return 100.0 if frac_league >= 1 else 50.0 + 50.0 * (frac - frac_league) / (1.0 - frac_league)
+
+
+def league_pctl(sorted_vals, val, league):
+    """Integer percentile of val against a sorted pool, split at the league average, half up."""
+    p = split_at_league(pool_fraction(sorted_vals, val), pool_fraction(sorted_vals, league))
+    return max(0, min(100, int(math.floor(p + 0.5))))
+
+def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False,
+                             league=None):
     """Compute percentile rank (0-100) for each row's metric value.
 
     Distribution is built from rows that:
@@ -806,6 +867,10 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
     ABS_PCTL_KEYS so the server-emitted percentiles match the client re-agg.
 
     Uses the 'mean rank' method for ties. O(n log n) via sort + bisect.
+
+    league: the shipped league average. When given, every row ranks through league_pctl, so the
+    league average reads 50 (split_at_league). None keeps the plain rank, used only for counting
+    stats that have no league average.
     """
     import bisect
     pctl_key = metric_key + '_pctl'
@@ -845,6 +910,13 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
         equal = bisect.bisect_right(sorted_vals, val) - below
         return max(0, min(100, round((below + 0.5 * equal) / n * 100)))
 
+    if league is not None:
+        lg = _v(league)
+        for row in rows:
+            val = row.get(metric_key)
+            row[pctl_key] = None if val is None else league_pctl(sorted_vals, _v(val), lg)
+        return
+
     for row in rows:
         val = row.get(metric_key)
         if val is None:
@@ -855,14 +927,30 @@ def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', q
             row[pctl_key] = _pctl_interp(val)
 
 
-def rank_in_quantiles(q, val):
-    """Percentile of val against 101 quantiles (0th to 100th) by linear interpolation, ties at
-    the middle of a flat run, rounded half up. js/aggregator.js _rankInQuantiles mirrors it
-    exactly; the two must move together."""
+def _quantile_position(q, val):
     import bisect
-    import math
+    lo, hi = bisect.bisect_left(q, val), bisect.bisect_right(q, val)
+    if hi > lo:
+        return (lo + hi - 1) / 2.0
+    if lo == 0:
+        return 0.0
+    if lo >= len(q):
+        return float(len(q) - 1)
+    return lo - 1 + (val - q[lo - 1]) / (q[lo] - q[lo - 1])
+
+
+def rank_in_quantiles(q, val, league=None):
+    """Percentile of val against 101 quantiles (0th to 100th) by linear interpolation, ties at
+    the middle of a flat run, rounded half up. With league (that level's league average) it is
+    split there, as split_at_league. js/aggregator.js _rankInQuantiles mirrors it exactly; the
+    two must move together."""
     if val is None or not q:
         return None
+    if league is not None:
+        n1 = len(q) - 1
+        p = split_at_league(_quantile_position(q, val) / n1, _quantile_position(q, league) / n1)
+        return max(0, min(100, int(math.floor(p + 0.5))))
+    import bisect
     lo, hi = bisect.bisect_left(q, val), bisect.bisect_right(q, val)
     if hi > lo:
         pos = (lo + hi - 1) / 2.0
@@ -875,7 +963,8 @@ def rank_in_quantiles(q, val):
     return int(math.floor(pos * 100.0 / (len(q) - 1) + 0.5))
 
 
-def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False):
+def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False,
+                                     league=None):
     """Compute percentiles from an MLB pool of one row per player (combined 2TM/3TM
     rows replace their per-team rows), then interpolate AAA rows and the per-team
     rows of multi-team players against the pool.
@@ -912,7 +1001,8 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
             continue
         mlb_rows.append(r)
 
-    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key, qualifier_fn=qualifier_fn, abs_val=abs_val)
+    compute_percentile_ranks(mlb_rows, metric_key, min_count, count_key, qualifier_fn=qualifier_fn, abs_val=abs_val,
+                             league=league)
     _v = (lambda x: abs(x)) if abs_val else (lambda x: x)
 
     def _mlb_in_pool(row):
@@ -937,6 +1027,9 @@ def compute_percentile_ranks_with_aaa(rows, metric_key, min_count=0, count_key='
             row[pctl_key] = 50
             continue
         val = _v(val)
+        if league is not None:
+            row[pctl_key] = league_pctl(mlb_values, val, _v(league))
+            continue
         below = bisect.bisect_left(mlb_values, val)
         above = bisect.bisect_right(mlb_values, val)
         equal = above - below

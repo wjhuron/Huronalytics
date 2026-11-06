@@ -77,6 +77,7 @@ The pieces below are hand-maintained copies of pipeline code, because JS cannot 
 | `aggregator.js` `QUAL` block | `pipeline/utils.py` `QUAL_*` constants |
 | `utils.js` `hitterPaPerGame` / `pitcherIpPerGame` | `pipeline/utils.py` same-named helpers |
 | `aggregator.js` `INVERT` maps | `pipeline/compute.py` `*_INVERT*` sets |
+| `aggregator.js` `_splitAtLeague` / `_leaguePctl` / `_rankInQuantiles` | `pipeline/compute.py` `split_at_league` / `league_pctl` / `rank_in_quantiles` |
 | `utils.js` `playerKey` / `isCombinedTeam` / `buildQualContext` | `pipeline/utils.py` `player_key` / `is_combined_team` / `current_team_by_player` |
 
 A metric added to the Python inversion set but not here gets colored backwards on one surface and correctly on the other, which is very hard to spot.

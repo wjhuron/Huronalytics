@@ -1709,9 +1709,32 @@ def _combo_exact(parts):
 STUFF_STORE_DECIMALS = 6
 
 
-def _pctl(sc, pool):
+def _pctl(sc, pool, league=None):
+    """Rank of sc in pool. With league it is split at that league average (2026-11-05, per Wally;
+    pipeline.compute.split_at_league), the rule every shipped percentile follows."""
+    if league is not None:
+        from pipeline.compute import league_pctl
+        return league_pctl(sorted(pool), sc, league)
     below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
     return round((below + 0.5 * equal) / len(pool) * 100)
+
+
+# The per-100 rates split at the pitch-weighted league mean; the totals (rvoe, xrvoe) at 0, the
+# league average of a run-value total by construction (pipeline.compute.PCTL_ZERO).
+XRVOE_RATE_FIELDS = ('xrvoe100', 'rvoe100')
+
+
+def _count_weighted_league(rows, key):
+    """Pitch-weighted league mean of key over MLB club rows (ROC/AAA and 2TM.. out), the rule
+    process_data's _pctl_league applies to a stat with no shipped League Avg value."""
+    num = den = 0.0
+    for r in rows:
+        v, w = r.get(key), r.get('count') or 0
+        if v is None or w <= 0 or r.get('team') in AAA_TEAMS or _is_combined_team(r.get('team')):
+            continue
+        num += v * w
+        den += w
+    return num / den if den else None
 
 
 # ── Pitching+ (season blend) RETIRED 2026-08-28 (per Wally). The name now
@@ -1940,11 +1963,15 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
                 and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])):
             qual_by_pt[row['pitchType']].append(row['stuffScore'])
     n_pl = 0
+    pctl_league_pitch = defaultdict(dict)
+    for pt in qual_by_pt:
+        pctl_league_pitch[pt]['stuffScore'] = _count_weighted_league(
+            [r for r in pl if r['pitchType'] == pt], 'stuffScore')
     for row in pl:
         sc = row.get('stuffScore'); pt = row['pitchType']
         if sc is not None: n_pl += 1
         if sc is not None and qual_by_pt.get(pt):
-            row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt])
+            row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt], pctl_league_pitch[pt]['stuffScore'])
         else:
             row['stuffScore_pctl'] = None
     # ── xRVOE -> pitch rows. ROC/AAA now carries it too (its RunExp was
@@ -1962,10 +1989,16 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
                         and row.get('team') not in AAA_TEAMS
                         and not _is_combined_team(row['team'])):
                     pools[f][row['pitchType']].append(rec[src])
+        for pt in pools['xrvoe100']:
+            pt_rows = [r for r in pl if r['pitchType'] == pt]
+            for f in XRVOE_FIELDS:
+                pctl_league_pitch[pt][f] = (_count_weighted_league(pt_rows, f)
+                                            if f in XRVOE_RATE_FIELDS else 0.0)
         for row in pl:
             for f in XRVOE_FIELDS:
                 v = row.get(f)
-                row[f + '_pctl'] = (_pctl(v, pools[f][row['pitchType']])
+                row[f + '_pctl'] = (_pctl(v, pools[f][row['pitchType']],
+                                          pctl_league_pitch[row['pitchType']].get(f))
                                     if v is not None and pools[f].get(row['pitchType'])
                                     else None)
     json.dump(pl, open(pl_path, 'w'))
@@ -2006,10 +2039,11 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
         sc = row.get('stuffScore')
         if sc is not None: n_pp += 1
         if sc is not None and qpool:
-            row['stuffScore_pctl'] = _pctl(sc, qpool)
+            row['stuffScore_pctl'] = _pctl(sc, qpool, 100.0)
         else:
             row['stuffScore_pctl'] = None
     n_x = 0
+    pctl_league_pitcher = {'stuffScore': 100.0}
     if xrvoe_ov:
         pools_o = {f: [] for f in XRVOE_FIELDS}
         for row in pp:
@@ -2020,12 +2054,14 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
                         and row.get('team') not in AAA_TEAMS
                         and not _is_combined_team(row['team'])):
                     pools_o[f].append(rec[src])
+        for f in XRVOE_FIELDS:
+            pctl_league_pitcher[f] = _count_weighted_league(pp, f) if f in XRVOE_RATE_FIELDS else 0.0
         for row in pp:
             if row.get('xrvoe100') is not None:
                 n_x += 1
             for f in XRVOE_FIELDS:
                 v = row.get(f)
-                row[f + '_pctl'] = (_pctl(v, pools_o[f])
+                row[f + '_pctl'] = (_pctl(v, pools_o[f], pctl_league_pitcher.get(f))
                                     if v is not None and pools_o[f] else None)
     # ── Pitcher+ (must run LAST: it consumes the fresh stuffScore/locPlus
     # written above, plus the rate stats process_data already set) ──
@@ -2115,6 +2151,21 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
           f'{n_x_pp} pitcher rows (ranks and consumers used the 1-decimal value)')
 
     json.dump(pp, open(pp_path, 'w'))
+
+    # The league averages these ranks split at join metadata.pctlLeague (process_data wrote the
+    # rest), so js/aggregator.js splits the re-aggregated Stuff+/xRVOE ranks at the same line.
+    # A missing metadata file is a process-order bug: fail loudly rather than leave the site
+    # ranking these stats on a different rule from the pipeline.
+    _md_path = os.path.join(DATA, 'metadata_rs.json')
+    _md = json.load(open(_md_path))
+    _pl = _md.setdefault('pctlLeague', {})
+    for _pt, _vals in pctl_league_pitch.items():
+        _pl.setdefault('pitch', {}).setdefault(_pt, {}).update(_vals)
+    _pl.setdefault('pitcher', {}).update(pctl_league_pitcher)
+    _tmp = _md_path + '.tmp'
+    with open(_tmp, 'w') as _f:
+        json.dump(_md, _f)
+    os.replace(_tmp, _md_path)
 
     # Baseline goes to metadata so the client can recompute Pitcher+ under
     # filters against the season-long league scale.

@@ -764,6 +764,17 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
 
     # percentiles: qualified MLB non-combined pool, every row ranked
     # (site convention). hdERA/hpERA are lower-is-better -> invert.
+    # Split at the league average (2026-11-05, per Wally; pipeline.compute.split_at_league):
+    # the + forms at 100, hdERA/hpERA at the IP-weighted mean over MLB club rows, the value
+    # the site's League Avg row prints. hWAR is a counting stat and keeps the plain rank.
+    def _ip_weighted(key):
+        pairs = [(r[key], _ip_outs(r.get('ip'))) for r in mlb
+                 if r.get(key) is not None and not is_combined_fn(r.get('team'))
+                 and _ip_outs(r.get('ip')) > 0]
+        den = sum(w for _, w in pairs)
+        return sum(v * w for v, w in pairs) / den if den else None
+    split_league = {'hdERA': _ip_weighted('hdERA'), 'hpERA': _ip_weighted('hpERA'),
+                    'hdERAPlus': 100.0, 'hpERAPlus': 100.0, 'hWAR': None}
     for key, invert in (('hdERA', True), ('hpERA', True),
                         ('hdERAPlus', False), ('hpERAPlus', False),
                         ('hWAR', False)):
@@ -772,7 +783,7 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
                 and not is_combined_fn(r.get('team'))
                 and _ip_outs(r.get('ip')) >= QUAL_OUTS]
         for r in rows:
-            p = _pctl(r.get(key), pool)
+            p = _pctl(r.get(key), pool, split_league[key])
             if p is not None and invert:
                 # int like every other shipped percentile (2026-08-27 audit:
                 # round(...,1) here was the one float-typed rank in the JSON).
