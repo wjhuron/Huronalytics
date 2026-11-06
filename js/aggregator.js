@@ -303,22 +303,8 @@ const Aggregator = {
   // Compute percentile for a value against a sorted MLB array using binary search
   // Percentile of val against 101 quantiles. Mirrors pipeline/compute.py rank_in_quantiles
   // exactly (linear interpolation, ties at the middle of a flat run, half up).
-  _quantilePosition: function (q, val) {
-    const lo = this._bisectLeft(q, val);
-    const hi = this._bisectRight(q, val);
-    if (hi > lo) return (lo + hi - 1) / 2;
-    if (lo === 0) return 0;
-    if (lo >= q.length) return q.length - 1;
-    return lo - 1 + (val - q[lo - 1]) / (q[lo] - q[lo - 1]);
-  },
-
-  _rankInQuantiles: function (q, val, league) {
+  _rankInQuantiles: function (q, val) {
     if (val === null || val === undefined || val !== val || !q || !q.length) return null;
-    if (league !== null && league !== undefined) {
-      const n1 = q.length - 1;
-      const p = this._splitAtLeague(this._quantilePosition(q, val) / n1, this._quantilePosition(q, league) / n1);
-      return Math.max(0, Math.min(100, Math.floor(p + 0.5)));
-    }
     const lo = this._bisectLeft(q, val);
     const hi = this._bisectRight(q, val);
     let pos;
@@ -327,37 +313,6 @@ const Aggregator = {
     else if (lo >= q.length) pos = q.length - 1;
     else pos = lo - 1 + (val - q[lo - 1]) / (q[lo] - q[lo - 1]);
     return Math.floor(pos * 100 / (q.length - 1) + 0.5);
-  },
-
-  // Share of a sorted pool below val, ties at the middle. Mirrors pipeline/compute.py pool_fraction.
-  _poolFraction: function (sorted, val) {
-    const below = this._bisectLeft(sorted, val);
-    return (below + 0.5 * (this._bisectRight(sorted, val) - below)) / sorted.length;
-  },
-
-  // Percentile split at the shipped league average (2026-11-05, per Wally): the league average
-  // reads 50, a below-average player ranks among the below-average players (0-50), an
-  // above-average one among the above-average players (50-100). Mirrors pipeline/compute.py
-  // split_at_league exactly; the two move together.
-  _splitAtLeague: function (frac, fracLeague) {
-    if (frac <= fracLeague) return fracLeague <= 0 ? 0 : 50 * frac / fracLeague;
-    return fracLeague >= 1 ? 100 : 50 + 50 * (frac - fracLeague) / (1 - fracLeague);
-  },
-
-  _leaguePctl: function (sorted, val, league) {
-    const p = this._splitAtLeague(this._poolFraction(sorted, val), this._poolFraction(sorted, league));
-    return Math.max(0, Math.min(100, Math.floor(p + 0.5)));
-  },
-
-  // The league average a percentile splits at: metadata.pctlLeague, written by the pipeline's
-  // percentile pass (side 'pitcher' | 'hitter' | 'pitch' | 'hitterPitch'; pt for the two
-  // pitch-type sides). null (a counting stat, a pitch category, old data) keeps the plain rank.
-  _pctlLeague: function (side, key, pt) {
-    const pl = DataStore.metadata && DataStore.metadata.pctlLeague;
-    let t = pl && pl[side];
-    if (t && pt !== undefined) t = t[pt];
-    const v = t ? t[key] : null;
-    return (v === null || v === undefined) ? null : v;
   },
 
   _percentileFromSorted: function (sortedMlb, val, isPool) {
@@ -379,12 +334,12 @@ const Aggregator = {
   // ---- Unified percentile computation (O(n log n) via sort + binary search) ----
   // ROC-aware: excludes ROC teams from the percentile pool, then interpolates ROC players
   // qualifyFn: function(row) returning true if row qualifies for the pool (replaces both minCount and _qualified modes)
-  _computePercentiles: function (rows, metricKey, minCount, countKey, useAbs, league) {
+  _computePercentiles: function (rows, metricKey, minCount, countKey, useAbs) {
     minCount = minCount || 0;
     countKey = countKey || 'count';
     this._computePercentilesUnified(rows, metricKey, function (row) {
       return minCount === 0 || (row[countKey] || 0) >= minCount;
-    }, useAbs, minCount > 0, league);
+    }, useAbs, minCount > 0);
   },
 
   // Percentile computation using _qualified flag for pool membership.
@@ -402,14 +357,9 @@ const Aggregator = {
   },
 
   // Shared implementation: O(n log n) percentile computation
-  _computePercentilesUnified: function (rows, metricKey, qualifyFn, useAbs, interpolateSubMinimum, league) {
+  _computePercentilesUnified: function (rows, metricKey, qualifyFn, useAbs, interpolateSubMinimum) {
     const pctlKey = metricKey + '_pctl';
     const self = this;
-    // With a league average every ranked row goes through the split (pipeline league_pctl).
-    const lg = (league === null || league === undefined) ? null : (useAbs ? Math.abs(league) : league);
-    const rank = function (sorted, val, isPool) {
-      return lg === null ? self._percentileFromSorted(sorted, val, isPool) : self._leaguePctl(sorted, val, lg);
-    };
 
     const mlbValid = [];
     const rocValid = [];  // interpolated (ROC + per-team rows of multi-team players)
@@ -444,13 +394,13 @@ const Aggregator = {
 
     // Compute percentiles for MLB rows using binary search: O(n log n)
     for (let k = 0; k < mlbValid.length; k++) {
-      rows[mlbValid[k].idx][pctlKey] = rank(sortedMlb, mlbValid[k].val, true);
+      rows[mlbValid[k].idx][pctlKey] = self._percentileFromSorted(sortedMlb, mlbValid[k].val, true);
       processed[mlbValid[k].idx] = true;
     }
 
     // Interpolate ROC rows into MLB distribution: O(r log n)
     for (let r = 0; r < rocValid.length; r++) {
-      rows[rocValid[r].idx][pctlKey] = rank(sortedMlb, rocValid[r].val, false);
+      rows[rocValid[r].idx][pctlKey] = self._percentileFromSorted(sortedMlb, rocValid[r].val, false);
       processed[rocValid[r].idx] = true;
     }
 
@@ -466,7 +416,7 @@ const Aggregator = {
           continue;
         }
         const sv = useAbs ? Math.abs(sVal) : sVal;
-        rows[s][pctlKey] = rank(sortedMlb, sv, false);
+        rows[s][pctlKey] = self._percentileFromSorted(sortedMlb, sv, false);
         processed[s] = true;
       }
     }
@@ -933,7 +883,7 @@ const Aggregator = {
     // rank stored for tooltip + sort, but the leaderboard suppresses cell
     // coloring on them.
     for (let si = 0; si < STAT_KEYS.length; si++) {
-      this._computePercentiles(rows, STAT_KEYS[si], 0, 'count', false, this._pctlLeague('pitcher', STAT_KEYS[si]));
+      this._computePercentiles(rows, STAT_KEYS[si]);
     }
     // Invert where lower is better
     for (let ri = 0; ri < rows.length; ri++) {
@@ -1126,7 +1076,7 @@ const Aggregator = {
     }
     this._flagTeamRows(rows);
     for (let si = 0; si < STAT_KEYS.length; si++) {
-      this._computePercentiles(rows, STAT_KEYS[si], 0, 'count', false, this._pctlLeague('pitcher', STAT_KEYS[si]));
+      this._computePercentiles(rows, STAT_KEYS[si]);
     }
     for (let ri = 0; ri < rows.length; ri++) {
       for (const inv in INVERT) {
@@ -1994,8 +1944,7 @@ const Aggregator = {
         // (see QUAL.MIN_PITCH_LOCPLUS) — it's displayed unshrunk, so the flat
         // 25 would color cells that are only ~0.26 reliable.
         const ptMin = (key === 'locPlus') ? QUAL.locPlusMinPitches(pt) : minPctl;
-        self._computePercentiles(ptGroups[pt], key, ptMin, countKey, ABS_PCTL_KEYS[key] || false,
-                                 self._pctlLeague('pitch', key, pt));
+        self._computePercentiles(ptGroups[pt], key, ptMin, countKey, ABS_PCTL_KEYS[key] || false);
       }
     });
 
@@ -2282,7 +2231,7 @@ const Aggregator = {
     this._flagTeamRows(rows);
     const self = this;
     STAT_KEYS.forEach(function (key) {
-      self._computePercentiles(rows, key, 0, 'count', false, self._pctlLeague('hitter', key));
+      self._computePercentiles(rows, key);
     });
     for (let ri = 0; ri < rows.length; ri++) {
       for (const inv in INVERT) {
@@ -2896,20 +2845,19 @@ const Aggregator = {
     // pool — unchanged.
     const self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
-      self._computePercentiles(rows, key, 0, 'count', false, self._pctlLeague('hitter', key));
+      self._computePercentiles(rows, key);
     });
 
     // ROC hitters rank inside AAA (2026-11-05, per Wally), the pipeline's rule in
     // process_data: metadata.aaaHitterQuantiles, raw direction, before the inversion
     // below. A stat with no AAA quantiles gets no rank; xwRC+ ranks as xwOBA does.
     var aaaQ = DataStore.metadata && DataStore.metadata.aaaHitterQuantiles;
-    var aaaL = (DataStore.metadata && DataStore.metadata.aaaHitterLeague) || {};
     if (aaaQ) {
       for (let rq = 0; rq < rows.length; rq++) {
         if (rows[rq].team !== 'ROC') continue;
         HITTER_STAT_KEYS.forEach(function (key) {
           const src = key === 'xWRCplus' ? 'xwOBA' : key;
-          rows[rq][key + '_pctl'] = aaaQ[src] ? self._rankInQuantiles(aaaQ[src], rows[rq][src], aaaL[src]) : null;
+          rows[rq][key + '_pctl'] = aaaQ[src] ? self._rankInQuantiles(aaaQ[src], rows[rq][src]) : null;
         });
       }
     }
@@ -3388,8 +3336,7 @@ const Aggregator = {
       HITTER_PITCH_PCTL_KEYS.forEach(function (key) {
         // Pool: rows with at least MIN_HITTER_PT pitches of this type seen.
         // Sub-minimum rows are interpolated automatically (minCount > 0 path).
-        self._computePercentiles(ptRows, key, QUAL.MIN_HITTER_PT, 'count', false,
-                                 self._pctlLeague('hitterPitch', key, ptKey));
+        self._computePercentiles(ptRows, key, QUAL.MIN_HITTER_PT);
       });
     }
 

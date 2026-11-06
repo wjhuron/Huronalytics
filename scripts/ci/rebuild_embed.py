@@ -69,8 +69,7 @@ def main(core_gz=CORE_GZ, heavy_gz=HEAVY_GZ, tables_gz=TABLES_GZ):
     try:
         _md = json.load(open(os.path.join(DATA, 'metadata_rs.json')))
         _core_md = obj.setdefault('metadata', {})
-        # pctlLeague: train_stuff adds the Stuff+/xRVOE league averages the ranks split at.
-        for _k in ('pitcherPlusBaseline', 'eraPlusConstants', 'pctlLeague'):
+        for _k in ('pitcherPlusBaseline', 'eraPlusConstants'):
             if _k in _md:
                 _core_md[_k] = _md[_k]
         _pla = _md.get('pitcherLeagueAverages') or {}

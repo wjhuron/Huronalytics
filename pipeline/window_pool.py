@@ -120,17 +120,13 @@ def _season_pool_rows(season_rows):
     return out
 
 
-def add_season_percentiles(row, season_rows, stats=None, league=None):
+def add_season_percentiles(row, season_rows, stats=None):
     """Rank each of `row`'s values inside the SEASON distribution.
 
     No qualification and no minimum sample: a window value is ranked for what
     it is. Inverted stats (K%, Chase%, Whiff%, GB%...) are flipped, matching
-    process_data's separate inversion pass. league = metadata.pctlLeague['hitter']:
-    each rank splits at the SEASON league average, as the shipped ones do
-    (pipeline.compute.split_at_league); a stat without one keeps the plain rank.
+    process_data's separate inversion pass.
     """
-    from pipeline.compute import league_pctl
-    league = league or {}
     if stats is None:
         stats = HITTER_STAT_KEYS + EXPECTED_KEYS
     season_rows = _season_pool_rows(season_rows)
@@ -144,12 +140,9 @@ def add_season_percentiles(row, season_rows, stats=None, league=None):
         if len(pool) < 10:
             row[pk] = None
             continue
-        if league.get(stat) is not None:
-            p = float(league_pctl(sorted(pool), val, league[stat]))
-        else:
-            below = sum(1 for x in pool if x < val)
-            equal = sum(1 for x in pool if x == val)
-            p = (below + 0.5 * equal) / len(pool) * 100.0
+        below = sum(1 for x in pool if x < val)
+        equal = sum(1 for x in pool if x == val)
+        p = (below + 0.5 * equal) / len(pool) * 100.0
         if stat in HITTER_INVERT_PCTL:
             p = 100.0 - p
         row[pk] = max(0, min(100, round(p)))
@@ -466,7 +459,7 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
             print(f"    no official row for this range — keeping the "
                   f"pitch-derived line, which runs short by any no-pitch IBBs")
 
-    add_season_percentiles(row, season_rows, league=(metadata.get('pctlLeague') or {}).get('hitter'))
+    add_season_percentiles(row, season_rows)
     return row
 
 

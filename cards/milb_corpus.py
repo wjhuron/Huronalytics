@@ -357,7 +357,6 @@ def apply_fg_line(h_row, player, rows):
 # percentile, every grade is 100 = AAA average, and the heat map is AAA wOBAcon. HITTER_POOL_AAA is built by
 # scripts/research/cards/aaa_relative_grades.py, about 20 minutes, one season.
 HITTER_POOL_AAA = os.path.join(_OUT, 'hitter_pool_AAA.json')
-AAA_QUANTILES = os.path.join(_ROOT, 'data', 'aaa_hitter_quantiles_rs.json')
 _AAA_RATE_KEYS = ('barrelPct', 'airPullPct', 'gbPct', 'izSwChase', 'izSwingPct', 'chasePct', 'izContactPct',
                   'contactPct', 'whiffPct', 'hardHitPct', 'ev95', 'xwOBAcon')
 _AAA_GRADES = (('bbPlus', 'bbPlusNoBat'), ('ctPlus', 'ctPlus'), ('sdPlus', 'sdPlus'), ('processPlus', 'processPlus'))
@@ -382,14 +381,6 @@ def apply_aaa_ruler(h_row, mid, window=False):
     if me is None:
         print(f'  AAA ruler NOT applied: {mid} is not in the AAA pool.')
         return
-    # The AAA league averages every rank splits at (pipeline.compute.split_at_league), the same
-    # table the site's ROC ranks read. Missing means every chip would rank on a different rule
-    # from the site, so stop.
-    with open(AAA_QUANTILES) as f:
-        aaa_lg = json.load(f).get('league') or {}
-    if not aaa_lg:
-        raise SystemExit(f'{AAA_QUANTILES} carries no league averages. '
-                         'Rebuild it: scripts/builders/build_aaa_hitter_quantiles.py')
     stint = window or abs((me.get('pa') or 0) - (h_row.get('pa') or 0)) > 3
     if stint:
         print(f"  AAA ruler: {h_row.get('pa')} PA on this row of {me.get('pa')} at AAA, scoring the row's own values.")
@@ -401,13 +392,12 @@ def apply_aaa_ruler(h_row, mid, window=False):
         # A window's wOBA has no FanGraphs line and reads MLB weights, as the pool's own wOBA does.
         vals = sorted((v['wOBA'] for v in pool.values() if v.get('wOBA') is not None) if key == 'wOBA' and window
                       else (l[col] for l in lines if l.get(col) is not None))
-        h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row.get(key), vals, invert=inv, league=aaa_lg.get(key))
+        h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row.get(key), vals, invert=inv)
     # xwOBA against the corpus. The pool is raw and the card prints the hitter basis, so a whole
     # AAA season ranks on its raw value: one definition on both sides, about .002 apart.
     xw = _xwoba_pool('AAA')
     raw = h_row.get('xwOBA') if stint else xw.get(mid)
-    h_row['xwOBA_pctl'] = (_rank_in_mlb_pool(raw, sorted(xw.values()), league=aaa_lg.get('xwOBA'))
-                           if raw is not None else None)
+    h_row['xwOBA_pctl'] = _rank_in_mlb_pool(raw, sorted(xw.values())) if raw is not None else None
     if raw is not None:
         # xwRC+ on the AAA scale. FanGraphs' own wRC+-per-wOBA slope at the level (100+ PA, PA
         # weighted; Furman moves 1.5 points from 1 to 400 PA) times his xwOBA against the level's
@@ -429,8 +419,7 @@ def apply_aaa_ruler(h_row, mid, window=False):
     for key in _AAA_RATE_KEYS:
         vals = sorted(v[key] for v in pool.values() if v.get(key) is not None)
         if h_row.get(key) is not None and vals:
-            h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row[key], vals, invert=key in HITTER_INVERT_PCTL,
-                                                     league=aaa_lg.get(key))
+            h_row[key + '_pctl'] = _rank_in_mlb_pool(h_row[key], vals, invert=key in HITTER_INVERT_PCTL)
     # Grades: 100 = AAA average.
     for key, src in _AAA_GRADES:
         both = [(v[src], v.get('pa') or 0) for v in pool.values() if v.get(src) is not None]
@@ -440,8 +429,7 @@ def apply_aaa_ruler(h_row, mid, window=False):
             h_row[key] = h_row[key + '_pctl'] = None
             continue
         mean = sum(v * n for v, n in both) / total
-        # The grade reads 100 at the AAA mean, so its rank splits there.
-        h_row[key + '_pctl'] = _rank_in_mlb_pool(val, sorted(v for v, _n in both), league=mean)
+        h_row[key + '_pctl'] = _rank_in_mlb_pool(val, sorted(v for v, _n in both))
         h_row[key] = val / mean * 100
         print(f'  {key}: {val:.1f} on the MLB scale / AAA mean {mean:.1f} -> {h_row[key]:.1f}')
     h_row['_aaaRuler'] = True

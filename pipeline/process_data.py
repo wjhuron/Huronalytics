@@ -47,7 +47,6 @@ from pipeline.compute import (
     compute_expected_stats, compute_stats, compute_xrv, fip_family,
     compute_pitcher_batted_ball, compute_hitter_stats,
     compute_percentile_ranks, compute_percentile_ranks_with_aaa, rank_in_quantiles,
-    PCTL_NO_LEAGUE, PCTL_PLUS_100, PCTL_ZERO, pctl_weight_key,
     METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
     PITCH_PCTL_KEYS, PITCH_BB_PCTL_KEYS, PITCH_BB_INVERT,
     PITCHER_INVERT_PCTL,
@@ -5042,43 +5041,6 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # leaving 52% of colored pitch-type cells with <20 BIP behind them).
     PITCH_BB_QUAL_KEYS = set(PITCH_BB_PCTL_KEYS) | {'gbPct', 'xwOBAsp'}
 
-    # Every percentile is split at the LEAGUE AVERAGE (2026-11-05, per Wally): the league average
-    # reads 50, a below-average player ranks among the below-average players (0-50) and an
-    # above-average one among the above-average players (50-100). The line is the shipped league
-    # average, the value the site's League Avg row prints (metadata *LeagueAverages), never one
-    # derived from the pool, so a .308 wOBA can never read above 50 against a .316 league. A
-    # stat with no shipped value takes the same weighted mean the League Avg block uses (MLB
-    # rows, ROC and combined rows out), and abs-ranked shape stats take the mean of |value|.
-    # A + stat's league is 100 by definition. Counting stats (PCTL_NO_LEAGUE) have no league
-    # average and keep the plain rank. The values used ship as metadata.pctlLeague, which
-    # js/aggregator.js reads, so the site splits at the same line.
-    _pctl_bip_extra = set(PITCH_BB_QUAL_KEYS) | set(PITCHER_BB_KEYS)
-
-    def _pctl_weighted(rows, stat, wkey, use_abs):
-        num = den = 0.0
-        for r in rows:
-            if r.get('_isROC') or r.get('_isCombined'):
-                continue
-            v, w = r.get(stat), r.get(wkey) or 0
-            if v is None or w <= 0:
-                continue
-            num += (abs(v) if use_abs else v) * w
-            den += w
-        return num / den if den > 0 else None
-
-    def _pctl_league(stat, shipped, rows, side, use_abs=False):
-        if stat in PCTL_NO_LEAGUE:
-            return None
-        if stat in PCTL_PLUS_100:
-            return 100.0
-        if stat in PCTL_ZERO:
-            return 0.0
-        if not use_abs and shipped.get(stat) is not None:
-            return shipped[stat]
-        return _pctl_weighted(rows, stat, pctl_weight_key(stat, side, _pctl_bip_extra), use_abs)
-
-    pctl_league = {'pitch': {}, 'pitcher': {}, 'hitter': {}, 'hitterPitch': {}}
-
     # 1. Pitch-type percentiles (grouped by pitch type)
     pt_groups = defaultdict(list)
     for row in pitch_leaderboard:
@@ -5096,10 +5058,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             # the flat 25 (see locplus_min_pitch): displayed Loc+ is unshrunk,
             # so a 25-pitch cell is only ~0.26 reliable.
             mc_pt = locplus_min_pitch(pt) if metric == 'locPlus' else mc
-            lg = _pctl_league(metric, league_avgs.get(pt) or {}, pt_rows, 'pitch', av)
-            pctl_league['pitch'].setdefault(pt, {})[metric] = lg
-            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc_pt, count_key=ck, abs_val=av,
-                                              league=lg)
+            compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc_pt, count_key=ck, abs_val=av)
 
     # 2. Pitcher percentiles (all stats including boxscore-derived).
     # Pool: ALL MLB pitchers (no qualifier). This matches the convention used
@@ -5113,18 +5072,14 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
                         + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera', 'locPlus', 'commandPlus', 'fWAR'])
     for stat in PITCHER_ALL_PCTL:
-        lg = _pctl_league(stat, pitcher_league_avgs, pitcher_leaderboard, 'pitcher')
-        pctl_league['pitcher'][stat] = lg
-        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0, league=lg)
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
 
     # 3. Hitter percentiles (all stats including boxscore-derived).
     # Same pool change as pitchers: all MLB hitters define the distribution,
     # qualification is a render-only gate for coloring. Counting stats
     # (hr, sb) were already using the full pool — unchanged.
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        lg = _pctl_league(stat, hitter_league_avgs, hitter_leaderboard, 'hitter')
-        pctl_league['hitter'][stat] = lg
-        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat, league=lg)
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
 
     # 4. Hitter pitch-type percentiles (grouped by pitch type) — min 25 pitches
     # of that type; pitch-type-vs-hitter has no PA-style qualifier, just the
@@ -5134,10 +5089,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         hpt_groups[row['pitchType']].append(row)
     for pt, pt_rows in hpt_groups.items():
         for stat in HITTER_PITCH_PCTL_KEYS:
-            lg = _pctl_league(stat, {}, pt_rows, 'hitter')
-            pctl_league['hitterPitch'].setdefault(pt, {})[stat] = lg
-            compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=MIN_PITCH_TYPE_OUTCOME, league=lg)
-    metadata['pctlLeague'] = pctl_league
+            compute_percentile_ranks_with_aaa(pt_rows, stat, min_count=MIN_PITCH_TYPE_OUTCOME)
 
     # ==========================================================
     # CONSOLIDATED INVERSIONS
@@ -5188,13 +5140,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     _aaa_q_path = os.path.join(DATA_DIR, 'aaa_hitter_quantiles_rs.json')
     if os.path.exists(_aaa_q_path):
         with open(_aaa_q_path) as _f:
-            _aaa_file = json.load(_f)
-        _aaa_q = _aaa_file['quantiles']
-        # The AAA league averages the ROC ranks split at (split_at_league), as the MLB ranks split
-        # at the MLB league average.
-        _aaa_lg = _aaa_file.get('league') or {}
+            _aaa_q = json.load(_f)['quantiles']
         metadata['aaaHitterQuantiles'] = _aaa_q
-        metadata['aaaHitterLeague'] = _aaa_lg
         _n_roc = 0
         for row in hitter_leaderboard:
             if row.get('team') != 'ROC':
@@ -5203,8 +5150,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             for pk in [k for k in row if k.endswith('_pctl')]:
                 stat = pk[:-5]
                 src = 'xwOBA' if stat == 'xWRCplus' else stat
-                row[pk] = (rank_in_quantiles(_aaa_q.get(src), row.get(src), _aaa_lg.get(src))
-                           if src in _aaa_q else None)
+                row[pk] = rank_in_quantiles(_aaa_q.get(src), row.get(src)) if src in _aaa_q else None
         print(f"  ROC hitters ranked inside AAA: {_n_roc} rows, {len(_aaa_q)} stats.")
     else:
         print(f"  WARNING: {_aaa_q_path} missing: ROC hitters stay on the MLB pool. "
