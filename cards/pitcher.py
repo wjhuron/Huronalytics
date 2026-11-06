@@ -267,7 +267,9 @@ def _season_pitch_lb_for(pitcher_name, eff_team, pitch_lb_by_pitcher):
 def _normalize_name(name):
     """Case-fold for name matching (handles 'de Oca' vs 'De Oca')."""
     return name.strip().lower()
-STRIKE_DESC = ['Called Strike','Swinging Strike','Foul','Foul Bunt','In Play']
+# Missed Bunt joined 2026-11-06 (per Wally): a missed bunt is a strike, as in the
+# pipeline's Strike% (every non-ball pitch) and Savant's type 'S'.
+STRIKE_DESC = ['Called Strike','Swinging Strike','Foul','Foul Bunt','Missed Bunt','In Play']
 
 # Batted ball type colors (for distribution chart)
 BB_COLORS = {
