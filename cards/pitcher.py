@@ -2329,8 +2329,8 @@ def render_social_card(config, pitches, output_file):
                     'fc': _tint(prow.get(pctl_key or (key + '_pctl')))}
 
         # Tiles read as a sentence: what HAPPENED (ERA), what he DESERVED (hdERA),
-        # what is COMING (hpERA), the two raw inputs, the two grades, one overall
-        # verdict. STUFF+/LOC+ joined and IP moved to the header on 2026-11-03, per Wally.
+        # the two raw inputs, the two grades, the overall verdict, and the value
+        # it bought (hdWAR, far right since 2026-11-06). STUFF+/LOC+ joined and IP moved to the header on 2026-11-03, per Wally.
         #
         # K% and BB% rather than K-BB% and Whiff% (2026-09-01, per Wally, and
         # the data agrees): K% and Whiff% correlate +0.830 across 412 arms at
@@ -2362,12 +2362,15 @@ def render_social_card(config, pitches, output_file):
                 else ('xFIP', 'xFIP'))
         for key, lab, fmt in (
                 (_mid[0],       _mid[1],    lambda v: f"{v:.2f}"),
-                ('hpERA',       'hpERA',    lambda v: f"{v:.2f}"),
                 ('kPct',        'K%',       lambda v: f"{v*100:.1f}%"),
                 ('bbPct',       'BB%',      lambda v: f"{v*100:.1f}%"),
                 ('stuffScore',  'STUFF+',   lambda v: f"{half_up(v)}"),
                 ('locPlus',     'LOC+',     lambda v: f"{half_up(v)}"),
-                ('pitcherPlus', 'PITCHER+', lambda v: f"{half_up(v)}")):
+                ('pitcherPlus', 'PITCHER+', lambda v: f"{half_up(v)}"),
+                # hdWAR replaced hpERA on 2026-11-06, per Wally: the season card is
+                # descriptive, and hdWAR is the one tile that carries volume (hdERA
+                # turned into wins over his innings), as on the hitter card.
+                ('hWAR',        'hdWAR',    lambda v: f"{v:.1f}")):
             cell = _num(key, fmt)
             cell['k'] = lab
             line.append(cell)
