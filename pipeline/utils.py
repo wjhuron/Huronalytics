@@ -239,6 +239,13 @@ def round_half_up(x, nd=0):
     return int(v) if nd == 0 else v
 
 
+def int_mean_tenths_half_up(s, n):
+    """Mean of n whole-number atoms summing to s, to 1 decimal, half up, in integer
+    arithmetic (Spence's Loc+ 18210 / 200 = 91.05 read 91.1 here and 91.0 on the site
+    through float noise). Mirrors Aggregator.intMeanTenthsHalfUp in js/aggregator.js."""
+    return ((20 * s + n) // (2 * n)) / 10 if n > 0 else None
+
+
 def mean_tenths_half_up(vals):
     """Mean of 1-decimal values (exit velocities), rounded half up to 1 decimal in
     INTEGER arithmetic, so the result never depends on summation order. A float sum

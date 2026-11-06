@@ -342,6 +342,13 @@ const Aggregator = {
   // Mean of 1-decimal values rounded half up, in integer arithmetic so the
   // result does not depend on summation order. Mirrors pipeline/utils.py
   // mean_tenths_half_up; the two move together.
+  // Mean of n whole-number atoms (sum s) to 1 decimal, half up, in integer
+  // arithmetic: an exact .x5 (Spence's 18210 / 200 = 91.05) no longer depends on
+  // float noise or toFixed. Mirrors pipeline/utils.py int_mean_tenths_half_up.
+  intMeanTenthsHalfUp: function (s, n) {
+    return n > 0 ? Math.floor((20 * s + n) / (2 * n)) / 10 : null;
+  },
+
   meanTenthsHalfUp: function (vals) {
     let t = 0, n = 0;
     for (let i = 0; i < vals.length; i++) {
@@ -720,7 +727,7 @@ const Aggregator = {
       // full precision (2026-09-24): Stuff+ displays as a whole number
       // rounded half up, which must see the true mean, not a 1-decimal copy
       stuffScore: nStuff > 0 ? sumStuff / nStuff : null,
-      locPlus: nLoc > 0 ? Number((sumLoc / nLoc).toFixed(1)) : null,
+      locPlus: Aggregator.intMeanTenthsHalfUp(sumLoc, nLoc),
       locPlusN: nLoc > 0 ? nLoc : null,
     };
   },
@@ -1796,7 +1803,7 @@ const Aggregator = {
       // Grade atoms: filtered Stuff+/Loc+ as plain averages of the
       // per-pitch integers (identical to the Sheets columns / window cards).
       obj.stuffScore = ms.nStuff > 0 ? ms.sumStuff / ms.nStuff : null;   // full precision, see above
-      obj.locPlus = ms.nLoc > 0 ? Number((ms.sumLoc / ms.nLoc).toFixed(1)) : null;
+      obj.locPlus = Aggregator.intMeanTenthsHalfUp(ms.sumLoc, ms.nLoc);
       obj.locPlusN = ms.nLoc > 0 ? ms.nLoc : null;
 
       // Break Tilt (circular mean)

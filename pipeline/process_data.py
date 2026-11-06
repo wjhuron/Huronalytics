@@ -694,17 +694,22 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
                 if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball'):
                     c[31] += 1  # airPull
 
-            # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)
+
+        # xBA / xSLG / xwOBAcon on compute_expected_stats' exact rule (2026-11-06):
+        # xBA and xSLG over non-bunt AT-BATS (a sac fly is not one), xwOBAcon over
+        # non-bunt, non-K at-bats plus sac flies, whatever the BBType says. Inside
+        # the batted-ball block a double with no BBType (Seigler) never counted.
+        if event and event not in NON_PA_EVENTS and bb_type not in BUNT_BB_TYPES:
+            _is_ab = (event not in BB_EVENTS and event not in HBP_EVENTS and event not in SF_EVENTS
+                      and event not in SH_EVENTS and event not in CI_EVENTS)
             xba_val = safe_float(p.get('xBA'))
             xslg_val = safe_float(p.get('xSLG'))
             xwobacon_val = safe_float(p.get('xwOBA'))
-            # xBA/xSLG over AT-BATS only, as compute_expected_stats: a sac fly is
-            # not an at-bat (the site read Wetherholt's xBA .256 against .255).
-            if xba_val is not None and event not in SF_EVENTS:
+            if _is_ab and xba_val is not None:
                 c[39] += xba_val; c[40] += 1
-            if xslg_val is not None and event not in SF_EVENTS:
+            if _is_ab and xslg_val is not None:
                 c[41] += xslg_val; c[42] += 1
-            if xwobacon_val is not None:
+            if xwobacon_val is not None and ((_is_ab and event not in K_EVENTS) or event in SF_EVENTS):
                 c[45] += xwobacon_val; c[46] += 1
 
         # xwOBA: assigned to all PA events (K, BB, HBP, BIP) EXCEPT SH (sac bunt)
@@ -917,17 +922,22 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
                 if sd in ('pull', 'pull_side') and bb_type in ('line_drive', 'fly_ball', 'popup'):
                     c[31] += 1
 
-            # Expected stats from Statcast per-pitch values (BIP only: xBA, xSLG, xwOBAcon)
+
+        # xBA / xSLG / xwOBAcon on compute_expected_stats' exact rule (2026-11-06):
+        # xBA and xSLG over non-bunt AT-BATS (a sac fly is not one), xwOBAcon over
+        # non-bunt, non-K at-bats plus sac flies, whatever the BBType says. Inside
+        # the batted-ball block a double with no BBType (Seigler) never counted.
+        if event and event not in NON_PA_EVENTS and bb_type not in BUNT_BB_TYPES:
+            _is_ab = (event not in BB_EVENTS and event not in HBP_EVENTS and event not in SF_EVENTS
+                      and event not in SH_EVENTS and event not in CI_EVENTS)
             xba_val = safe_float(p.get('xBA'))
             xslg_val = safe_float(p.get('xSLG'))
             xwobacon_val = safe_float(p.get('xwOBA'))
-            # xBA/xSLG over AT-BATS only, as compute_expected_stats: a sac fly is
-            # not an at-bat (the site read Wetherholt's xBA .256 against .255).
-            if xba_val is not None and event not in SF_EVENTS:
+            if _is_ab and xba_val is not None:
                 c[39] += xba_val; c[40] += 1
-            if xslg_val is not None and event not in SF_EVENTS:
+            if _is_ab and xslg_val is not None:
                 c[41] += xslg_val; c[42] += 1
-            if xwobacon_val is not None:
+            if xwobacon_val is not None and ((_is_ab and event not in K_EVENTS) or event in SF_EVENTS):
                 c[45] += xwobacon_val; c[46] += 1
 
         # xwOBA: assigned to all PA events (K, BB, HBP, BIP) EXCEPT SH (sac bunt)
