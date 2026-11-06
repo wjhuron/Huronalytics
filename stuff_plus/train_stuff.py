@@ -1543,7 +1543,7 @@ def main():
                 if tab is None or rownum is None: continue
                 g = _grade(raw, anchors.get(pt))
                 if g is not None:
-                    grades[f'{tab}\t{int(rownum)}'] = round(g, 2)
+                    grades[f'{tab}\t{int(rownum)}'] = round(g, 6)   # 6, not 2: readers round to the atom once
         _emit(df, 'stuff_raw', league)
         # target-less pitches (pre-supplement): scored upstream in the canon
         # display-aggregation section with the same OOF fold discipline.
@@ -1555,7 +1555,7 @@ def main():
             for tab, rownum, g in zip(roc_df['sheet_tab'], roc_df['sheet_row'], _rg):
                 if tab is None or rownum is None or not np.isfinite(g):
                     continue
-                grades[f'{tab}\t{int(rownum)}'] = round(float(g), 2)
+                grades[f'{tab}\t{int(rownum)}'] = round(float(g), 6)   # 6, not 2: readers round to the atom once
         with open(args.dump_pitch_grades, 'w') as f:
             json.dump(grades, f, separators=(',', ':'))
         print(f'  per-pitch grade dump: {len(grades)} pitches -> {args.dump_pitch_grades}')

@@ -1038,7 +1038,10 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
             g = _pitch_grade(p)
             if g is None:
                 continue
-            grades[f'{tab}\t{int(rownum)}'] = round(g, 2)
+            # 6 decimals, not 2 (2026-11-06): every reader rounds this to the integer
+            # atom, and a 2-decimal copy rounded twice (99.4996 -> 99.50 -> 100) put
+            # the site's atom 1 off the leaderboard's own int(round(g)).
+            grades[f'{tab}\t{int(rownum)}'] = round(g, 6)
         with open(dump_pitch_grades_path, 'w') as f:
             _json.dump(grades, f, separators=(',', ':'))
         print(f"  Loc+ per-pitch grade dump: {len(grades)} pitches -> "
