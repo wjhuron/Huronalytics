@@ -50,6 +50,8 @@ ZONE_HALF_WIDTH = 0.83        # half plate (8.5") + ball radius (1.45") in feet,
 # foul tip is stored as 'Swinging Strike' (backfill_supplement), so it is a whiff too.
 SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play', 'Missed Bunt'}
 WHIFF_DESCRIPTIONS = {'Swinging Strike', 'Missed Bunt'}
+# Not a strike: Strike%, FPS% and 1-1 Win% count every pitch outside this set.
+BALL_DESCRIPTIONS = frozenset({'Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'})
 CSW_DESCRIPTIONS = {'Called Strike'} | WHIFF_DESCRIPTIONS
 # The SD+ decision model's swing set, frozen: its cell tables and constants were
 # measured with bunts out of the swing class. Do not point it at the rate set.
@@ -222,6 +224,19 @@ def pitcher_ip_per_game(is_starter, is_roc):
 # js/aggregator.js and js/utils.js; change both together.
 PCTL_PA_PER_GAME_MLB = 2.1
 PCTL_BF_PER_GAME_MLB = 1.25
+
+
+def round_half_up(x, nd=0):
+    """Round half up, bit for bit as the site does (Math.round(x * 10**nd) / 10**nd, the
+    same IEEE double arithmetic). Python's round() is half-to-even, so a stored value that
+    lands on a tie (a median of two 1-decimal exit velocities, 88.25) read 0.1 lower than
+    the site's recompute on 76 hitters' median EV (2026-11-06)."""
+    if x is None:
+        return None
+    import math
+    m = 10 ** nd
+    v = math.floor(x * m + 0.5) / m
+    return int(v) if nd == 0 else v
 
 
 def pctl_qualifier(rows, name_key, team_games, is_pitcher):

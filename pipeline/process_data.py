@@ -23,7 +23,7 @@ from pipeline.utils import (
     break_tilt_to_minutes, circular_mean_minutes, minutes_to_tilt_display,
     compute_in_zone, outs_to_ip_str, outs_to_ip_float, ip_str_to_float,
     DATA_DIR,
-    SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
+    SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, BALL_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
     MLB_TEAMS, AAA_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
     BALL_RADIUS_FT, ZONE_HALF_WIDTH, box_key,
@@ -117,8 +117,8 @@ def _hitter_pitch_row_finish(row, plist, ep_pitchers, woba_weights,
     Three season-row conventions the per-pitch rows lacked:
     - xwOBA on the pulled-air hitter basis (xwoba_key='xwOBA_hb'), so the
       tab's All row matches the hitter's headline xwOBA.
-    - xwOBAcon excludes position-pitcher (EP) pitches, mirroring the
-      skill-metric exclusion on the season row.
+    - xwOBAcon keeps position-pitcher (EP) pitches, as the season row does
+      since 2026-11-06 (it excluded them before).
     - Pitch-derived AVG/SLG/ISO: the columns shipped with every avg_pctl None
       and no values. A per-type slash has no official line to merge, so the
       pitch-derived version is the only honest basis (PA-ending events only;
@@ -131,12 +131,6 @@ def _hitter_pitch_row_finish(row, plist, ep_pitchers, woba_weights,
                            count_offsets=count_offsets,
                            bip_count_means=bip_count_means,
                            negate=True))
-    if ep_pitchers:
-        _skill = [q for q in plist
-                  if (q.get('Pitcher'), q.get('PTeam')) not in ep_pitchers]
-        if len(_skill) != len(plist):
-            row['xwOBAcon'] = compute_expected_stats(
-                _skill, woba_weights=woba_weights).get('xwOBAcon')
     n_ab = n_h = n_tb = 0
     _tb = {'Single': 1, 'Double': 2, 'Triple': 3, 'Home Run': 4}
     for q in plist:
@@ -251,7 +245,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
     #  0:n  1:iz  2:sw  3:wh  4:csw  5:ooz  6:oozSw  7:bip  8:gb
     #  9:pa  10:h  11:hr  12:k  13:bb  14:hbp  15:sf  16:sh  17:ci
     #  18:izSw  19:izWh  20:firstPitches  21:firstPitchStrikes
-    #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (line-drive HRs)
+    #  22:fb (fly balls)  23:nHrBip (HR on BIP, for HR/FB)  24:ldHr (non-fly-ball HRs)
     #  25:pu (popups, for HR/FB denominator)  26:nStrikes  27:ibb
     #  28:oneOneTotal  29:oneOneWins  30:earlyActionPAs
     #  31:sumStuff  32:nStuff  33:sumLoc  34:nLoc
@@ -299,7 +293,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             c[5] += 1  # ooz
             if desc in SWING_DESCRIPTIONS and p.get('BBType') not in BUNT_BB_TYPES:   # the is_swing rule
                 c[6] += 1  # oozSw
-        if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
+        if desc not in BALL_DESCRIPTIONS:
             c[26] += 1  # nStrikes
         bb_type = p.get('BBType')
         if bb_type and bb_type not in BUNT_BB_TYPES:
@@ -312,8 +306,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
                 c[25] += 1  # pu (popups for HR/FB)
             if p.get('Event') == 'Home Run':
                 c[23] += 1  # nHrBip (HR on BIP)
-                if bb_type == 'line_drive':
-                    c[24] += 1  # ldHr (line-drive HRs for HR/FB denominator)
+                if bb_type != 'fly_ball':
+                    # 'ldHr' slot = every NON-fly-ball HR (line drive, ground ball,
+                    # popup) since 2026-11-06, so the site's nHrBip - ldHr is the
+                    # fly-ball HR count the server's strict HR/FB uses.
+                    c[24] += 1
         event = p.get('Event')
         if event and event not in NON_PA_EVENTS:
             c[9] += 1   # pa
@@ -330,13 +327,13 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         if p.get('Count') == '0-0':
             c[20] += 1  # firstPitches
             # Any non-ball 0-0 pitch, bunt attempts included (compute.py fpsPct).
-            if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
+            if desc not in BALL_DESCRIPTIONS:
                 c[21] += 1  # firstPitchStrikes
 
         # 1-1 Win%: everything except balls/HBP/pitchout counts as winning the 1-1 pitch
         if p.get('Count') == '1-1':
             c[28] += 1  # oneOneTotal
-            if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
+            if desc not in BALL_DESCRIPTIONS:
                 c[29] += 1  # oneOneWins
 
         # Early Action: PA ended in 3 or fewer pitches
@@ -456,7 +453,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         if p.get('Count') == '0-0':
             c[20] += 1  # firstPitches
             # Any non-ball 0-0 pitch, bunt attempts included (compute.py fpsPct).
-            if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
+            if desc not in BALL_DESCRIPTIONS:
                 c[21] += 1  # firstPitchStrikes
 
         # Metric sums
@@ -681,8 +678,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
                 c[32] += 1  # hardHit
             if event == 'Home Run':
                 c[33] += 1  # nHrBip
-                if bb_type == 'line_drive':
-                    c[34] += 1  # ldHr (line-drive HRs)
+                if bb_type != 'fly_ball':
+                    c[34] += 1  # 'ldHr' slot = non-fly-ball HRs (see pitcher micro)
 
             # Spray direction
             hc_x = safe_float(p.get('HC_X'))
@@ -701,9 +698,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             xba_val = safe_float(p.get('xBA'))
             xslg_val = safe_float(p.get('xSLG'))
             xwobacon_val = safe_float(p.get('xwOBA'))
-            if xba_val is not None:
+            # xBA/xSLG over AT-BATS only, as compute_expected_stats: a sac fly is
+            # not an at-bat (the site read Wetherholt's xBA .256 against .255).
+            if xba_val is not None and event not in SF_EVENTS:
                 c[39] += xba_val; c[40] += 1
-            if xslg_val is not None:
+            if xslg_val is not None and event not in SF_EVENTS:
                 c[41] += xslg_val; c[42] += 1
             if xwobacon_val is not None:
                 c[45] += xwobacon_val; c[46] += 1
@@ -712,8 +711,10 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # and CI, matching the standard AB+BB+HBP+SF denominator and pipeline_compute.
         # HITTER atoms read xwOBA_hb (pulled-air adjusted) so filtered
         # client views re-aggregate to the same basis as the row value.
+        # Bunts leave xwOBA, as in compute_expected_stats since 2026-08-15.
         if (event and event not in NON_PA_EVENTS and event != 'Intent Walk'
-                and event not in SH_EVENTS and event not in CI_EVENTS):
+                and event not in SH_EVENTS and event not in CI_EVENTS
+                and bb_type not in BUNT_BB_TYPES):
             xwoba_val = safe_float(p.get('xwOBA_hb', p.get('xwOBA')))
             if xwoba_val is not None:
                 c[43] += xwoba_val; c[44] += 1
@@ -901,8 +902,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
                 c[32] += 1  # hardHit
             if event == 'Home Run':
                 c[33] += 1  # nHrBip
-                if bb_type == 'line_drive':
-                    c[34] += 1  # ldHr
+                if bb_type != 'fly_ball':
+                    c[34] += 1  # 'ldHr' slot = non-fly-ball HRs (see pitcher micro)
 
             hc_x = safe_float(p.get('HC_X'))
             hc_y = safe_float(p.get('HC_Y'))
@@ -920,9 +921,11 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             xba_val = safe_float(p.get('xBA'))
             xslg_val = safe_float(p.get('xSLG'))
             xwobacon_val = safe_float(p.get('xwOBA'))
-            if xba_val is not None:
+            # xBA/xSLG over AT-BATS only, as compute_expected_stats: a sac fly is
+            # not an at-bat (the site read Wetherholt's xBA .256 against .255).
+            if xba_val is not None and event not in SF_EVENTS:
                 c[39] += xba_val; c[40] += 1
-            if xslg_val is not None:
+            if xslg_val is not None and event not in SF_EVENTS:
                 c[41] += xslg_val; c[42] += 1
             if xwobacon_val is not None:
                 c[45] += xwobacon_val; c[46] += 1
@@ -930,8 +933,10 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # xwOBA: assigned to all PA events (K, BB, HBP, BIP) EXCEPT SH (sac bunt)
         # and CI, matching the standard AB+BB+HBP+SF denominator and pipeline_compute.
         # Hitter atoms read xwOBA_hb, same as the block above.
+        # Bunts leave xwOBA, as in compute_expected_stats since 2026-08-15.
         if (event and event not in NON_PA_EVENTS and event != 'Intent Walk'
-                and event not in SH_EVENTS and event not in CI_EVENTS):
+                and event not in SH_EVENTS and event not in CI_EVENTS
+                and bb_type not in BUNT_BB_TYPES):
             xwoba_val = safe_float(p.get('xwOBA_hb', p.get('xwOBA')))
             if xwoba_val is not None:
                 c[43] += xwoba_val; c[44] += 1
@@ -2886,25 +2891,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                                 bip_count_means=XRV_BIP_COUNT_MEANS,
                                 negate=True))
 
-        # SKILL METRICS EXCLUDE POSITION-PLAYER PITCHING (2026-07-25).
-        # The rule: EP counts for the official ledger, not for skill estimation.
-        # Counting stats, the slash line, wOBA and xwOBA above keep every EP PA
-        # (the 2026-07-13 policy, so pitch-derived totals still reconcile to
-        # official). But xwOBAcon / xwOBAsp / sprayVal are ABILITY estimates
-        # with no official total to match, and a catcher's 48mph eephus is not
-        # evidence about a hitter's contact quality. Measured: 445 EP batted
-        # balls league-wide, median |BB+| shift 0.16 but up to 2.9 points, in
-        # BOTH directions — so this removes noise rather than a bias.
-        # hitter_league_avgs['xwOBAcon'] (the BB+ denominator) is derived from
-        # these rows, so it inherits the exclusion automatically.
-        _skill = ([p for p in pitches
-                   if (p.get('Pitcher'), p.get('PTeam')) not in ep_pitchers]
-                  if ep_pitchers else pitches)
-        if len(_skill) != len(pitches):
-            row['xwOBAcon'] = compute_expected_stats(
-                _skill, woba_weights=WOBA_WEIGHTS).get('xwOBAcon')
-        row['xwOBAsp'] = compute_xwobasp(_skill)
-        row['sprayVal'] = compute_sprayval(_skill)
+        # Position-player pitching COUNTS for hitters (2026-11-06, per Wally),
+        # reversing the 2026-07-25 skill exclusion: xwOBAcon / xwOBAsp / sprayVal
+        # (and BB+, which reads xwOBAcon) take every pitch the hitter saw, so the
+        # site's re-aggregation, which sums every pitch, lands on the shipped
+        # value (Rushing's xwOBAcon read .431 on the site against .435 shipped).
+        # SD+/CT+ still score on the EP-free lists below: they are model grades
+        # with measured cell tables, and the site does not recompute them.
+        row['xwOBAsp'] = compute_xwobasp(pitches)
+        row['sprayVal'] = compute_sprayval(pitches)
 
         hitter_leaderboard.append(row)
 

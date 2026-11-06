@@ -6,9 +6,9 @@ from collections import defaultdict
 
 from pipeline.hwar import gdp_extra_cost
 from pipeline.utils import (
-    safe_float, median, percentile, is_barrel, barrel_flag, is_swing,
+    safe_float, median, percentile, is_barrel, barrel_flag, is_swing, round_half_up,
     spray_angle, spray_direction,
-    SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
+    SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, BALL_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
     ALL_TEAMS,
 )
@@ -202,7 +202,10 @@ def compute_expected_stats(pitches, woba_weights=None, xwoba_key='xwOBA'):
     # denominator for pipeline/hwar.py, which must not read the rounded column
     result['_xwOBAraw'] = xwoba_sum / xwoba_denom if xwoba_denom > 0 else None
     result['_xwOBAn'] = xwoba_denom
-    result['xwOBAcon'] = round(xwobacon_sum / xwobacon_denom, 3) if xwobacon_denom > 0 else None
+    # 6 decimals, not 3 (2026-11-06): BB+ is built from this value, and the 3-decimal
+    # copy put the shipped BB+ up to 0.2 off the site's full-precision recompute.
+    # The display rounds to 3.
+    result['xwOBAcon'] = round(xwobacon_sum / xwobacon_denom, 6) if xwobacon_denom > 0 else None
     return result
 
 
@@ -252,9 +255,8 @@ def compute_stats(pitches):
     kbb_pct = round(k_pct - bb_pct, 4) if k_pct is not None and bb_pct is not None else None
 
     babip_denom = n_ab - n_k - n_hr + n_sf
-    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
+    babip = round_half_up((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
-    BALL_DESCRIPTIONS = {'Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'}
     n_strikes = sum(1 for p in pitches if p.get('Description') not in BALL_DESCRIPTIONS)
     strike_pct = n_strikes / total if total > 0 else None
 
@@ -459,7 +461,7 @@ def compute_pitcher_batted_ball(pitches):
 
     ev_vals = [safe_float(p.get('ExitVelo')) for p in bip]
     ev_valid = [v for v in ev_vals if v is not None]
-    avg_ev = round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None
+    avg_ev = round_half_up(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None
     max_ev = round(max(ev_valid), 1) if ev_valid else None
 
     hard_hit = sum(1 for v in ev_valid if v >= 95)
@@ -559,7 +561,7 @@ def compute_hitter_stats(pitches):
             n_bunt_hr += 1
     xbh = n_2b + n_3b + n_hr
     babip_denom = n_ab - n_k - n_hr + n_sf
-    babip = round((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
+    babip = round_half_up((n_h - n_hr) / babip_denom, 3) if babip_denom > 0 else None
 
     # Bunts are not swings and not chases (2026-08-15): every swing
     # denominator below goes through is_swing, which adds the bunt-BBType
@@ -603,17 +605,17 @@ def compute_hitter_stats(pitches):
     if all_evs:
         sorted_evs = sorted(all_evs, reverse=True)
         top_half = sorted_evs[:max(1, len(sorted_evs) // 2)]
-        ev50 = round(sum(top_half) / len(top_half), 1)
+        ev50 = round_half_up(sum(top_half) / len(top_half), 1)
         # Median EV (2026-08-27, per Wally): replaces EV50 on the displayed
         # surfaces. Same linear-interpolated percentile helper as ev95, so the
         # client's filtered recompute (percentileLinear in js/aggregator.js)
         # lands on the identical value. ev50 stays in the row for continuity.
-        med_ev = round(percentile(all_evs, 50), 1)
+        med_ev = round_half_up(percentile(all_evs, 50), 1)
         # BB+ ingredient. A mean of a heavy-tailed per-BIP quantity is a weak
         # estimator of contact-quality skill; a high EV percentile is far more
         # stable. Stored rounded so the server value and the client's filtered
         # recompute in js/aggregator.js agree exactly.
-        ev95 = round(percentile(all_evs, 95), 1)
+        ev95 = round_half_up(percentile(all_evs, 95), 1)
 
     has_barrel_col = any(barrel_flag(p.get('Barrel')) is not None for p in bip)
     if has_barrel_col:
@@ -671,11 +673,11 @@ def compute_hitter_stats(pitches):
 
     fb_distances = [safe_float(p.get('Distance')) for p in bip if p.get('BBType') == 'fly_ball']
     fb_distances = [d for d in fb_distances if d is not None]
-    avg_fb_dist = round(sum(fb_distances) / len(fb_distances), 0) if fb_distances else None
+    avg_fb_dist = round_half_up(sum(fb_distances) / len(fb_distances)) if fb_distances else None
 
     hr_distances = [safe_float(p.get('Distance')) for p in bip if p.get('Event') == 'Home Run']
     hr_distances = [d for d in hr_distances if d is not None]
-    avg_hr_dist = round(sum(hr_distances) / len(hr_distances), 0) if hr_distances else None
+    avg_hr_dist = round_half_up(sum(hr_distances) / len(hr_distances)) if hr_distances else None
 
     bs_vals = []
     sl_vals = []
@@ -737,7 +739,7 @@ def compute_hitter_stats(pitches):
         'triples': n_3b,
         'hr': n_hr,
         'xbh': xbh,
-        'avgEVAll': round(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
+        'avgEVAll': round_half_up(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
         'ev50': ev50,
         'medEV': med_ev,
         'ev95': ev95,

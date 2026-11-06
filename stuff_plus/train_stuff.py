@@ -62,6 +62,7 @@ except ImportError as e:
     # percentile pools and nothing else would error.
     print(f'  WARNING: pipeline.utils.AAA_TEAMS unavailable ({e}); using {{"ROC"}}')
     AAA_TEAMS = {'ROC'}
+from pipeline.utils import MLB_TEAMS  # noqa: E402  (combined-row pools: club stints only)
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC', 'KN'}
 # Types whose per-type anchor pool is too thin to trust borrow a donor pool
@@ -1916,8 +1917,12 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     # physics vs the training manifold, which doesn't change with the uniform).
     pool_pt = defaultdict(list)
     flag_pt = defaultdict(bool)
+    # MLB club stints only (2026-11-06): the frame also holds scoring-only rows
+    # under other tab labels (24 extra pitches for Halvorsen, 19 for Bird), which
+    # put the 2TM row 0.4-0.8 off the pitch-weighted mean of his club rows, the
+    # value the site and a sheet AVERAGEIF give.
     for r in agg.itertuples():
-        if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
+        if r.team in MLB_TEAMS:
             pool_pt[(r.pitcher, r.pitch_type)].append(
                 (getattr(r, 'atom_sum', 0.0), getattr(r, 'atom_n', 0)))
             flag_pt[(r.pitcher, r.pitch_type)] |= bool(getattr(r, 'low_support', False))
@@ -1985,7 +1990,7 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     pool_ov = defaultdict(list)
     flag_ov = defaultdict(bool)
     for r in overall.itertuples():
-        if r.team not in AAA_TEAMS and not _is_combined_team(r.team):
+        if r.team in MLB_TEAMS:   # club stints only, as pool_pt above
             pool_ov[(r.pitcher, r.throws)].append(
                 (getattr(r, 'atom_sum', 0.0), getattr(r, 'atom_n', 0)))
             flag_ov[(r.pitcher, r.throws)] |= bool(getattr(r, 'low_support', False))

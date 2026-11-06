@@ -2278,6 +2278,12 @@ const Aggregator = {
     const validDates = this._getValidDateSet(filters);
     const vsHand = filters.vsHand || 'all';
     const teamMode = filters.viewMode === 'team';
+    // Season bat tracking by row, for the BB+ prior below. Those fields merge into
+    // the row only AFTER BB+ is computed (hBoxAlways), so until 2026-11-06 the
+    // prior never applied on the site and every BB+ read the pre-prior value
+    // (Teel 104.9 against 102.8 shipped). Same season values the merge ships.
+    const btSeason = {};
+    (window.HITTER_DATA || []).forEach(function (h) { btSeason[h.hitter + '|' + h.team] = h; });
     const standsMap = teamMode ? this._buildHitterStandsMap(micro, ci) : null;
     const self2 = this;
     const teamRowOk = function (hitterIdx, teamIdx) {
@@ -2673,14 +2679,15 @@ const Aggregator = {
         // pre-prior definition.
         const btP = (DataStore && DataStore.metadata &&
                      DataStore.metadata.bbPlusBtPrior) || null;
-        const btN = obj.nCompSwings || 0;
-        if (btP && btP.anchors && obj.batSpeed != null &&
-            obj.squaredUpPct != null && btN > 0 &&
+        const btRow = (obj.batSpeed != null) ? obj : (btSeason[obj.hitter + '|' + obj.team] || {});
+        const btN = btRow.nCompSwings || 0;
+        if (btP && btP.anchors && btRow.batSpeed != null &&
+            btRow.squaredUpPct != null && btN > 0 &&
             btP.anchors.bsSd > 0 && btP.anchors.squpSd > 0) {
           const a = btP.anchors;
           const prior = a.raw +
-            btP.betaBs * (obj.batSpeed - a.bsMean) / a.bsSd +
-            btP.betaSqup * (obj.squaredUpPct - a.squpMean) / a.squpSd;
+            btP.betaBs * (btRow.batSpeed - a.bsMean) / a.bsSd +
+            btP.betaSqup * (btRow.squaredUpPct - a.squpMean) / a.squpSd;
           const priorEff = (btN * prior + btP.s0 * 100) / (btN + btP.s0);
           rawBB = (nBipBB * rawBB + btP.k * priorEff) / (nBipBB + btP.k);
         }

@@ -54,7 +54,7 @@ pitchers are scored against the MLB surfaces but excluded from the
 import math
 from collections import defaultdict
 
-from pipeline.utils import safe_float, AAA_TEAMS
+from pipeline.utils import safe_float, AAA_TEAMS, round_half_up
 from pipeline.sdplus import classify_zone, ZONES, build_bip_count_offsets
 
 # ── Model options (each A/B-validated on the 3-objective harness:
@@ -1016,7 +1016,7 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
             atoms = [int(round(g)) for g in map(_pitch_grade, plist)
                      if g is not None]
             if atoms:
-                results[key]['locPlus'] = round(sum(atoms) / len(atoms), 1)
+                results[key]['locPlus'] = round_half_up(sum(atoms) / len(atoms), 1)   # the site's Math.round
 
     _atom_override(pitcher_results, pitches_by_pitcher)
     _atom_override(pitch_results, pitches_by_pitch_type)

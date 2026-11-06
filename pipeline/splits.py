@@ -57,18 +57,10 @@ def hitter_split_groups(groups):
 
 def hitter_split_rows(groups, skill_groups, woba_weights):
     """The pitch-derived split rows (stats, expected stats, bat tracking), built like the
-    season row: every pitch for the ledger and xwOBA, the skill pitches (no position-player
-    pitching) for xwOBAcon, exactly as process_data's hitter loop does."""
-    from pipeline.compute import compute_expected_stats
+    season row: every pitch, position-player pitching included since 2026-11-06 (process_data's
+    hitter loop does the same; skill_groups is kept for the callers' signature)."""
     md = {'wobaWeights': woba_weights}
-    out = {}
-    for k, ps in groups.items():
-        row = build_window_hitter_row(ps, md)
-        sk = skill_groups.get(k) or []
-        if len(sk) != len(ps):
-            row['xwOBAcon'] = compute_expected_stats(sk, woba_weights=woba_weights).get('xwOBAcon')
-        out[k] = row
-    return out
+    return {k: build_window_hitter_row(ps, md) for k, ps in groups.items()}
 
 
 def finish_hitter_splits(rows, sd_extra, ct_extra, metadata, season_rows):

@@ -533,24 +533,20 @@ def slash_from_pitches(pitches):
 
 
 def hitter_row(pitches, skill_pitches, lg):
-    """skill_pitches = pitches minus position-player pitching. The pipeline
-    scores xwOBAcon / xwOBAsp / SD+ / CT+ on that subset (a catcher's 48 mph
-    eephus is not evidence about a hitter), while the slash line and wOBA keep
-    every PA."""
+    """skill_pitches = pitches minus position-player pitching. Since 2026-11-06
+    the pipeline scores only SD+ / CT+ on that subset; xwOBAcon, xwOBAsp, EV95
+    and the slash line keep every pitch, position-player pitching included."""
     row = {}
     row.update(compute_hitter_stats(pitches))
     row.update(compute_expected_stats(pitches, woba_weights=lg.woba_weights))
     row.update(slash_from_pitches(pitches))
     row['nPitches'] = len(pitches)
-    if len(skill_pitches) != len(pitches):
-        row['xwOBAcon'] = compute_expected_stats(
-            skill_pitches, woba_weights=lg.woba_weights).get('xwOBAcon')
-    row['xwOBAsp'] = lg.xwobasp(skill_pitches)
+    row['xwOBAsp'] = lg.xwobasp(pitches)
     row['xRv100'] = lg.xrv100(pitches, negate=True)
     row['sdPlus'], row['sdPlusN'] = lg.sd_plus(skill_pitches)
     row['ctPlus'], row['ctPlusN'] = lg.ct_plus(skill_pitches)
     row['bbPlus'] = lg.bb_plus(row.get('xwOBAcon'), row.get('nBip') or 0)
-    row['processPlus'] = lg.process_plus(row.get('xwOBAcon'), lg.ev95(skill_pitches),
+    row['processPlus'] = lg.process_plus(row.get('xwOBAcon'), lg.ev95(pitches),
                                          row.get('nBip') or 0, lg.sd_raw(skill_pitches),
                                          lg.ct_raw(skill_pitches))
     return row
