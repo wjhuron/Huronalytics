@@ -1546,9 +1546,7 @@ def add_fielding(h_row, position):
         return h_row
     row = dict(h_row)
     row['frv'] = me['total']
-    # FRV is runs against the average fielder, so the league average is 0 (split_at_league).
-    row['frv_pctl'] = _rank_in_mlb_pool(me['total'], sorted(v['total'] for v in cache.values() if v.get('total') is not None),
-                                        league=0.0)
+    row['frv_pctl'] = _rank_in_mlb_pool(me['total'], sorted(v['total'] for v in cache.values() if v.get('total') is not None))
     key = _POS_OUTS_KEY.get(position)
     peers = [v for v in cache.values() if key and v.get('outs_by_pos') and any(v['outs_by_pos'].values())
              and max(v['outs_by_pos'], key=v['outs_by_pos'].get) == key]
@@ -1556,8 +1554,7 @@ def add_fielding(h_row, position):
         if me.get(part) is None:
             continue
         row['frv_' + part] = me[part]
-        row[f'frv_{part}_pctl'] = _rank_in_mlb_pool(me[part], sorted(v[part] for v in peers if v.get(part) is not None),
-                                                    league=0.0)
+        row[f'frv_{part}_pctl'] = _rank_in_mlb_pool(me[part], sorted(v[part] for v in peers if v.get(part) is not None))
     row['_fieldPos'] = position
     return row
 
