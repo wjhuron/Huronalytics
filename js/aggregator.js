@@ -22,6 +22,11 @@ var QUAL = {
   SP_IP_PER_GAME_MILB: 0.8,  // ROC / MiLB starter
   RP_IP_PER_GAME_MILB: 0.24, // ROC / MiLB reliever
   SP_GS_RATIO:       0.5,   // Starter if GS/G > 0.5
+  // Percentile pool AND coloring gate: Baseball Savant's percentile qualifier
+  // (2026-11-05, per Wally). The lines above stay the batting-title Qualified
+  // row filter. Mirrors pipeline/utils.py PCTL_PA_PER_GAME_MLB / PCTL_BF_PER_GAME_MLB.
+  PCTL_PA_PER_GAME:  2.1,   // MLB hitter, PA per team game
+  PCTL_BF_PER_GAME:  1.25,  // MLB pitcher, batters faced per team game (SP and RP)
   HARD_HIT_MPH:      95,    // Exit velo >= 95 mph = hard hit
   MIN_BIP_PCTL:      25,    // Minimum BIP for batted-ball percentile coloring
   MIN_BAT_TRACKING:  10,    // Minimum competitive swings for bat tracking stats (kept low: bat-tracking samples are naturally scarce)
@@ -868,6 +873,7 @@ const Aggregator = {
       const r = rows[qi];
       const res = Utils.resolveQual(r, qualCtx, true);
       r._qualified = res.qualified;
+      r._pctlQual = Utils.isPctlQualified(r, qualCtx, true);
       // Per-team row of a multi-team player: interpolate against the combined-row pool
       r._inPool = res.combinedRow && r !== res.combinedRow ? false : true;
     }
@@ -875,15 +881,13 @@ const Aggregator = {
     for (let bqi = 0; bqi < rows.length; bqi++) {
       rows[bqi].bipQual = (rows[bqi].nBip || 0) >= QUAL.MIN_BIP_PCTL;
     }
-    // Pool: ALL MLB pitchers (no qualifier). Matches the pipeline's
-    // post-2026-05-29 design where displayed league avg and percentile pool
-    // are the same population, so "below league avg → above 50th pctl"
-    // reads correctly. Qualification (and bipQual for BIP-dependent stats)
-    // is a render-only gate — non-qualified rows still get a percentile
-    // rank stored for tooltip + sort, but the leaderboard suppresses cell
-    // coloring on them.
+    // Pool: Savant's percentile qualifier, 1.25 batters faced per team game
+    // (2026-11-05, per Wally; pipeline/process_data.py, pctl_qualifier). Every
+    // other row is interpolated against it, so it still carries a rank for the
+    // tooltip and sort; the leaderboard colors only _pctlQual rows.
+    const pctlPool = function (row) { return !!row._pctlQual; };
     for (let si = 0; si < STAT_KEYS.length; si++) {
-      this._computePercentiles(rows, STAT_KEYS[si]);
+      this._computePercentilesUnified(rows, STAT_KEYS[si], pctlPool, false, true);
     }
     // Invert where lower is better
     for (let ri = 0; ri < rows.length; ri++) {
@@ -2835,17 +2839,16 @@ const Aggregator = {
       rows, hitterTg, Aggregator._isROCTeam.bind(Aggregator), window.HITTER_DATA || rows);
     for (let qi = 0; qi < rows.length; qi++) {
       rows[qi]._qualified = Utils.isQualified(rows[qi], hitterQualCtx, false);
+      rows[qi]._pctlQual = Utils.isPctlQualified(rows[qi], hitterQualCtx, false);
     }
 
-    // Compute percentiles. Pool: ALL MLB hitters (no qualifier) — matches
-    // the displayed-league-avg pool so "below league avg → above 50th
-    // pctl" reads correctly. Qualification is enforced as a render-only
-    // gate (non-qualified rows store a rank for tooltip but get no
-    // coloring). Counting stats (hr, sb) were already using the full
-    // pool — unchanged.
+    // Compute percentiles. Pool: Savant's percentile qualifier, 2.1 PA per
+    // team game (2026-11-05, per Wally; the pipeline's pctl_qualifier). Every
+    // other row is interpolated against it for the tooltip; only _pctlQual
+    // rows are colored.
     const self = this;
     HITTER_STAT_KEYS.forEach(function (key) {
-      self._computePercentiles(rows, key);
+      self._computePercentilesUnified(rows, key, function (row) { return !!row._pctlQual; }, false, true);
     });
 
     // ROC hitters rank inside AAA (2026-11-05, per Wally), the pipeline's rule in

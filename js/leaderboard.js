@@ -1054,13 +1054,18 @@ const Leaderboard = {
               showColor = PITCH_SHAPE_ALWAYS_COLOR[col.key] || (row.count || 0) >= QUAL.MIN_PITCH_PCTL;
             }
           } else if (isPitcherRow) {
-            // Pitcher overall: IP-based qualification (ROC-aware:
-            // MLB SP 1.0 / RP 0.5, ROC SP 0.8 / RP 0.4 × team games).
-            const ipFloat = Utils.parseIP(row.ip);
-            const isStarter = Utils.isStarter(row.g, row.gs);
-            const isROC = Aggregator.loaded && Aggregator._isROCTeam(row.team);
-            const ipThresh = tg * Utils.pitcherIpPerGame(isStarter, isROC);
-            showColor = ipFloat >= ipThresh;
+            // Pitcher overall: Savant's percentile qualifier, 1.25 batters
+            // faced per team game (2026-11-05, per Wally); ROC keeps its
+            // MiLB IP line. _pctlQual is set by the Aggregator; the fallback
+            // covers rows that never went through it.
+            if (row._pctlQual !== undefined) {
+              showColor = row._pctlQual;
+            } else {
+              const isROC = Aggregator.loaded && Aggregator._isROCTeam(row.team);
+              showColor = isROC
+                ? Utils.parseIP(row.ip) >= tg * Utils.pitcherIpPerGame(Utils.isStarter(row.g, row.gs), true)
+                : ((row.tbf != null ? row.tbf : row.pa) || 0) >= tg * QUAL.PCTL_BF_PER_GAME;
+            }
             // Pitcher always-color: extension
             if (!showColor) showColor = col.key === 'extension';
           } else if (isHitterPitchType) {
@@ -1070,10 +1075,12 @@ const Leaderboard = {
             // Hitter overall: per-stat qualification gates.
             // Always use overall-season PA (paAll) so platoon/date splits honour
             // overall qualification rather than requiring a split-specific minimum.
-            // ROC-aware: MLB 3.1 PA×TG, ROC 2.7.
+            // Savant's percentile qualifier, 2.1 PA per team game (2026-11-05,
+            // per Wally); ROC keeps its 2.7 MiLB line.
             const overallPa = (row.paAll != null ? row.paAll : row.pa) || 0;
             const isROC = Aggregator.loaded && Aggregator._isROCTeam(row.team);
-            const paQual = overallPa >= tg * Utils.hitterPaPerGame(isROC);
+            const paQual = row._pctlQual !== undefined ? row._pctlQual
+              : overallPa >= tg * (isROC ? Utils.hitterPaPerGame(true) : QUAL.PCTL_PA_PER_GAME);
             if (HITTER_ALWAYS_COLOR[col.key]) {
               showColor = true;
             } else if (HITTER_BIP_STATS[col.key]) {

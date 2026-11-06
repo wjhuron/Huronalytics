@@ -5222,7 +5222,13 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
     try:
         with open(os.path.join(_data_dir, 'pitcher_leaderboard_rs.json')) as f:
             _raw_prows = json.load(f)
-        _prows = _scratch_mlb_pool_rows(_raw_prows)
+        # Savant's percentile qualifier (1.25 batters faced per team game), the
+        # pool the shipped pitcher ranks use since 2026-11-05.
+        from pipeline.utils import pctl_qualifier
+        with open(METADATA_PATH) as f:
+            _tgp = json.load(f).get('teamGamesPlayed') or {}
+        _pq = pctl_qualifier(_raw_prows, 'pitcher', _tgp, True)
+        _prows = [r for r in _scratch_mlb_pool_rows(_raw_prows) if _pq(r)]
         for s in _SCRATCH_POOL_STATS:
             vals = [(_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s)) for r in _prows]
             ctx['pitcher_pools'][s] = sorted(v for v in vals if v is not None)

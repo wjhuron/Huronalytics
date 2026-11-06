@@ -1998,9 +1998,25 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
         else:
             row['stuffScore'] = None
             row['stuffScore_lowSupport'] = False
+    # Pitcher-level pool: Savant's percentile qualifier (1.25 batters faced per
+    # team game, 2026-11-05, per Wally; pipeline.utils.pctl_qualifier), the pool
+    # every other pitcher rank uses and the one js/aggregator.js re-ranks
+    # stuffScore in. A combined 2TM row stands for the player; his stints are
+    # ranked against it. No teamGamesPlayed in metadata is a process-order bug.
+    from pipeline.utils import pctl_qualifier
+    _tgp = json.load(open(os.path.join(DATA, 'metadata_rs.json'))).get('teamGamesPlayed')
+    if not _tgp:
+        raise SystemExit('metadata_rs.json has no teamGamesPlayed: run pipeline.process_data first')
+    _pq = pctl_qualifier(pp, 'pitcher', _tgp, True)
+    _combined_ids = {r.get('mlbId') for r in pp if _is_combined_team(r['team'])}
+    def _in_pctl_pool(row):
+        if row.get('team') in AAA_TEAMS:
+            return False
+        if not _is_combined_team(row['team']) and row.get('mlbId') in _combined_ids:
+            return False
+        return _pq(row)
     qpool = [row['stuffScore'] for row in pp
-             if row.get('stuffScore') is not None and (row.get('count') or 0) >= 25
-             and row.get('team') not in AAA_TEAMS and not _is_combined_team(row['team'])]
+             if row.get('stuffScore') is not None and _in_pctl_pool(row)]
     n_pp = 0
     for row in pp:
         sc = row.get('stuffScore')
@@ -2016,9 +2032,10 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
             rec = xrvoe_ov.get((row['pitcher'], row['team']))
             for f, src in XRVOE_FIELDS.items():
                 row[f] = rec[src] if rec else None
-                if (rec and rec[src] is not None
-                        and row.get('team') not in AAA_TEAMS
-                        and not _is_combined_team(row['team'])):
+                # xRVOE lives on club rows only (a 2TM row carries none), so the
+                # pool keeps the club rows that clear the qualifier themselves.
+                if (rec and rec[src] is not None and row.get('team') not in AAA_TEAMS
+                        and not _is_combined_team(row['team']) and _pq(row)):
                     pools_o[f].append(rec[src])
         for row in pp:
             if row.get('xrvoe100') is not None:

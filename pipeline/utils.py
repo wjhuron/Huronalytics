@@ -200,6 +200,46 @@ def pitcher_ip_per_game(is_starter, is_roc):
     return QUAL_SP_IP_PER_GAME_MLB if is_starter else QUAL_RP_IP_PER_GAME_MLB
 
 
+# ── Percentile qualifier (Baseball Savant's, 2026-11-05, per Wally) ─────
+# The PERCENTILE POOL and the render-time COLORING GATE use Savant's
+# percentile-rankings qualifier: 2.1 PA per team game for hitters, 1.25
+# batters faced per team game for pitchers (starters and relievers alike).
+# With it the pool reproduces Bohm's Savant chart within a point on K%, Whiff%,
+# Chase%, Barrel%, BB% and Sprint Speed. The QUAL_* block above stays the
+# batting-title line: it defines the Qualified row filter and the metric pools
+# (Process+ standardization, the wRC+ scale match), which must not move with
+# the percentile display. ROC/MiLB rows keep the QUAL_* MiLB lines (their ranks
+# live inside AAA). Mirrors QUAL.PCTL_* and Utils.resolveQual(..., forPctl) in
+# js/aggregator.js and js/utils.js; change both together.
+PCTL_PA_PER_GAME_MLB = 2.1
+PCTL_BF_PER_GAME_MLB = 1.25
+
+
+def pctl_qualifier(rows, name_key, team_games, is_pitcher):
+    """Return fn(row) -> True when an MLB row clears Savant's percentile qualifier.
+
+    rows are the leaderboard rows (stints and 2TM.. rows), team_games the
+    metadata teamGamesPlayed map. A combined row is measured against the games of
+    the club the player most recently played for (current_team_by_player), the
+    rule qualification uses everywhere. Pitchers count official batters faced
+    (`tbf`, falling back to `pa`). No team games is not qualified."""
+    current = current_team_by_player(rows, name_key, AAA_TEAMS)
+    per_game = PCTL_BF_PER_GAME_MLB if is_pitcher else PCTL_PA_PER_GAME_MLB
+
+    def _q(row):
+        team = row.get('team')
+        if team in AAA_TEAMS:
+            return False
+        club = current.get(player_key(row, name_key)) if is_combined_team(team) else team
+        tg = team_games.get(club) or 0
+        if is_pitcher:
+            amount = row.get('tbf') if row.get('tbf') is not None else row.get('pa')
+        else:
+            amount = row.get('pa')
+        return tg > 0 and (amount or 0) >= per_game * tg
+    return _q
+
+
 def is_combined_team(team):
     """'2TM', '3TM' ... '10TM'. A multi-team LABEL, not a franchise.
 

@@ -16,6 +16,7 @@ from collections import defaultdict
 
 # ── Pipeline modules ─────────────────────────────────────────────────────
 from pipeline.utils import (
+    pctl_qualifier,
     safe_float, normalize_date, _today_et, avg, median, round_metric,
     is_barrel, barrel_flag, spray_angle, spray_direction, duplicate_pa_events,
     is_no_pitch, real_pitches, batting_side,
@@ -5014,13 +5015,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # ==========================================================
     print("\n--- Computing percentiles (single pass) ---")
 
-    # Pool doctrine (comment corrected 2026-08-27): the percentile pool is
-    # ALL MLB players — qualification is a render-time coloring gate applied
-    # in the site layer, never a pool filter (root CLAUDE.md). A stale header
-    # here claimed qualified-only pools, above ~50 lines of qualifier
-    # plumbing that no percentile call ever received; both are gone. The
-    # qualifier_fn parameter on compute_percentile_ranks remains for any
-    # future caller that genuinely wants a restricted pool.
+    # Pool doctrine (2026-11-05, per Wally: match Baseball Savant): the
+    # pitcher and hitter percentile pools are the players who clear Savant's
+    # percentile qualifier (pipeline.utils.pctl_qualifier: 2.1 PA / 1.25
+    # batters faced per team game), each counted once. Every row still gets a
+    # rank, interpolated against the pool; the site colors only qualified rows.
+    # Pitch-type rows keep their per-type pitch minimums. Before this date the
+    # pool was ALL MLB players, which put a .308 wOBA at the 56th percentile.
 
     # Pitch-type outcome stats — non-shape per-pitch stats use min_count=25
     # so pitches thrown rarely (e.g., 5 sliders) don't pollute the per-pitch
@@ -5061,7 +5062,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             compute_percentile_ranks_with_aaa(pt_rows, metric, min_count=mc_pt, count_key=ck, abs_val=av)
 
     # 2. Pitcher percentiles (all stats including boxscore-derived).
-    # Pool: ALL MLB pitchers (no qualifier). This matches the convention used
+    # Pool until 2026-11-05: ALL MLB pitchers (no qualifier); now Savant's qualifier, below. This matches the convention used
     # for the displayed league average (PA/IP-weighted mean over every MLB
     # pitcher) so "ERA below league avg" reads as "above the 50th percentile"
     # for the reader. Qualification is enforced as a render-only gate: every
@@ -5071,15 +5072,22 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # only display percentile chips for players who clear sample minimums.
     PITCHER_ALL_PCTL = (STAT_KEYS + PITCHER_METRIC_PCTL_KEYS + PITCHER_BB_KEYS
                         + EXPECTED_KEYS + ['fbVelo', 'runValue', 'rv100', 'xRunValue', 'xRv100', 'era', 'hr9', 'fip', 'xFIP', 'siera', 'locPlus', 'commandPlus', 'fWAR'])
+    # Pool: Savant's percentile qualifier, 1.25 batters faced per team game
+    # (2026-11-05, per Wally; pipeline.utils.pctl_qualifier). Every row still
+    # gets a rank, interpolated against that pool when it is outside it.
+    _pit_pq = pctl_qualifier(pitcher_leaderboard, 'pitcher', team_games_played, True)
     for stat in PITCHER_ALL_PCTL:
-        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0)
+        compute_percentile_ranks_with_aaa(pitcher_leaderboard, stat, min_count=0, qualifier_fn=_pit_pq)
 
     # 3. Hitter percentiles (all stats including boxscore-derived).
     # Same pool change as pitchers: all MLB hitters define the distribution,
     # qualification is a render-only gate for coloring. Counting stats
     # (hr, sb) were already using the full pool — unchanged.
+    # Pool: Savant's percentile qualifier, 2.1 PA per team game (2026-11-05,
+    # per Wally). Bohm's ranks then match his Savant chart within a point.
+    _hit_pq = pctl_qualifier(hitter_leaderboard, 'hitter', team_games_played, False)
     for stat in HITTER_STAT_KEYS + EXPECTED_KEYS:
-        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat)
+        compute_percentile_ranks_with_aaa(hitter_leaderboard, stat, qualifier_fn=_hit_pq)
 
     # 4. Hitter pitch-type percentiles (grouped by pitch type) — min 25 pitches
     # of that type; pitch-type-vs-hitter has no PA-style qualifier, just the

@@ -120,7 +120,7 @@ def _season_pool_rows(season_rows):
     return out
 
 
-def add_season_percentiles(row, season_rows, stats=None):
+def add_season_percentiles(row, season_rows, stats=None, team_games=None):
     """Rank each of `row`'s values inside the SEASON distribution.
 
     No qualification and no minimum sample: a window value is ranked for what
@@ -129,7 +129,16 @@ def add_season_percentiles(row, season_rows, stats=None):
     """
     if stats is None:
         stats = HITTER_STAT_KEYS + EXPECTED_KEYS
-    season_rows = _season_pool_rows(season_rows)
+    # The season pool is Savant's percentile qualifier (2.1 PA per team game),
+    # the pool the shipped ranks use since 2026-11-05 (pipeline.utils.pctl_qualifier).
+    # team_games = metadata teamGamesPlayed; without it the pool cannot be
+    # qualified, so stop rather than rank on a different pool from the site.
+    if not team_games:
+        raise ValueError('add_season_percentiles needs metadata teamGamesPlayed '
+                         '(run process_data first)')
+    from pipeline.utils import pctl_qualifier
+    _pq = pctl_qualifier(season_rows, 'hitter', team_games, False)
+    season_rows = [r for r in _season_pool_rows(season_rows) if _pq(r)]
     for stat in stats:
         val = row.get(stat)
         pk = stat + '_pctl'
@@ -459,7 +468,7 @@ def score_window_against_season(hitter_key, window_pitches, all_pitches,
             print(f"    no official row for this range — keeping the "
                   f"pitch-derived line, which runs short by any no-pitch IBBs")
 
-    add_season_percentiles(row, season_rows)
+    add_season_percentiles(row, season_rows, team_games=metadata.get('teamGamesPlayed'))
     return row
 
 

@@ -64,8 +64,8 @@ Values from different levels are not on the same scale, and mixing them silently
 
 Three different things get confused constantly:
 
-- **The percentile pool is all MLB players.** Every row gets a stored rank. Qualification does not filter the pool. ROC hitter rows are the exception: `process_data` re-ranks them inside AAA from `data/aaa_hitter_quantiles_rs.json` just before the inversion pass.
-- **Qualification is a render-time coloring gate**, applied in the site layer, not here. Hitters: 3.1 PA times team games (2.7 for ROC). The constants are the `QUAL_*` block in `utils.py`.
+- **The percentile pool is Savant's qualified players** (`pctl_qualifier` in `utils.py`: 2.1 PA / 1.25 batters faced per team game). Every row gets a stored rank, interpolated against that pool when outside it. Pitch-type rows keep their per-type minimums. ROC hitter rows are the exception: `process_data` re-ranks them inside AAA from `data/aaa_hitter_quantiles_rs.json` just before the inversion pass.
+- **Qualification has two lines.** The coloring gate is the percentile line above (2.7 PA for ROC), applied in the site layer. The batting-title `QUAL_*` block (3.1 PA) drives the Qualified row filter and the Process+ / wRC+ standardization pools.
 - **A computation floor is neither.** `MIN_HITTER_SWINGS = 65`, `MIN_CELL = 20`, `MIN_POOL = 300` in `commandplus` and `50` in `pitcherplus` are floors below which a value is not computed at all. Note that the two `MIN_POOL` values count different units: pitches in one file, qualified pitchers in the other.
 
 ## Event and swing semantics

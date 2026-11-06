@@ -1094,7 +1094,9 @@ var PlayerPage = {
 
     // Determine if player qualifies based on team games played
     // Micro data is already game-type-specific, so no date range needed
-    var isQualified = Utils.isQualified(data, this._qualContext(isPitcher), isPitcher);
+    // Coloring gate: Savant's percentile qualifier (2.1 PA / 1.25 batters faced
+    // per team game, 2026-11-05, per Wally), not the batting-title line.
+    var isQualified = Utils.isPctlQualified(data, this._qualContext(isPitcher), isPitcher);
     // (maxEV left the hitter always-color set 2026-08-27 with the Max EV
     // bubble itself — EV95 replaced it and is BIP-gated like the other rates.)
     var alwaysColorKeys = isPitcher ? { ffVelo: true, siVelo: true } : {};
@@ -1361,9 +1363,9 @@ var PlayerPage = {
     sectionLabel.textContent = 'xRun Value / 100 Pitches';
     container.appendChild(sectionLabel);
 
-    // Qualification (PA × team games, ROC-aware: 3.1 MLB / 2.7 ROC) —
-    // same gate the generic _renderPercentiles uses for hitter rate stats.
-    var isQualified = Utils.isQualified(data, this._qualContext(false), false);
+    // Coloring gate: Savant's percentile qualifier (2.1 PA per team game MLB,
+    // 2.7 ROC), the gate _renderPercentiles uses for hitter rate stats.
+    var isQualified = Utils.isPctlQualified(data, this._qualContext(false), false);
 
     function buildRow(label, xRv100, pctl, colored) {
       var row = document.createElement('div');
@@ -2287,7 +2289,7 @@ var PlayerPage = {
           pctl = row[col.key + '_platoonPctl'];
           if (pctl === undefined) pctl = row[col.key + '_pctl'];
         }
-        if (pctl != null && val != null && row._qualified) {
+        if (pctl != null && val != null && (row._pctlQual !== undefined ? row._pctlQual : row._qualified)) {
           td.style.backgroundColor = Utils.percentileColor(pctl);
           td.style.color = Utils.percentileTextColor(pctl);
         }

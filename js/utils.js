@@ -373,7 +373,11 @@ const Utils = {
    * combined row or the threshold do not recompute them.
    * @param isPitcher true for IP x team games, false for PA x team games.
    */
-  resolveQual: function (row, ctx, isPitcher) {
+  // forPctl: Savant's percentile qualifier (QUAL.PCTL_*: 2.1 PA / 1.25 batters
+  // faced per team game) instead of the batting-title line. It decides the
+  // percentile pool and whether a cell is colored; the title line still drives
+  // the Qualified row filter. ROC rows keep their MiLB lines either way.
+  resolveQual: function (row, ctx, isPitcher, forPctl) {
     var isROCRow = ctx.isROC(row.team);
     // A ROC/AAA stint is its own league and never inherits the combined row.
     // That row is built from MLB stints only, so borrowing its innings put
@@ -387,12 +391,13 @@ const Utils = {
     } else {
       tg = ctx.teamGames[row.team] || 0;
     }
+    var savant = !!forPctl && !isROCRow;
     var amount = isPitcher
-      ? this.parseIP(src.ip)
+      ? (savant ? ((src.tbf != null ? src.tbf : src.pa) || 0) : this.parseIP(src.ip))
       : ((src.paAll != null ? src.paAll : src.pa) || 0);
     var perGame = isPitcher
-      ? this.pitcherIpPerGame(this.isStarter(src.g, src.gs), isROCRow)
-      : this.hitterPaPerGame(isROCRow);
+      ? (savant ? QUAL.PCTL_BF_PER_GAME : this.pitcherIpPerGame(this.isStarter(src.g, src.gs), isROCRow))
+      : (savant ? QUAL.PCTL_PA_PER_GAME : this.hitterPaPerGame(isROCRow));
     return {
       combinedRow: mt,
       denomTeam: mt ? ctx.denomTeam[this.playerKey(row)] : row.team,
@@ -407,6 +412,11 @@ const Utils = {
 
   isQualified: function (row, ctx, isPitcher) {
     return this.resolveQual(row, ctx, isPitcher).qualified;
+  },
+
+  // Savant's percentile qualifier: the percentile pool and the coloring gate.
+  isPctlQualified: function (row, ctx, isPitcher) {
+    return this.resolveQual(row, ctx, isPitcher, true).qualified;
   },
 
   // Create a pitch badge <span> element (small or regular size)
