@@ -154,7 +154,7 @@ def add_season_percentiles(row, season_rows, stats=None, team_games=None):
         p = (below + 0.5 * equal) / len(pool) * 100.0
         if stat in HITTER_INVERT_PCTL:
             p = 100.0 - p
-        row[pk] = max(0, min(100, round(p)))
+        row[pk] = max(1, min(100, round(p)))   # Savant's 1-100 range (floor_pctls)
     return row
 
 

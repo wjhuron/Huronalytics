@@ -229,11 +229,30 @@ const Aggregator = {
    * @returns {(PitcherRow|PitchRow|HitterRow)[]} Aggregated rows with percentiles.
    */
   aggregate: function (tab, filters) {
-    if (tab === 'pitcher') return this._aggregatePitcher(filters);
-    if (tab === 'pitch') return this._aggregatePitch(filters);
-    if (tab === 'hitter') return this._aggregateHitter(filters);
-    if (tab === 'hitterPitch') return this._aggregateHitterPitch(filters);
-    return [];
+    let rows;
+    if (tab === 'pitcher') rows = this._aggregatePitcher(filters);
+    else if (tab === 'pitch') rows = this._aggregatePitch(filters);
+    else if (tab === 'hitter') rows = this._aggregateHitter(filters);
+    else if (tab === 'hitterPitch') rows = this._aggregateHitterPitch(filters);
+    else return [];
+    return this.floorPctls(rows);
+  },
+
+  // Savant's 1-100 percentile range (2026-11-05, per Wally): the lowest qualified
+  // player reads 1, not 0. Runs on FINAL values, after every inversion, because an
+  // inversion turns a 100 into a 0. Mirrors pipeline/compute.py floor_pctls.
+  PCTL_FLOOR: 1,
+  floorPctls: function (rows) {
+    if (!rows) return rows;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      for (const k in r) {
+        if (k.length > 5 && k.slice(-5) === '_pctl' && typeof r[k] === 'number' && r[k] < this.PCTL_FLOOR) {
+          r[k] = this.PCTL_FLOOR;
+        }
+      }
+    }
+    return rows;
   },
 
   _getMlbIdMap: function (type) {

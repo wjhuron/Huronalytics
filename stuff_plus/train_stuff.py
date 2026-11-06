@@ -1709,6 +1709,9 @@ def _combo_exact(parts):
 STUFF_STORE_DECIMALS = 6
 
 
+from pipeline.compute import floor_pctls  # noqa: E402
+
+
 def _pctl(sc, pool):
     below = sum(1 for x in pool if x < sc); equal = sum(1 for x in pool if x == sc)
     return round((below + 0.5 * equal) / len(pool) * 100)
@@ -1968,6 +1971,7 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
                 row[f + '_pctl'] = (_pctl(v, pools[f][row['pitchType']])
                                     if v is not None and pools[f].get(row['pitchType'])
                                     else None)
+    floor_pctls(pl)   # Savant's 1-100 range, after every rank above
     json.dump(pl, open(pl_path, 'w'))
 
     # ── overall -> pitcher_leaderboard ──
@@ -2127,10 +2131,12 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     n_x_pl = write_exact_stuff(pl, look_x, pool_pt,
                                lambda r: (r['pitcher'], r['team'], r['pitchType']),
                                lambda r: (r['pitcher'], r['pitchType']))
+    floor_pctls(pl)   # Savant's 1-100 range, after every rank above
     json.dump(pl, open(pl_path, 'w'))
     print(f'  stuffScore stored at {STUFF_STORE_DECIMALS} decimals: {n_x_pl} pitch rows, '
           f'{n_x_pp} pitcher rows (ranks and consumers used the 1-decimal value)')
 
+    floor_pctls(pp)   # Savant's 1-100 range, after every rank above
     json.dump(pp, open(pp_path, 'w'))
 
     # Baseline goes to metadata so the client can recompute Pitcher+ under

@@ -786,6 +786,21 @@ def compute_hitter_stats(pitches):
 
 # ── Percentile computation ───────────────────────────────────────────────
 
+PCTL_FLOOR = 1
+
+
+def floor_pctls(rows):
+    """Clamp every stored percentile to PCTL_FLOOR..100, Savant's 1-100 range (2026-11-05,
+    per Wally): the lowest qualified player reads 1, not 0. Run on FINAL values, after every
+    inversion pass, since an inversion turns a 100 into a 0. process_data and train_stuff run it
+    just before they write; js/aggregator.js floorPctls mirrors it at the end of aggregate()."""
+    for row in rows:
+        for k, v in row.items():
+            if k.endswith('_pctl') and isinstance(v, (int, float)) and not isinstance(v, bool) and v < PCTL_FLOOR:
+                row[k] = PCTL_FLOOR
+    return rows
+
+
 def compute_percentile_ranks(rows, metric_key, min_count=0, count_key='count', qualifier_fn=None, abs_val=False):
     """Compute percentile rank (0-100) for each row's metric value.
 

@@ -4641,7 +4641,8 @@ def _rank_in_mlb_pool(val, sorted_pool, invert=False):
     below = bisect.bisect_left(sorted_pool, val)
     above = bisect.bisect_right(sorted_pool, val)
     pctl = max(0, min(100, round((below + 0.5 * (above - below)) / len(sorted_pool) * 100)))
-    return 100 - pctl if invert else pctl
+    # Savant's 1-100 range, floored after the inversion (pipeline.compute.floor_pctls).
+    return max(1, 100 - pctl if invert else pctl)
 
 
 def _scratch_mlb_pool_rows(rows):
@@ -4857,7 +4858,7 @@ def _pctl_of(value, pool, invert=False):
     if not pool:
         return None
     pct = bisect.bisect_left(pool, value) / len(pool) * 100
-    return round(100 - pct if invert else pct)
+    return max(1, round(100 - pct if invert else pct))   # Savant's 1-100 range
 
 
 _MLB_PICKLE_CACHE = None   # module-level: load the 382k-pitch pickle once per process

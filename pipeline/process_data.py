@@ -48,6 +48,7 @@ from pipeline.compute import (
     compute_expected_stats, compute_stats, compute_xrv, fip_family,
     compute_pitcher_batted_ball, compute_hitter_stats,
     compute_percentile_ranks, compute_percentile_ranks_with_aaa, rank_in_quantiles,
+    floor_pctls,
     METRIC_COLS, METRIC_KEYS, PITCH_STAT_KEYS, STAT_KEYS,
     PITCH_PCTL_KEYS, PITCH_BB_PCTL_KEYS, PITCH_BB_INVERT,
     PITCHER_INVERT_PCTL,
@@ -5329,6 +5330,10 @@ def write_json_outputs(result, suffix):
                 sort_rows_default(result['pitcher_leaderboard'])
         except (json.JSONDecodeError, KeyError):
             print("  Warning: could not read existing overall Stuff+ scores")
+
+    # Savant's 1-100 percentile range: floor every final rank at 1 (floor_pctls).
+    for _lb in ('pitch_leaderboard', 'pitcher_leaderboard', 'hitter_leaderboard', 'hitter_pitch_leaderboard'):
+        floor_pctls(result[_lb])
 
     # Round floats in every committed artifact (these also land in git via
     # `git add data/`, so shrinking them speeds the push too). Mutating
