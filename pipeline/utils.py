@@ -249,6 +249,26 @@ def pctl_qualifier(rows, name_key, team_games, is_pitcher):
     return _q
 
 
+def season_starter_fn(rows):
+    """fn(row) -> True when the pitcher is a starter over his whole MLB season:
+    GS/G above SP_GS_RATIO on his combined 2TM.. row when he has one, else on the
+    row itself (a ROC row always reads its own). Mirrors Utils.seasonIsStarter in
+    js/utils.js, the site's SP/RP rule."""
+    def _sp(g, gs):
+        g, gs = g or 0, gs or 0
+        return g > 0 and gs / g > SP_GS_RATIO
+    combined = {player_key(r, 'pitcher'): _sp(r.get('g'), r.get('gs'))
+                for r in rows if is_combined_team(r.get('team'))}
+
+    def _fn(row):
+        if row.get('team') not in AAA_TEAMS:
+            k = player_key(row, 'pitcher')
+            if k in combined:
+                return combined[k]
+        return _sp(row.get('g'), row.get('gs'))
+    return _fn
+
+
 def pctl_pool_rows(rows, name_key, team_games, is_pitcher):
     """The rows that define a percentile distribution: MLB rows only, one per
     player (a 2TM.. row stands for a traded player and his club stints leave),

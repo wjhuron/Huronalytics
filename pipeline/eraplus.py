@@ -771,11 +771,22 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
     # lower-is-better -> invert.
     from pipeline.utils import pctl_pool_rows
     _pctl_rows = pctl_pool_rows(rows, 'pitcher', team_games, True)
+    # hdWAR is a season TOTAL, so it ranks within role (2026-11-06, per Wally):
+    # starters against starters, relievers against relievers, by the site's SP/RP
+    # rule (season_starter_fn). In one pool the 166 relievers (median 0.43) put
+    # an 88-inning starter's 0.93 at the 56th percentile; among starters he is 36th.
+    from pipeline.utils import season_starter_fn
+    _is_sp = season_starter_fn(rows)
     for key, invert in (('hdERA', True), ('hpERA', True),
                         ('hdERAPlus', False), ('hpERAPlus', False),
                         ('hWAR', False)):
         pool = [r[key] for r in _pctl_rows if r.get(key) is not None]
+        if key == 'hWAR':
+            role_pool = {sp: [r[key] for r in _pctl_rows if r.get(key) is not None and _is_sp(r) == sp]
+                         for sp in (True, False)}
         for r in rows:
+            if key == 'hWAR':
+                pool = role_pool[_is_sp(r)]
             p = _pctl(r.get(key), pool)
             if p is not None and invert:
                 # int like every other shipped percentile (2026-08-27 audit:
