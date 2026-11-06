@@ -1990,16 +1990,23 @@ def _social_tint_pools():
         c[1] += d in STRIKE_DESC
         c[2] += d in SWING_DESC
         c[3] += d == 'Swinging Strike'
-    pools = {}
+    pools, tot = {}, defaultdict(lambda: [0, 0, 0, 0])
     for (_nm, _tm, th, bh, pt), (n, st, sw, wh) in cells.items():
+        t = tot[(th, bh, pt)]
+        t[0] += n; t[1] += st; t[2] += sw; t[3] += wh
         q = pools.setdefault((th, bh, pt), {'strike': [], 'whiff': []})
         if n >= SOCIAL_STRIKE_MIN_PITCHES:
             q['strike'].append(st / n)
         if sw >= SOCIAL_WHIFF_MIN_SWINGS:
             q['whiff'].append(wh / sw)
-    for q in pools.values():
+    for g, q in pools.items():
         q['strike'].sort()
         q['whiff'].sort()
+        # The league rate of the group (every pitch, no gate) is where each tint splits
+        # (pipeline.compute.split_at_league).
+        n, st, sw, wh = tot[g]
+        q['strike_lg'] = st / n if n else None
+        q['whiff_lg'] = wh / sw if sw else None
     _SOCIAL_TINT_POOLS = pools
     print(f"  Social tint pools: {len(pools)} type x hand groups")
     return pools
@@ -2007,6 +2014,7 @@ def _social_tint_pools():
 
 # xwOBAcon pools on the same cells, gated at XWC_COLOR_MIN_BIP.
 _SOCIAL_XWC_POOLS = None
+_SOCIAL_XWC_LEAGUE = {}
 
 
 def _social_xwc_pools():
@@ -2018,8 +2026,9 @@ def _social_xwc_pools():
     for p in _load_mlb_pickle() or []:
         if p.get('_source') == 'MLB' and p.get('Pitch Type') and p.get('Description') == 'In Play':
             cells[(p.get('Pitcher'), p.get('PTeam'), p.get('Throws'), p.get('Bats'), p.get('Pitch Type'))].append(p)
-    pools, sizes = defaultdict(list), []
+    pools, sizes, groups = defaultdict(list), [], defaultdict(list)
     for (_nm, _tm, th, bh, pt), pl in cells.items():
+        groups[(th, bh, pt)].extend(pl)
         sizes.append(len(pl))
         if len(pl) >= XWC_COLOR_MIN_BIP:
             v = compute_expected_stats(pl, None).get('xwOBAcon')
@@ -2027,6 +2036,8 @@ def _social_xwc_pools():
                 pools[(th, bh, pt)].append(v)
     for v in pools.values():
         v.sort()
+    # The league xwOBAcon of each group, every ball in play, is where its tint splits.
+    _SOCIAL_XWC_LEAGUE.update({g: compute_expected_stats(pl, None).get('xwOBAcon') for g, pl in groups.items()})
     _SOCIAL_XWC_POOLS = pools
     sizes.sort()
     print(f"  xwOBAcon pools: {len(sizes)} cells, median {sizes[len(sizes) // 2]} BIP, "
@@ -2783,18 +2794,19 @@ def render_social_card(config, pitches, output_file):
                 txt(cx, hy, lab, 9.2, TEXT_PRIMARY, 'black',
                     ha='right' if al == 'r' else 'center')
 
-        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs, pool=None, invert=False):
+        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs, pool=None, invert=False, league=None):
             # Percentile tint behind Strike% and Whiff%, season card only, inside the
             # pitcher's own type and hands. Lighter than the grade chips so those stay
             # the main read. A cell under its gate gets no tint and is not in the pool.
             if pool is None:
-                pool = (_social_tint_pools().get((pitches[0].get('Throws'), bats, r_['pt'])) or {}).get(k)
+                grp = _social_tint_pools().get((pitches[0].get('Throws'), bats, r_['pt'])) or {}
+                pool, league = grp.get(k), grp.get(k + '_lg')
             _open = (r_['bip'] >= XWC_COLOR_MIN_BIP if k == 'xwobacon'
                      else r_['n'] >= SOCIAL_STRIKE_MIN_PITCHES if k == 'strike'
                      else r_['sw'] >= SOCIAL_WHIFF_MIN_SWINGS)
             if not pool or not _open or r_.get(k) is None:
                 return
-            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool, invert=invert))[0]
+            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool, invert=invert, league=league))[0]
             from matplotlib.colors import to_rgb
             bg = to_rgb(BG)
             fc = tuple(0.55 * fc[i] + 0.45 * bg[i] for i in range(3))
@@ -2944,7 +2956,8 @@ def render_social_card(config, pitches, output_file):
                                 continue
                             _xp = _social_xwc_pools().get((pitches[0].get('Throws'), bats, r_['pt']))
                             if _xp:
-                                _tint_cell(cx, ry, rh, r_, k, bats, v, fs, pool=_xp, invert=True)
+                                _tint_cell(cx, ry, rh, r_, k, bats, v, fs, pool=_xp, invert=True,
+                                           league=_SOCIAL_XWC_LEAGUE.get((pitches[0].get('Throws'), bats, r_['pt'])))
                         c_ = TEXT_PRIMARY
                     else:
                         # One decimal, no leading '+' (display rule); the
@@ -3766,13 +3779,17 @@ def render_card(config, pitches, output_file):
                         and _bb['fb'] >= 10 and _pools.get('hrfb')):
                     p_row['hrFbPct'] = _bb['hr'] / _bb['fb'] * 100
                     # lower = better: percentile is share of pool ABOVE us
+                    _lg = config.get('pitcher_league_avgs') or {}
                     p_row['hrFbPct_pctl'] = _pctl_of(
-                        p_row['hrFbPct'], _pools['hrfb'], invert=True)
+                        p_row['hrFbPct'], _pools['hrfb'], invert=True,
+                        league=_lg['hrFbPct'] * 100 if _lg.get('hrFbPct') is not None else None)
                 if (p_row.get('puPct_pctl') is None
                         and _bb['bip'] >= 25 and _pools.get('pu')):
                     p_row['puPct'] = _bb['pu'] / _bb['bip'] * 100
+                    _lg = config.get('pitcher_league_avgs') or {}
                     p_row['puPct_pctl'] = _pctl_of(
-                        p_row['puPct'], _pools['pu'], invert=False)
+                        p_row['puPct'], _pools['pu'], invert=False,
+                        league=_lg['puPct'] * 100 if _lg.get('puPct') is not None else None)
             bubble_cols = _bubble_columns_for(config, p_row)
             # Classic-frame inches (0.790/0.235 of the 17.5in card) so the
             # rail's physical geometry is untouched by the taller figure; the
@@ -4631,12 +4648,18 @@ def _stuff_rank_key(v):
     return None if v is None else round(v, 1)
 
 
-def _rank_in_mlb_pool(val, sorted_pool, invert=False):
+def _rank_in_mlb_pool(val, sorted_pool, invert=False, league=None):
     """Percentile of val against a sorted MLB value pool — the interpolation
-    path of pipeline_compute.compute_percentile_ranks_with_aaa (fraction
-    below + half ties, rounded, clamped)."""
+    path of pipeline.compute.compute_percentile_ranks_with_aaa (fraction
+    below + half ties, rounded, clamped). With league it is split at that
+    league average (pipeline.compute.league_pctl), the rule every shipped
+    percentile follows since 2026-11-05; pass it for every stat that has one."""
     if val is None or len(sorted_pool) < 2:
         return None
+    if league is not None:
+        from pipeline.compute import league_pctl
+        p = league_pctl(sorted_pool, val, league)
+        return 100 - p if invert else p
     import bisect
     below = bisect.bisect_left(sorted_pool, val)
     above = bisect.bisect_right(sorted_pool, val)
@@ -4851,11 +4874,16 @@ def _hrfb_pu_pools():
     return _HRFB_PU_POOLS
 
 
-def _pctl_of(value, pool, invert=False):
-    """Percentile of value in a sorted pool; invert for lower-is-better."""
+def _pctl_of(value, pool, invert=False, league=None):
+    """Percentile of value in a sorted pool; invert for lower-is-better. With league it is
+    split at that league average (pipeline.compute.league_pctl)."""
     import bisect
     if not pool:
         return None
+    if league is not None:
+        from pipeline.compute import league_pctl
+        p = league_pctl(pool, value, league)
+        return 100 - p if invert else p
     pct = bisect.bisect_left(pool, value) / len(pool) * 100
     return round(100 - pct if invert else pct)
 
@@ -5219,6 +5247,14 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
     # Percentile pools from the leaderboard JSONs.
     _data_dir = os.path.dirname(METADATA_PATH)
     ctx['pitcher_pools'], ctx['pitch_pools'] = {}, {}
+    # The league averages the shipped ranks split at (metadata.pctlLeague, written by
+    # process_data and train_stuff; pipeline.compute.split_at_league). A stat without one keeps
+    # the plain rank, as it does on the site.
+    with open(METADATA_PATH) as f:
+        ctx['pctl_league'] = json.load(f).get('pctlLeague') or {}
+    if not ctx['pctl_league']:
+        print('  WARNING: metadata has no pctlLeague (run process_data): scratch ranks are NOT split '
+              'at the league average and will disagree with the site.')
     try:
         with open(os.path.join(_data_dir, 'pitcher_leaderboard_rs.json')) as f:
             _raw_prows = json.load(f)
@@ -5411,7 +5447,8 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
     for s in _SCRATCH_POOL_STATS:
         _v = _stuff_rank_key(row.get(s)) if s == 'stuffScore' else row.get(s)
         row[s + '_pctl'] = _rank_in_mlb_pool(_v, ctx['pitcher_pools'].get(s) or [],
-                                             invert=(s in _SCRATCH_INVERT_PITCHER))
+                                             invert=(s in _SCRATCH_INVERT_PITCHER),
+                                             league=(ctx.get('pctl_league') or {}).get('pitcher', {}).get(s))
 
     # Pitcher+ — the six-component shrunk-z composite, scored on the
     # published season baseline (metadata pitcherPlusBaseline) exactly as
@@ -5428,7 +5465,7 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
             row['pitcherPlus'] = None
             print("  Pitcher+: Stuff+ or xRV missing -> not scoreable, nulled")
         row['pitcherPlus_pctl'] = _rank_in_mlb_pool(
-            row.get('pitcherPlus'), ctx.get('pitcher_plus_pool') or [])
+            row.get('pitcherPlus'), ctx.get('pitcher_plus_pool') or [], league=100.0)
 
     # Per-pitch-type rows (nVAA/nHAA, velo, RV rates, Stuff+, Loc+).
     by_pt = defaultdict(list)
@@ -5484,14 +5521,17 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
             locplus_by_pt[pt] = lp
 
         pools = ctx['pitch_pools'].get(pt, {})
-        d['velocity_pctl'] = _rank_in_mlb_pool(d['velocity'], pools.get('velocity') or [])
-        nvp = _rank_in_mlb_pool(d['nVAA'], pools.get('nVAA') or [])
+        _ptlg = ((ctx.get('pctl_league') or {}).get('pitch') or {}).get(pt) or {}
+        d['velocity_pctl'] = _rank_in_mlb_pool(d['velocity'], pools.get('velocity') or [],
+                                               league=_ptlg.get('velocity'))
+        nvp = _rank_in_mlb_pool(d['nVAA'], pools.get('nVAA') or [], league=_ptlg.get('nVAA'))
         # nVAA direction flips by pitch type (matches process_data's
         # VAA_NO_INVERT_TYPES): steeper is better except for FF/FC.
         if nvp is not None and pt not in ('FF', 'FC'):
             nvp = 100 - nvp
         d['nVAA_pctl'] = nvp
-        d['stuffScore_pctl'] = _rank_in_mlb_pool(_stuff_rank_key(d['stuffScore']), pools.get('stuffScore') or [])
+        d['stuffScore_pctl'] = _rank_in_mlb_pool(_stuff_rank_key(d['stuffScore']), pools.get('stuffScore') or [],
+                                                 league=_ptlg.get('stuffScore'))
         pitch_lb[pt] = d
 
     # Per-hand Loc+ for the location-plot titles. Same integer atoms as every
