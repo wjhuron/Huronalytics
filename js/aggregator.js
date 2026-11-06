@@ -339,6 +339,18 @@ const Aggregator = {
     return Math.floor(pos * 100 / (q.length - 1) + 0.5);
   },
 
+  // Mean of 1-decimal values rounded half up, in integer arithmetic so the
+  // result does not depend on summation order. Mirrors pipeline/utils.py
+  // mean_tenths_half_up; the two move together.
+  meanTenthsHalfUp: function (vals) {
+    let t = 0, n = 0;
+    for (let i = 0; i < vals.length; i++) {
+      if (vals[i] === null || vals[i] === undefined) continue;
+      t += Math.round(vals[i] * 10); n++;
+    }
+    return n > 0 ? Math.floor((2 * t + n) / (2 * n)) / 10 : null;
+  },
+
   _percentileFromSorted: function (sortedMlb, val, isPool) {
     const n = sortedMlb.length;
     const below = this._bisectLeft(sortedMlb, val);
@@ -615,7 +627,7 @@ const Aggregator = {
     }
 
     return {
-      avgEVAgainst: evs.length > 0 ? Math.round(evs.reduce(function(a,b){return a+b;},0) / evs.length * 10) / 10 : null,
+      avgEVAgainst: Aggregator.meanTenthsHalfUp(evs),
       maxEVAgainst: evs.length > 0 ? Math.round(Math.max.apply(null, evs) * 10) / 10 : null,
       hardHitPct: evs.length > 0 ? n_hard / evs.length : null,
       barrelPctAgainst: evs.length > 0 ? n_barrel / evs.length : null,
@@ -2467,7 +2479,7 @@ const Aggregator = {
         if (bla !== null) allLA.push(bla);
       }
 
-      const avgEVAll = evsAll.length > 0 ? Math.round(evsAll.reduce(function(a,b){return a+b;},0) / evsAll.length * 10) / 10 : null;
+      const avgEVAll = Aggregator.meanTenthsHalfUp(evsAll);
       const maxEV = evsAll.length > 0 ? Math.round(Math.max.apply(null, evsAll) * 10) / 10 : null;
       const medLA = allLA.length > 0 ? Math.round(median(allLA.slice()) * 10) / 10 : null;
 

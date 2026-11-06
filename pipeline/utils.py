@@ -239,6 +239,19 @@ def round_half_up(x, nd=0):
     return int(v) if nd == 0 else v
 
 
+def mean_tenths_half_up(vals):
+    """Mean of 1-decimal values (exit velocities), rounded half up to 1 decimal in
+    INTEGER arithmetic, so the result never depends on summation order. A float sum
+    of 87.1 + 87.2 ... landed one side or the other of an exact .x5 tie depending on
+    order, and three hitters' avg EV read 0.1 apart on the site (2026-11-06). Mirrors
+    Aggregator.meanTenthsHalfUp in js/aggregator.js."""
+    vals = [v for v in vals if v is not None]
+    if not vals:
+        return None
+    t, n = sum(int(round(v * 10)) for v in vals), len(vals)
+    return ((2 * t + n) // (2 * n)) / 10
+
+
 def pctl_qualifier(rows, name_key, team_games, is_pitcher):
     """Return fn(row) -> True when an MLB row clears Savant's percentile qualifier.
 

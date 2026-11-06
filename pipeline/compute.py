@@ -7,6 +7,7 @@ from collections import defaultdict
 from pipeline.hwar import gdp_extra_cost
 from pipeline.utils import (
     safe_float, median, percentile, is_barrel, barrel_flag, is_swing, round_half_up,
+    mean_tenths_half_up,
     spray_angle, spray_direction,
     SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, BALL_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
@@ -195,9 +196,12 @@ def compute_expected_stats(pitches, woba_weights=None, xwoba_key='xwOBA'):
     # Ks contribute an implicit 0). Return None when no AB had any Statcast data,
     # otherwise the result is 0.0 for AAA-only players (which then gets a 0th
     # percentile, swamping the leaderboard).
-    result['xBA'] = round(xba_sum / nonbunt_ab, 3) if (nonbunt_ab > 0 and xba_denom > 0) else None
-    result['xSLG'] = round(xslg_sum / nonbunt_ab, 3) if (nonbunt_ab > 0 and xslg_denom > 0) else None
-    result['xwOBA'] = round(xwoba_sum / xwoba_denom, 3) if xwoba_denom > 0 else None
+    # 6 decimals (2026-11-06): the percentile pass ranks the stored value, and a
+    # 3-decimal copy tied hitters the site's full-precision rank told apart (ranks
+    # up to 2 points off). The display rounds to 3.
+    result['xBA'] = round(xba_sum / nonbunt_ab, 6) if (nonbunt_ab > 0 and xba_denom > 0) else None
+    result['xSLG'] = round(xslg_sum / nonbunt_ab, 6) if (nonbunt_ab > 0 and xslg_denom > 0) else None
+    result['xwOBA'] = round(xwoba_sum / xwoba_denom, 6) if xwoba_denom > 0 else None
     # private (stripped before the JSON dump): the full-precision rate and its
     # denominator for pipeline/hwar.py, which must not read the rounded column
     result['_xwOBAraw'] = xwoba_sum / xwoba_denom if xwoba_denom > 0 else None
@@ -461,7 +465,7 @@ def compute_pitcher_batted_ball(pitches):
 
     ev_vals = [safe_float(p.get('ExitVelo')) for p in bip]
     ev_valid = [v for v in ev_vals if v is not None]
-    avg_ev = round_half_up(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None
+    avg_ev = mean_tenths_half_up(ev_valid)
     max_ev = round(max(ev_valid), 1) if ev_valid else None
 
     hard_hit = sum(1 for v in ev_valid if v >= 95)
@@ -739,7 +743,7 @@ def compute_hitter_stats(pitches):
         'triples': n_3b,
         'hr': n_hr,
         'xbh': xbh,
-        'avgEVAll': round_half_up(sum(ev_valid) / len(ev_valid), 1) if ev_valid else None,
+        'avgEVAll': mean_tenths_half_up(ev_valid),
         'ev50': ev50,
         'medEV': med_ev,
         'ev95': ev95,

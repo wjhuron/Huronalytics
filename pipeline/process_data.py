@@ -2797,7 +2797,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             if zone_woba is not None:
                 xwobasp_sum += zone_woba
                 xwobasp_count += 1
-        return round(xwobasp_sum / xwobasp_count, 3) if xwobasp_count > 0 else None
+        return round(xwobasp_sum / xwobasp_count, 6) if xwobasp_count > 0 else None   # full precision, as xwOBAcon
 
     # --- Helper: spray residual ("pull skill") for a list of pitches ---
     # Per BIP: zone wOBAcon (spray × LA) minus LA-only league wOBAcon —
