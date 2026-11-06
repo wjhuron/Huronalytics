@@ -23,7 +23,7 @@ from pipeline.utils import (
     break_tilt_to_minutes, circular_mean_minutes, minutes_to_tilt_display,
     compute_in_zone, outs_to_ip_str, outs_to_ip_float, ip_str_to_float,
     DATA_DIR,
-    SWING_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
+    SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
     MLB_TEAMS, AAA_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
     BALL_RADIUS_FT, ZONE_HALF_WIDTH, box_key,
@@ -289,15 +289,15 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             c[2] += 1  # sw
             if in_zone:
                 c[18] += 1  # izSw
-        if desc == 'Swinging Strike':
+        if desc in WHIFF_DESCRIPTIONS:
             c[3] += 1  # wh
             if in_zone:
                 c[19] += 1  # izWh
-        if desc in ('Called Strike', 'Swinging Strike'):
+        if desc in CSW_DESCRIPTIONS:
             c[4] += 1  # csw
         if p.get('InZone') == 'No':
             c[5] += 1  # ooz
-            if desc in ('Swinging Strike', 'In Play', 'Foul'):
+            if desc in SWING_DESCRIPTIONS and p.get('BBType') not in BUNT_BB_TYPES:   # the is_swing rule
                 c[6] += 1  # oozSw
         if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
             c[26] += 1  # nStrikes
@@ -329,7 +329,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # FPS counts (first pitch of PA: count == "0-0")
         if p.get('Count') == '0-0':
             c[20] += 1  # firstPitches
-            if desc in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'):
+            # Any non-ball 0-0 pitch, bunt attempts included (compute.py fpsPct).
+            if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
                 c[21] += 1  # firstPitchStrikes
 
         # 1-1 Win%: everything except balls/HBP/pitchout counts as winning the 1-1 pitch
@@ -424,15 +425,15 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             c[2] += 1
             if in_zone:
                 c[18] += 1  # izSw
-        if desc == 'Swinging Strike':
+        if desc in WHIFF_DESCRIPTIONS:
             c[3] += 1
             if in_zone:
                 c[19] += 1  # izWh
-        if desc in ('Called Strike', 'Swinging Strike'):
+        if desc in CSW_DESCRIPTIONS:
             c[4] += 1
         if p.get('InZone') == 'No':
             c[5] += 1
-            if desc in ('Swinging Strike', 'In Play', 'Foul'):
+            if desc in SWING_DESCRIPTIONS and p.get('BBType') not in BUNT_BB_TYPES:   # the is_swing rule
                 c[6] += 1
         bb_type = p.get('BBType')
         if bb_type and bb_type not in BUNT_BB_TYPES:
@@ -454,7 +455,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # FPS counts (first pitch of PA: count == "0-0")
         if p.get('Count') == '0-0':
             c[20] += 1  # firstPitches
-            if desc in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'):
+            # Any non-ball 0-0 pitch, bunt attempts included (compute.py fpsPct).
+            if desc not in ('Ball', 'Intent Ball', 'Hit By Pitch', 'Pitchout'):
                 c[21] += 1  # firstPitchStrikes
 
         # Metric sums
@@ -634,7 +636,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         _swing = desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES
         if _swing:
             c[12] += 1  # swings
-        if desc == 'Swinging Strike':
+        if desc in WHIFF_DESCRIPTIONS:
             c[13] += 1  # whiffs
 
         # Zone-based counts
@@ -723,7 +725,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             if strikes == '2':
                 if desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES:
                     c[35] += 1  # twoStrikeSwings (bunt-excluded, matches whiff convention)
-                if desc == 'Swinging Strike':
+                if desc in WHIFF_DESCRIPTIONS:
                     c[36] += 1  # twoStrikeWhiffs
             if count_str == '0-0':
                 c[37] += 1  # firstPitchAppearances
@@ -858,7 +860,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         _swing = desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES
         if _swing:
             c[12] += 1  # swings
-        if desc == 'Swinging Strike':
+        if desc in WHIFF_DESCRIPTIONS:
             c[13] += 1  # whiffs
 
         if in_zone == 'Yes':
@@ -941,7 +943,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             if strikes == '2':
                 if desc in SWING_DESCRIPTIONS and bb_type not in BUNT_BB_TYPES:
                     c[35] += 1  # twoStrikeSwings (bunt-excluded, matches whiff convention)
-                if desc == 'Swinging Strike':
+                if desc in WHIFF_DESCRIPTIONS:
                     c[36] += 1  # twoStrikeWhiffs
             if count_str == '0-0':
                 c[37] += 1  # firstPitchAppearances
@@ -2991,7 +2993,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     #   pitcherHand: 'R' / 'L' single char
     # Bunts are not swings (matches SWING_DESCRIPTIONS / the leaderboard + cards).
     # 'Foul Tip' is already normalized to 'Swinging Strike' upstream, so it's dead here.
-    SWING_DESC_FULL = {'Swinging Strike', 'Foul', 'In Play'}
+    SWING_DESC_FULL = SWING_DESCRIPTIONS   # a missed bunt plots as a whiff (2026-11-06)
     hitter_swing_locations = {}
     for (hitter, team), pitches in hitter_groups.items():
         sz_tops, sz_bots = [], []
@@ -3015,7 +3017,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             pz = safe_float(p.get('PlateZ'))
             if px is None or pz is None:
                 continue
-            if desc == 'Swinging Strike':
+            if desc in WHIFF_DESCRIPTIONS:
                 evt = 2  # whiff
             elif desc == 'In Play':
                 evt = 3  # BIP

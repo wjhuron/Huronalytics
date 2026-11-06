@@ -527,13 +527,15 @@ def _channels(row, xrv_map, park, is_combined, combined_park=None):
 
 def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
                    is_combined_fn=None, season=None, roc_pitches=None,
-                   league_rates=None):
+                   league_rates=None, team_games=None):
     """Set hdERA / hpERA / hdERAPlus / hpERAPlus (+ _pctl each) in place.
     Returns the constants bundle for metadata, or None if the pool is too
     thin. `pitches` = the MLB+MiLB pitch dicts (sheet schema) for the
     xRV/100 channel; `is_combined_fn` identifies 2TM/3TM rows.
     `league_rates` = metadata pitcherLeagueAverages (lgRA9/lgERA) for hWAR;
-    without them hWAR is left as carried and the skip is logged."""
+    without them hWAR is left as carried and the skip is logged.
+    `team_games` = metadata teamGamesPlayed, for the percentile pool (Savant's
+    qualifier, pipeline.utils.pctl_pool_rows); required."""
     aaa = set(aaa_teams)
     _HD_SCALE.clear()     # set again below once the pool's z statistics exist
     if is_combined_fn is None:
@@ -762,15 +764,17 @@ def apply_era_plus(rows, pitches, aaa_teams=('ROC', 'AAA'),
         print('  eraplus WARNING: no lgRA9/lgERA in metadata pitcherLeagueAverages — hWAR '
               'left as carried (run process_data before the inject)')
 
-    # percentiles: qualified MLB non-combined pool, every row ranked
-    # (site convention). hdERA/hpERA are lower-is-better -> invert.
+    # percentiles: every row ranked against Savant's qualified pool (1.25
+    # batters faced per team game, one row per player; 2026-11-06, per Wally),
+    # the pool every other pitcher rank uses. It replaced the 60 IP pool
+    # (QUAL_OUTS), which no longer decides any rank. hdERA/hpERA are
+    # lower-is-better -> invert.
+    from pipeline.utils import pctl_pool_rows
+    _pctl_rows = pctl_pool_rows(rows, 'pitcher', team_games, True)
     for key, invert in (('hdERA', True), ('hpERA', True),
                         ('hdERAPlus', False), ('hpERAPlus', False),
                         ('hWAR', False)):
-        pool = [r[key] for r in mlb
-                if r.get(key) is not None
-                and not is_combined_fn(r.get('team'))
-                and _ip_outs(r.get('ip')) >= QUAL_OUTS]
+        pool = [r[key] for r in _pctl_rows if r.get(key) is not None]
         for r in rows:
             p = _pctl(r.get(key), pool)
             if p is not None and invert:

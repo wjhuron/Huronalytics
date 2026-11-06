@@ -43,7 +43,7 @@ import math
 from collections import defaultdict
 
 from pipeline.utils import (
-    safe_float, SWING_DESCRIPTIONS, BUNT_BB_TYPES, MLB_TEAMS,
+    safe_float, MODEL_SWING_DESCRIPTIONS, BUNT_BB_TYPES, MLB_TEAMS,
     ZONE_HALF_WIDTH,
 )
 
@@ -193,7 +193,7 @@ def classify_zone(p):
 
 def classify_decision(p):
     desc = p.get('Description')
-    if desc in SWING_DESCRIPTIONS:
+    if desc in MODEL_SWING_DESCRIPTIONS:   # frozen model set, not the rate set
         return 'swing'
     if desc in TAKE_DESCRIPTIONS:
         return 'take'

@@ -91,9 +91,9 @@ calculate_pitcher_stats <- function(data, pitcher_name) {
   total_pitches <- nrow(pitcher_data)
 
   # Define pitch outcome event categories
-  swing_events <- c("Swinging Strike", "Foul", "In Play")
-  csw_events <- c("Called Strike", "Swinging Strike")
-  swstr_events <- c("Swinging Strike")
+  swing_events <- c("Swinging Strike", "Foul", "In Play", "Missed Bunt")
+  csw_events <- c("Called Strike", "Swinging Strike", "Missed Bunt")
+  swstr_events <- c("Swinging Strike", "Missed Bunt")
   # Bunts are not swings: precomputed mask from pitcher_report_utils.R.
   pitcher_data$IsSwing <- swing_mask(pitcher_data)
   in_play_events <- c("In Play")

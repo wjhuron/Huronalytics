@@ -8,7 +8,7 @@ from pipeline.hwar import gdp_extra_cost
 from pipeline.utils import (
     safe_float, median, percentile, is_barrel, barrel_flag, is_swing,
     spray_angle, spray_direction,
-    SWING_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
+    SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
     SF_EVENTS, SH_EVENTS, CI_EVENTS, NON_PA_EVENTS, BUNT_BB_TYPES,
     ALL_TEAMS,
 )
@@ -222,12 +222,12 @@ def compute_stats(pitches):
     # Chase% joined 2026-08-15). BBType is only set on In Play rows, so the
     # guard is inert for Swinging Strike / Foul.
     swings = sum(1 for p in pitches if is_swing(p))
-    whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
-    csw = sum(1 for p in pitches if p['Description'] in ('Called Strike', 'Swinging Strike'))
+    whiffs = sum(1 for p in pitches if p['Description'] in WHIFF_DESCRIPTIONS)
+    csw = sum(1 for p in pitches if p['Description'] in CSW_DESCRIPTIONS)
 
     iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
     iz_swings = sum(1 for p in iz_pitches if is_swing(p))
-    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] == 'Swinging Strike')
+    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] in WHIFF_DESCRIPTIONS)
     ooz = [p for p in pitches if p.get('InZone') == 'No']
     ooz_swung = sum(1 for p in ooz if is_swing(p))
 
@@ -263,8 +263,10 @@ def compute_stats(pitches):
     run_value = sum(rv_values) if rv_values else None
 
     first_pitches = [p for p in pitches if p.get('Count') == '0-0']
+    # A first-pitch strike is any non-ball 0-0 pitch, bunt attempts included (2026-11-06,
+    # per Wally): a Foul Bunt or Missed Bunt on 0-0 is a strike. Same rule as Strike%.
     fps_strikes = sum(1 for p in first_pitches
-                      if p.get('Description') in ('Called Strike', 'Swinging Strike', 'Foul', 'In Play'))
+                      if p.get('Description') not in BALL_DESCRIPTIONS)
     fps_pct = fps_strikes / len(first_pitches) if first_pitches else None
 
     two_strike_pitches = [p for p in pitches if '-' in (p.get('Count') or '') and p['Count'].split('-')[1] == '2']
@@ -273,7 +275,7 @@ def compute_stats(pitches):
     two_strike_swings = sum(1 for p in two_strike_pitches
                             if p['Description'] in SWING_DESCRIPTIONS
                             and p.get('BBType') not in BUNT_BB_TYPES)
-    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
+    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] in WHIFF_DESCRIPTIONS)
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
 
     one_one_pitches = [p for p in pitches if p.get('Count') == '1-1']
@@ -565,12 +567,12 @@ def compute_hitter_stats(pitches):
     # collapsed the old parallel swings_non_bunt / iz_swings_non_bunt
     # counters — with bunts out of the base counts they were duplicates.
     n_swings = sum(1 for p in pitches if is_swing(p))
-    whiffs = sum(1 for p in pitches if p['Description'] == 'Swinging Strike')
+    whiffs = sum(1 for p in pitches if p['Description'] in WHIFF_DESCRIPTIONS)
 
     iz_pitches = [p for p in pitches if p.get('InZone') == 'Yes']
     ooz_pitches = [p for p in pitches if p.get('InZone') == 'No']
     iz_swings = sum(1 for p in iz_pitches if is_swing(p))
-    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] == 'Swinging Strike')
+    iz_whiffs = sum(1 for p in iz_pitches if p['Description'] in WHIFF_DESCRIPTIONS)
     ooz_swings = sum(1 for p in ooz_pitches if is_swing(p))
 
     iz_swing_pct = iz_swings / len(iz_pitches) if iz_pitches else None
@@ -660,7 +662,7 @@ def compute_hitter_stats(pitches):
     two_strike_swings = sum(1 for p in two_strike_pitches
                             if p['Description'] in SWING_DESCRIPTIONS
                             and p.get('BBType') not in BUNT_BB_TYPES)
-    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] == 'Swinging Strike')
+    two_strike_whiffs = sum(1 for p in two_strike_pitches if p['Description'] in WHIFF_DESCRIPTIONS)
     two_strike_whiff_pct = two_strike_whiffs / two_strike_swings if two_strike_swings > 0 else None
 
     first_pitches_h = [p for p in pitches if p.get('Count') == '0-0']

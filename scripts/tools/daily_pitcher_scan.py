@@ -127,9 +127,9 @@ COL_LABEL = {'velo': 'velocity', 'rx': 'release X', 'rz': 'release height', 'ext
 PITCH_NAMES = {'FF': 'four-seamer', 'SI': 'sinker', 'FC': 'cutter', 'SL': 'slider', 'ST': 'sweeper',
                'CU': 'curveball', 'CH': 'changeup', 'FS': 'splitter', 'KC': 'knuckle-curve',
                'SV': 'slurve', 'CS': 'slow curve', 'KN': 'knuckleball', 'FO': 'forkball', 'SC': 'screwball'}
-SWING_DESC = {'Swinging Strike', 'Foul', 'In Play'}   # bunts are not swings
-WHIFF_DESC = {'Swinging Strike'}
-CSW_DESC = {'Called Strike', 'Swinging Strike'}
+SWING_DESC = {'Swinging Strike', 'Foul', 'In Play', 'Missed Bunt'}   # a missed bunt is a swing (2026-11-06); other bunts are not
+WHIFF_DESC = {'Swinging Strike', 'Missed Bunt'}
+CSW_DESC = {'Called Strike', 'Swinging Strike', 'Missed Bunt'}
 OUTING_METRICS = [('whiff', 'Whiff%', True), ('chase', 'Chase%', True), ('csw', 'CSW%', True),
                   ('stuff', 'Stuff+', True), ('loc', 'Loc+', True), ('xrv100', 'xRV/100', True),
                   ('pplus', 'Pitching+', True)]

@@ -146,10 +146,11 @@ PITCH_NAMES = {
     'EP':'Eephus'
 }
 PITCH_ORDER = ['FF','SI','FC','SL','ST','CU','SV','CH','FS','KN']
-# Bunts are not swings (matches pipeline.utils.SWING_DESCRIPTIONS) so card
-# Whiff%/Chase%/Swing% use the same swing set as the leaderboard they're colored
-# against. STRIKE_DESC still counts Foul Bunt — a foul bunt is a strike.
-SWING_DESC = ['Swinging Strike','Foul','In Play']
+# Swing, whiff and CSW sets come from pipeline.utils, so card Whiff%/Chase%/Swing%
+# use the leaderboard's sets: a missed bunt is a swing and a whiff (2026-11-06),
+# a foul bunt and a bunt in play are not swings. STRIKE_DESC counts every bunt attempt.
+from pipeline.utils import SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS  # noqa: E402
+SWING_DESC = sorted(SWING_DESCRIPTIONS)
 
 
 def is_swing(p):
@@ -682,7 +683,7 @@ PP_OUTING_K = {'stuff': 42.0, 'loc': 185.0, 'csw': 398.0, 'xrv100': 1581.0}
 #     (r .076 vs .077). Below 10, the dash.
 PP_OUTING_POOL_MIN = 20
 PP_OUTING_MIN_N = 10
-_PP_CSW_DESCRIPTIONS = ('Called Strike', 'Swinging Strike')
+_PP_CSW_DESCRIPTIONS = tuple(sorted(CSW_DESCRIPTIONS))   # a missed bunt is a whiff (2026-11-06)
 
 
 def _ordinal(n):
@@ -1991,7 +1992,7 @@ def _social_tint_pools():
         c[0] += 1
         c[1] += d in STRIKE_DESC
         c[2] += d in SWING_DESC
-        c[3] += d == 'Swinging Strike'
+        c[3] += d in WHIFF_DESCRIPTIONS
     pools = {}
     for (_nm, _tm, th, bh, pt), (n, st, sw, wh) in cells.items():
         q = pools.setdefault((th, bh, pt), {'strike': [], 'whiff': []})
@@ -2649,7 +2650,6 @@ def render_social_card(config, pitches, output_file):
 
     # per-pitch-type table (prototype, Driveline-style chips on our palette)
     if _tbl:
-        SWING = ('Swinging Strike', 'Foul', 'In Play')
         # Daily cards estimate the two Savant supplement columns xRV needs
         # when a pitch lacks them (pre-backfill game); season cards never
         # estimate, they sum what the sheet carries, the leaderboard's own
@@ -2660,8 +2660,8 @@ def render_social_card(config, pitches, output_file):
             """One table row from a pitch list. The TOTAL row calls this on
             the whole outing, so every rate is recomputed over all pitches,
             never averaged across the per-type rows."""
-            sw = [p for p in pl if p.get('Description') in SWING]
-            wh = sum(1 for p in sw if p.get('Description') == 'Swinging Strike')
+            sw = [p for p in pl if is_swing(p)]
+            wh = sum(1 for p in sw if p.get('Description') in WHIFF_DESCRIPTIONS)
             cs = sum(1 for p in pl if p.get('Description') == 'Called Strike')
             izv = [1 if r2 else 0 for r2 in
                    (compute_iz(p) for p in pl) if r2 is not None]
@@ -3640,7 +3640,7 @@ def render_card(config, pitches, output_file):
                 if pt not in locations[hand]: continue
                 color = PITCH_COLORS.get(pt, '#999')
                 for px_val, pz_val, desc, barrel_flag, hh_flag in locations[hand][pt]:
-                    if desc == 'Swinging Strike':
+                    if desc in WHIFF_DESCRIPTIONS:
                         _mark = 'W'
                     elif barrel_flag:
                         _mark = 'B'
@@ -5230,22 +5230,16 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
             _raw_prows = json.load(f)
         # Savant's percentile qualifier (1.25 batters faced per team game), the
         # pool the shipped pitcher ranks use since 2026-11-05.
-        from pipeline.utils import pctl_qualifier
+        from pipeline.utils import pctl_pool_rows
         with open(METADATA_PATH) as f:
             _tgp = json.load(f).get('teamGamesPlayed') or {}
-        _pq = pctl_qualifier(_raw_prows, 'pitcher', _tgp, True)
-        _prows = [r for r in _scratch_mlb_pool_rows(_raw_prows) if _pq(r)]
+        _prows = pctl_pool_rows(_raw_prows, 'pitcher', _tgp, True)
         for s in _SCRATCH_POOL_STATS:
             vals = [(_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s)) for r in _prows]
             ctx['pitcher_pools'][s] = sorted(v for v in vals if v is not None)
-        # Pitcher+ percentile pool — the pipeline's own convention (qualified
-        # MLB baseline rows, apply_pitcher_plus), NOT the all-MLB pool the
-        # bubble stats rank in.
-        from pipeline.pitcherplus import _is_baseline as _pp_is_baseline
-        ctx['pitcher_plus_pool'] = sorted(
-            v for v in (r.get('pitcherPlus') for r in _raw_prows
-                        if _pp_is_baseline(r, ('ROC', 'AAA')))
-            if v is not None)
+        # Pitcher+ ranks in the same Savant pool since 2026-11-06 (apply_pitcher_plus).
+        ctx['pitcher_plus_pool'] = sorted(v for v in (r.get('pitcherPlus') for r in _prows)
+                                          if v is not None)
         with open(os.path.join(_data_dir, 'pitch_leaderboard_rs.json')) as f:
             _plrows = _scratch_mlb_pool_rows(json.load(f))
         pt_pools = defaultdict(dict)
@@ -6180,7 +6174,7 @@ def main():
             iz_count = sum(1 for r in iz_results if r is True)
             total_p = sum(1 for r in iz_results if r is not None)
             swings = [p for p in pp if is_swing(p)]
-            whiffs = [p for p in pp if p.get('Description') == 'Swinging Strike']
+            whiffs = [p for p in pp if p.get('Description') in WHIFF_DESCRIPTIONS]
             bip_all = [p for p in pp if p.get('BBType') and not str(p.get('BBType', '')).startswith('bunt')]
             gb_count = sum(1 for p in bip_all if p.get('BBType') == 'ground_ball')
             fb_count = sum(1 for p in bip_all if p.get('BBType') in ('fly_ball', 'popup'))
@@ -6263,7 +6257,7 @@ def main():
             # Single-game stat line — xRV is now shown per-pitch-type as
             # PitchRV/xPitchRV in the metrics table; no need to duplicate it
             # in the box-score header.
-            whiff_count = sum(1 for p in pitches if p.get('Description') == 'Swinging Strike')
+            whiff_count = sum(1 for p in pitches if p.get('Description') in WHIFF_DESCRIPTIONS)
             # CSW% lives in the metrics table (per pitch type), not here.
             stat_headers = ['IP', 'P', 'TBF', 'R', 'ER', 'K', 'BB', 'Whiffs']
             stat_values = [ip_str, str(pitch_count), str(box['tbf']), str(box['r']),

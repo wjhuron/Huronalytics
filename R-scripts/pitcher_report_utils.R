@@ -229,9 +229,9 @@ keep_populated_cols <- function(cols, data, pitcher_name) {
 # anyone threw, so those stay NA and render blank.
 # Bunts are not swings (mirrors pipeline.utils.is_swing; 2026-08-27 audit):
 # an In Play pitch whose BBType is a bunt leaves every swing denominator.
-# Foul Bunt / Missed Bunt never enter the set (distinct Descriptions).
+# A Missed Bunt is a swing and a whiff (2026-11-06, per Wally); Foul Bunt never enters.
 swing_mask <- function(df) {
-  s <- df$Description %in% c("Swinging Strike", "Foul", "In Play")
+  s <- df$Description %in% c("Swinging Strike", "Foul", "In Play", "Missed Bunt")
   if ("BBType" %in% names(df)) {
     bunt <- !is.na(df$BBType) & grepl("^bunt", df$BBType)
     s & !(df$Description == "In Play" & bunt)
@@ -244,9 +244,9 @@ summarize_total_row <- function(data, pitcher_name, gb_zero = "---") {
   d <- data %>% filter(Pitcher == pitcher_name)
   n_all <- nrow(d)
 
-  swing_events   <- c("Swinging Strike", "Foul", "In Play")
-  csw_events     <- c("Called Strike", "Swinging Strike")
-  swstr_events   <- c("Swinging Strike")
+  swing_events   <- c("Swinging Strike", "Foul", "In Play", "Missed Bunt")
+  csw_events     <- c("Called Strike", "Swinging Strike", "Missed Bunt")
+  swstr_events   <- c("Swinging Strike", "Missed Bunt")
   in_play_events <- c("In Play")
 
   pct <- function(num, den) if (den > 0) sprintf("%.1f%%", num / den * 100) else "---"
@@ -387,9 +387,9 @@ summarize_pitch_type_stats <- function(data, pitcher_name, has_arm_angle = FALSE
   has_bb_type <- "BBType" %in% names(data)
 
   # Define pitch outcome event categories (simplified descriptions)
-  swing_events <- c("Swinging Strike", "Foul", "In Play")
-  csw_events <- c("Called Strike", "Swinging Strike")
-  swstr_events <- c("Swinging Strike")
+  swing_events <- c("Swinging Strike", "Foul", "In Play", "Missed Bunt")
+  csw_events <- c("Called Strike", "Swinging Strike", "Missed Bunt")
+  swstr_events <- c("Swinging Strike", "Missed Bunt")
   in_play_events <- c("In Play")
 
   pitcher_data$IsSwing <- swing_mask(pitcher_data)

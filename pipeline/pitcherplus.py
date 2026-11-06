@@ -413,7 +413,7 @@ from pipeline.utils import _pctl  # single-homed percentile convention
 
 
 def apply_pitcher_plus(rows, aaa_teams=('ROC', 'AAA'), data_dir=None,
-                       current_season=None, mlb_pitches=None):
+                       current_season=None, mlb_pitches=None, team_games=None):
     """Set row['pitcherPlus'] + row['pitcherPlus_pctl'] in place. Returns the
     baseline bundle (for metadata / the client-side aggregator), or None if
     the pool was too thin to calibrate.
@@ -475,9 +475,14 @@ def apply_pitcher_plus(rows, aaa_teams=('ROC', 'AAA'), data_dir=None,
         r['pitcherPlusProj'] = (round(100.0 + SCALE_K * (raw - bmu) / bsd, 1)
                                 if (raw is not None and bsd) else None)
 
+    # Ranks: Savant's qualified pool (1.25 batters faced per team game, one row
+    # per player; 2026-11-06, per Wally), the pool every other pitcher rank
+    # uses. The (mu, sigma) baseline above still reads _is_baseline (QUAL_N);
+    # only the percentile moved. team_games = metadata teamGamesPlayed, required.
+    from pipeline.utils import pctl_pool_rows
+    _pctl_rows = pctl_pool_rows(rows, 'pitcher', team_games, True)
     for key in ('pitcherPlus', 'pitcherPlusProj'):
-        pool = [r[key] for r in rows
-                if r.get(key) is not None and _is_baseline(r, aaa)]
+        pool = [r[key] for r in _pctl_rows if r.get(key) is not None]
         for r in rows:
             r[key + '_pctl'] = _pctl(r.get(key), pool)
     if base is not None:

@@ -44,7 +44,16 @@ ZONE_HALF_WIDTH = 0.83        # half plate (8.5") + ball radius (1.45") in feet,
                               # rounded-rect geometry in compute_in_zone.
 
 # ── Event classification sets ────────────────────────────────────────────
-SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play'}
+# Rate-stat swing and miss sets (Swing%, Chase%, Contact%, Whiff%, SwStr%, CSW%,
+# FPSw%). A MISSED BUNT is a swing and a miss on both sides since 2026-11-06 (per
+# Wally); a foul bunt and a bunt put in play are still not swings (is_swing). A bunt
+# foul tip is stored as 'Swinging Strike' (backfill_supplement), so it is a whiff too.
+SWING_DESCRIPTIONS = {'Swinging Strike', 'Foul', 'In Play', 'Missed Bunt'}
+WHIFF_DESCRIPTIONS = {'Swinging Strike', 'Missed Bunt'}
+CSW_DESCRIPTIONS = {'Called Strike'} | WHIFF_DESCRIPTIONS
+# The SD+ decision model's swing set, frozen: its cell tables and constants were
+# measured with bunts out of the swing class. Do not point it at the rate set.
+MODEL_SWING_DESCRIPTIONS = frozenset({'Swinging Strike', 'Foul', 'In Play'})
 HIT_EVENTS = {'Single', 'Double', 'Triple', 'Home Run'}
 K_EVENTS = {'Strikeout', 'Strikeout Double Play'}
 BB_EVENTS = {'Walk', 'Intent Walk'}
@@ -240,6 +249,24 @@ def pctl_qualifier(rows, name_key, team_games, is_pitcher):
     return _q
 
 
+def pctl_pool_rows(rows, name_key, team_games, is_pitcher):
+    """The rows that define a percentile distribution: MLB rows only, one per
+    player (a 2TM.. row stands for a traded player and his club stints leave),
+    each clearing Savant's percentile qualifier. The inject-side ranks
+    (eraplus, pitcherplus, train_stuff) use it so every tile on a card ranks in
+    the pool the pipeline's own pass uses. No team games means no pool: raise,
+    because a silent fallback would rank on a different pool from the site."""
+    if not team_games:
+        raise ValueError('pctl_pool_rows needs metadata teamGamesPlayed: '
+                         'run python3 -m pipeline.process_data first')
+    q = pctl_qualifier(rows, name_key, team_games, is_pitcher)
+    combined = {player_key(r, name_key) for r in rows if is_combined_team(r.get('team'))}
+    return [r for r in rows
+            if r.get('team') not in AAA_TEAMS
+            and (is_combined_team(r.get('team')) or player_key(r, name_key) not in combined)
+            and q(r)]
+
+
 def is_combined_team(team):
     """'2TM', '3TM' ... '10TM'. A multi-team LABEL, not a franchise.
 
@@ -321,10 +348,11 @@ TEAM_ABBREV_TO_ID = {
 def is_swing(p):
     """The swing test for every rate denominator, everywhere.
 
-    Bunts are not swings and not chases (Wally, 2026-08-15). 'Foul Bunt'
-    and 'Missed Bunt' already sit outside SWING_DESCRIPTIONS, but a bunt
-    put IN PLAY reads Description='In Play' with a bunt BBType, so the
-    Description test alone lets it through. Single-homed because this
+    Bunts are not swings and not chases (Wally, 2026-08-15), with one
+    exception since 2026-11-06: a MISSED bunt is a swing and a whiff. 'Foul
+    Bunt' sits outside SWING_DESCRIPTIONS, but a bunt put IN PLAY reads
+    Description='In Play' with a bunt BBType, so the Description test alone
+    lets it through. Single-homed because this
     predicate has to hold identically across the leaderboard, the micro
     counters the site sums for filtered views, and the cards.
     """

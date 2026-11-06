@@ -70,7 +70,7 @@ Three different things get confused constantly:
 
 ## Event and swing semantics
 
-- **Bunts are not swings.** `SWING_DESCRIPTIONS` is exactly `{'Swinging Strike', 'Foul', 'In Play'}`. Foul Bunt and Missed Bunt stay out of Swing%, Whiff%, and Chase% on both sides, though a foul bunt still counts as a strike.
+- **Bunts are not swings, except a missed bunt.** `SWING_DESCRIPTIONS` is `{'Swinging Strike', 'Foul', 'In Play', 'Missed Bunt'}` and `WHIFF_DESCRIPTIONS` is `{'Swinging Strike', 'Missed Bunt'}` (2026-11-06). Foul Bunt and bunts in play stay out of every swing denominator (`is_swing`), though every bunt attempt is a strike. SD+ classifies decisions on the frozen `MODEL_SWING_DESCRIPTIONS`.
 - **Barrel is the official `launch_speed_angle`**, never the EV/LA recompute, which undercounts by about 5%.
 - **Outs come from per-pitch `count.outs`.** `about.outs` is absent in Triple-A and archived MLB feeds.
 - Position-player pitching is excluded from skill metrics but their PAs still count for hitters.

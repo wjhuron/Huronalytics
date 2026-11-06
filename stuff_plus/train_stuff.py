@@ -2007,20 +2007,13 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     # every other pitcher rank uses and the one js/aggregator.js re-ranks
     # stuffScore in. A combined 2TM row stands for the player; his stints are
     # ranked against it. No teamGamesPlayed in metadata is a process-order bug.
-    from pipeline.utils import pctl_qualifier
+    from pipeline.utils import pctl_qualifier, pctl_pool_rows
     _tgp = json.load(open(os.path.join(DATA, 'metadata_rs.json'))).get('teamGamesPlayed')
     if not _tgp:
         raise SystemExit('metadata_rs.json has no teamGamesPlayed: run pipeline.process_data first')
     _pq = pctl_qualifier(pp, 'pitcher', _tgp, True)
-    _combined_ids = {r.get('mlbId') for r in pp if _is_combined_team(r['team'])}
-    def _in_pctl_pool(row):
-        if row.get('team') in AAA_TEAMS:
-            return False
-        if not _is_combined_team(row['team']) and row.get('mlbId') in _combined_ids:
-            return False
-        return _pq(row)
-    qpool = [row['stuffScore'] for row in pp
-             if row.get('stuffScore') is not None and _in_pctl_pool(row)]
+    qpool = [row['stuffScore'] for row in pctl_pool_rows(pp, 'pitcher', _tgp, True)
+             if row.get('stuffScore') is not None]
     n_pp = 0
     for row in pp:
         sc = row.get('stuffScore')
@@ -2056,7 +2049,7 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
     from datetime import datetime as _dt
     _pp_base = apply_pitcher_plus(pp, data_dir=DATA,
                                   current_season=_dt.now().year,
-                                  mlb_pitches=mlb_pitches)
+                                  mlb_pitches=mlb_pitches, team_games=_tgp)
     n_pplus = sum(1 for row in pp if row.get('pitcherPlus') is not None)
     n_proj = sum(1 for row in pp if row.get('pitcherPlusProj') is not None)
 
@@ -2078,7 +2071,7 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
             print(f'  eraplus: metadata unreadable ({_e}); hWAR carried')
         _era_const = apply_era_plus(pp, mlb_pitches,
                                     roc_pitches=_era_roc_pitches,
-                                    league_rates=_lg_rates)
+                                    league_rates=_lg_rates, team_games=_tgp)
     else:
         # No pitch list handed in (unexpected caller): keep the carried
         # hdERA/hpERA values rather than dying mid-inject.

@@ -67,7 +67,7 @@ from cards.pitcher import (
 )
 # barrel_flag's single home is pipeline.utils (2026-09-07); cards.pitcher stopped
 # re-exporting it and every hitter card failed at import until 2026-09-16.
-from pipeline.utils import barrel_flag  # noqa: E402
+from pipeline.utils import barrel_flag, WHIFF_DESCRIPTIONS  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────
 # WARM PAPER THEME — the canonical hitter-card look.
@@ -595,7 +595,7 @@ def compute_group_stats(group_pitches, sacq_lookups, bats):
     # BBType on any swinging strike), so they stay in the numerator.
     from pipeline.utils import is_swing as _is_swing
     swings = [p for p in group_pitches if _is_swing(p)]
-    whiffs = [p for p in group_pitches if p.get('Description') == 'Swinging Strike']
+    whiffs = [p for p in group_pitches if p.get('Description') in WHIFF_DESCRIPTIONS]
     swings_non_bunt = swings
     iz = [p for p in group_pitches if compute_iz(p) is True]
     ooz_swings = [p for p in swings if compute_iz(p) is False]
@@ -1529,9 +1529,11 @@ _POS_OUTS_KEY = {'C': '2', '1B': '3', '2B': '4', '3B': '5', 'SS': '6', 'LF': '7'
 
 
 def add_fielding(h_row, position):
-    """h_row plus FRV and its parts for this position, with percentiles: FRV against every
-    listed fielder, a part against fielders whose most outs came at this position. Blank
-    when Savant does not list him, which leaves the fielding rows off the card."""
+    """h_row plus FRV and its parts for this position, with percentiles: FRV against the
+    hitters who clear Savant's percentile qualifier (2.1 PA per team game, the pool every
+    other hitter rank uses; 2026-11-06, per Wally: Bohm's -9.5 reads 4, Savant's own value),
+    a part against fielders whose most outs came at this position. Blank when Savant does
+    not list him, which leaves the fielding rows off the card."""
     from cards.pitcher import _rank_in_mlb_pool
     path = os.path.join(_REPO, 'data', 'fielding_runs_cache.json')
     if not os.path.exists(path):
@@ -1546,7 +1548,14 @@ def add_fielding(h_row, position):
         return h_row
     row = dict(h_row)
     row['frv'] = me['total']
-    row['frv_pctl'] = _rank_in_mlb_pool(me['total'], sorted(v['total'] for v in cache.values() if v.get('total') is not None))
+    from pipeline.utils import pctl_pool_rows
+    with open(_HITTER_LB_PATH) as f:
+        _lb = json.load(f)
+    with open(os.path.join(_REPO, 'data', 'metadata_rs.json')) as f:
+        _tg = json.load(f).get('teamGamesPlayed')
+    _qual = {str(r.get('mlbId')) for r in pctl_pool_rows(_lb, 'hitter', _tg, False)}
+    row['frv_pctl'] = _rank_in_mlb_pool(me['total'], sorted(v['total'] for k, v in cache.items()
+                                                            if v.get('total') is not None and k in _qual))
     key = _POS_OUTS_KEY.get(position)
     peers = [v for v in cache.values() if key and v.get('outs_by_pos') and any(v['outs_by_pos'].values())
              and max(v['outs_by_pos'], key=v['outs_by_pos'].get) == key]
@@ -2838,7 +2847,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
             desc = p.get('Description', '')
             if desc in SWING_ALL:
                 swing_pts.append((px, pz))
-                if desc == 'Swinging Strike':
+                if desc in WHIFF_DESCRIPTIONS:
                     whiff_pts.append((px, pz))
             if desc == 'In Play' and not str(p.get('BBType', '')).startswith('bunt'):
                 if is_roc:
