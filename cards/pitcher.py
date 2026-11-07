@@ -2509,8 +2509,12 @@ def render_social_card(config, pitches, output_file):
     _nmax = max((n_ for _p, _h, _v, n_ in _cents), default=1)
     _ntot = sum(n_ for _p, _h, _v, n_ in _cents) or 1
 
+    # PROTOTYPE (2026-09-16): with the velo inside the disc the floor rises
+    # to 200 pt^2 (14 pt across) so '93.0' fits at the smallest digit size.
+    _s_min = 200.0 if config.get('velo_in_plot') else SOCIAL_BUBBLE_S_MIN
+
     def _disc_s(n_):
-        return max(SOCIAL_BUBBLE_S_MIN,
+        return max(_s_min,
                    SOCIAL_BUBBLE_S30 * ((n_ / _ntot) / 0.30) ** SOCIAL_BUBBLE_EXP)
 
     _chip_boxes = []
@@ -2553,32 +2557,32 @@ def render_social_card(config, pitches, output_file):
                     color=TEXT_PRIMARY, fontfamily='IBM Plex Sans', zorder=7)
         _halo = [_aa_stroke(linewidth=3.0, foreground=PLOT_PANEL)]
         for _i, _line in enumerate(_corner):
-            _cy = 0.975 - 0.048 * _i   # room for the extension chip
+            _cy = 0.975 - 0.042 * _i
             if not _line.startswith('EXTENSION'):
                 mv.text(_cx, _cy, _line, ha='left' if _aa_sign < 0 else 'right',
                         path_effects=_halo, **_ckw)
                 continue
-            # The extension value takes a percentile tint, higher is better (2026-11-06, per
-            # Wally), ranked against the Savant percentile pool's season extensions, the
-            # same light blend as the Strike%/Whiff% cells. The label and the tinted value
-            # are two texts, so the label is placed from the value's measured width.
+            # The extension NUMBER is drawn in its percentile colour, higher is better
+            # (2026-11-06, per Wally: the number itself, no chip), ranked against the
+            # season extensions of the Savant percentile pool. The deeper ring shade of
+            # the scale keeps a mid-pool value legible on the plot panel. Label, number
+            # and unit are three texts, placed from each one's measured width.
             _ev = sum(_ext_all) / len(_ext_all)
-            _fc = _percentile_color(_rank_in_mlb_pool(_ev, _social_ext_pool()))[0]
-            from matplotlib.colors import to_rgb as _to_rgb
-            _bg = _to_rgb(BG)
-            _fc = tuple(0.55 * _fc[k] + 0.45 * _bg[k] for k in range(3))
-            _val = f'{_ev:.1f} FT'
-            _box = dict(boxstyle='round,pad=0.22,rounding_size=0.25', fc=_fc, ec='none')
+            _vc = _percentile_color(_rank_in_mlb_pool(_ev, _social_ext_pool()))[1]
+            _parts = [('EXTENSION ', TEXT_PRIMARY), (f'{_ev:.1f}', _vc), (' FT', TEXT_PRIMARY)]
             _rend = fig.canvas.get_renderer()
             _inv = mv.transAxes.inverted()
+            _kw = dict(_ckw); _kw.pop('color')
             if _aa_sign < 0:
-                _lab = mv.text(_cx, _cy, 'EXTENSION ', ha='left', path_effects=_halo, **_ckw)
-                _x1 = _inv.transform(_lab.get_window_extent(_rend))[1][0]
-                mv.text(_x1 + 0.006, _cy, _val, ha='left', bbox=_box, **_ckw)
+                _x = _cx
+                for _t, _col in _parts:
+                    _o = mv.text(_x, _cy, _t, ha='left', color=_col, path_effects=_halo, **_kw)
+                    _x = _inv.transform(_o.get_window_extent(_rend))[1][0]
             else:
-                _v = mv.text(_cx - 0.006, _cy, _val, ha='right', bbox=_box, **_ckw)
-                _x0 = _inv.transform(_v.get_window_extent(_rend))[0][0]
-                mv.text(_x0 - 0.006, _cy, 'EXTENSION ', ha='right', path_effects=_halo, **_ckw)
+                _x = _cx
+                for _t, _col in reversed(_parts):
+                    _o = mv.text(_x, _cy, _t, ha='right', color=_col, path_effects=_halo, **_kw)
+                    _x = _inv.transform(_o.get_window_extent(_rend))[0][0]
 
     # Expected movement (2026-11-03, per Wally): a small dotted ring at what a
     # pitcher who looks like this usually throws (pipeline/xmove.py, the hitter
