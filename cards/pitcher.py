@@ -1975,6 +1975,9 @@ def _render_single_game_panel(fig, pitches, config=None):
 # 7% signal at the gate, so read that color as description of the sample, not as skill.
 SOCIAL_STRIKE_MIN_PITCHES = 100
 SOCIAL_WHIFF_MIN_SWINGS = 40
+# Where the arm-angle ray stops, in inches of horizontal break on the arm side (a display
+# convention, per Wally 2026-11-06: the frame is 25, the ray read too long).
+_AA_RAY_HB = 20.0
 SOCIAL_LOC_MIN_PITCHES = 50
 _SOCIAL_TINT_POOLS = None
 
@@ -2505,21 +2508,33 @@ def render_social_card(config, pitches, output_file):
     _aa_sign = -1.0 if (pitches[0].get('Throws') == 'L') else 1.0
     if _aa_all:
         _a = math.radians(sum(_aa_all) / len(_aa_all))
-        # Long enough to leave the frame; the axes clip it at the edge.
-        mv.plot([0, _aa_sign * 2 * _lim * math.cos(_a)], [0, 2 * _lim * math.sin(_a)],
+        # The ray stops at 20 in of horizontal break on the arm side (2026-11-06, per Wally),
+        # short of the frame; a steep angle still leaves through the top, where the axes clip it.
+        _c = math.cos(_a)
+        _t = (_AA_RAY_HB / _c) if _c > 1e-6 else 2 * _lim
+        mv.plot([0, _aa_sign * _t * _c], [0, _t * math.sin(_a)],
                 color=TEXT_PRIMARY, lw=1.1, ls=(0, (1.0, 2.6)), alpha=0.75, zorder=2.2,
                 solid_capstyle='round')
 
     # Average arm angle over every pitch on the card, in the top corner on the ray's side
     # (2026-11-03, per Wally). The ray crosses this spot at about 42-55 deg, so the text
     # takes the same cream halo as the pitch labels and the ray passes behind it.
+    # Average extension sits on the line below it (2026-11-06, per Wally), over every pitch
+    # on the card with a measured value; none measured drops the line.
+    _ext_all = [v for v in (sf(p.get('Extension')) for p in pitches) if v is not None]
+    _corner = []
     if _aa_all:
+        _corner.append(f'ARM ANGLE {sum(_aa_all) / len(_aa_all):.1f}°')
+    if _ext_all:
+        _corner.append(f'EXTENSION {sum(_ext_all) / len(_ext_all):.1f} FT')
+    if _corner:
         from matplotlib.patheffects import withStroke as _aa_stroke
-        mv.text(0.015 if _aa_sign < 0 else 0.985, 0.975,
-                f'ARM ANGLE {sum(_aa_all) / len(_aa_all):.1f}°', transform=mv.transAxes,
-                ha='left' if _aa_sign < 0 else 'right', va='top', fontsize=9,
-                fontweight='bold', color=TEXT_PRIMARY, fontfamily='IBM Plex Sans', zorder=7,
-                path_effects=[_aa_stroke(linewidth=3.0, foreground=PLOT_PANEL)])
+        for _i, _line in enumerate(_corner):
+            mv.text(0.015 if _aa_sign < 0 else 0.985, 0.975 - 0.042 * _i, _line,
+                    transform=mv.transAxes,
+                    ha='left' if _aa_sign < 0 else 'right', va='top', fontsize=9,
+                    fontweight='bold', color=TEXT_PRIMARY, fontfamily='IBM Plex Sans', zorder=7,
+                    path_effects=[_aa_stroke(linewidth=3.0, foreground=PLOT_PANEL)])
 
     # Expected movement (2026-11-03, per Wally): a small dotted ring at what a
     # pitcher who looks like this usually throws (pipeline/xmove.py, the hitter
