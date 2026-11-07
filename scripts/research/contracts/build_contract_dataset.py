@@ -130,6 +130,28 @@ def versatility(inn_seasons):
     return 1 / sum(v * v for v in sh.values()), max(sh, key=sh.get), sh
 
 
+def classify(pos_lbl, hist):
+    """(is_pitcher, role, start share) from the tracker Pos label and the three history seasons.
+
+    A compound label ('SP/RP', 'RP/SP') is a pitcher when its FIRST position is a pitcher, and its role
+    comes from the start share like an unlabeled pitcher. Until 2026-11-07 only the exact labels
+    SP/RP/P counted, so 23 'SP/RP' rows (Bubic, Soroka, Civale ... and 17 in the 2020 class) were
+    scored as hitters with 0 WAR. 'DH/SP' (Ohtani) stays a hitter.
+    """
+    compound = bool(pos_lbl) and '/' in pos_lbl
+    if pos_lbl:
+        is_p = pos_lbl.split('/')[0] in ('SP', 'RP', 'P')
+    else:
+        is_p = sum(h.get('ip', 0) for h in hist) * 4.3 > sum(h.get('pa', 0) for h in hist)
+    if not is_p:
+        return False, 'H', None
+    g = sum(h.get('g_p', 0) for h in hist[:2])
+    gs_sh = sum(h.get('gs', 0) for h in hist[:2]) / g if g else 0.0
+    by_share = pos_lbl is None or compound
+    role = 'SP' if (pos_lbl == 'SP' or (by_share and gs_sh >= 0.5)) else 'RP'
+    return True, role, gs_sh
+
+
 def main():
     act = {y: load_actual(y) for y in range(2016, 2027)}
     am2fg = {}
@@ -159,19 +181,7 @@ def main():
             am = r.get('_mlbam') if not pd.isna(r.get('_mlbam', np.nan)) else None
             am = int(am) if am else next((int(h['mlbam']) for h in hist if h.get('mlbam')), None)
             pos_lbl = r.get('Pos') if isinstance(r.get('Pos'), str) else None
-            ip3 = sum(h.get('ip', 0) for h in hist)
-            pa3 = sum(h.get('pa', 0) for h in hist)
-            if pos_lbl:
-                is_p = pos_lbl in ('SP', 'RP', 'P')
-            else:
-                is_p = ip3 * 4.3 > pa3
-            gs_sh = None
-            if is_p:
-                g = sum(h.get('g_p', 0) for h in hist[:2])
-                gs_sh = sum(h.get('gs', 0) for h in hist[:2]) / g if g else 0.0
-                role = 'SP' if (pos_lbl == 'SP' or (pos_lbl is None and gs_sh >= 0.5)) else 'RP'
-            else:
-                role = 'H'
+            is_p, role, gs_sh = classify(pos_lbl, hist)
             wkey = 'pwar' if is_p else 'bwar'
             war = [h.get(wkey, 0.0) for h in hist]
             pt = [h.get('ip' if is_p else 'pa', 0.0) for h in hist]
