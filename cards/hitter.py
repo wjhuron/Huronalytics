@@ -1329,7 +1329,7 @@ SOCIAL_HITTER_COLUMNS = [
 
 
 def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats, span, output_file,
-                              position):
+                              position, stats_style='bars2'):
     """1080x1350 feed card, the hitter twin of cards/pitcher.py render_social_card: the line,
     the LA x spray chart, then six rows per column. A date-window or MiLB row keeps whatever
     it can score; a stat with no value leaves the card."""
@@ -1357,10 +1357,36 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
             return f'{int(round(v))}'
         return f'{v:.1f}'
 
-    fig = plt.figure(figsize=(8, 10), dpi=135)
+    # Which stat rows the card shows, decided before the figure: a one-column bar layout
+    # needs a taller card. Rows without a value leave the column.
+    _mlb_row = not h_row.get('_milbCard') and team not in ('ROC', 'AAA')
+
+    def _keep(key):
+        v = h_row.get(key)
+        # AAA bat speed covers 3.7% of swings against every swing in the MLB pool, so the row
+        # leaves a non-MLB card (2026-11-05, per Wally).
+        return not (v is None or (key == 'babip' and _mlb_row)
+                    or (key == 'batSpeed' and not _mlb_row) or (key == 'ev95' and _mlb_row))
+    _kept = [(title, [r for r in rows if _keep(r[1])]) for title, rows in SOCIAL_HITTER_COLUMNS]
+    # Bar rows (2026-11-06 prototype, per Wally): label, value, percentile circle and a bar
+    # filled to the percentile, the website's player-page row. "bars1" stacks both sections
+    # in one column; the card grows below the 1350 px box by _ext (box units), a display
+    # convention like the pitcher card's fit height.
+    _B1_ROW, _B1_HEAD, _B1_GAP = .047, .044, .016
+    _ext = 0.0
+    if stats_style == 'bars1':
+        _need = sum(_B1_HEAD + len(r) * _B1_ROW for _, r in _kept) + _B1_GAP * (len(_kept) - 1)
+        _last = .3345 - _need + _B1_ROW          # the last row's centre
+        _ext = max(0.0, .062 - _last)            # keep the footer clearance under it
+    fig = plt.figure(figsize=(8, 10 * (1 + _ext)), dpi=135)
     ax = fig.add_axes([0, 0, 1, 1])
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
+    ax.set_xlim(0, 1); ax.set_ylim(-_ext, 1); ax.axis('off')
     fig.patch.set_facecolor(BG)
+
+    def fax(rect):
+        # A child axes placed in the 1350 px box's coordinates.
+        x_, y_, w_, h_ = rect
+        return fig.add_axes([x_, (y_ + _ext) / (1 + _ext), w_, h_ / (1 + _ext)])
 
     def rr(x, y, w, h, fc, r=.012):
         ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f'round,pad=0,rounding_size={r}',
@@ -1422,7 +1448,7 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
     top, bot, left = .8175, .4355, L + .018
     pw = (R - left - (.014 if switch else 0)) / len(panels)
     for i, (side, head) in enumerate(panels):
-        a = fig.add_axes([left + i * (pw + .014), bot, pw, top - bot])
+        a = fax([left + i * (pw + .014), bot, pw, top - bot])
         a.set_facecolor(BG); a.set_xlim(-50, 50); a.set_ylim(-20, 60)
         bounds = ({'pull': (30, 50), 'pull_side': (15, 30), 'center_pull': (0, 15), 'center_oppo': (-15, 0),
                    'oppo_side': (-30, -15), 'oppo': (-50, -30)} if side == 'L' else
@@ -1479,38 +1505,63 @@ def render_social_hitter_card(hitter_name, h_row, pitches, metadata, team, bats,
         t(xk + .014, yk, lab, 9.5, ink_dark, '600', ha='left')
     t(.452, yk, 'AAA wOBAcon' if h_row.get('_aaaRuler') else 'MLB wOBAcon', 9.5, ink_dark, '600', ha='left')
     t(.600, yk, '.000', 9, muted, '600', ha='left')
-    ax_scale = fig.add_axes([.642, yk - .0065, .245, .013])
+    ax_scale = fax([.642, yk - .0065, .245, .013])
     ax_scale.imshow(np.linspace(0, 1, 256).reshape(1, -1), aspect='auto', cmap=WOBA_CMAP, vmin=0, vmax=1, alpha=.70)
     ax_scale.set_xticks([]); ax_scale.set_yticks([])
     for sp in ax_scale.spines.values():
         sp.set_color(border)
     t(R, yk, '1.000+', 9, muted, '600', ha='right')
     ax.plot([L, R], [.3525, .3525], color=border, lw=1.1)
-    _mlb_row = not h_row.get('_milbCard') and team not in ('ROC', 'AAA')
-    _cols = SOCIAL_HITTER_COLUMNS
-    for (title, rows), x0 in zip(_cols, (L, .525)):
-        t(x0, .3345, title, 10.5, ink_dark, 'black', ha='left')
+    def bar_row(xl, xv, xc, xb0, xb1, y, lab, valstr, pc):
+        # The website's player-page row (2026-11-06, per Wally): label, bar filled to the
+        # percentile, the circle with the percentile, then the value at the far right.
+        fc = _percentile_color(pc)[0] if pc is not None else None
+        t(xl, y, lab, 12, ink_dark, 'bold', ha='left')
+        t(xv, y, valstr, 12, ink_dark, '500', ha='right')
+        ax.plot([xb0, xb1], [y, y], color='#e2d8c5', lw=7, solid_capstyle='round', zorder=2)
+        if pc is None:
+            t(xc, y, '—', 11, muted, 'bold', 'Bitter')
+            return
+        ax.plot([xb0, xb0 + (xb1 - xb0) * max(pc, 1) / 100], [y, y], color=fc, lw=7,
+                solid_capstyle='round', zorder=3)
+        ax.scatter([xc], [y], s=330, color=fc, edgecolors=border, linewidths=.9, zorder=4)
+        ax.text(xc, y, f'{pc:.0f}', fontsize=10, color=ink_on(fc), fontweight='black',
+                fontfamily='Bitter', ha='center', va='center', zorder=5)
+
+    if stats_style == 'bars1':
         y = .3345
-        for lab, key, spec in rows:
-            v = h_row.get(key)
-            # AAA bat speed covers 3.7% of swings against every swing in the MLB pool, so the row
-            # leaves a non-MLB card (2026-11-05, per Wally).
-            if (v is None or (key == 'babip' and _mlb_row)
-                    or (key == 'batSpeed' and not _mlb_row) or (key == 'ev95' and _mlb_row)):
-                continue
-            y -= .267 / 5   # five rows a column fill the band six used to
-            pc = h_row.get(key + '_pctl')
-            fc = _percentile_color(pc)[0] if pc is not None else DARK_CELL
-            t(x0, y, lab, 12, ink_dark, 'bold', ha='left')
-            t(x0 + .275, y, fmt(v, spec), 12, ink_dark, '500', ha='right')
-            rr(x0 + .29, y - .0165, .088, .033, fc, r=.009)
-            t(x0 + .334, y, '—' if pc is None else f'{pc:.0f}', 12, ink_on(fc), 'black', 'Bitter')
-    t(L, .0123, 'huronalytics.vercel.app', 10.5, ink_dark, 'normal', ha='left')
+        for k_, (title, rows) in enumerate(_kept):
+            if k_:
+                y -= _B1_GAP
+            t(L, y, title, 10.5, ink_dark, 'black', ha='left')
+            y -= _B1_HEAD
+            for lab, key, spec in rows:
+                bar_row(L, R, R - .135, L + .220, R - .175, y, lab, fmt(h_row[key], spec),
+                        h_row.get(key + '_pctl'))
+                y -= _B1_ROW
+    else:
+        for (title, rows), x0 in zip(_kept, (L, .525)):
+            t(x0, .3345, title, 10.5, ink_dark, 'black', ha='left')
+            y = .3345
+            for lab, key, spec in rows:
+                y -= .267 / 5   # five rows a column fill the band six used to
+                pc = h_row.get(key + '_pctl')
+                if stats_style == 'bars2':
+                    bar_row(x0, x0 + .392, x0 + .289, x0 + .160, x0 + .258, y, lab,
+                            fmt(h_row[key], spec), pc)
+                    continue
+                fc = _percentile_color(pc)[0] if pc is not None else DARK_CELL
+                t(x0, y, lab, 12, ink_dark, 'bold', ha='left')
+                t(x0 + .275, y, fmt(h_row[key], spec), 12, ink_dark, '500', ha='right')
+                rr(x0 + .29, y - .0165, .088, .033, fc, r=.009)
+                t(x0 + .334, y, '—' if pc is None else f'{pc:.0f}', 12, ink_on(fc), 'black', 'Bitter')
+    t(L, .0123 - _ext, 'huronalytics.vercel.app', 10.5, ink_dark, 'normal', ha='left')
     _src = 'MLB, Baseball Savant, FanGraphs' if h_row.get('wRCplus') is not None else 'MLB, Baseball Savant'
     # On a MiLB card the source list gives way to the note on which chips use which pool.
-    _foot = ('Everything relative to AAA:  100 = AAA average  ·  chips = AAA percentile' if h_row.get('_aaaRuler')
-             else f'Data: {_src}  ·  chips = MLB percentile')
-    t(R, .0123, _foot, 8.2, ink_dark, 'normal', ha='right')
+    _what = 'chips' if stats_style == 'chips' else 'bars'
+    _foot = (f'Everything relative to AAA:  100 = AAA average  ·  {_what} = AAA percentile' if h_row.get('_aaaRuler')
+             else f'Data: {_src}  ·  {_what} = MLB percentile')
+    t(R, .0123 - _ext, _foot, 8.2, ink_dark, 'normal', ha='right')
     fig.savefig(output_file, dpi=135, facecolor=BG)
     plt.close(fig)
     print(f'  Saved: {output_file}')
@@ -1654,7 +1705,8 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
                        milb_player_id=None, milb_scope='all',
                        la_hard_dots='all', la_ellipse=None, la_heat='full',
                        la_grid=True, la_heat_alpha=0.70, la_dot_style='mono',
-                       la_dot_scale=1.6, position_override=None, social=False):
+                       la_dot_scale=1.6, position_override=None, social=False,
+                       social_stats='bars2'):
     """Render a seasonal hitter card, or a card for one date window.
 
     date_filter:
@@ -1873,7 +1925,7 @@ def render_hitter_card(hitter_name, team_abbrev=None, year_label='2026 Season',
         return render_social_hitter_card(
             hitter_name, h_row, hitter_pitches, metadata, team, bats, date_display or year_label,
             os.path.join(output_dir, f"Social-{hitter_name.replace(', ', '').replace(' ', '')}-{_slug}.png"),
-            position_override or h_row.get('position') or '—')
+            position_override or h_row.get('position') or '—', stats_style=social_stats)
 
     # Compute SzTop/SzBot (already constant per hitter in current data)
     sz_tops = [v for v in (sf(p.get('SzTop')) for p in hitter_pitches) if v is not None]
@@ -3338,6 +3390,7 @@ def main():
     la_dot_style   = "mono"               # Clean view: dots "warm" (red, amber) or "mono" (black, white)
     la_dot_scale   = 1.6                  # Clean view: dot area multiplier
     social         = False                # True = 1080x1350 feed card instead of the full card
+    social_stats   = "bars2"              # Social card stat rows: "chips" (percentile bubbles), "bars2" (two columns of bars) or "bars1" (one column, taller card)
     position       = None                 # Header position label, e.g. "3B"; None = the leaderboard's
     show_notes     = False                # Reader's notes under the bubble grid: True or False
     milb_corpus    = False                # True = read data/_milb2026 for filter_hitters; team is ignored
@@ -3383,6 +3436,8 @@ def main():
                          help="Clean view: hard-hit dots 'air' (no hard grounders) or 'all'.")
     parser.add_argument('--la-ellipse', default=None,
                          help="Clean view: ellipse size as a percent of all batted balls, or 'none'.")
+    parser.add_argument('--social-stats', default=None, choices=['chips', 'bars2', 'bars1'],
+                        help='Social card stat rows: chips, bars2 (two columns of bars) or bars1 (one column)')
     parser.add_argument('--la-view', default=None, choices=['damage', 'outcome', 'clean'],
                          help="LA x Spray mode: 'clean' (default) = full-color league zones + hard-hit and barrel dots; 'damage' = softened damage-zone "
                               "gradient + barrel/hard-hit/other dots + quality-contact "
@@ -3420,6 +3475,7 @@ def main():
     if args.la_dot_scale is not None: la_dot_scale = args.la_dot_scale
     if args.position is not None: position = args.position
     if args.social: social = True
+    if args.social_stats is not None: social_stats = args.social_stats
     if args.la_grid is not None: la_grid = (args.la_grid == 'on')
     if args.la_heat_alpha is not None: la_heat_alpha = args.la_heat_alpha
     if args.la_ellipse is not None: la_ellipse = None if args.la_ellipse == 'none' else int(args.la_ellipse)
@@ -3491,7 +3547,8 @@ def main():
                                 milb_scope=milb_scope, la_hard_dots=la_hard_dots,
                                 la_ellipse=la_ellipse, la_heat=la_heat, la_grid=la_grid,
                                 la_heat_alpha=la_heat_alpha, la_dot_style=la_dot_style,
-                                la_dot_scale=la_dot_scale, position_override=position, social=social)
+                                la_dot_scale=la_dot_scale, position_override=position, social=social,
+                                social_stats=social_stats)
     else:
         # No specific names: render every (qualified) hitter, optionally filtered by team
         leaderboard = load_hitter_leaderboard()
@@ -3515,7 +3572,8 @@ def main():
                                 show_notes=show_notes, la_hard_dots=la_hard_dots,
                                 la_ellipse=la_ellipse, la_heat=la_heat, la_grid=la_grid,
                                 la_heat_alpha=la_heat_alpha, la_dot_style=la_dot_style,
-                                la_dot_scale=la_dot_scale, position_override=position, social=social)
+                                la_dot_scale=la_dot_scale, position_override=position, social=social,
+                                social_stats=social_stats)
 
 
 if __name__ == '__main__':
