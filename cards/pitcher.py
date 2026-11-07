@@ -2011,6 +2011,25 @@ def _social_tint_pools():
     return pools
 
 
+# Season extension of every pitcher in the Savant percentile pool (pctl_pool_rows), for
+# the social card's extension tint. Loaded once per process.
+_SOCIAL_EXT_POOL = None
+
+
+def _social_ext_pool():
+    global _SOCIAL_EXT_POOL
+    if _SOCIAL_EXT_POOL is None:
+        from pipeline.utils import pctl_pool_rows
+        _d = os.path.dirname(METADATA_PATH)
+        with open(os.path.join(_d, 'pitcher_leaderboard_rs.json')) as f:
+            _rows = json.load(f)
+        with open(METADATA_PATH) as f:
+            _tg = json.load(f).get('teamGamesPlayed')
+        _SOCIAL_EXT_POOL = sorted(r['extension'] for r in pctl_pool_rows(_rows, 'pitcher', _tg, True)
+                                  if r.get('extension') is not None)
+    return _SOCIAL_EXT_POOL
+
+
 # xwOBAcon pools on the same cells, gated at XWC_COLOR_MIN_BIP.
 _SOCIAL_XWC_POOLS = None
 
@@ -2529,12 +2548,37 @@ def render_social_card(config, pitches, output_file):
         _corner.append(f'EXTENSION {sum(_ext_all) / len(_ext_all):.1f} FT')
     if _corner:
         from matplotlib.patheffects import withStroke as _aa_stroke
+        _cx = 0.015 if _aa_sign < 0 else 0.985
+        _ckw = dict(transform=mv.transAxes, va='top', fontsize=9, fontweight='bold',
+                    color=TEXT_PRIMARY, fontfamily='IBM Plex Sans', zorder=7)
+        _halo = [_aa_stroke(linewidth=3.0, foreground=PLOT_PANEL)]
         for _i, _line in enumerate(_corner):
-            mv.text(0.015 if _aa_sign < 0 else 0.985, 0.975 - 0.042 * _i, _line,
-                    transform=mv.transAxes,
-                    ha='left' if _aa_sign < 0 else 'right', va='top', fontsize=9,
-                    fontweight='bold', color=TEXT_PRIMARY, fontfamily='IBM Plex Sans', zorder=7,
-                    path_effects=[_aa_stroke(linewidth=3.0, foreground=PLOT_PANEL)])
+            _cy = 0.975 - 0.048 * _i   # room for the extension chip
+            if not _line.startswith('EXTENSION'):
+                mv.text(_cx, _cy, _line, ha='left' if _aa_sign < 0 else 'right',
+                        path_effects=_halo, **_ckw)
+                continue
+            # The extension value takes a percentile tint, higher is better (2026-11-06, per
+            # Wally), ranked against the Savant percentile pool's season extensions, the
+            # same light blend as the Strike%/Whiff% cells. The label and the tinted value
+            # are two texts, so the label is placed from the value's measured width.
+            _ev = sum(_ext_all) / len(_ext_all)
+            _fc = _percentile_color(_rank_in_mlb_pool(_ev, _social_ext_pool()))[0]
+            from matplotlib.colors import to_rgb as _to_rgb
+            _bg = _to_rgb(BG)
+            _fc = tuple(0.55 * _fc[k] + 0.45 * _bg[k] for k in range(3))
+            _val = f'{_ev:.1f} FT'
+            _box = dict(boxstyle='round,pad=0.22,rounding_size=0.25', fc=_fc, ec='none')
+            _rend = fig.canvas.get_renderer()
+            _inv = mv.transAxes.inverted()
+            if _aa_sign < 0:
+                _lab = mv.text(_cx, _cy, 'EXTENSION ', ha='left', path_effects=_halo, **_ckw)
+                _x1 = _inv.transform(_lab.get_window_extent(_rend))[1][0]
+                mv.text(_x1 + 0.006, _cy, _val, ha='left', bbox=_box, **_ckw)
+            else:
+                _v = mv.text(_cx - 0.006, _cy, _val, ha='right', bbox=_box, **_ckw)
+                _x0 = _inv.transform(_v.get_window_extent(_rend))[0][0]
+                mv.text(_x0 - 0.006, _cy, 'EXTENSION ', ha='right', path_effects=_halo, **_ckw)
 
     # Expected movement (2026-11-03, per Wally): a small dotted ring at what a
     # pitcher who looks like this usually throws (pipeline/xmove.py, the hitter
