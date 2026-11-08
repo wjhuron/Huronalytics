@@ -316,8 +316,17 @@ def main():
     plg['xwOBAcon'] = wmean([(r.get('xwOBAcon'), r.get('nBip')) for r in pr], 4)
     plg.update(era=round(lg_era, 2), lgERA=round(lg_era, 4), fip=round(lg_era, 2), xFIP=round(lg_era, 2))
     plg['count'] = len(pr)
-    hd = hdera_scale(pitchers, pitcher_era())
+    era = pitcher_era()
+    hd = hdera_scale(pitchers, era)
     plg['hdera'] = round(hd['anchor'], 2)
+    # Every pitcher's ERA and AAA-scale hdERA, for the card's ERA and hdERA tile ranks.
+    for mid, r in pitchers.items():
+        er, outs = era.get(mid, (None, 0))
+        r['era'] = er * 27.0 / outs if outs else None
+        r['hdERA'] = None
+        if r.get('xwOBA') is not None and r.get('pa'):
+            shr = (r['xwOBA'] * r['pa'] + N0_XW * hd['lgXw']) / (r['pa'] + N0_XW)
+            r['hdERA'] = hd['anchor'] + hd['dhB'] * (shr - hd['m']) / hd['sd']
     print('hdERA AAA scale:', {k: round(v, 4) for k, v in hd.items()})
 
     soc = [c for g in got.values() for c in g['soc']]

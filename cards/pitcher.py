@@ -4669,6 +4669,9 @@ _SCRATCH_POOL_STATS = ['xRunValue', 'xRv100', 'xwOBA', 'kPct', 'bbPct', 'kbbPct'
                        'xwOBAcon', 'hardHitPct', 'barrelPctAgainst', 'gbPct', 'babip',
                        'fbVelo', 'extension', 'stuffScore', 'locPlus',
                        'izPct', 'fpsPct']
+# The ERA and hdERA tiles rank in the same pool; the card fills those two values
+# in main(), after the context, so they are pooled here but ranked there.
+_SCRATCH_LINE_STATS = ('era', 'hdERA')
 
 
 def _normalize_scratch_pitch(row):
@@ -5325,7 +5328,7 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
         with open(METADATA_PATH) as f:
             _tgp = json.load(f).get('teamGamesPlayed') or {}
         _prows = pctl_pool_rows(_raw_prows, 'pitcher', _tgp, True)
-        for s in _SCRATCH_POOL_STATS:
+        for s in list(_SCRATCH_POOL_STATS) + list(_SCRATCH_LINE_STATS):
             vals = [(_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s)) for r in _prows]
             ctx['pitcher_pools'][s] = sorted(v for v in vals if v is not None)
         # Pitcher+ ranks in the same Savant pool since 2026-11-06 (apply_pitcher_plus).
@@ -5424,7 +5427,7 @@ def _install_aaa_pools(ctx, pool):
     ctx['pitcher_pools'] = {
         s: sorted(v for v in ((_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s))
                               for r in q) if v is not None)
-        for s in _SCRATCH_POOL_STATS}
+        for s in list(_SCRATCH_POOL_STATS) + list(_SCRATCH_LINE_STATS)}
     ctx['pitcher_plus_pool'] = sorted(r['pitcherPlus'] for r in q if r.get('pitcherPlus') is not None)
     base = pool.get('pitcherPlusBase')
     ctx['pitcher_plus_base'] = {k: tuple(v) for k, v in base.items()} if base else None
@@ -6597,6 +6600,12 @@ def main():
                         _shr = (_xw * _pa + N0_XW * _hd['lgXw']) / (_pa + N0_XW)
                         _dh = round(_hd['anchor'] + _hd['dhB'] * (_shr - _hd['m']) / _hd['sd'], 2)
                 pctl_row['hdERA'] = _dh
+                # ERA and hdERA tiles rank in the card's pool (MLB, or AAA under the ruler);
+                # low is good, so both invert.
+                _lp = scratch_ctx.get('pitcher_pools') or {}
+                pctl_row['era_pctl'] = _rank_in_mlb_pool(era_val if is_multi_game else None,
+                                                          _lp.get('era') or [], invert=True)
+                pctl_row['hdERA_pctl'] = _rank_in_mlb_pool(_dh, _lp.get('hdERA') or [], invert=True)
                 pctl_row['hpERA'] = _ph
                 print(f"  Window context: hdERA {_dh} | hpERA {_ph}")
         elif is_multi_game:
