@@ -6583,6 +6583,19 @@ def main():
                 # level shift of +0.77 runs. Every card with minor league rows follows.
                 if pitcher_name in corpus_players and not corpus_players[pitcher_name]['mlb_only']:
                     _dh = None
+                # Under the AAA ruler hdERA is rebuilt on the AAA scale instead: the AAA
+                # pool's anchor and z statistics with the slope measured on AAA (DH_B_AAA).
+                if _aaa_pool:
+                    from pipeline.eraplus import N0_XW
+                    _dh = None
+                    _hd = _aaa_pool.get('hdera')
+                    _xw, _pa = pctl_row.get('xwOBA'), pctl_row.get('pa') or 0
+                    if not _hd:
+                        print(f"  hdERA left blank: {AAA_PITCHER_POOL} has no hdERA scale. "
+                              f"Rebuild it: {AAA_POOL_BUILD_CMD}")
+                    elif _xw is not None and _pa > 0:
+                        _shr = (_xw * _pa + N0_XW * _hd['lgXw']) / (_pa + N0_XW)
+                        _dh = round(_hd['anchor'] + _hd['dhB'] * (_shr - _hd['m']) / _hd['sd'], 2)
                 pctl_row['hdERA'] = _dh
                 pctl_row['hpERA'] = _ph
                 print(f"  Window context: hdERA {_dh} | hpERA {_ph}")
@@ -6618,8 +6631,10 @@ def main():
             'hand': hand,
             # display_team overrides the header label only; every data lookup
             # above stays keyed on eff_team (the tab/leaderboard identity).
+            # A scratch-tab card under the AAA ruler reads AAA, not the tab name.
             'team': display_team or (corpus_players[pitcher_name]['club']
-                                     if pitcher_name in corpus_players else eff_team),
+                                     if pitcher_name in corpus_players
+                                     else ('AAA' if _aaa_pool and scratch_tab else eff_team)),
             'age': age,
             'game_date': card_date,
             'stat_headers': stat_headers,

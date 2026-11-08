@@ -242,6 +242,12 @@ IZSW_PER_PITCH = 0.33  # league iz-swings per pitch (.32-.34, 2021-2026);
                        # so the shrink denominator is count * this ratio
 
 DH_B = 0.917                # LOSO slope, 30+ IP display population
+# The same recipe on Triple-A (scripts/research/era/aaa_hdera_slope.py, 2026-11-08):
+# held-one-season-out OLS slope of AAA ERA on z(shrunk xwOBA), 30+ AAA IP, 2023-2026.
+# LOSO slopes 1.045-1.091 across the four replicates; the same code reads 0.927 on
+# MLB 2021-2025 against the shipped 0.917. Used only by the AAA-ruler pitcher card,
+# with the AAA pool's own anchor and z statistics (data/_milb2026/pitcher_pool_AAA.json).
+DH_B_AAA = 1.069
 
 # hpERA weights, ERA direction. REFIT 2026-10-07 (scripts/research/era/
 # hpera_honest_refit.py, final fit on every replicate): honest pools, NEXT

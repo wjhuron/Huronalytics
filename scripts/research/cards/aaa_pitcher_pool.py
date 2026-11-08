@@ -36,6 +36,7 @@ os.chdir(ROOT)
 from cards import milb_corpus as mc  # noqa: E402
 from cards import pitcher as P  # noqa: E402
 from pipeline.compute import compute_expected_stats, compute_stats  # noqa: E402
+from pipeline.eraplus import DH_B_AAA, N0_XW, POOL_MIN_OUTS  # noqa: E402
 from pipeline.pitcherplus import build_baseline, score_row  # noqa: E402
 from pipeline.utils import WHIFF_DESCRIPTIONS, is_no_pitch, safe_float  # noqa: E402
 
@@ -101,6 +102,35 @@ def league_era():
     if len(sp) < 28 or not outs:
         sys.exit(f'AAA team totals look wrong ({len(sp)} teams, {outs} outs). Not writing the pool.')
     return er * 27 / outs, len(sp)
+
+
+def pitcher_era():
+    """Per-pitcher AAA earned runs and outs, one combined row per pitcher, from the MLB Stats API.
+    Stops on a failed or short fetch."""
+    url = ('https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching'
+           f'&sportId={AAA_SPORT_ID}&season={SEASON}&playerPool=All&limit=10000&gameType=R')
+    with urllib.request.urlopen(url, timeout=60) as r:
+        sp = json.load(r)['stats'][0]['splits']
+    if len(sp) < 1000:
+        sys.exit(f'AAA pitcher lines look wrong ({len(sp)} rows). Not writing the pool.')
+    return {str(x['player']['id']): (int(x['stat'].get('earnedRuns', 0)), int(x['stat'].get('outs', 0)))
+            for x in sp}
+
+
+def hdera_scale(pitchers, era):
+    """hdERA's AAA scale, the apply_era_plus rules on the AAA pool: 30+ IP, anchor = mean ERA,
+    xwOBA shrunk at N0_XW toward the PA-weighted pool mean, z over the pool. The slope is
+    DH_B_AAA (scripts/research/era/aaa_hdera_slope.py)."""
+    pool = [(r['xwOBA'], r['pa'], era[mid]) for mid, r in pitchers.items()
+            if mid in era and era[mid][1] >= POOL_MIN_OUTS and r.get('xwOBA') is not None and r.get('pa')]
+    if len(pool) < 300:
+        sys.exit(f'Only {len(pool)} AAA pitchers at 30+ IP with an xwOBA. Not writing the pool.')
+    lg_xw = sum(x * pa for x, pa, _ in pool) / sum(pa for _, pa, _ in pool)
+    shr = [(x * pa + N0_XW * lg_xw) / (pa + N0_XW) for x, pa, _ in pool]
+    m = sum(shr) / len(shr)
+    sd = (sum((s - m) ** 2 for s in shr) / len(shr)) ** 0.5
+    anchor = sum(er * 27.0 / outs for _, _, (er, outs) in pool) / len(pool)
+    return {'anchor': anchor, 'lgXw': lg_xw, 'm': m, 'sd': sd, 'dhB': DH_B_AAA, 'n': len(pool)}
 
 
 def ibb_by_pitcher(pks):
@@ -286,6 +316,9 @@ def main():
     plg['xwOBAcon'] = wmean([(r.get('xwOBAcon'), r.get('nBip')) for r in pr], 4)
     plg.update(era=round(lg_era, 2), lgERA=round(lg_era, 4), fip=round(lg_era, 2), xFIP=round(lg_era, 2))
     plg['count'] = len(pr)
+    hd = hdera_scale(pitchers, pitcher_era())
+    plg['hdera'] = round(hd['anchor'], 2)
+    print('hdERA AAA scale:', {k: round(v, 4) for k, v in hd.items()})
 
     soc = [c for g in got.values() for c in g['soc']]
     pool = {
@@ -299,6 +332,7 @@ def main():
         'socialCells': soc,
         'leagueAverages': lg,
         'pitcherLeagueAverages': plg,
+        'hdera': hd,
     }
     name = 'pitcher_pool_AAA_smoke.json' if args.limit else 'pitcher_pool_AAA.json'
     tmp = os.path.join(OUT, name + '.tmp')
