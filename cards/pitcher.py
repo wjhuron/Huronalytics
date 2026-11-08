@@ -3149,7 +3149,8 @@ def render_social_card(config, pitches, output_file):
         note_r = (('Data: MLB, Baseball Savant, FanGraphs' if _fg_src else 'Data: MLB, Baseball Savant')
                   + '  ·  disc size = usage  ·  '
                   + ('ring = expected movement  ·  ' if _expected else '')
-                  + '100 = league avg')
+                  + ('100 = AAA avg' if config.get('aaa_ruler')
+                     else '100 = league avg'))
 
     # Footer height, tuned by measured clearance from the card's bottom edge
     # (2026-09-01, per Wally). At the original 0.009 the 'y' descender in
@@ -4750,7 +4751,7 @@ def _scratch_mlb_pool_rows(rows):
 K_SHRINK_DAILY = 0
 
 
-def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
+def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None, shift=None, cont_out=None):
     """Stuff+ for scratch pitchers, at whatever config the LOCAL bundle
     carries (the bundle stores its version; the guard below requires it to
     equal train_stuff.BUNDLE_VERSION, since 2026-09-02). The
@@ -4764,7 +4765,9 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     prior-season slot from the bundle's arm_prior, v16); otherwise the
     no-arm companion model anchored to its MLB (no-arm) scales, exactly as
     train_stuff.main() grades such a pitch. k_shrink overrides the season K_SHRINK
-    (used lightly for daily cards)."""
+    (used lightly for daily cards). shift is the AAA ruler's {pitch type: AAA mean
+    - 100}, taken off before rounding; cont_out, when a dict, collects each
+    pitch's unrounded MLB-anchored grade by PitchID (the AAA pool builder)."""
     import pickle as _pickle
     _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if _repo_root not in sys.path:
@@ -4815,13 +4818,20 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
     # columns — so AVERAGEIF over the sheet reproduces the card to the digit.
     # k_shrink is accepted for call-site compat and ignored (always 0).
     import numpy as _np
-    def _atom(r, scale):
+    # The AAA ruler subtracts the type's AAA mean (less 100) BEFORE the atom is
+    # rounded, so a AAA card's atoms average 100 per type as an MLB card's do.
+    _shift = shift or {}
+
+    def _atom(r, scale, pt=None, pid=None):
         if not scale:
             return None
         mu, sd = scale.get('mu'), scale.get('sd')
         if mu is None or sd is None or not sd > 0:
             return None
-        return int(round(100 + _sv.K_SCALE * (r - mu) / sd))
+        cont = 100 + _sv.K_SCALE * (r - mu) / sd
+        if cont_out is not None and pid:
+            cont_out[str(pid)] = cont
+        return int(round(cont - _shift.get(pt, 0.0)))
 
     # OOF fold-model discipline — the SAME model choice the pipeline's
     # per-pitch grade dump uses (each pitcher scored by the fold that held him
@@ -4855,7 +4865,7 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
         atoms_all = []
         for pt in sub['pitch_type'].unique():
             mask = (sub['pitch_type'] == pt).values
-            atoms = [a for a in (_atom(float(r), pt_scale.get(pt)) for r in raw[mask])
+            atoms = [a for a in (_atom(float(r), pt_scale.get(pt), pt) for r in raw[mask])
                      if a is not None]
             if atoms:
                 per_pt[(pitcher, pt)] = round(float(_np.mean(atoms)), 1)
@@ -4863,7 +4873,7 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None):
         # per-pitch atoms by PitchID — the fallback source when a sheet row's
         # grade cells are still blank (fresh game before the pipeline ran)
         for _pid, _pt3, _r in zip(sub['pid'], sub['pitch_type'], raw):
-            _a = _atom(float(_r), pt_scale.get(_pt3))
+            _a = _atom(float(_r), pt_scale.get(_pt3), _pt3, _pid)
             if _pid and _a is not None:
                 atoms_by_pid[str(_pid)] = _a
         overall[pitcher] = (round(float(_np.mean(atoms_all)), 1)
@@ -5193,16 +5203,23 @@ def _social_rv(plist, estimate=False):
     return sum(vals) if vals else None
 
 
-def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
+def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None,
+                                  keep_cont=False):
     """Heavy one-time setup for scratch-tab / daily cards: MLB pickle baselines
     (Loc+ surfaces + norm pool, xRV count anchoring), Stuff+ scoring (bundle
     config via the bundle),
     leaderboard percentile pools, nVAA/nHAA regressions. stuff_k_shrink is
-    passed through to Stuff+ scoring (light for daily cards)."""
+    passed through to Stuff+ scoring (light for daily cards).
+
+    aaa is the AAA pitcher pool (load_aaa_pitcher_pool): the grades are shifted
+    to 100 = AAA average and every pool is swapped for its AAA twin. keep_cont
+    keeps the unrounded MLB-anchored grade of every pitch, for the pool builder."""
     from pipeline.locplus import compute_loc_plus
 
     t0 = time_module.time()
-    ctx = {'norm_by_pitcher': norm_by_pitcher}
+    ctx = {'norm_by_pitcher': norm_by_pitcher, 'aaa': aaa}
+    _shift = (aaa or {}).get('shift') or {}
+    _stuff_shift, _loc_shift = _shift.get('stuff') or {}, _shift.get('loc') or {}
 
     mlb = _load_mlb_pickle()
     print(f"  [ctx] {len(mlb)} MLB pitches ready ({time_module.time()-t0:.0f}s)")
@@ -5244,7 +5261,8 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
     # the per-type rows and the overall value. No priors, no clip.
     _loc_S = _loc_anchors['surfaces']
     _loc_pt_anc = _loc_anchors['pt']
-    def _loc_atom(p):
+    def _loc_cont(p):
+        # The unrounded MLB-anchored Loc+ of one pitch.
         if not _loc_scorable(p):
             return None
         anc = _loc_pt_anc.get(group_of(p))
@@ -5253,8 +5271,15 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
         v = score_pitch(p, _loc_S)
         if v is None:
             return None
-        return int(round(100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]))
+        return 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
+
+    def _loc_atom(p):
+        # The AAA ruler takes the group's AAA mean (less 100) off before rounding.
+        c = _loc_cont(p)
+        return None if c is None else int(round(c - _loc_shift.get(group_of(p), 0.0)))
     ctx['loc_atom_fn'] = _loc_atom   # per-pitch fallback for blank sheet cells
+    ctx['loc_cont_fn'] = _loc_cont
+    ctx['loc_group_fn'] = group_of
     ctx['loc_overall'], ctx['loc_pt'] = {}, {}
     for _nm, _plist in norm_by_pitcher.items():
         _by_type = defaultdict(list)
@@ -5273,8 +5298,11 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
     # _scratch_stuff_scores, which also prints it).
     print("  [scratch] Scoring Stuff+...")
     try:
+        ctx['stuff_cont_by_pid'] = {} if keep_cont else None
         (ctx['stuff_overall'], ctx['stuff_pt'],
-         ctx['stuff_atoms_by_pid']) = _scratch_stuff_scores(norm_by_pitcher, stuff_k_shrink)
+         ctx['stuff_atoms_by_pid']) = _scratch_stuff_scores(
+            norm_by_pitcher, stuff_k_shrink, shift=_stuff_shift,
+            cont_out=ctx['stuff_cont_by_pid'])
     except (FileNotFoundError, RuntimeError):
         # A missing or version-stale bundle is an operator problem with a
         # known fix, not a data condition — raise it instead of rendering a
@@ -5342,8 +5370,97 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None):
             print("  WARNING: metadata pitcherPlusBaseline missing/unreadable "
                   "— scratch cards will show Pitcher+ as —")
 
+    if aaa:
+        _install_aaa_pools(ctx, aaa)
     print(f"  [scratch] League context ready ({time_module.time()-t0:.0f}s)")
     return ctx
+
+
+# ═══════════════════════════════════════════════════════════════
+# AAA RULER (2026-11-08, per Wally): a scratch-tab or MiLB-corpus season card
+# can read against 2026 AAA instead of MLB, as the AAA hitter cards do. Every
+# chip is a AAA percentile, every tint reads the AAA average, and Stuff+, Loc+
+# and Pitcher+ read 100 = AAA average. Stuff+ and Loc+ keep the MLB point
+# size: each pitch's grade is shifted by its type's (Loc+: group's) AAA mean
+# less 100 before it is rounded, so the atoms average 100 at AAA. Pitcher+ is
+# rebuilt on the AAA pool's (mu, sigma). The chip pools are Savant's line,
+# 1.25 batters faced per AAA team game; the per-type, split and HR/FB pools
+# keep the conventions their MLB twins use. The pool is one season, built by
+# scripts/research/cards/aaa_pitcher_pool.py into AAA_PITCHER_POOL.
+# ═══════════════════════════════════════════════════════════════
+AAA_PITCHER_POOL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                'data', '_milb2026', 'pitcher_pool_AAA.json')
+AAA_POOL_BUILD_CMD = 'PYTHONHASHSEED=0 .venv/bin/python scripts/research/cards/aaa_pitcher_pool.py'
+
+
+def load_aaa_pitcher_pool():
+    """The AAA pitcher pool, or stop: a card asked for the AAA ruler must never
+    fall back to MLB rulers in silence."""
+    if not os.path.exists(AAA_PITCHER_POOL):
+        sys.exit(f'AAA ruler: {AAA_PITCHER_POOL} is missing. Build it (about 30 minutes, '
+                 f'alone on this machine): {AAA_POOL_BUILD_CMD}')
+    with open(AAA_PITCHER_POOL) as f:
+        pool = json.load(f)
+    print(f"  AAA ruler: pool of {len(pool['pitchers'])} AAA pitchers "
+          f"(built {pool['meta']['built']}, {pool['meta']['pitches']} pitches)")
+    return pool
+
+
+def aaa_qualified(pool):
+    """The AAA pitchers inside Savant's percentile line: 1.25 batters faced per
+    game of the club each one pitched for last."""
+    from pipeline.utils import PCTL_BF_PER_GAME_MLB
+    tg = pool['meta']['teamGames']
+    return [r for r in pool['pitchers'].values()
+            if tg.get(r['club']) and (r.get('tbf') or 0) >= PCTL_BF_PER_GAME_MLB * tg[r['club']]]
+
+
+def _install_aaa_pools(ctx, pool):
+    """Swap every MLB ruler the scratch card reads for its AAA twin: the chip
+    pools, Pitcher+'s baseline and pool, the per-type pools, and the social
+    card's split, xwOBAcon and extension pools plus the HR/FB and PU pools."""
+    global _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS, _SOCIAL_EXT_POOL, _HRFB_PU_POOLS
+    q = aaa_qualified(pool)
+    ctx['pitcher_pools'] = {
+        s: sorted(v for v in ((_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s))
+                              for r in q) if v is not None)
+        for s in _SCRATCH_POOL_STATS}
+    ctx['pitcher_plus_pool'] = sorted(r['pitcherPlus'] for r in q if r.get('pitcherPlus') is not None)
+    base = pool.get('pitcherPlusBase')
+    ctx['pitcher_plus_base'] = {k: tuple(v) for k, v in base.items()} if base else None
+    pt_pools = defaultdict(lambda: defaultdict(list))
+    for by_pt in pool['pitchTypes'].values():
+        for pt, d in by_pt.items():
+            for s in ('velocity', 'nVAA', 'stuffScore', 'locPlus'):
+                v = d.get(s)
+                if v is not None:
+                    pt_pools[pt][s].append(_stuff_rank_key(v) if s == 'stuffScore' else v)
+    ctx['pitch_pools'] = {pt: {s: sorted(v) for s, v in d.items()} for pt, d in pt_pools.items()}
+    tint = {}
+    xwc = defaultdict(list)
+    for th, bh, pt, n, st, sw, wh, nbip, xw in pool['socialCells']:
+        t = tint.setdefault((th, bh, pt), {'strike': [], 'whiff': []})
+        if n >= SOCIAL_STRIKE_MIN_PITCHES:
+            t['strike'].append(st / n)
+        if sw >= SOCIAL_WHIFF_MIN_SWINGS:
+            t['whiff'].append(wh / sw)
+        if nbip >= XWC_COLOR_MIN_BIP and xw is not None:
+            xwc[(th, bh, pt)].append(xw)
+    for t in tint.values():
+        t['strike'].sort()
+        t['whiff'].sort()
+    for v in xwc.values():
+        v.sort()
+    _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS = tint, dict(xwc)
+    _SOCIAL_EXT_POOL = sorted(r['extension'] for r in q if r.get('extension') is not None)
+    hb = [r['hrfb'] for r in pool['pitchers'].values() if r.get('hrfb')]
+    _HRFB_PU_POOLS = {'hrfb': sorted(a[1] / a[0] * 100 for a in hb if a[0] >= 20),
+                      'pu': sorted(a[2] / a[3] * 100 for a in hb if a[3] >= 50)}
+    ctx['league_avgs'] = pool['leagueAverages']
+    ctx['overall_avgs'] = pool['pitcherLeagueAverages']
+    print(f"  AAA ruler: {len(q)} pitchers clear 1.25 BF per team game; "
+          f"Pitcher+ pool {len(ctx['pitcher_plus_pool'])}; "
+          f"{len(ctx['pitch_pools'])} pitch types; {len(tint)} split cells")
 
 
 def _social_atom_maps(np_, ctx):
@@ -5475,6 +5592,14 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
         if _l is not None: _La.append(_l)
     row['stuffScore'] = sum(_Sa) / len(_Sa) if _Sa else None   # full precision; ranks on 1 decimal
     row['locPlus'] = round(sum(_La) / len(_La), 1) if _La else None
+    if ctx.get('aaa'):
+        # The MLB-anchored pair, for the estimators calibrated on it (hpERA).
+        # The AAA ruler moves what the card SHOWS, never an MLB model's inputs.
+        _sc = ctx.get('stuff_cont_by_pid') or {}
+        _Sm = [int(round(_sc[k])) for k in (str(q.get('PitchID') or '') for q in pitches) if k in _sc]
+        _Lm = [int(round(c)) for c in (ctx['loc_cont_fn'](q) for q in pitches) if c is not None]
+        row['_stuffScoreMLB'] = sum(_Sm) / len(_Sm) if _Sm else None
+        row['_locPlusMLB'] = round(sum(_Lm) / len(_Lm), 1) if _Lm else None
 
     # Percentile bubbles — rank each computed stat into the MLB pool.
     for s in _SCRATCH_POOL_STATS:
@@ -5652,6 +5777,7 @@ def main():
     milb_scope      = "all"              # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
     milb_levels     = None               # Levels, e.g. "AAA", "MLB", "AAA,MLB"; None = all corpus levels (AAA, Single-A, MLB-spring, Rookie, AFL, Prospect-event), no MLB
     milb_player_id  = None               # Corpus only: the mlbId when one name is two players
+    aaa_ruler       = False              # True = rank and grade against 2026 AAA, not MLB (scratch-tab or corpus season/range cards; needs data/_milb2026/pitcher_pool_AAA.json)
     output_dir      = OUTPUT_DIR
 
     # ── CLI overrides (optional — values above are used if no args passed) ──
@@ -5720,6 +5846,10 @@ def main():
                              'and joins only when named (default: every corpus level)')
     parser.add_argument('--milb-player-id', default=None,
                         help='Corpus only: the mlbId when one name is two players')
+    parser.add_argument('--aaa-ruler', action='store_true',
+                        help='Rank and grade against 2026 AAA instead of MLB: AAA percentiles, '
+                             'AAA tints, Stuff+/Loc+/Pitcher+ at 100 = AAA average. Scratch-tab '
+                             'or MiLB-corpus season and date-range cards only')
     args = parser.parse_args()
 
     if args.team is not None: team = args.team
@@ -5741,6 +5871,7 @@ def main():
     if args.milb_scope is not None: milb_scope = args.milb_scope
     if args.milb_levels is not None: milb_levels = args.milb_levels
     if args.milb_player_id is not None: milb_player_id = args.milb_player_id
+    if args.aaa_ruler: aaa_ruler = True
 
     # Parse filter_pitchers string into list
     if filter_pitchers:
@@ -6069,12 +6200,30 @@ def main():
     # Loc+, xRV anchoring, percentile pools, nVAA/nHAA regressions) once for
     # all card pitchers. Heavy (loads the MLB pitch pickle) — scratch only.
     scratch_ctx = None
+    _aaa_pool = None
+    if aaa_ruler:
+        if not (scratch_tab and is_multi_game):
+            sys.exit('AAA ruler: scratch-tab (team NEW or a tab) or MiLB-corpus season and '
+                     'date-range cards only. A single game reads the MLB outing pool, and a '
+                     'team-tab card reads the shipped leaderboard.')
+        _aaa_pool = load_aaa_pitcher_pool()
+        # Every grade is recomputed on the AAA shift, so a stamped MLB cell is set aside.
+        _n_cells = 0
+        for _pl in pitches_by_pitcher.values():
+            for _r in _pl:
+                for _c in ('Stuff+', 'Loc+'):
+                    if _r.get(_c) not in (None, ''):
+                        _n_cells += 1
+                    _r[_c] = ''
+        if _n_cells:
+            print(f"  AAA ruler: {_n_cells} MLB-anchored grade cells set aside, regraded vs AAA")
     if scratch_tab and is_multi_game:
-        print("\nStep 1b: Computing scratch-tab MLB-style context...")
+        print("\nStep 1b: Computing scratch-tab " + ("AAA" if _aaa_pool else "MLB") + "-style context...")
         try:
             _norm = {nm: [_normalize_scratch_pitch(r) for r in pl]
                      for nm, pl in pitches_by_pitcher.items()}
-            scratch_ctx = _build_scratch_league_context(_norm, stuff_k_shrink=K_SHRINK_DAILY)
+            scratch_ctx = _build_scratch_league_context(_norm, stuff_k_shrink=K_SHRINK_DAILY,
+                                                        aaa=_aaa_pool, keep_cont=bool(_aaa_pool))
             scratch_ctx['ibb_by_pitcher'] = dict(ibb_by_pitcher)
         except Exception as _e:
             import traceback; traceback.print_exc()
@@ -6096,6 +6245,9 @@ def main():
         except Exception as _e:
             import traceback; traceback.print_exc()
             print(f"  WARNING: daily Stuff+/Loc+ context failed ({_e}) — omitting those columns")
+    if _aaa_pool and scratch_ctx is None:
+        sys.exit('AAA ruler: the scratch context failed (traceback above), and a AAA card '
+                 'must not render on MLB rulers. Fix the error and rerun.')
     if scratch_ctx is not None:
         # A single-game card fills RunExp and xwOBA from the league tables
         # before the backfill (see _compute_scratch_pitcher_context); season
@@ -6181,6 +6333,10 @@ def main():
             card_date = card_date.replace(
                 display_date, corpus_players[pitcher_name]['label']
                 + (f"  ·  {display_date}" if date_filter is not None else ''), 1)
+        if _aaa_pool:
+            # Before any 'Through' date, so the social kicker (which drops it) keeps it.
+            _head = card_date.split('  ·  Through')[0]
+            card_date = card_date.replace(_head, _head + ' vs AAA', 1)
         pitches = pitches_by_pitcher[pitcher_name]
         print(f"\n  --- {pitcher_name} ({len(pitches)} pitches) ---")
 
@@ -6418,7 +6574,9 @@ def main():
             if _epc and pctl_row is not None:
                 from pipeline.eraplus import score_scratch_row
                 _dh, _ph = score_scratch_row(
-                    pctl_row,
+                    (dict(pctl_row, stuffScore=pctl_row.get('_stuffScoreMLB'),
+                          locPlus=pctl_row.get('_locPlusMLB'))
+                     if _aaa_pool else pctl_row),
                     scratch_ctx['norm_by_pitcher'].get(pitcher_name) or [],
                     box.get('g'), box.get('gs'), eff_team, _epc)
                 # The pipeline scores no hdERA on a ROC/AAA row: its xwOBA channel reads a
@@ -6471,9 +6629,10 @@ def main():
             'social_box': dict(box) if box else {},
             'headshot': headshot,
             'mlb_id': mlb_id,
-            'league_avgs': league_avgs,
-            'overall_avgs': overall_avgs,
-            'pitcher_league_avgs': overall_avgs,
+            'league_avgs': (scratch_ctx['league_avgs'] if _aaa_pool else league_avgs),
+            'overall_avgs': (scratch_ctx['overall_avgs'] if _aaa_pool else overall_avgs),
+            'pitcher_league_avgs': (scratch_ctx['overall_avgs'] if _aaa_pool else overall_avgs),
+            'aaa_ruler': bool(_aaa_pool),
             # xmove_models stays empty for daily → is_season False → daily layout
             # (RelZ/RelX kept, no RV pair). Stuff+/Loc+/nVAA/nHAA come
             # from the computed context maps below regardless.
@@ -6511,12 +6670,13 @@ def main():
         else:
             name_slug = pitcher_name.replace(' ', '').replace(',', '')
         _hs = f"-vs{bats_filter}" if bats_filter else ""
-        output_file = os.path.join(output_dir, f"{date_slug}-{name_slug}{_hs}.png")
+        _aaa_s = "-vsAAA" if _aaa_pool else ""
+        output_file = os.path.join(output_dir, f"{date_slug}-{name_slug}{_hs}{_aaa_s}.png")
 
         # Render
         if social:
             output_file = os.path.join(output_dir,
-                                       f"Social-{date_slug}-{name_slug}{_hs}.png")
+                                       f"Social-{date_slug}-{name_slug}{_hs}{_aaa_s}.png")
             success = render_social_card(config, pitches, output_file)
         else:
             success = render_card(config, pitches, output_file)
