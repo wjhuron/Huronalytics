@@ -4375,7 +4375,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 n_mlb += 1
                 fg_player = _fg_mlb_h.get(mid_str)
                 if fg_player:
-                    if fg_player.get('wRCplus') is not None:
+                    # FG publishes one season row per player, so its wRC+ belongs to
+                    # the combined 2TM.. row (or the only row). A traded player's
+                    # stint rows keep the pipeline's own value from that stint's wOBA
+                    # and club park; until 2026-11-07 every stint row carried the
+                    # season wRC+ (Ward's .194-wOBA SEA stint read 102).
+                    _stint = mid in _fg_comb_h and not row.get('_isCombined')
+                    if fg_player.get('wRCplus') is not None and not _stint:
                         row['wRCplus'] = fg_player['wRCplus']
                         n_mlb_wrc += 1
                     _war = fg_player.get('war')
@@ -4901,8 +4907,15 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         _fg_pit_cache = _fg_refresh_pit(max_age_hours=24, verbose=False)
         _fg_pit = _fg_pit_cache.get('mlbPitchers', {})
         n_pit_replaced = n_pit = 0
+        # FG's row is the pitcher's whole season: it belongs on the combined 2TM..
+        # row (or the only row), never on a traded pitcher's stint rows, which keep
+        # the pipeline's own stint value. Until 2026-11-07 this was inverted: stints
+        # took the season value and the combined row kept the pipeline's.
+        _fg_comb_p = {r.get('mlbId') for r in pitcher_leaderboard if r.get('_isCombined')}
         for row in pitcher_leaderboard:
-            if row.get('_isROC') or row.get('_isCombined'):
+            if row.get('_isROC'):
+                continue
+            if row.get('mlbId') in _fg_comb_p and not row.get('_isCombined'):
                 continue
             mid = row.get('mlbId')
             if mid is None:
