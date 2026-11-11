@@ -23,6 +23,9 @@ listed at the end without a tier. Tiers: natural breaks in projected RA9 within 
 starts are 40%+ of 2026 AAA + MLB games), N_TIERS each, the MLB free-agent class ranked but not
 tiered. The tier count is a CONVENTION.
 
+P(MLB deal) (deal_prob.py): the contract model's probability of a guaranteed MLB deal, blank under
+20 MLB innings 2024-2026 (out of the model's range). Pitchers at 1.00 are removed before tiering.
+
 Writes ~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv.
     python3 scripts/research/milb_fa/rank_all.py
 """
@@ -38,6 +41,9 @@ sys.path.insert(0, HERE)
 import bt_run as BT  # noqa: E402
 import rank_small as RS  # noqa: E402
 from mlb_released_adds import mlb_lines, signed_since  # noqa: E402
+from deal_prob import p_mlb_deal  # noqa: E402
+
+CERTAIN = 0.995
 from rank_live import disp  # noqa: E402
 from rank_sample_check import build_big  # noqa: E402
 
@@ -242,6 +248,13 @@ def main():
             n.append('heavy shrinkage (under 75 BF at every minor level)')
         notes.append('; '.join(n))
     f['Note'] = notes
+    # P(MLB deal) (deal_prob.py, 2026-11-11, per Wally: "remove any guy you think is 100%"). A
+    # pitcher at CERTAIN or above is gone before tiering: he is not a depth signing. CERTAIN is
+    # the probability that prints as 1.00 at two decimals, read literally from "100%".
+    f = f.join(p_mlb_deal(f)[['p_mlb']])
+    gone = f[f.p_mlb >= CERTAIN]
+    print(f'removed {len(gone)} at P(MLB deal) >= {CERTAIN}: {", ".join(gone.Name)}')
+    f = f[~(f.p_mlb >= CERTAIN)].reset_index(drop=True)
     # MLB free-agent class: elected free agency at the MLB level on or after 2026-10-28 (the
     # six-year and outrighted class). They stay on the list and in RoleRank but are not tiered
     # with the depth pool, so they do not take its tier-1 slots.
@@ -289,7 +302,8 @@ def main():
     # relevant information"); mlbId stays last for matching by id
     out.loc[out.MLBadd, 'Note'] = ('added: MLB time, let go before 10/28; '
                                    + out.loc[out.MLBadd, 'Note'].fillna('')).str.rstrip('; ')
-    cols = ['Role', 'Tier', 'RoleRank', 'Name', 'Age', 'projRA9', 'MLB_AAA_BF', 'Levels2026',
+    out['P(MLB deal)'] = f.loc[out.index, 'p_mlb'].round(2)
+    cols = ['Role', 'Tier', 'RoleRank', 'Name', 'Age', 'projRA9', 'P(MLB deal)', 'MLB_AAA_BF', 'Levels2026',
             'K-BB% (all-level, AAA scale)', 'SwStr% (all-level, AAA scale)',
             'MLB_Stuff+', 'MLB_Loc+', 'MLB_arsenal', 'AAA_Stuff+', 'AAA_Loc+', 'AAA_FBvelo', 'AAA_arsenal',
             'LastMove', 'Note', 'mlbId']
