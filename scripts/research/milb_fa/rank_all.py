@@ -1,0 +1,189 @@
+"""Every free-agent pitcher on one list, in tiers (2026-11-11, per Wally: "rank every single
+pitcher, not just the targets. put them in tiers", "if players do not have enough data/sample,
+note that", plus the pre-10/28 released / elected-FA pitchers with 2026 MLB time).
+
+Pool: every pitcher in ~/Downloads/stuff/milb_fa_2026_pitchers.csv who is still free
+(data/_milb_fa/not_free.csv, then the MLB transactions API since 2026-11-09), plus
+data/_milb_fa/mlb_adds.csv (mlb_released_adds.py: last move before 2026-10-28, 2026 MLB time
+in Sheets).
+
+Projection (next-season RA9 on the MLB scale), as rank_live.py: the shipped projection
+(projections_pit.csv proj1_RA9_MLB) where it exists, otherwise the xallm spec (rank_small.py,
+k 25, small samples k 800). Then the MIXED-LIST CALIBRATION measured in rank_sample_check.py
+(part D: per-group target = a + s * prediction, held out 5/5 pairs, +.022 r, 3.6 SE), applied in
+the backtest's AAA-translated nRA9 space with the all-pair fits:
+    no MLB time        s .70     MLB time, under half of BF   s .47
+    MLB-primary        s .49     small minor sample (<75 BF at every level)   s 1.18
+The fits were made on xallm predictions; the shipped projection stands in for them on the
+pitchers it covers (r .91, mean gap -.03 runs).
+Prior seasons are NOT used: the prior-season spec lost to the shipped projection on its own
+population (rank_sample_check.py part C, 1 of 4 pairs), and inside the uncovered groups it did
+not clear 2 SE.
+
+Tiers: within role (SP if starts are 40%+ of 2026 AAA + MLB games, else of all 2026 games),
+by calibrated RA9: tier 1 top 10%, 2 next 15%, 3 next 25%, 4 next 25%, 5 bottom 25%. The cuts
+are a CONVENTION; there is no objective that sets them.
+Sample notes come from the measured ranges: the backtest has no pitcher under 30 BF (those are
+listed but not tiered), its held-out r is .31 at 30-99 BF against .39 at 200-399, and its
+MLB-primary group stops at 250 MLB BF.
+
+Writes ~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv.
+    python3 scripts/research/milb_fa/rank_all.py
+"""
+import os
+import sys
+
+import numpy as np
+import pandas as pd
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bt_run as BT  # noqa: E402
+import rank_small as RS  # noqa: E402
+from mlb_released_adds import mlb_lines, signed_since  # noqa: E402
+from rank_live import disp  # noqa: E402
+
+D = os.path.join(BT.ROOT, 'data', '_milb_fa')
+OUT = os.path.expanduser('~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv')
+# rank_sample_check.py part D, all-pair fits (a, s), target and prediction in AAA nRA9 units
+CAL = {'noMLB': (-1.876, 0.698), 'MLBminor': (-2.701, 0.471), 'MLBprimary': (-2.122, 0.487),
+       'small': (1.937, 1.183),
+       # rank_sample_check.py part E: 250+ MLB BF, s .45-.52 in every leave-one-out fit
+       'MLBbig': (-2.067, 0.484)}
+TIERS = [(0.10, 1), (0.25, 2), (0.50, 3), (0.75, 4), (1.01, 5)]
+ORDER = ['MLB', 'AAA', 'AA', 'A+', 'A']
+
+
+def main():
+    csv = pd.read_csv(os.path.expanduser('~/Downloads/stuff/milb_fa_2026_pitchers.csv'))
+    nf = pd.read_csv(os.path.join(D, 'not_free.csv')).set_index('mlbId')
+    ma = pd.read_csv(os.path.join(D, 'mlb_adds.csv'))
+    ma = ma[ma.signedSince.isna()]
+    base = csv.drop_duplicates('mlbId').set_index('mlbId')
+    ids = [i for i in base.index if i in nf.index and not bool(nf.loc[i, 'notFree'])]
+    names = {i: base.loc[i, 'Name'] for i in ids}
+    names.update({int(r.mlbId): disp(r.Player) for r in ma.itertuples()})
+    moved = signed_since(set(names))
+    for i in moved:
+        names.pop(i, None)
+    print(f'pool: {len(ids)} free in the FA CSV + {len(ma)} MLB adds; {len(moved)} signed since 11-09 '
+          f'({", ".join(moved.values()) or "none"}); {len(names)} pitchers')
+
+    data = BT.load(2026, 'pit')
+    offs = {s: BT.offsets(data, s)[0] for s in RS.STATS}
+    sheet = mlb_lines().set_index('mlbId')
+    rows = []
+    for mid, nm in names.items():
+        g = data[data.mlbId == mid]
+        mi = g[g.lvl != 'MLB']
+        rec = {'mlbId': mid, 'Name': nm, 'nAll': g.w.sum(), 'mlbN': g[g.lvl == 'MLB'].w.sum(),
+               'minorMax': mi.w.max() if len(mi) else 0.0,
+               'age': g.Age.dropna().iloc[0] if g.Age.notna().any() else base.Age.get(mid, np.nan)}
+        gg = g[g.lvl.isin(['AAA', 'MLB'])][['G', 'GS']].sum()
+        if not gg.G:
+            gg = g[['G', 'GS']].sum()
+        rec['gs_share'] = gg.GS / gg.G if gg.G else np.nan
+        rec['isSP'] = float(bool(gg.G) and gg.GS / gg.G >= BT.SP_GS_SHARE)
+        rec['Role'] = 'SP' if gg.G and gg.GS / gg.G >= 0.4 else 'RP'
+        for s in RS.STATS:
+            q = g[g[s].notna()]
+            rec['xallm_' + s] = np.average(q[s] - q.lvl.map(offs[s]), weights=q.w) if len(q) else np.nan
+        per = g.groupby('lvl').w.sum()
+        rec['Levels2026'] = ', '.join(f'{l} {int(per[l])}' for l in ORDER if l in per)
+        rec['SheetsMLB_BF'] = sheet.MLB_TBF.get(mid, 0)
+        rec['MLB_Stuff+'] = sheet['MLB_Stuff+'].get(mid, np.nan)
+        rec['AAA_Stuff+'] = base['AAA_Stuff+'].get(mid, np.nan) if 'AAA_Stuff+' in base else np.nan
+        rows.append(rec)
+    f = pd.DataFrame(rows)
+    f['small'] = (f.minorMax < BT.MIN['pit']) & (f.mlbN <= f.nAll - f.mlbN)
+    f['G'] = np.select([f.small, f.mlbN == 0, f.mlbN <= f.nAll / 2, f.mlbN >= 250],
+                       ['small', 'noMLB', 'MLBminor', 'MLBbig'], 'MLBprimary')
+
+    # base prediction in AAA nRA9 units: shipped where it exists, else the xallm spec
+    fr = RS.build()
+    tr = fr[(fr.tw > 0) & fr.T_nRA9.notna()].dropna(subset=RS.SPEC)
+    ok = f.dropna(subset=RS.SPEC)
+    f.loc[ok.index, 'p_x'], _ = RS.fit_predict_m(tr, ok, RS.SPEC, 'nRA9', RS.K)
+    sm = ok[f.loc[ok.index, 'small']]
+    if len(sm):
+        f.loc[sm.index, 'p_x'], _ = RS.fit_predict_m(tr, sm, RS.SPEC, 'nRA9', RS.K_SMALL)
+    off = offs['nRA9']['MLB']
+    pr = pd.read_csv(os.path.join(D, 'projections_pit.csv')).drop_duplicates('mlbId').set_index('mlbId')
+    f['shipRA9'] = f.mlbId.map(pr['proj1_RA9_MLB'])
+    f['p'] = np.where(f.shipRA9.notna(), -f.shipRA9 - off, f.p_x)
+    f['Source'] = np.where(f.shipRA9.notna(), 'shipped projection',
+                           np.where(f.p_x.notna(), 'xallm spec', 'none'))
+    a = f.G.map(lambda g: CAL[g][0])
+    s = f.G.map(lambda g: CAL[g][1])
+    f['projRA9_uncal'] = -(f.p + off)
+    f['projRA9'] = -(a + s * f.p + off)
+
+    # sheets vs FanGraphs MLB batters faced
+    dis = f[(f.SheetsMLB_BF - f.mlbN).abs() > 5]
+    print(f'MLB BF, Sheets vs FanGraphs: {len(dis)} pitchers differ by more than 5 BF')
+    if len(dis):
+        print(dis[['Name', 'SheetsMLB_BF', 'mlbN']].to_string(index=False))
+
+    notes = []
+    for r in f.itertuples():
+        n = []
+        if r.Source == 'none':
+            n.append('NO PROJECTION: no 2026 line at MLB, AAA, AA, A+ or A')
+        elif r.nAll < 30:
+            n.append(f'NOT ENOUGH DATA: {int(r.nAll)} BF in 2026, below the tested range; not tiered')
+        elif r.nAll < 100:
+            n.append(f'SMALL SAMPLE: {int(r.nAll)} BF; ranking still informative (held-out r .31) but wide')
+        if r.G in ('MLBminor', 'MLBprimary', 'MLBbig'):
+            n.append('MLB time: projection pulled about halfway to average (MLB-time lines predict half as well)')
+        if r.small and r.nAll >= 30:
+            n.append('under 75 BF at every minor level: heavy shrinkage')
+        notes.append('; '.join(n))
+    f['Note'] = notes
+    # MLB free-agent class: elected free agency at the MLB level on or after 2026-10-28 (the
+    # six-year and outrighted class). They stay on the list and in RoleRank but are not tiered
+    # with the depth pool, so they do not take its tier-1 slots.
+    res = pd.read_csv(os.path.join(D, 'resolved.csv'), dtype={'mlbId': 'Int64'})
+    lastr = res[res.mlbId.notna()].sort_values('Date').groupby('mlbId').tail(1).set_index('mlbId')
+    mlbclass = set(lastr[(lastr.Date >= '2026-10-28') & (lastr.Level == 'MLB')
+                         & (lastr['Transaction Type'] == 'elected free agency')].index)
+    f['MLBclass'] = f.mlbId.isin(mlbclass)
+    f['tiered'] = (f.Source != 'none') & (f.nAll >= 30)
+    f['Tier'] = ''
+    f['RoleRank'] = np.nan
+    for role, g in f[f.tiered].groupby('Role'):
+        g = g.sort_values('projRA9')
+        f.loc[g.index, 'RoleRank'] = np.arange(1, len(g) + 1)
+        d = g[~g.MLBclass]
+        q = (np.arange(len(d)) + 1) / len(d)
+        f.loc[d.index, 'Tier'] = [next(t for c, t in TIERS if x <= c) for x in q]
+        f.loc[g.index[g.MLBclass], 'Tier'] = 'MLB FA'
+    f['MLBadd'] = f.mlbId.isin(ma.mlbId)
+    last = {int(r.mlbId): f"{r.lastMoveDate} {r.lastMove} ({r.lastMoveTeam})" for r in ma.itertuples()}
+    f['LastMove'] = [last.get(i) or nf.lastListMove.get(i, '') for i in f.mlbId]
+    f.loc[f.MLBclass, 'Note'] = (f.loc[f.MLBclass, 'Note'] + '; MLB free-agent class (elected FA at MLB level on or after 10/28): ranked, not tiered with depth arms').str.lstrip('; ')
+    f.loc[~f.tiered & (f.Source != 'none'), 'Tier'] = 'not enough data'
+    f.loc[f.Source == 'none', 'Tier'] = 'no projection'
+    f['K-BB% (all-level, AAA scale)'] = (100 * f['xallm_K-BB%']).round(1)
+    f['SwStr% (all-level, AAA scale)'] = (100 * f['xallm_SwStr%']).round(1)
+    out = f.assign(Age=f.age.round(0), BF2026=f.nAll.astype(int), projRA9=f.projRA9.round(2),
+                   projRA9_uncal=f.projRA9_uncal.round(2), Group=f.G)
+    out = out.sort_values(['Role', 'tiered', 'projRA9'], ascending=[False, False, True])
+    out['Tier'] = out.Tier.astype(str)
+    cols = ['Role', 'Tier', 'RoleRank', 'Name', 'mlbId', 'Age', 'projRA9', 'projRA9_uncal', 'BF2026', 'Levels2026',
+            'SheetsMLB_BF', 'K-BB% (all-level, AAA scale)', 'SwStr% (all-level, AAA scale)', 'AAA_Stuff+',
+            'MLB_Stuff+', 'Group', 'Source', 'MLBadd', 'LastMove', 'Note']
+    out = out[cols]
+    out['RoleRank'] = out.RoleRank.astype('Int64')
+    tmp = OUT + '.tmp'
+    out.to_csv(tmp, index=False)
+    os.replace(tmp, OUT)
+    print(f'wrote {OUT}: {len(out)} pitchers, {int(f.tiered.sum())} tiered')
+    print(out.groupby(['Role', 'Tier']).size().to_string())
+    for role in ('SP', 'RP'):
+        print(f'\n{role} tier 1-2:')
+        print(out[(out.Role == role) & out.Tier.isin(['1', '2'])][['RoleRank', 'Tier', 'Name', 'Age', 'projRA9', 'BF2026',
+                                                              'Levels2026', 'Note']].to_string(index=False))
+
+
+if __name__ == '__main__':
+    main()
