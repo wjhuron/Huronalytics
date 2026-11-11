@@ -289,6 +289,75 @@ def main():
     print(f'E. MLB 250+ BF, n {len(big)}: held-out r per pair {rb}; calibration (a, s) all pairs {fa}; '
           f'leave-one-out fits {fits}')
     out['E_mlb_big'] = {'n': int(len(big)), 'r': rb, 'fit_all': fa, 'fits_lopo': fits}
+    # F. AGE (2026-11-11, per Wally after the Mikolas question): the spec fit on every level
+    # gives age +0.127 runs a year, which partly measures level (frame mean age 24). Refit the
+    # spec on the free-agent POOL ONLY (age 25+, AAA top level or MLB-primary, plus the 250+
+    # MLB rows of part E) and score a mixed list of that pool, groups calibrated leave-one-pair-
+    # out as in part D, against the all-level fit. Rule fixed before the run: adopt the pool
+    # fit unless it loses the pooled delta by more than 2 SE (it removes a measured bias; it
+    # does not need to win on order).
+    big2 = build_big()
+    big2 = big2[(big2.age >= 25) & (big2.tw > 0) & big2.T_nRA9.notna()].dropna(subset=RS.SPEC)
+    allf = pd.concat([fr, big2], ignore_index=True)
+    allf['top'] = allf['top'].fillna('MLB')
+    ok = (allf.tw > 0) & allf.T_nRA9.notna() & allf[RS.SPEC].notna().all(axis=1)
+    inpool = (allf.age >= 25) & ((allf.top == 'AAA') | allf.grp.isin(['MLB-primary', 'MLB-big']))
+    ev = allf[ok & inpool].copy()
+    ev['G'] = np.select([ev.grp == 'small MiLB', ev.mlbN == 0, ev.mlbN <= ev.nAll / 2, ev.mlbN >= 250],
+                        ['small', 'noMLB', 'MLBminor', 'MLBbig'], 'MLBprimary')
+    preds = {}
+    ages = {}
+    for arm, trmask in (('all-level fit', ok), ('pool fit', ok & inpool)):
+        col = pd.Series(np.nan, index=ev.index)
+        ag = []
+        for hp in sorted(ev.pair.unique()):
+            tr = allf[trmask & (allf.pair != hp)]
+            for small in (True, False):
+                te = ev[(ev.pair == hp) & ((ev.grp == 'small MiLB') == small)]
+                if len(te):
+                    col[te.index], b = RS.fit_predict_m(tr, te, RS.SPEC, 'nRA9', RS.K_SMALL if small else RS.K)
+                    if not small:
+                        ag.append(round(float(b[-1]), 3))
+        ages[arm] = ag
+        cal = pd.Series(np.nan, index=ev.index)
+        for hp in sorted(ev.pair.unique()):
+            trn, te = ev[ev.pair != hp], ev[ev.pair == hp]
+            for G, tg in trn.groupby('G'):
+                m = te.G == G
+                X = np.column_stack([np.ones(len(tg)), col[tg.index]]); w = np.sqrt(tg.tw.values)
+                a, b = np.linalg.lstsq(X * w[:, None], tg.T_nRA9.values * w, rcond=None)[0]
+                cal[te.index[m]] = a + b * col[te.index[m]]
+        preds[arm] = (col, cal)
+    pairs = sorted(ev.pair.unique())
+    rr = {arm: [wr(c[ev.pair == hp], ev.T_nRA9[ev.pair == hp], ev.tw[ev.pair == hp], ev.role[ev.pair == hp])
+                for hp in pairs] for arm, (_, c) in preds.items()}
+    d = [a - b for a, b in zip(rr['pool fit'], rr['all-level fit'])]
+    rngf = np.random.default_rng(2)
+    boots = []
+    for _ in range(B):
+        ds = []
+        for hp in pairs:
+            idx = ev.index[ev.pair == hp]
+            i = rngf.choice(idx, len(idx))
+            h = ev.loc[i]
+            ds.append(wr(preds['pool fit'][1][i], h.T_nRA9, h.tw, h.role)
+                      - wr(preds['all-level fit'][1][i], h.T_nRA9, h.tw, h.role))
+        boots.append(np.mean(ds))
+    se = float(np.std(boots))
+    # calibration fits on all pairs for the pool fit (what rank_all applies)
+    colp = preds['pool fit'][0]
+    fits = {}
+    for G, g in ev.groupby('G'):
+        X = np.column_stack([np.ones(len(g)), colp[g.index]]); w = np.sqrt(g.tw.values)
+        fits[G] = np.round(np.linalg.lstsq(X * w[:, None], g.T_nRA9.values * w, rcond=None)[0], 3).tolist()
+    print(f'F. mixed list incl. 250+ MLB, n {len(ev)}: all-level fit r {np.round(rr["all-level fit"], 4)} | '
+          f'pool fit r {np.round(rr["pool fit"], 4)} | d {np.mean(d):+.4f} se {se:.4f} wins {sum(x > 0 for x in d)}/{len(d)}'
+          f' | adopt {bool(np.mean(d) > -2 * se)}')
+    print(f'   age coefficient per held-out fit: all-level {ages["all-level fit"]}, pool {ages["pool fit"]}')
+    print(f'   pool-fit calibration (a, s) by group, all pairs: {fits}')
+    out['F_age_pool'] = {'n': int(len(ev)), 'r': {k: [round(x, 4) for x in v] for k, v in rr.items()},
+                         'd': round(float(np.mean(d)), 4), 'se': round(se, 4), 'ages': ages, 'cal_pool_fit': fits,
+                         'adopt': bool(np.mean(d) > -2 * se)}
     tmp = os.path.join(D, '_rank_sample_check.json.tmp')
     json.dump(out, open(tmp, 'w'), indent=1)
     os.replace(tmp, os.path.join(D, '_rank_sample_check.json'))

@@ -7,29 +7,26 @@ Pool: every pitcher in ~/Downloads/stuff/milb_fa_2026_pitchers.csv who is still 
 data/_milb_fa/mlb_adds.csv (mlb_released_adds.py: last move before 2026-10-28, 2026 MLB time
 in Sheets).
 
-Projection (next-season RA9 on the MLB scale), as rank_live.py: the shipped projection
-(projections_pit.csv proj1_RA9_MLB) where it exists, otherwise the xallm spec (rank_small.py,
-k 25, small samples k 800). Then the MIXED-LIST CALIBRATION measured in rank_sample_check.py
-(part D: per-group target = a + s * prediction, held out 5/5 pairs, +.022 r, 3.6 SE), applied in
-the backtest's AAA-translated nRA9 space with the all-pair fits:
-    no MLB time        s .70     MLB time, under half of BF   s .47
-    MLB-primary        s .49     small minor sample (<75 BF at every level)   s 1.18
-The fits were made on xallm predictions; the shipped projection stands in for them on the
-pitchers it covers (r .91, mean gap -.03 runs).
-Prior seasons are NOT used: the prior-season spec lost to the shipped projection on its own
-population (rank_sample_check.py part C, 1 of 4 pairs), and inside the uncovered groups it did
-not clear 2 SE.
+Projection (next-season RA9 on the MLB scale): ONE model for everyone, the xallm spec of
+rank_small.py (K-BB%, SwStr%, xFIP, GB% over every level, MLB included, translated to AAA;
+role; age; k 25, small samples k 800) FIT ON THE FREE-AGENT POOL ONLY (age 25+, AAA top level
+or mostly MLB, 250+ MLB BF included). rank_sample_check.py part F: the all-level fit gave age
+.09-.13 runs a year, partly measuring level; the pool fit gives .03 and orders a mixed list
+better (5/5 pairs, +.006 r, 3.7 SE). The shipped projection is not used because it carries the
+all-level age slope. Then the per-group MIXED-LIST CALIBRATION (target = a + s * prediction,
+groups: no MLB, MLB under half, mostly MLB, 250+ MLB, small minor sample), fit in part F and
+read from data/_milb_fa/_rank_sample_check.json.
+Prior seasons are NOT used (part B/C: under 2 SE where it would apply, lost to shipped).
 
-Tiers: within role (SP if starts are 40%+ of 2026 AAA + MLB games, else of all 2026 games),
-by calibrated RA9: tier 1 top 10%, 2 next 15%, 3 next 25%, 4 next 25%, 5 bottom 25%. The cuts
-are a CONVENTION; there is no objective that sets them.
-Sample notes come from the measured ranges: the backtest has no pitcher under 30 BF (those are
-listed but not tiered), its held-out r is .31 at 30-99 BF against .39 at 200-399, and its
-MLB-primary group stops at 250 MLB BF.
+Scope: pitchers with 2026 MLB or AAA batters faced only; under MIN_MLBAAA MLB + AAA BF they are
+listed at the end without a tier. Tiers: natural breaks in projected RA9 within role (SP if
+starts are 40%+ of 2026 AAA + MLB games), N_TIERS each, the MLB free-agent class ranked but not
+tiered. The tier count is a CONVENTION.
 
 Writes ~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv.
     python3 scripts/research/milb_fa/rank_all.py
 """
+import json
 import os
 import sys
 
@@ -42,6 +39,7 @@ import bt_run as BT  # noqa: E402
 import rank_small as RS  # noqa: E402
 from mlb_released_adds import mlb_lines, signed_since  # noqa: E402
 from rank_live import disp  # noqa: E402
+from rank_sample_check import build_big  # noqa: E402
 
 D = os.path.join(BT.ROOT, 'data', '_milb_fa')
 OUT = os.path.expanduser('~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv')
@@ -51,12 +49,17 @@ OUT = os.path.expanduser('~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv')
 # card_min_breakeven.py); the projection has no cliff there (held-out r .31 at 30-99 total BF).
 # The projection still reads every level he pitched at; only the gate looks at MLB + AAA.
 MIN_MLBAAA = 100
-# rank_sample_check.py part D, all-pair fits (a, s), target and prediction in AAA nRA9 units
-CAL = {'noMLB': (-1.876, 0.698), 'MLBminor': (-2.701, 0.471), 'MLBprimary': (-2.122, 0.487),
-       'small': (1.937, 1.183),
-       # rank_sample_check.py part E: 250+ MLB BF, s .45-.52 in every leave-one-out fit
-       'MLBbig': (-2.067, 0.484)}
-TIERS = [(0.10, 1), (0.25, 2), (0.50, 3), (0.75, 4), (1.01, 5)]
+# Calibration (a, s) per group, target and prediction in AAA nRA9 units: rank_sample_check.py
+# part F (the POOL-FIT spec, 2026-11-11), read from its JSON so no constant is copied by hand.
+# Part F refused to adopt -> stop rather than fall back.
+_SC = json.load(open(os.path.join(D, '_rank_sample_check.json')))
+if not _SC.get('F_age_pool', {}).get('adopt'):
+    sys.exit('rank_sample_check.py part F did not adopt the pool fit; rerun it before ranking')
+CAL = {k: tuple(v) for k, v in _SC['F_age_pool']['cal_pool_fit'].items()}
+# Tiers: natural breaks in projected RA9 within each role (optimal 1-D partition, minimum
+# within-tier squared deviation), N_TIERS per role. The count is a CONVENTION matching the
+# earlier chat list Wally found easy to read; no objective sets it.
+N_TIERS = 7
 ORDER = ['MLB', 'AAA', 'AA', 'A+', 'A']
 
 
@@ -115,6 +118,37 @@ def pitch_metrics(ids, mlb_team):
     return pd.DataFrame.from_dict(out, orient='index')
 
 
+def natural_breaks(x, k):
+    """Tier labels 1..k for sorted values x: the partition into k contiguous groups with the
+    least total within-group squared deviation (Fisher's exact 1-D method)."""
+    x = np.asarray(x, float)
+    n = len(x)
+    k = min(k, n)
+    cs, cs2 = np.concatenate([[0], np.cumsum(x)]), np.concatenate([[0], np.cumsum(x * x)])
+
+    def sse(i, j):            # x[i:j]
+        m = j - i
+        return cs2[j] - cs2[i] - (cs[j] - cs[i]) ** 2 / m
+    cost = np.full((k + 1, n + 1), np.inf)
+    back = np.zeros((k + 1, n + 1), int)
+    cost[0, 0] = 0
+    for t in range(1, k + 1):
+        for j in range(t, n + 1):
+            best, arg = np.inf, t - 1
+            for i in range(t - 1, j):
+                c = cost[t - 1, i] + sse(i, j)
+                if c < best:
+                    best, arg = c, i
+            cost[t, j], back[t, j] = best, arg
+    lab = np.zeros(n, int)
+    j = n
+    for t in range(k, 0, -1):
+        i = back[t, j]
+        lab[i:j] = t
+        j = i
+    return lab
+
+
 def main():
     csv = pd.read_csv(os.path.expanduser('~/Downloads/stuff/milb_fa_2026_pitchers.csv'))
     nf = pd.read_csv(os.path.join(D, 'not_free.csv')).set_index('mlbId')
@@ -166,19 +200,22 @@ def main():
                        ['small', 'noMLB', 'MLBminor', 'MLBbig'], 'MLBprimary')
 
     # base prediction in AAA nRA9 units: shipped where it exists, else the xallm spec
-    fr = RS.build()
-    tr = fr[(fr.tw > 0) & fr.T_nRA9.notna()].dropna(subset=RS.SPEC)
+    # POOL FIT (part F): train only on the free-agent shape, age 25+, AAA top level or mostly MLB
+    # (250+ MLB BF included); the all-level fit's age slope partly measured level
+    fr = pd.concat([RS.build(), build_big()], ignore_index=True)
+    fr['top'] = fr['top'].fillna('MLB')
+    tr = fr[(fr.tw > 0) & fr.T_nRA9.notna() & (fr.age >= 25)
+            & ((fr.top == 'AAA') | fr.grp.isin(['MLB-primary', 'MLB-big']))].dropna(subset=RS.SPEC)
     ok = f.dropna(subset=RS.SPEC)
-    f.loc[ok.index, 'p_x'], _ = RS.fit_predict_m(tr, ok, RS.SPEC, 'nRA9', RS.K)
+    f.loc[ok.index, 'p_x'], beta = RS.fit_predict_m(tr, ok, RS.SPEC, 'nRA9', RS.K)
+    print('pool-fit spec', dict(zip(['const'] + RS.SPEC, np.round(beta, 3))))
     sm = ok[f.loc[ok.index, 'small']]
     if len(sm):
         f.loc[sm.index, 'p_x'], _ = RS.fit_predict_m(tr, sm, RS.SPEC, 'nRA9', RS.K_SMALL)
     off = offs['nRA9']['MLB']
-    pr = pd.read_csv(os.path.join(D, 'projections_pit.csv')).drop_duplicates('mlbId').set_index('mlbId')
-    f['shipRA9'] = f.mlbId.map(pr['proj1_RA9_MLB'])
-    f['p'] = np.where(f.shipRA9.notna(), -f.shipRA9 - off, f.p_x)
-    f['Source'] = np.where(f.shipRA9.notna(), 'shipped projection',
-                           np.where(f.p_x.notna(), 'xallm spec', 'none'))
+    # one model for everyone: the shipped projection carries the all-level age slope too
+    f['p'] = f.p_x
+    f['Source'] = np.where(f.p_x.notna(), 'pool-fit spec', 'none')
     a = f.G.map(lambda g: CAL[g][0])
     s = f.G.map(lambda g: CAL[g][1])
     f['projRA9_uncal'] = -(f.p + off)
@@ -220,8 +257,7 @@ def main():
         g = g.sort_values('projRA9')
         f.loc[g.index, 'RoleRank'] = np.arange(1, len(g) + 1)
         d = g[~g.MLBclass]
-        q = (np.arange(len(d)) + 1) / len(d)
-        f.loc[d.index, 'Tier'] = [next(t for c, t in TIERS if x <= c) for x in q]
+        f.loc[d.index, 'Tier'] = natural_breaks(d.projRA9.values, N_TIERS)
         f.loc[g.index[g.MLBclass], 'Tier'] = 'MLB FA'
     f['MLBadd'] = f.mlbId.isin(ma.mlbId)
     last = {int(r.mlbId): f"{r.lastMoveDate} {r.lastMove} ({r.lastMoveTeam})" for r in ma.itertuples()}
