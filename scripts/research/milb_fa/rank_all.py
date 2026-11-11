@@ -45,6 +45,12 @@ from rank_live import disp  # noqa: E402
 
 D = os.path.join(BT.ROOT, 'data', '_milb_fa')
 OUT = os.path.expanduser('~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv')
+# Scope (Wally, 2026-11-11): rank only pitchers with 2026 MLB or AAA batters faced; a pitcher
+# whose MLB + AAA sample is under MIN_MLBAAA is listed at the END, not tiered. 100 BF is a
+# CONVENTION taken from the low end of the measured raw K-BB% break-even (100-145 BF,
+# card_min_breakeven.py); the projection has no cliff there (held-out r .31 at 30-99 total BF).
+# The projection still reads every level he pitched at; only the gate looks at MLB + AAA.
+MIN_MLBAAA = 100
 # rank_sample_check.py part D, all-pair fits (a, s), target and prediction in AAA nRA9 units
 CAL = {'noMLB': (-1.876, 0.698), 'MLBminor': (-2.701, 0.471), 'MLBprimary': (-2.122, 0.487),
        'small': (1.937, 1.183),
@@ -52,6 +58,61 @@ CAL = {'noMLB': (-1.876, 0.698), 'MLBminor': (-2.701, 0.471), 'MLBprimary': (-2.
        'MLBbig': (-2.067, 0.484)}
 TIERS = [(0.10, 1), (0.25, 2), (0.50, 3), (0.75, 4), (1.01, 5)]
 ORDER = ['MLB', 'AAA', 'AA', 'A+', 'A']
+
+
+def pitch_metrics(ids, mlb_team):
+    """Tracked pitch metrics per pitcher, MLB and AAA only (Single-A tracking is ignored, per
+    Wally). Every grade reads on the MLB ruler so the two levels compare.
+      AAA: data/_milb2026/pitcher_pool_AAA.json (AAA regular season, corpus tags). Its per-type
+           grades are on the AAA ruler; the pool's own per-type shift puts them back on MLB.
+      MLB: the Sheets season leaderboards (pitcher and pitch rows), the combined row when the
+           pitcher had one."""
+    import json
+    pool = json.load(open(os.path.join(BT.ROOT, 'data', '_milb2026', 'pitcher_pool_AAA.json')))
+    sh = pool['shift']
+    lb = pd.DataFrame(json.load(open(os.path.join(BT.ROOT, 'data', 'pitcher_leaderboard_rs.json'))))
+    pt = pd.DataFrame(json.load(open(os.path.join(BT.ROOT, 'data', 'pitch_leaderboard_rs.json'))))
+    lb = lb.set_index(['mlbId', 'team'])
+    ptg = {k: g for k, g in pt.groupby(['mlbId', 'team'])}
+
+    def fmt(t, usage, velo, st, lo):
+        parts = [t, f'{velo:.1f}' if pd.notna(velo) else '', f'{usage:.0%}']
+        if pd.notna(st):
+            parts.append(f'St {st:.0f}')
+        if pd.notna(lo):
+            parts.append(f'Loc {lo:.0f}')
+        return ' '.join(x for x in parts if x)
+    out = {}
+    for mid in ids:
+        r = {}
+        a = pool['pitchers'].get(str(mid))
+        if a:
+            r.update({'AAA_pitches': a.get('count'), 'AAA_Stuff+': a.get('stuffScoreMLB'),
+                      'AAA_Loc+': a.get('locPlusMLB'), 'AAA_FBvelo': a.get('fbVelo'),
+                      'AAA_Ext': a.get('extension'), 'AAA_SwStr%': a.get('swStrPct'),
+                      'AAA_Chase%': a.get('chasePct'), 'AAA_IZWhiff%': a.get('izWhiffPct'),
+                      'AAA_GB%': a.get('gbPct')})
+            ty = pool['pitchTypes'].get(str(mid), {})
+            n = sum(v['count'] for v in ty.values()) or 1
+            r['AAA_arsenal'] = '; '.join(
+                fmt(t, v['count'] / n, v.get('velocity'),
+                    v['stuffScore'] + sh['stuff'].get(t, 0) if v.get('stuffScore') is not None else np.nan,
+                    v['locPlus'] + sh['loc'].get(t, 0) if v.get('locPlus') is not None else np.nan)
+                for t, v in sorted(ty.items(), key=lambda kv: -kv[1]['count']) if v['count'] / n >= 0.02)
+        tm = mlb_team.get(mid)
+        if tm is not None and (mid, tm) in lb.index:
+            m = lb.loc[(mid, tm)]
+            r.update({'MLB_pitches': m.get('count'), 'MLB_Stuff+': m.get('stuffScore'),
+                      'MLB_Loc+': m.get('locPlus'), 'MLB_SwStr%': m.get('swStrPct'),
+                      'MLB_Chase%': m.get('chasePct'), 'MLB_GB%': m.get('gbPct')})
+            g = ptg.get((mid, tm))
+            if g is not None:
+                g = g.sort_values('count', ascending=False)
+                n = g['count'].sum() or 1
+                r['MLB_arsenal'] = '; '.join(fmt(x.pitchType, x['count'] / n, x.velocity, x.stuffScore, x.locPlus)
+                                             for _, x in g.iterrows() if x['count'] / n >= 0.02)
+        out[mid] = r
+    return pd.DataFrame.from_dict(out, orient='index')
 
 
 def main():
@@ -78,6 +139,7 @@ def main():
         mi = g[g.lvl != 'MLB']
         rec = {'mlbId': mid, 'Name': nm, 'nAll': g.w.sum(), 'mlbN': g[g.lvl == 'MLB'].w.sum(),
                'minorMax': mi.w.max() if len(mi) else 0.0,
+               'mlbaaaN': g[g.lvl.isin(['MLB', 'AAA'])].w.sum(),
                'age': g.Age.dropna().iloc[0] if g.Age.notna().any() else base.Age.get(mid, np.nan)}
         gg = g[g.lvl.isin(['AAA', 'MLB'])][['G', 'GS']].sum()
         if not gg.G:
@@ -95,6 +157,10 @@ def main():
         rec['AAA_Stuff+'] = base['AAA_Stuff+'].get(mid, np.nan) if 'AAA_Stuff+' in base else np.nan
         rows.append(rec)
     f = pd.DataFrame(rows)
+    dropped = f[f.mlbaaaN <= 0]
+    print(f'scope: {len(dropped)} pitchers with no 2026 MLB or AAA batters faced left out; '
+          f'{len(f) - len(dropped)} kept')
+    f = f[f.mlbaaaN > 0].reset_index(drop=True)
     f['small'] = (f.minorMax < BT.MIN['pit']) & (f.mlbN <= f.nAll - f.mlbN)
     f['G'] = np.select([f.small, f.mlbN == 0, f.mlbN <= f.nAll / 2, f.mlbN >= 250],
                        ['small', 'noMLB', 'MLBminor', 'MLBbig'], 'MLBprimary')
@@ -129,14 +195,14 @@ def main():
         n = []
         if r.Source == 'none':
             n.append('NO PROJECTION: no 2026 line at MLB, AAA, AA, A+ or A')
-        elif r.nAll < 30:
-            n.append(f'NOT ENOUGH DATA: {int(r.nAll)} BF in 2026, below the tested range; not tiered')
-        elif r.nAll < 100:
-            n.append(f'SMALL SAMPLE: {int(r.nAll)} BF; ranking still informative (held-out r .31) but wide')
+        elif r.mlbaaaN < MIN_MLBAAA:
+            n.append(f'not enough MLB/AAA data ({int(r.mlbaaaN)} BF, under {MIN_MLBAAA})')
+        elif r.mlbaaaN < 150:
+            n.append(f'thin MLB/AAA sample ({int(r.mlbaaaN)} BF)')
         if r.G in ('MLBminor', 'MLBprimary', 'MLBbig'):
-            n.append('MLB time: projection pulled about halfway to average (MLB-time lines predict half as well)')
+            n.append('MLB time: projection pulled toward average')
         if r.small and r.nAll >= 30:
-            n.append('under 75 BF at every minor level: heavy shrinkage')
+            n.append('heavy shrinkage (under 75 BF at every minor level)')
         notes.append('; '.join(n))
     f['Note'] = notes
     # MLB free-agent class: elected free agency at the MLB level on or after 2026-10-28 (the
@@ -147,7 +213,7 @@ def main():
     mlbclass = set(lastr[(lastr.Date >= '2026-10-28') & (lastr.Level == 'MLB')
                          & (lastr['Transaction Type'] == 'elected free agency')].index)
     f['MLBclass'] = f.mlbId.isin(mlbclass)
-    f['tiered'] = (f.Source != 'none') & (f.nAll >= 30)
+    f['tiered'] = (f.Source != 'none') & (f.mlbaaaN >= MIN_MLBAAA)
     f['Tier'] = ''
     f['RoleRank'] = np.nan
     for role, g in f[f.tiered].groupby('Role'):
@@ -160,18 +226,37 @@ def main():
     f['MLBadd'] = f.mlbId.isin(ma.mlbId)
     last = {int(r.mlbId): f"{r.lastMoveDate} {r.lastMove} ({r.lastMoveTeam})" for r in ma.itertuples()}
     f['LastMove'] = [last.get(i) or nf.lastListMove.get(i, '') for i in f.mlbId]
-    f.loc[f.MLBclass, 'Note'] = (f.loc[f.MLBclass, 'Note'] + '; MLB free-agent class (elected FA at MLB level on or after 10/28): ranked, not tiered with depth arms').str.lstrip('; ')
-    f.loc[~f.tiered & (f.Source != 'none'), 'Tier'] = 'not enough data'
+    f.loc[f.MLBclass, 'Note'] = (f.loc[f.MLBclass, 'Note'] + '; MLB free-agent class (elected at MLB level on/after 10/28): ranked, not tiered').str.lstrip('; ')
+    f.loc[~f.tiered & (f.Source != 'none'), 'Tier'] = 'not enough MLB/AAA data'
+    f.loc[~f.tiered, 'RoleRank'] = np.nan
     f.loc[f.Source == 'none', 'Tier'] = 'no projection'
+    pm = pitch_metrics(list(f.mlbId), sheet.mlbTeam.to_dict())
+    for c in [c for c in ('AAA_Stuff+', 'MLB_Stuff+') if c in f]:
+        f = f.drop(columns=c)
+    f = f.join(pm, on='mlbId')
+    for c in ('AAA_SwStr%', 'AAA_Chase%', 'AAA_IZWhiff%', 'AAA_GB%', 'MLB_SwStr%', 'MLB_Chase%', 'MLB_GB%'):
+        if c in f:
+            f[c] = (100 * pd.to_numeric(f[c], errors='coerce')).round(1)
+    for c in ('AAA_Stuff+', 'AAA_Loc+', 'MLB_Stuff+', 'MLB_Loc+'):
+        if c in f:
+            f[c] = pd.to_numeric(f[c], errors='coerce').round(0)
+    nt = f[(f.mlbaaaN > 0) & f.get('AAA_arsenal', pd.Series(index=f.index)).isna() & f.get('MLB_arsenal', pd.Series(index=f.index)).isna()]
+    print(f'pitch metrics: {len(f) - len(nt)} of {len(f)} have MLB or AAA tracking; none for {len(nt)}: '
+          f'{", ".join(nt.Name.head(15))}')
     f['K-BB% (all-level, AAA scale)'] = (100 * f['xallm_K-BB%']).round(1)
     f['SwStr% (all-level, AAA scale)'] = (100 * f['xallm_SwStr%']).round(1)
-    out = f.assign(Age=f.age.round(0), BF2026=f.nAll.astype(int), projRA9=f.projRA9.round(2),
+    out = f.assign(Age=f.age.round(0), BF2026=f.nAll.astype(int), MLB_AAA_BF=f.mlbaaaN.astype(int), projRA9=f.projRA9.round(2),
                    projRA9_uncal=f.projRA9_uncal.round(2), Group=f.G)
     out = out.sort_values(['Role', 'tiered', 'projRA9'], ascending=[False, False, True])
     out['Tier'] = out.Tier.astype(str)
-    cols = ['Role', 'Tier', 'RoleRank', 'Name', 'mlbId', 'Age', 'projRA9', 'projRA9_uncal', 'BF2026', 'Levels2026',
-            'SheetsMLB_BF', 'K-BB% (all-level, AAA scale)', 'SwStr% (all-level, AAA scale)', 'AAA_Stuff+',
-            'MLB_Stuff+', 'Group', 'Source', 'MLBadd', 'LastMove', 'Note']
+    # columns kept to what a signing decision reads (Wally: "only list columns that offer
+    # relevant information"); mlbId stays last for matching by id
+    out.loc[out.MLBadd, 'Note'] = ('added: MLB time, let go before 10/28; '
+                                   + out.loc[out.MLBadd, 'Note'].fillna('')).str.rstrip('; ')
+    cols = ['Role', 'Tier', 'RoleRank', 'Name', 'Age', 'projRA9', 'MLB_AAA_BF', 'Levels2026',
+            'K-BB% (all-level, AAA scale)', 'SwStr% (all-level, AAA scale)',
+            'MLB_Stuff+', 'MLB_Loc+', 'MLB_arsenal', 'AAA_Stuff+', 'AAA_Loc+', 'AAA_FBvelo', 'AAA_arsenal',
+            'LastMove', 'Note', 'mlbId']
     out = out[cols]
     out['RoleRank'] = out.RoleRank.astype('Int64')
     tmp = OUT + '.tmp'
@@ -181,7 +266,7 @@ def main():
     print(out.groupby(['Role', 'Tier']).size().to_string())
     for role in ('SP', 'RP'):
         print(f'\n{role} tier 1-2:')
-        print(out[(out.Role == role) & out.Tier.isin(['1', '2'])][['RoleRank', 'Tier', 'Name', 'Age', 'projRA9', 'BF2026',
+        print(out[(out.Role == role) & out.Tier.isin(['1', '2'])][['RoleRank', 'Tier', 'Name', 'Age', 'projRA9', 'MLB_AAA_BF',
                                                               'Levels2026', 'Note']].to_string(index=False))
 
 
