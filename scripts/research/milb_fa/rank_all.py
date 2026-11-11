@@ -24,7 +24,7 @@ starts are 40%+ of 2026 AAA + MLB games), N_TIERS each, the MLB free-agent class
 tiered. The tier count is a CONVENTION.
 
 P(MLB deal) (deal_prob.py): the contract model's probability of a guaranteed MLB deal, blank under
-20 MLB innings 2024-2026 (out of the model's range). Pitchers at 1.00 are removed before tiering.
+20 MLB innings 2024-2026 (out of the model's range). Pitchers at MAX_P or above are removed before tiering.
 
 Writes ~/Downloads/milb_fa_pitcher_tiers_2026-11-11.csv.
     python3 scripts/research/milb_fa/rank_all.py
@@ -43,7 +43,7 @@ import rank_small as RS  # noqa: E402
 from mlb_released_adds import mlb_lines, signed_since  # noqa: E402
 from deal_prob import p_mlb_deal  # noqa: E402
 
-CERTAIN = 0.995
+MAX_P = 0.75
 from rank_live import disp  # noqa: E402
 from rank_sample_check import build_big  # noqa: E402
 
@@ -248,13 +248,14 @@ def main():
             n.append('heavy shrinkage (under 75 BF at every minor level)')
         notes.append('; '.join(n))
     f['Note'] = notes
-    # P(MLB deal) (deal_prob.py, 2026-11-11, per Wally: "remove any guy you think is 100%"). A
-    # pitcher at CERTAIN or above is gone before tiering: he is not a depth signing. CERTAIN is
-    # the probability that prints as 1.00 at two decimals, read literally from "100%".
+    # P(MLB deal) (deal_prob.py). A pitcher at MAX_P or above is gone before tiering: he is
+    # likely to get guaranteed money, so he is not a depth signing. MAX_P is Wally's cut
+    # (2026-11-11: "remove everyone >= .75"; it replaced .995, "anyone you think is 100%"),
+    # applied to the unrounded probability. Out-of-range pitchers (blank P) always stay.
     f = f.join(p_mlb_deal(f)[['p_mlb']])
-    gone = f[f.p_mlb >= CERTAIN]
-    print(f'removed {len(gone)} at P(MLB deal) >= {CERTAIN}: {", ".join(gone.Name)}')
-    f = f[~(f.p_mlb >= CERTAIN)].reset_index(drop=True)
+    gone = f[f.p_mlb >= MAX_P]
+    print(f'removed {len(gone)} at P(MLB deal) >= {MAX_P}: {", ".join(gone.Name)}')
+    f = f[~(f.p_mlb >= MAX_P)].reset_index(drop=True)
     # MLB free-agent class: elected free agency at the MLB level on or after 2026-10-28 (the
     # six-year and outrighted class). They stay on the list and in RoleRank but are not tiered
     # with the depth pool, so they do not take its tier-1 slots.
