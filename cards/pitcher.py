@@ -5723,7 +5723,7 @@ def _resolve_pitcher_teams(names, include_non_mlb=False):
     tabs with a 2TM/3TM label (matching the pipeline's combined leaderboard row),
     so a traded arm's full season is stitched together automatically. A pitcher
     with a single MLB stint resolves to that team; an arm with no MLB rows (e.g.
-    AAA-only) resolves to its non-MLB tab(s). Aggregate 2TM/3TM pseudo-teams are
+    AAA-only) resolves to nothing (a blank team is MLB only). Aggregate 2TM/3TM pseudo-teams are
     never read directly (they are not real worksheets).
 
     include_non_mlb=True (the --all-levels flag) also folds a pitcher's AAA (and
@@ -5746,12 +5746,12 @@ def _resolve_pitcher_teams(names, include_non_mlb=False):
     for nm in names:
         real = {t for t in by_name.get(nm, set()) if t not in ('2TM', '3TM')}
         mlb_stints = {t for t in real if t in MLB}
-        if include_non_mlb:
-            used = sorted(real)
-        else:
-            used = sorted(mlb_stints) if mlb_stints else sorted(real)
+        # A blank team is an MLB card (2026-11-13, per Wally): an arm with no MLB row
+        # resolves to nothing, never to his ROC/AAA tab. MiLB cards take team NEW, ROC or AAA.
+        used = sorted(real) if include_non_mlb else sorted(mlb_stints)
         if not used:
-            print(f"  WARNING: no leaderboard team found for '{nm}' — cannot auto-resolve")
+            print(f"  WARNING: no MLB leaderboard row for '{nm}'. A blank team reads MLB data "
+                  f"only; set team to NEW, ROC or AAA for his MiLB card")
             continue
         union.update(used)
         if mlb_stints and set(used) - MLB:
@@ -6091,6 +6091,13 @@ def main():
                     time_module.sleep(2 ** attempt)
                 else:
                     raise
+        if t == 'NEW':
+            # The NEW tab holds both levels for an arm like Bryse Wilson (PTeam AAA and
+            # MLB). A NEW card is his AAA card (2026-11-13, per Wally); his MLB card is
+            # team "" and reads the MLB team tabs, so MLB rows here are left out.
+            _n_all = len(t_rows)
+            t_rows = [r for r in t_rows if str(r.get('PTeam', '')).strip().upper() == 'AAA']
+            print(f"  NEW: kept {len(t_rows)} PTeam AAA rows, left out {_n_all - len(t_rows)} other rows")
         for r in t_rows:
             r['_card_team'] = t      # tag source team for per-team boxscore fetch
         all_rows.extend(t_rows)
@@ -6204,6 +6211,11 @@ def main():
     # all card pitchers. Heavy (loads the MLB pitch pickle) — scratch only.
     scratch_ctx = None
     _aaa_pool = None
+    if aaa_ruler and not scratch_tab:
+        # The settings block keeps aaa_ruler on for NEW cards; an MLB card (team "" or an
+        # MLB team) and a ROC/AAA team-tab card read the shipped leaderboard instead.
+        print("  AAA ruler off: this card reads a team tab (MLB ruler, shipped leaderboard)")
+        aaa_ruler = False
     if aaa_ruler:
         if not (scratch_tab and is_multi_game):
             sys.exit('AAA ruler: scratch-tab (team NEW or a tab) or MiLB-corpus season and '
