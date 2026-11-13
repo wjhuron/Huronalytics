@@ -1,6 +1,6 @@
 """locplus_handneutral.py: a hand-neutral Loc+ arm, applied as a patch to
 pipeline.locplus (2026-11-11). Importing this module installs the patch; it
-is a no-op until lp.HANDNEU is set true.
+is a no-op while lp.HANDNEU is 0.
 
 Shipped Loc+ scores a pitch on its (group, batter hand, pitcher hand) surface
 and standardizes within the group only, so a group that is worse against
@@ -8,7 +8,11 @@ opposite-hand hitters at every location (the sinker: 23-28 Loc+ points per
 pitch at a FIXED location, locplus_platoon_level.py) loses Loc+ in proportion
 to its opposite-hand share. The arm removes that level:
 
-    v' = v - [ L(g, b, t) - L(g, t) ]
+    v' = v - h * [ L(g, b, t) - L(g, t) ]
+
+h is lp.HANDNEU, the STRENGTH (2026-11-13 sweep, per Wally: "is the platoon
+split too strong?"). 0 is shipped Loc+, 1 the full removal tested 2026-11-11,
+and a negative h makes the hand level larger, so a sweep can bracket 0.
 
 L(g, b, t) is the mean ExpRV of the season's BASELINE pitches (the ones that
 build the surfaces) in that group and hand pair, L(g, t) the same over both
@@ -22,6 +26,7 @@ Use through with_handneutral.py:
     python3 scripts/research/locplus/with_handneutral.py -- \\
         scripts/research/locplus/locplus_target_audit.py run \\
         --flag ctl1111=HANDNEU_TAG:1 --flag handNeu1111=HANDNEU:1
+Strength sweep (2026-11-13): --flag ctl1113=HANDNEU_TAG:1 --flag hs_p050=HANDNEU:0.5 ...
 """
 import os
 import sys
@@ -34,7 +39,7 @@ sys.path.insert(0, ROOT)
 import pipeline.locplus as lp  # noqa: E402
 
 if not getattr(lp, '_HANDNEU_PATCHED', False):
-    lp.HANDNEU = False
+    lp.HANDNEU = 0.0      # a float, so the audit's --flag parses HANDNEU:0.5
     lp.HANDNEU_TAG = False
     _orig_build = lp.build_surfaces
     _orig_score = lp.score_pitch
@@ -65,7 +70,7 @@ if not getattr(lp, '_HANDNEU_PATCHED', False):
             return v
         # a (group, hand) pair absent from the baseline has no surface either,
         # so _orig_score already returned None for it; KeyError here is a bug
-        return v - off[(lp.group_of(p), p.get('Bats'), p.get('Throws'))]
+        return v - lp.HANDNEU * off[(lp.group_of(p), p.get('Bats'), p.get('Throws'))]
 
     lp.build_surfaces = build_surfaces
     lp.score_pitch = score_pitch
