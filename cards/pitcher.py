@@ -6123,6 +6123,39 @@ def main():
             _n_all = len(t_rows)
             t_rows = [r for r in t_rows if str(r.get('PTeam', '')).strip().upper() == 'AAA']
             print(f"  NEW: kept {len(t_rows)} PTeam AAA rows, left out {_n_all - len(t_rows)} other rows")
+            # A player-ID pull tags every non-MLB game PTeam AAA, so a rehab or
+            # assignment start at a lower level rode along: Cornielle's Single-A start
+            # (820266) made his card 18 G / 17 GS against an official 17 / 16 and put
+            # 60 Single-A pitches on the AAA ruler (2026-11-13, per Wally). Keep the
+            # Triple-A games only, by the schedule's sport id for each gamePk.
+            _lvl = _game_sport_ids({str(r.get('PitchID', '')).split('_')[0] for r in t_rows} - {''})
+            _drop = {pk for pk, sid in _lvl.items() if sid != 11}
+            if _drop:
+                _n_aaa = len(t_rows)
+                t_rows = [r for r in t_rows if str(r.get('PitchID', '')).split('_')[0] not in _drop]
+                print(f"  NEW: left out {_n_aaa - len(t_rows)} rows from {len(_drop)} games below or "
+                      f"above Triple-A: " + ', '.join(f"{pk} (sportId {_lvl[pk]})" for pk in sorted(_drop)))
+            # A blank xwOBA on NEW that the MiLB corpus has priced is filled from the
+            # corpus by PitchID (2026-11-13, per Wally): two blanks put Cornielle's NEW
+            # hdERA at 3.93 against 4.00 on his corpus card. hdERA reads xwOBA only, and the
+            # card reads no xBA or xSLG. scripts/ops/fill_new_xwoba_from_corpus.py writes
+            # the same values into the tab for the other readers.
+            _blank = [r for r in t_rows if str(r.get('xwOBA', '')).strip() == '' and r.get('PitchID')]
+            if _blank:
+                from cards.milb_corpus import corpus_xwoba
+                try:
+                    _cx = corpus_xwoba(r['PitchID'] for r in _blank)
+                except FileNotFoundError as _e:
+                    _cx = None
+                    print(f"  NEW: {len(_blank)} blank xwOBA cells left blank; the MiLB corpus "
+                          f"is absent ({_e}). Rebuild it with scripts/builders/milb2026_pull.py.")
+                if _cx:
+                    for r in _blank:
+                        if str(r['PitchID']) in _cx:
+                            r['xwOBA'] = float(_cx[str(r['PitchID'])])
+                    print(f"  NEW: filled {len(_cx)} blank xwOBA cells from the MiLB corpus "
+                          f"({len(_blank) - len(_cx)} blank cells have no corpus value). Write them "
+                          f"to the tab: scripts/ops/fill_new_xwoba_from_corpus.py --apply")
         for r in t_rows:
             r['_card_team'] = t      # tag source team for per-team boxscore fetch
         all_rows.extend(t_rows)
@@ -6136,18 +6169,6 @@ def main():
     # does before any stat touches the rows. The sheet's InZone column is
     # stamped at scrape time from FEED coordinates, and the Savant
     # PlateX/PlateZ backfill (2026-08-29) corrects the coordinates but not
-            # A player-ID pull tags every non-MLB game PTeam AAA, so a rehab or
-            # assignment start at a lower level rode along: Cornielle's Single-A start
-            # (820266) made his card 18 G / 17 GS against an official 17 / 16 and put
-            # 60 Single-A pitches on the AAA ruler (2026-11-13, per Wally). Keep the
-            # Triple-A games only, by the schedule's sport id for each gamePk.
-            _lvl = _game_sport_ids({str(r.get('PitchID', '')).split('_')[0] for r in t_rows} - {''})
-            _drop = {pk for pk, sid in _lvl.items() if sid != 11}
-            if _drop:
-                _n_aaa = len(t_rows)
-                t_rows = [r for r in t_rows if str(r.get('PitchID', '')).split('_')[0] not in _drop]
-                print(f"  NEW: left out {_n_aaa - len(t_rows)} rows from {len(_drop)} games below or "
-                      f"above Triple-A: " + ', '.join(f"{pk} (sportId {_lvl[pk]})" for pk in sorted(_drop)))
     # the stamped flag, so the stored column goes stale after every
     # supplement run. Derive it; never trust the stamp.
     from pipeline.utils import compute_in_zone as _ciz_all

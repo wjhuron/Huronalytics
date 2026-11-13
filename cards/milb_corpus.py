@@ -239,6 +239,26 @@ def ibb_count(player, rows):
     return n
 
 
+def corpus_xwoba(pitch_ids):
+    """{PitchID: xwOBA string} for the given PitchIDs that carry an xwOBA in the corpus.
+
+    The NEW tab leaves some xwOBA cells blank that Savant has since priced, and the corpus
+    pulled them later. The NEW card and scripts/ops/fill_new_xwoba_from_corpus.py both fill
+    from here. Raises FileNotFoundError when the corpus is absent, so each caller says
+    what it did instead."""
+    want = {str(p) for p in pitch_ids if p}
+    if not want:
+        return {}
+    if not os.path.exists(CORPUS_PATH):
+        raise FileNotFoundError(CORPUS_PATH)
+    out = {}
+    for chunk in pd.read_csv(CORPUS_PATH, usecols=['PitchID', 'xwOBA'], dtype=str,
+                             keep_default_na=False, chunksize=200_000):
+        hit = chunk[chunk.PitchID.isin(want) & (chunk.xwOBA.str.strip() != '')]
+        out.update(zip(hit.PitchID, hit.xwOBA.str.strip()))
+    return out
+
+
 def _fg_level(code):
     """One FanGraphs level, cached on disk. Delete the file to refresh it."""
     path = os.path.join(_OUT, f'fg_hitters_level{code}.json')
