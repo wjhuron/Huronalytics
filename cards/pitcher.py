@@ -1086,6 +1086,31 @@ def _lookup_person_lastfirst(person_id):
     _person_name_cache[person_id] = None
     return None
 
+def _game_sport_ids(game_pks):
+    """{gamePk: sport id} from the MLB schedule (11 = Triple-A, 14 = Single-A, 1 = MLB).
+    Fails closed: a card must not render with games of unknown level, so a failed pull
+    or a gamePk the schedule does not return stops the run."""
+    from pipeline.fetch import _fetch_with_retry
+    pks = sorted(game_pks)
+    out = {}
+    for i in range(0, len(pks), 100):
+        url = ('https://statsapi.mlb.com/api/v1/schedule?hydrate=team&gamePks='
+               + ','.join(pks[i:i + 100]))
+        try:
+            data = json.loads(_fetch_with_retry(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20))
+        except (OSError, ValueError) as e:
+            sys.exit(f'Game-level lookup failed ({e}). The NEW card keeps Triple-A games '
+                     f'only and cannot tell the level without it. Rerun when the MLB API answers.')
+        for d in data.get('dates', []):
+            for g in d.get('games', []):
+                out[str(g['gamePk'])] = g['teams']['home']['team'].get('sport', {}).get('id')
+    missing = [pk for pk in pks if out.get(pk) is None]
+    if missing:
+        sys.exit(f'Game-level lookup: the schedule returned no level for {", ".join(missing)}. '
+                 f'Check those PitchID prefixes on the tab.')
+    return out
+
+
 def fetch_boxscore(game_pk):
     url = f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"
     try:
@@ -6111,6 +6136,18 @@ def main():
     # does before any stat touches the rows. The sheet's InZone column is
     # stamped at scrape time from FEED coordinates, and the Savant
     # PlateX/PlateZ backfill (2026-08-29) corrects the coordinates but not
+            # A player-ID pull tags every non-MLB game PTeam AAA, so a rehab or
+            # assignment start at a lower level rode along: Cornielle's Single-A start
+            # (820266) made his card 18 G / 17 GS against an official 17 / 16 and put
+            # 60 Single-A pitches on the AAA ruler (2026-11-13, per Wally). Keep the
+            # Triple-A games only, by the schedule's sport id for each gamePk.
+            _lvl = _game_sport_ids({str(r.get('PitchID', '')).split('_')[0] for r in t_rows} - {''})
+            _drop = {pk for pk, sid in _lvl.items() if sid != 11}
+            if _drop:
+                _n_aaa = len(t_rows)
+                t_rows = [r for r in t_rows if str(r.get('PitchID', '')).split('_')[0] not in _drop]
+                print(f"  NEW: left out {_n_aaa - len(t_rows)} rows from {len(_drop)} games below or "
+                      f"above Triple-A: " + ', '.join(f"{pk} (sportId {_lvl[pk]})" for pk in sorted(_drop)))
     # the stamped flag, so the stored column goes stale after every
     # supplement run. Derive it; never trust the stamp.
     from pipeline.utils import compute_in_zone as _ciz_all
