@@ -8,8 +8,12 @@ carry. Sources, in order: the existing artifact, data/mlb_id_cache.json
 unresolved. Heights come from /api/v1/people. Ambiguous names (several ids)
 take the mean.
 
-Names are collected from data/all_pitches_rs_cache.pkl (MLB + ROC/AAA).
-The NEW tab is deliberately excluded — see collect_names. The artifact is written to a temp path and moved, never
+Names are collected from data/all_pitches_rs_cache.pkl (MLB + ROC/AAA) and
+from the NLE2026 NEW tab (see collect_new_pitchers). A NEW-tab pitcher is
+resolved BY ID only: the builder reads the boxscore of a game he pitched in
+(gamePk from the PitchID prefix) and takes the id of the pitcher in that game
+whose name matches. No name search is used for NEW, so a common name cannot
+pick up a stranger's height. The artifact is written to a temp path and moved, never
 partially. A network failure leaves the previous artifact in place and
 prints how many names stay unresolved; the trainer imputes those to the
 frozen league mean and says so.
@@ -24,6 +28,8 @@ import os
 import pickle
 import re
 import sys
+import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -66,12 +72,7 @@ def search_name(name):
 
 
 def collect_names():
-    """MLB + ROC/AAA arms only. The NEW tab (scoring_only_rs_cache.pkl) is
-    deliberately excluded (per Wally 2026-08-23): its arms are often college
-    or indie pitchers the MLB API cannot resolve, they only ever receive a
-    NEW-tab grade, and they impute to the league mean in the trainer with a
-    log line. When one of them reaches a real MLB/ROC cache, this builder
-    resolves them then."""
+    """MLB + ROC/AAA arms. NEW-tab arms come from collect_new_pitchers."""
     names = set()
     p = os.path.join(DATA, 'all_pitches_rs_cache.pkl')
     if os.path.exists(p):
@@ -80,6 +81,71 @@ def collect_names():
                 if x.get('Pitch Type') != 'EP' and x.get('Pitcher'):
                     names.add(x['Pitcher'])
     return names
+
+
+def _norm_name(n):
+    """'Last, First' or 'First Last' -> 'first last', accents and Jr./Sr./II dropped."""
+    n = unicodedata.normalize('NFKD', n or '').encode('ascii', 'ignore').decode()
+    last, sep, first = n.partition(', ')
+    n = f'{first} {last}' if sep else n
+    toks = [t for t in re.split(r'[\s.]+', n.lower()) if t]
+    return ' '.join(t for t in toks if t not in {'jr', 'sr', 'ii', 'iii', 'iv'})
+
+
+def collect_new_pitchers():
+    """NEW-tab arms -> set of gamePks they pitched in (per Wally 2026-11-13; until
+    then the tab was excluded because its arms were often college or indie
+    pitchers). Reads the tab from Sheets; if that read fails, falls back to
+    data/scoring_only_rs_cache.pkl (process_data's copy of the tab) and says so.
+    Returns {} when neither is available."""
+    rows, src = None, 'the NEW tab'
+    try:
+        sys.path.insert(0, ROOT)
+        from pipeline.fetch import read_new_tab_pitches
+        rows = read_new_tab_pitches()
+    except Exception as e:  # gspread / auth / network: any of them means no live read
+        print(f'  WARNING: NEW tab read failed ({type(e).__name__}: {e}); '
+              f'trying scoring_only_rs_cache.pkl')
+    if rows is None:
+        p = os.path.join(DATA, 'scoring_only_rs_cache.pkl')
+        if not os.path.exists(p):
+            print('  WARNING: no NEW-tab source; NEW arms stay unresolved')
+            return {}
+        with open(p, 'rb') as f:
+            rows = pickle.load(f)
+        src = p
+    out = {}
+    for x in rows:
+        pk = str(x.get('PitchID', '')).split('_')[0]
+        if x.get('Pitch Type') != 'EP' and x.get('Pitcher') and pk.isdigit():
+            out.setdefault(x['Pitcher'], set()).add(int(pk))
+    print(f'  {len(out)} NEW-tab pitchers from {src}')
+    return out
+
+
+def resolve_new_ids(new_arms, max_games=3):
+    """name -> MLB id, from the boxscores of up to max_games of his games. A name
+    that matches no pitcher, or two different ids, in those games is left out."""
+    ids = {}
+    for name, pks in sorted(new_arms.items()):
+        key, found = _norm_name(name), set()
+        for pk in sorted(pks, reverse=True)[:max_games]:
+            with urllib.request.urlopen(API + f'game/{pk}/boxscore', timeout=30) as r:
+                box = json.load(r)
+            for side in ('home', 'away'):
+                t = box.get('teams', {}).get(side, {})
+                for pid in t.get('pitchers', []):
+                    pl = t.get('players', {}).get(f'ID{pid}', {})
+                    if _norm_name(pl.get('person', {}).get('fullName')) == key:
+                        found.add(int(pid))
+            if found:
+                break
+        if len(found) == 1:
+            ids[name] = found.pop()
+        else:
+            print(f'  NEW: {name}: {"no" if not found else "several"} boxscore '
+                  f'match{"es" if found else ""} {sorted(found)}; left unresolved')
+    return ids
 
 
 def main():
@@ -131,6 +197,34 @@ def main():
                 art['ids_by_name'][n] = want[n]
             else:
                 unresolved.append(n)
+    # NEW-tab arms, by boxscore id only (never a name search).
+    new_arms = collect_new_pitchers()
+    if new_arms:
+        try:
+            nid = resolve_new_ids(new_arms)
+            H = fetch_people(set(nid.values()))
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            print(f'  WARNING: MLB API failed on NEW arms ({e}); they stay as-is')
+            nid, H = {}, {}
+        n_add = 0
+        for n, i in sorted(nid.items()):
+            known = art['ids_by_name'].get(n)
+            if known is not None:
+                if i not in known:
+                    # The trainer keys height by name, so one name can hold one
+                    # height. Keep the MLB/ROC entry and say so.
+                    print(f'  NEW: {n} is id {i} here but the artifact holds {known} '
+                          f'under that name; kept the artifact entry')
+                continue
+            if i in H:
+                art['by_name'][n] = float(H[i])
+                art['ids_by_name'][n] = [i]
+                n_add += 1
+                print(f'  NEW: {n} -> id {i}, {H[i]} in')
+            else:
+                unresolved.append(n)
+        unresolved += sorted(set(new_arms) - set(nid) - set(art['by_name']))
+        print(f'  NEW: added {n_add} heights')
     vals = list(art['by_name'].values())
     art['league_mean'] = round(sum(vals) / len(vals), 2) if vals else None
     art['n'] = len(vals)
