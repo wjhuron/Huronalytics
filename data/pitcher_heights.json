@@ -206,6 +206,7 @@
 "Bergert, Ryan": 73.0,
 "Bericoto, Victor": 73.0,
 "Berm\u00fadez, Jonathan": 74.0,
+"Bernal, Jonatan": 73.0,
 "Bernardino, Brennan": 76.0,
 "Berrios, Osvaldo": 74.0,
 "Berroa, Prelander": 71.0,
@@ -1919,6 +1920,7 @@
 "Rashi, Taylor": 76.0,
 "Rasmussen, Drew": 73.0,
 "Rave, John": 70.0,
+"Ray, Dylan": 75.0,
 "Ray, Robbie": 74.0,
 "Raya, Marco": 73.0,
 "Rea, Colin": 77.0,
@@ -1980,6 +1982,7 @@
 "Rodriguez, Chris": 74.0,
 "Rodriguez, Eduardo": 74.0,
 "Rodriguez, Grayson": 77.0,
+"Rodriguez, Gustavo": 75.0,
 "Rodriguez, Jefry": 78.0,
 "Rodriguez, Jesus": 70.0,
 "Rodriguez, Nivaldo": 73.0,
@@ -3285,6 +3288,9 @@
 ],
 "Berm\u00fadez, Jonathan": [
 642834
+],
+"Bernal, Jonatan": [
+685763
 ],
 "Bernardino, Brennan": [
 657514
@@ -8429,6 +8435,9 @@
 "Rave, John": [
 670231
 ],
+"Ray, Dylan": [
+691009
+],
 "Ray, Robbie": [
 592662
 ],
@@ -8611,6 +8620,9 @@
 ],
 "Rodriguez, Grayson": [
 680570
+],
+"Rodriguez, Gustavo": [
+683020
 ],
 "Rodriguez, Jefry": [
 622446
@@ -10670,5 +10682,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2665
+"n": 2668
 }
