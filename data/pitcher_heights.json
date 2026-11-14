@@ -1457,6 +1457,7 @@
 "Maxwell, Zach": 78.0,
 "May, Dustin": 78.0,
 "May, Trevor": 77.0,
+"Mayer, Gunner": 78.0,
 "Mayer, Marcelo": 75.0,
 "Mayers, Mike": 74.0,
 "Mayfield, Jack": 71.0,
@@ -7040,6 +7041,9 @@
 "May, Trevor": [
 543507
 ],
+"Mayer, Gunner": [
+686763
+],
 "Mayer, Marcelo": [
 691785
 ],
@@ -10666,5 +10670,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2664
+"n": 2665
 }
