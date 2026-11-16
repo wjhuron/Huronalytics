@@ -70,6 +70,7 @@
 "Amador, Adael": 71.0,
 "Amaya, Jacob": 70.0,
 "Amaya, Miguel": 73.0,
+"Anderson, Aidan": 73.0,
 "Anderson, Brett": 76.0,
 "Anderson, Chase": 73.0,
 "Anderson, Drew": 75.0,
@@ -1290,6 +1291,7 @@
 "Latz, Jacob": 74.0,
 "Lauer, Eric": 75.0,
 "Laureano, Ram\u00f3n": 69.0,
+"Lavallee, Johnathan": 76.0,
 "Lavender, Nate": 74.0,
 "Law, Derek": 75.0,
 "Laweryson, Cody": 76.0,
@@ -1828,6 +1830,7 @@
 "Phillips, Connor": 74.0,
 "Phillips, Evan": 74.0,
 "Phillips, Tyler": 77.0,
+"Pilar, Anderson": 74.0,
 "Pilkington, Konnor": 75.0,
 "Pillar, Kevin": 72.0,
 "Pinango, Yohendrick": 70.0,
@@ -2880,6 +2883,9 @@
 ],
 "Amaya, Miguel": [
 665804
+],
+"Anderson, Aidan": [
+689379
 ],
 "Anderson, Brett": [
 474463
@@ -6543,6 +6549,9 @@
 "Laureano, Ram\u00f3n": [
 657656
 ],
+"Lavallee, Johnathan": [
+702300
+],
 "Lavender, Nate": [
 681320
 ],
@@ -8158,6 +8167,9 @@
 ],
 "Phillips, Tyler": [
 663969
+],
+"Pilar, Anderson": [
+666768
 ],
 "Pilkington, Konnor": [
 663455
@@ -10682,5 +10694,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2668
+"n": 2671
 }
