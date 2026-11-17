@@ -531,6 +531,7 @@
 "Cusick, Ryan": 78.0,
 "Cyr, Tyler": 73.0,
 "C\u00e1ceres, Kelvin": 73.0,
+"Dabovich, R.J.": 75.0,
 "Dallas, Chad": 71.0,
 "Dana, Caden": 76.0,
 "Daniel, Davis": 73.0,
@@ -4269,6 +4270,9 @@
 ],
 "C\u00e1ceres, Kelvin": [
 680983
+],
+"Dabovich, R.J.": [
+681924
 ],
 "Dallas, Chad": [
 689149
@@ -10702,5 +10706,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2673
+"n": 2674
 }
