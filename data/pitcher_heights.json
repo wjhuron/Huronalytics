@@ -1088,6 +1088,7 @@
 "Hudson, Dakota": 77.0,
 "Hudson, Daniel": 75.0,
 "Huff, Sam": 76.0,
+"Huggins, Kenya": 75.0,
 "Hughes, Brandon": 74.0,
 "Hughes, Gabriel": 76.0,
 "Hummel, Cooper": 69.0,
@@ -5945,6 +5946,9 @@
 "Huff, Sam": [
 669087
 ],
+"Huggins, Kenya": [
+695761
+],
 "Hughes, Brandon": [
 676714
 ],
@@ -10714,5 +10718,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2676
+"n": 2677
 }
