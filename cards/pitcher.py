@@ -2452,6 +2452,8 @@ def render_social_card(config, pitches, output_file):
             cell['g'] = g
             if key == 'hpWAR' and _hu:
                 cell['sub'] = f"per {_hu} IP"
+            if key == 'hpERA' and config.get('hp_src'):
+                cell['sub'] = "MLB scale, rough estimate"
             line.append(cell)
         # A stat with no value leaves the row, as on an AFL card (2026-11-03, per Wally).
         # hpWAR is blank on a small-sample row (apply_hpwar), so it leaves too.
@@ -6796,8 +6798,25 @@ def main(new_level=None):
                     f"{_ph:.2f}" if _ph is not None else '—',
                 ]
 
+        # hpERA from minor league pitches (2026-11-17, per Wally): the card scores it on the MLB
+        # scale with no level correction, and scripts/research/milb_fa/hpera_band.py measured it
+        # as a weak MLB forecast whatever the sample (1,407 AAA arms 2023-2025: next-season ERA
+        # on the MLB scale ran 1.1 runs above it on average, with a 10th-90th miss of -0.7 to
+        # +3.4 that did not narrow from 100 to 400+ batters faced). So the tile carries a fixed
+        # marker, not a sample-scaled band. Gated on where the inputs came from.
+        from pipeline.utils import AAA_TEAMS as _AAA_HP
+        _cp = corpus_players.get(pitcher_name) if corpus_players else None
+        if _cp is not None and not _cp['mlb_only']:
+            _hp_src = 'AAA' if set(_cp['levels']) <= {'AAA', 'MLB'} else 'MiLB'
+        elif scratch_tab and (_aaa_pool or _new_lv == 'AAA'):
+            _hp_src = 'AAA'
+        elif eff_team in _AAA_HP:
+            _hp_src = 'AAA'
+        else:
+            _hp_src = None
         # Build config
         config = {
+            'hp_src': _hp_src,
             'display_name': display_name,
             'hand': hand,
             # display_team overrides the header label only; every data lookup
