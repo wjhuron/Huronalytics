@@ -2044,6 +2044,7 @@
 "Rosscup, Zac": 74.0,
 "Rossman, Bubby": 77.0,
 "Rosso, Ram\u00f3n": 76.0,
+"Roth, Houston": 75.0,
 "Roupp, Landen": 74.0,
 "Rowen, Ben": 76.0,
 "Roxby, Braxton": 75.0,
@@ -8813,6 +8814,9 @@
 "Rosso, Ram\u00f3n": [
 665759
 ],
+"Roth, Houston": [
+674175
+],
 "Roupp, Landen": [
 694738
 ],
@@ -10706,5 +10710,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2674
+"n": 2675
 }
