@@ -1970,6 +1970,7 @@
 "Roark, Tanner": 74.0,
 "Robert Jr., Luis": 74.0,
 "Robert, Daniel": 76.0,
+"Roberts, Austin": 72.0,
 "Roberts, Ethan": 70.0,
 "Robertson, Daniel": 71.0,
 "Robertson, David": 71.0,
@@ -8592,6 +8593,9 @@
 "Robert, Daniel": [
 642016
 ],
+"Roberts, Austin": [
+686762
+],
 "Roberts, Ethan": [
 681799
 ],
@@ -10710,5 +10714,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2675
+"n": 2676
 }
