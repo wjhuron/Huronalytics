@@ -5855,7 +5855,7 @@ def _resolve_pitcher_teams(names, include_non_mlb=False):
 
 
 def main(new_level=None):
-    """new_level is set only by the NEW two-level dispatch below: 'AAA' or 'MLB'."""
+    """new_level is set only by the NEW level dispatch below: 'AAA', 'MLB' or 'AFL'."""
     # ── Settings (edit these directly or override via command line) ──
     team            = ""
     start_date      = None    # Set to None for full season
@@ -5874,7 +5874,7 @@ def main(new_level=None):
     milb_scope      = "all"              # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
     milb_levels     = None               # Levels, e.g. "AAA", "MLB", "AAA,MLB"; None = all corpus levels (AAA, Single-A, MLB-spring, Rookie, AFL, Prospect-event), no MLB
     milb_player_id  = None               # Corpus only: the mlbId when one name is two players
-    new_levels      = "both"             # NEW tab: "both" = an AAA card from the PTeam AAA rows and an MLB card from the PTeam MLB rows, for each arm with rows there; "AAA" or "MLB" = that card only
+    new_levels      = "both"             # NEW tab: "both" = an AAA card from the PTeam AAA rows, an MLB card from the PTeam MLB rows and an AFL card from the PTeam AFL rows, for each arm with rows there; "AAA", "MLB" or "AFL" = that card only
     aaa_ruler       = False              # True = rank and grade against 2026 AAA, not MLB (scratch-tab or corpus season/range cards; needs data/_milb2026/pitcher_pool_AAA.json)
     output_dir      = OUTPUT_DIR
 
@@ -5920,9 +5920,9 @@ def main(new_level=None):
                              'workbook (e.g. Sheet2) instead of a team tab. '
                              'Scratch data never touches the leaderboards; cards '
                              'render MiLB-style (no percentile bubbles).')
-    parser.add_argument('--new-levels', default=None, choices=['both', 'AAA', 'MLB'],
-                        help='NEW tab: both cards (AAA on the AAA ruler, MLB on the MLB '
-                             'ruler) or one level only')
+    parser.add_argument('--new-levels', default=None, choices=['both', 'AAA', 'MLB', 'AFL'],
+                        help='NEW tab: every level card (AAA and AFL on the AAA ruler, MLB on '
+                             'the MLB ruler) or one level only')
     parser.add_argument('--all-levels', action='store_true',
                         help='Auto whole-season mode only (no --team): also fold in '
                              'a pitcher\'s AAA/non-MLB stints so an arm split between '
@@ -5987,13 +5987,14 @@ def main(new_level=None):
     # workbook (never read by the pipeline, so it cannot reach the site);
     # --tab overrides for other scratch tab names.
     scratch_tab = args.tab or ('NEW' if str(team).strip().upper() == 'NEW' else None)
-    # NEW holds two levels in PTeam (AAA, MLB). With new_levels "both" the run makes one
-    # pass per level (2026-11-13, per Wally): the AAA card from the AAA rows on the AAA
-    # ruler, the MLB card from the MLB rows on MLB averages. A pass with no rows for the
-    # filtered arms ends with exit code 0, and the other pass still runs.
+    # NEW holds three levels in PTeam (AAA, MLB, AFL). With new_levels "both" the run makes
+    # one pass per level (2026-11-13, per Wally; AFL added 2026-11-17 for an AFL-only arm,
+    # Huggins): the AAA card from the AAA rows on the AAA ruler, the MLB card from the MLB
+    # rows on MLB averages, the AFL card from the AFL rows on the AAA ruler. A pass with no
+    # rows for the filtered arms ends with exit code 0, and the other passes still run.
     if scratch_tab == 'NEW' and new_level is None and not milb_corpus:
         if new_levels == 'both':
-            for _lv in ('AAA', 'MLB'):
+            for _lv in ('AAA', 'MLB', 'AFL'):
                 print(f"\n{'═'*60}\nNEW {_lv} pass\n{'═'*60}")
                 try:
                     main(new_level=_lv)
@@ -6219,7 +6220,7 @@ def main(new_level=None):
             # Triple-A games only, by the schedule's sport id for each gamePk. An MLB pass
             # keeps MLB games (sport id 1) by the same rule.
             _lvl = _game_sport_ids({str(r.get('PitchID', '')).split('_')[0] for r in t_rows} - {''})
-            _drop = {pk for pk, sid in _lvl.items() if sid != {'AAA': 11, 'MLB': 1}[_new_lv]}
+            _drop = {pk for pk, sid in _lvl.items() if sid != {'AAA': 11, 'MLB': 1, 'AFL': 17}[_new_lv]}
             if _drop:
                 _n_aaa = len(t_rows)
                 t_rows = [r for r in t_rows if str(r.get('PitchID', '')).split('_')[0] not in _drop]
@@ -6500,6 +6501,9 @@ def main(new_level=None):
             card_date = card_date.replace(
                 display_date, corpus_players[pitcher_name]['label']
                 + (f"  ·  {display_date}" if date_filter is not None else ''), 1)
+        if _new_lv == 'AFL':
+            # '2026 AFL', as on a corpus AFL card: the AFL is not his season.
+            card_date = card_date.replace(display_date, display_date[:4] + ' AFL', 1)
         if _aaa_pool:
             # Before any 'Through' date, so the social kicker (which drops it) keeps it.
             _head = card_date.split('  ·  Through')[0]
@@ -6621,7 +6625,9 @@ def main(new_level=None):
                     stat_headers = ['G', 'GS', 'IP', 'ERA', 'FIP', 'xFIP']
                     stat_values[4] = f"{_rocr['fip']:.2f}"
                     stat_values[5] = f"{_rocr['xFIP']:.2f}"
-            elif scratch_tab and mlb_id is not None and _new_lv != 'MLB':
+            # An AFL card keeps its box line: the FanGraphs minors line is his season
+            # across levels, not the AFL.
+            elif scratch_tab and mlb_id is not None and _new_lv not in ('MLB', 'AFL'):
                 from pipeline.fg_overrides import fetch_milb_pitcher_line
                 _yrs = [int(str(p.get('Game Date'))[:4]) for p in pitches
                         if str(p.get('Game Date', ''))[:4].isdigit()]
@@ -6808,6 +6814,8 @@ def main(new_level=None):
         _cp = corpus_players.get(pitcher_name) if corpus_players else None
         if _cp is not None and not _cp['mlb_only']:
             _hp_src = 'AAA' if set(_cp['levels']) <= {'AAA', 'MLB'} else 'MiLB'
+        elif scratch_tab and _new_lv == 'AFL':
+            _hp_src = 'MiLB'
         elif scratch_tab and (_aaa_pool or _new_lv == 'AAA'):
             _hp_src = 'AAA'
         elif eff_team in _AAA_HP:
@@ -6824,8 +6832,9 @@ def main(new_level=None):
             # A scratch-tab card under the AAA ruler reads AAA, not the tab name.
             'team': display_team or (corpus_players[pitcher_name]['club']
                                      if pitcher_name in corpus_players
-                                     else ('AAA' if _aaa_pool and scratch_tab
-                                           else ('MLB' if _new_lv == 'MLB' else eff_team))),
+                                     else ('AFL' if _new_lv == 'AFL'
+                                           else ('AAA' if _aaa_pool and scratch_tab
+                                                 else ('MLB' if _new_lv == 'MLB' else eff_team)))),
             'age': age,
             'game_date': card_date,
             'stat_headers': stat_headers,
@@ -6877,7 +6886,9 @@ def main(new_level=None):
             name_slug = pitcher_name.replace(' ', '').replace(',', '')
         _hs = f"-vs{bats_filter}" if bats_filter else ""
         # The NEW MLB card takes its own suffix, so it never overwrites a team-tab MLB card.
-        _aaa_s = "-vsAAA" if _aaa_pool else ("-NEWMLB" if _new_lv == 'MLB' else "")
+        # The AFL card takes its own part too, or it overwrites the AAA card (both are -vsAAA).
+        _aaa_s = (("-AFL" if _new_lv == 'AFL' else "")
+                  + ("-vsAAA" if _aaa_pool else ("-NEWMLB" if _new_lv == 'MLB' else "")))
         output_file = os.path.join(output_dir, f"{date_slug}-{name_slug}{_hs}{_aaa_s}.png")
 
         # Render
