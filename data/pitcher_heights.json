@@ -1788,6 +1788,7 @@
 "Peguero, Elvis": 76.0,
 "Peguero, Joel": 70.0,
 "Peguero, Liover": 72.0,
+"Pelham, CD": 78.0,
 "Pennington, Walter": 74.0,
 "Penrod, Zach": 74.0,
 "Peoples, Ben": 73.0,
@@ -8043,6 +8044,9 @@
 "Peguero, Liover": [
 678894
 ],
+"Pelham, CD": [
+641962
+],
 "Pennington, Walter": [
 679156
 ],
@@ -10698,5 +10702,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2672
+"n": 2673
 }
