@@ -1947,6 +1947,7 @@ def _render_single_game_panel(fig, pitches, config=None):
         if not spts:
             return
         n = len(spts); rh = min(0.13, 0.78 / n); gap = 0.02
+        _up = usage_pcts({pt: data[pt] for pt in spts}, 1, total)
         for i, pt in enumerate(spts):
             y = 0.80 - i * (rh + gap); pct = data[pt] / total if total else 0
             color = PITCH_COLORS.get(pt, '#999'); tcb = badge_text_color(color)
@@ -1956,7 +1957,7 @@ def _render_single_game_panel(fig, pitches, config=None):
             ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58, rh * 0.56, facecolor=TRACK, edgecolor='none'))
             if pct > 0:
                 ax.add_patch(Rectangle((0.17, y - rh * 0.28), 0.58 * pct, rh * 0.56, facecolor=color, edgecolor='none'))
-            ax.text(0.78, y, ("< 1%" if 0 < pct*100 < 1 else f'{pct*100:.1f}%'), fontsize=10, va='center', ha='left',
+            ax.text(0.78, y, ("< 1%" if 0 < pct*100 < 1 else f'{_up[pt]:.1f}%'), fontsize=10, va='center', ha='left',
                     color=TEXT_PRIMARY, fontweight='bold', fontfamily='IBM Plex Sans')
             # Season-usage tick: the track is a 0-100% ruler, so the tick
             # rides the TRACK, not the colored fill — an under-average night
@@ -2276,26 +2277,44 @@ def render_social_card(config, pitches, output_file):
         lum = .2126 * v[0] + .7152 * v[1] + .0722 * v[2]
         return '#ffffff' if 1.05 / (lum + .05) >= 3.0 else TEXT_PRIMARY
 
-    def tile_row(y, h, cells, vsize=17, ksize=8.2, ssize=7.2):
+    def tile_row(y, h, cells, vsize=17, ksize=8.2, ssize=7.2, gap=0.012,
+                 ggap=None, glabels=None):
         # Ink follows _ink_on: the tile's own tint decides it.
         # OPTICAL right margin: the rounded last tile overshoots the plot
         # spine's extreme by ~3px so its flat face reads flush (rounded
         # shapes look short of a straight edge they mathematically touch).
+        # A cell's 'g' names its group; with ggap set, a change of group
+        # opens the wider gap, and glabels {g: text} prints a small label
+        # over that group. Cells with no 'g' lay out as before.
         _R_opt = R + 0.0028
-        n = len(cells); gap = 0.012
-        w = (_R_opt - L - gap * (n - 1)) / n
+        n = len(cells)
+        _brk = [i > 0 and ggap is not None and c.get('g') != cells[i - 1].get('g')
+                for i, c in enumerate(cells)]
+        nb = sum(_brk)
+        w = (_R_opt - L - gap * (n - 1 - nb) - (ggap or 0) * nb) / n
+        _gx = {}
+        x = L - w - gap
         for i, c in enumerate(cells):
-            x = L + i * (w + gap)
+            x += w + (ggap if _brk[i] else gap)
+            if c.get('g') is not None:
+                _gx.setdefault(c['g'], [x, x + w])[1] = x + w
             fc = c.get('fc', DARK_CELL)
             ink = _ink_on(fc)
             rrect(x, y, w, h, fc)
             cy = y + h / 2
-            has_sub = bool(c.get('sub'))
-            txt(x + w / 2, cy + (0.012 if has_sub else 0.006), c['v'], vsize,
-                ink, weight='black', family='Bitter')
-            txt(x + w / 2, cy - (0.010 if has_sub else 0.015), c['k'], ksize, ink)
-            if has_sub:
-                txt(x + w / 2, cy - 0.022, c['sub'], ssize, ink, 'normal')
+            # A sub-line ('per 180 IP') sits UNDER the tile, so every value and key
+            # keeps one position across the row (2026-11-17, per Wally).
+            txt(x + w / 2, cy + 0.006, c['v'], vsize, ink, weight='black', family='Bitter')
+            txt(x + w / 2, cy - 0.015, c['k'], ksize, ink)
+            if c.get('sub'):
+                txt(x + w / 2, y - 0.0075, c['sub'], ssize, TEXT_SECONDARY, 'normal')
+        for g, lab in (glabels or {}).items():
+            if g not in _gx:
+                continue
+            x0, x1 = _gx[g]
+            txt((x0 + x1) / 2, y + h + 0.009, lab, 7.4, TEXT_SECONDARY)
+            ax.plot([x0 + 0.004, x1 - 0.004], [y + h + 0.0035] * 2, color=SUBTLE_BORDER,
+                    lw=1.0, transform=ax.transAxes, solid_capstyle='round')
 
     # Per-pitch grade atoms. Defined for BOTH card types since 2026-09-01:
     # the split table reads them, and season/range cards now render that table.
@@ -2378,9 +2397,16 @@ def render_social_card(config, pitches, output_file):
             return {'v': '—' if v is None else fmt(v), 'k': None,
                     'fc': _tint(prow.get(pctl_key or (key + '_pctl')))}
 
-        # Tiles read as a sentence: what HAPPENED (ERA), what he DESERVED (hdERA),
-        # the two raw inputs, the two grades, the overall verdict, and the value
-        # it bought (hdWAR, far right since 2026-11-06). STUFF+/LOC+ joined and IP moved to the header on 2026-11-03, per Wally.
+        # Three tile groups since 2026-11-17, per Wally: the card shows how he
+        # fared in 2026 AND what he projects to in 2027. 2026 (ERA, hdERA, K%,
+        # BB%, hdWAR), then the grades of what he throws (STUFF+, LOC+), then
+        # 2027 PROJ (hpERA, hpWAR Full). Pitcher+ left the row: hpERA is the
+        # Pitcher+ component set on the ERA scale plus park and hand, so the
+        # two repeat each other. hpWAR is the FULL rate (per 180 IP as a
+        # starter, per 60 as a reliever), not hpWARtot: the card shows what
+        # his arm is worth, and the playing-time projection is a roster
+        # question. Only the 2027 group carries a label; it sits at the far
+        # right, clear of the header line. IP moved to the header on 2026-11-03.
         #
         # K% and BB% rather than K-BB% and Whiff% (2026-09-01, per Wally, and
         # the data agrees): K% and Whiff% correlate +0.830 across 412 arms at
@@ -2410,23 +2436,30 @@ def render_social_card(config, pitches, output_file):
         # than a clean translation.
         _mid = (('hdERA', 'hdERA') if prow.get('hdERA') is not None
                 else ('xFIP', 'xFIP'))
-        for key, lab, fmt in (
-                (_mid[0],       _mid[1],    lambda v: f"{v:.2f}"),
-                ('kPct',        'K%',       lambda v: f"{v*100:.1f}%"),
-                ('bbPct',       'BB%',      lambda v: f"{v*100:.1f}%"),
-                ('stuffScore',  'STUFF+',   lambda v: f"{half_up(v)}"),
-                ('locPlus',     'LOC+',     lambda v: f"{half_up(v)}"),
-                ('pitcherPlus', 'PITCHER+', lambda v: f"{half_up(v)}"),
-                # hdWAR replaced hpERA on 2026-11-06, per Wally: the season card is
-                # descriptive, and hdWAR is the one tile that carries volume (hdERA
-                # turned into wins over his innings), as on the hitter card.
-                ('hWAR',        'hdWAR',    lambda v: f"{v:.1f}")):
+        _hu = ''.join(ch for ch in str(prow.get('hpWAR_unit') or '') if ch.isdigit())
+        line[0]['g'] = 0
+        for g, key, lab, fmt in (
+                (0, _mid[0],      _mid[1],  lambda v: f"{v:.2f}"),
+                (0, 'kPct',       'K%',     lambda v: f"{v*100:.1f}%"),
+                (0, 'bbPct',      'BB%',    lambda v: f"{v*100:.1f}%"),
+                (0, 'hWAR',       'hdWAR',  lambda v: f"{v:.1f}"),
+                (1, 'stuffScore', 'STUFF+', lambda v: f"{half_up(v)}"),
+                (1, 'locPlus',    'LOC+',   lambda v: f"{half_up(v)}"),
+                (2, 'hpERA',      'hpERA',  lambda v: f"{v:.2f}"),
+                (2, 'hpWAR',      'hpWAR',  lambda v: f"{v:.1f}")):
             cell = _num(key, fmt)
             cell['k'] = lab
+            cell['g'] = g
+            if key == 'hpWAR' and _hu:
+                cell['sub'] = f"per {_hu} IP"
             line.append(cell)
         # A stat with no value leaves the row, as on an AFL card (2026-11-03, per Wally).
+        # hpWAR is blank on a small-sample row (apply_hpwar), so it leaves too.
         line = [c for c in line if c['v'] != '—']
-        tile_row(0.835, 0.052, line, vsize=18)   # eight tiles: '23.2%' touched the edge at 19
+        # Nine tiles: '23.2%' touches the edge above 16. 0.026 between groups
+        # is a display convention.
+        tile_row(0.835, 0.052, line, vsize=16, ksize=7.6, ssize=6.2, gap=0.010,
+                 ggap=0.026, glabels={2: '2027 PROJ'})
         _tbl = _spl = True
         mv_top, mv_bot = 0.8175, 0.4355
         # The season plot gives the Stuff+ strip its height back (2026-11-05, per Wally).
@@ -2920,6 +2953,9 @@ def render_social_card(config, pitches, output_file):
             # balls). The plot still shows the type (2026-11-03, per Wally).
             if is_season:
                 rows = [r for r in rows if r['n'] / nsub >= 0.01]
+            # The shown rows' usage adds to 100 (usage_pcts). On a season card the
+            # base is the shown rows, so a dropped sub-1% type cannot leave 99%.
+            _upct = usage_pcts({r['pt']: r['n'] for r in rows}, 0)
             if title:
                 txt(_rail - _ink_left_pad(fig, title, 10.5, 'black'),
                     y, title, 10.5, TEXT_PRIMARY, 'black', ha='left')
@@ -3003,8 +3039,8 @@ def render_social_card(config, pitches, output_file):
                         v, c_ = str(r_['n']), TEXT_PRIMARY
                     elif k == 'usepct':
                         # A thrown type is never 0% (2026-11-03, per Wally).
-                        _u = r_['n'] / nsub * 100
-                        v, c_ = ('< 1%' if round(_u) == 0 else '%.0f%%' % _u), TEXT_PRIMARY
+                        _u = _upct.get(r_['pt'], 0.0)
+                        v, c_ = ('< 1%' if _u == 0 else '%.0f%%' % _u), TEXT_PRIMARY
                     elif k == 'csw':
                         v = '%.0f%%' % (r_['csw'] * 100)
                         c_ = TEXT_PRIMARY
@@ -3659,6 +3695,7 @@ def render_card(config, pitches, output_file):
                 transform=ax.transAxes, facecolor=BG,
                 edgecolor=SUBTLE_BORDER, linewidth=1.0, zorder=8))
             _cy = _py1 - 0.033
+            _mixp = usage_pcts(dict(_mix), 0, _tot)
             for _pt, _cnt in _mix:
                 _col = PITCH_COLORS.get(_pt, TEXT_SECONDARY)
                 ax.add_patch(Rectangle((_px0 + 0.014, _cy - _row_h * 0.34), 0.095, _row_h * 0.68,
@@ -3671,7 +3708,7 @@ def render_card(config, pitches, output_file):
                 # hand, so a sub-1% share reads "< 1%" rather than a misleading
                 # "0%" (matches the metrics table + usage-list convention).
                 ax.text(_px0 + 0.135, _cy,
-                        ("< 1%" if 0 < _cnt / _tot * 100 < 1 else f'{_cnt / _tot * 100:.0f}%'),
+                        ("< 1%" if _mixp[_pt] == 0 else f'{_mixp[_pt]:.0f}%'),
                         transform=ax.transAxes, ha='left', va='center',
                         fontsize=9.5, fontweight='bold', color=TEXT_PRIMARY,
                         zorder=10, fontfamily='IBM Plex Sans')
@@ -3948,6 +3985,12 @@ def render_card(config, pitches, output_file):
         key=lambda pt: (-pitch_counts[pt], PITCH_ORDER.index(pt) if pt in PITCH_ORDER else 999)
     )
 
+    # Usage column adds to 100.0% (usage_pcts).
+    _tbl_n = {}
+    for p in pitches:
+        if p.get('Pitch Type') in table_pitch_order:
+            _tbl_n[p['Pitch Type']] = _tbl_n.get(p['Pitch Type'], 0) + 1
+    _tbl_up = usage_pcts(_tbl_n, 1, tc)
     for pt in table_pitch_order:
         pp = [p for p in pitches if p.get('Pitch Type') == pt]
         if not pp: continue
@@ -4141,7 +4184,7 @@ def render_card(config, pitches, output_file):
         _c_hb = sum(hbs)/len(hbs) if hbs else None
         _nvaa = nvaa_by_pt.get(pt)
         _nhaa = nhaa_by_pt.get(pt)
-        row=[pt_name,str(n),("< 1%" if 0 < n/tc*100 < 1 else f"{n/tc*100:.1f}%"),
+        row=[pt_name,str(n),("< 1%" if 0 < n/tc*100 < 1 else f"{_tbl_up[pt]:.1f}%"),
             f"{_c_velo:.1f}" if velos else '—',
             f"{max(velos):.1f}" if velos else '—',
             f"{int(_c_spin)}" if spins else '—',
@@ -4720,6 +4763,29 @@ def half_up(v):
     per-pitch atoms stay int(round()) because they must equal the Sheets
     integers CI writes."""
     return int(math.floor(v + 0.5))
+
+
+def usage_pcts(counts, decimals=0, total=None):
+    """Usage percents that add up: {key: count} -> {key: percent} at `decimals`,
+    by largest remainder (2026-11-17, per Wally: a usage column read 101%).
+    Rounding each share on its own lets the column sum to 99 or 101. Each share
+    is floored to the display unit, and the units still owed go to the largest
+    remainders (ties to the larger count, then the key), so every value stays
+    within one unit of its exact share. `total` defaults to the sum of counts;
+    a larger total (pitches with no type) owes the rounded share of the listed
+    keys, which is 100 whenever every pitch has a type."""
+    if not counts:
+        return {}
+    tot = total if total else sum(counts.values())
+    if not tot:
+        return {k: 0.0 for k in counts}
+    scale = 10 ** decimals
+    exact = {k: c / tot * 100 * scale for k, c in counts.items()}
+    units = {k: int(math.floor(v)) for k, v in exact.items()}
+    owed = int(math.floor(sum(exact.values()) + 0.5)) - sum(units.values())
+    for k in sorted(exact, key=lambda k: (-(exact[k] - units[k]), -counts[k], str(k)))[:max(owed, 0)]:
+        units[k] += 1
+    return {k: u / scale for k, u in units.items()}
 
 
 def _stuff_rank_key(v):
