@@ -375,6 +375,7 @@
 "Carasiti, Matt": 74.0,
 "Caratini, Victor": 72.0,
 "Carlson, Dylan": 73.0,
+"Carlson, Sam": 76.0,
 "Carlton, Drew": 73.0,
 "Carpenter, Kerry": 73.0,
 "Carpenter, Matt": 76.0,
@@ -3798,6 +3799,9 @@
 ],
 "Carlson, Dylan": [
 666185
+],
+"Carlson, Sam": [
+672277
 ],
 "Carlton, Drew": [
 656290
@@ -10694,5 +10698,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2671
+"n": 2672
 }
