@@ -2453,7 +2453,7 @@ def render_social_card(config, pitches, output_file):
             if key == 'hpWAR' and _hu:
                 cell['sub'] = f"per {_hu} IP"
             if key == 'hpERA' and config.get('hp_src'):
-                cell['sub'] = "MLB scale, rough estimate"
+                continue
             line.append(cell)
         # A stat with no value leaves the row, as on an AFL card (2026-11-03, per Wally).
         # hpWAR is blank on a small-sample row (apply_hpwar), so it leaves too.
@@ -6804,12 +6804,14 @@ def main(new_level=None):
                     f"{_ph:.2f}" if _ph is not None else '—',
                 ]
 
-        # hpERA from minor league pitches (2026-11-17, per Wally): the card scores it on the MLB
-        # scale with no level correction, and scripts/research/milb_fa/hpera_band.py measured it
-        # as a weak MLB forecast whatever the sample (1,407 AAA arms 2023-2025: next-season ERA
-        # on the MLB scale ran 1.1 runs above it on average, with a 10th-90th miss of -0.7 to
-        # +3.4 that did not narrow from 100 to 400+ batters faced). So the tile carries a fixed
-        # marker, not a sample-scaled band. Gated on where the inputs came from.
+        # hpERA from minor league pitches leaves the card (2026-11-17, per Wally). The card scores
+        # it on the MLB scale with no level correction, and scripts/research/milb_fa/hpera_band.py
+        # measured it as a weak MLB forecast whatever the sample (1,407 AAA arms 2023-2025:
+        # next-season ERA on the MLB scale ran 1.1 runs above it on average, with a 10th-90th
+        # miss of -0.7 to +3.4 that did not narrow from 100 to 400+ batters faced). A "rough
+        # estimate" marker shipped first; next to a pitcher's MLB card it still read as a 4.05
+        # projection beside a 7.11 ERA, so the tile and the header-strip column now go.
+        # Gated on where the inputs came from.
         from pipeline.utils import AAA_TEAMS as _AAA_HP
         _cp = corpus_players.get(pitcher_name) if corpus_players else None
         if _cp is not None and not _cp['mlb_only']:
@@ -6822,6 +6824,10 @@ def main(new_level=None):
             _hp_src = 'AAA'
         else:
             _hp_src = None
+        if _hp_src and 'hpERA' in stat_headers:
+            _i = stat_headers.index('hpERA')
+            stat_headers = stat_headers[:_i] + stat_headers[_i + 1:]
+            stat_values = stat_values[:_i] + stat_values[_i + 1:]
         # Build config
         config = {
             'hp_src': _hp_src,
