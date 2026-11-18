@@ -39,13 +39,17 @@ term; the eight hpERA channels are the rest of this table.
            and W_PH was fit on this input)  gs    starter share (gs/g)
                                             park  home park factor
     lhp    left-handed pitcher indicator, RAW and centered at the pool's
-           LHP share (2026-09-05): without it LHP beat the forecast by
-           0.11-0.20 ERA in 17 of 22 replicates, because the stuff channel
-           grades their physics ~0.7 SD worse while their outcomes match
-           RHP and Loc+ offsets only part of that. A calibration term for
-           the FORECAST; deliberately not a Stuff+ feature (Loc+ already
-           embeds the LHP outcome premium through its per-hand-pair
-           surfaces, so it would be counted twice here).
+           LHP share. RETIRED AS A WEIGHT with Stuff+ v18 (2026-11-18): W_LHP is 0.
+           From 2026-09-05 this term carried -0.19 to -0.21 ERA per left-hander,
+           because Stuff+ graded their physics about 5 points low while their
+           results matched right-handers. Stuff+ v18 takes pitcher hand as a model
+           feature, the left-hander offset in the grade falls from 6.8 points to
+           0.6, and on the honest-refit design the fitted hand weight falls from
+           -.178 to -.017 with the forecast unchanged (hand Stuff+ without the term:
+           NEXT -0.2% MSE, ROS -0.1%; scripts/research/era/hpera_new_inputs_refit.py).
+           Keeping both would count the effect twice. The channel and its plumbing
+           stay (metadata still publishes wLhp, now 0) so an older metadata bundle
+           with a non-zero weight still scores as it was built.
 
 The 100-scale twins mirror wRC+/ERA- construction (a labeled convention,
 not a fit): hdERA+ = 200 - 100 * hdERA / poolERA, higher = better,
@@ -273,14 +277,24 @@ DH_B_AAA = 1.069
 # without B and B+1 the weights below come out. Held out, refit still beats SIERA 5/5
 # NEXT and 6/6 ROS; hpERA moves sd .028, max .23. The 10-07 set: stuff .257 loc .090
 # k .149 izwh .059 xrv .131 gb .143 gs -.029 park .152, LHP -.207.
-W_PH = {'stuff': 0.224, 'loc': 0.090, 'k': 0.164, 'izwh': 0.062,
-        'xrv': 0.135, 'gb': 0.147, 'gs': -0.022, 'park': 0.154}
-# Pitcher-hand term (2026-09-05): ERA credit for a left-hander, applied to
-# the RAW indicator centered at the pool's LHP share, so the pool-mean
-# forecast does not move. Fold-mean -0.211 ROS-60; -0.254 NEXT-60 with SE
-# .013 across the five year-pairs. Kept outside the z-sum on purpose: an
-# indicator's z would tie the weight to the pool share.
-W_LHP = -0.186      # refit 2026-11-05 with W_PH; -0.207 on 10-07, -0.211 before
+# REFIT 2026-11-18 for Stuff+ v18 (scripts/research/era/hpera_new_inputs_build.py and
+# hpera_new_inputs_refit.py, arm 'hand-nolhp', final fit on every replicate): the same
+# honest-refit design, with Stuff+ from the model that holds pitcher hand and NO hand
+# term. On the same rows the shipped channel set refits to stuff .219 loc .080 k .168
+# izwh .060 xrv .137 gb .146 gs -.020 park .156 lhp -.178, within .010 of the 11-05 set
+# below on every channel, which validates the rebuild. Held out by year, this set against
+# that one: NEXT MSE -0.2% (2/5), ROS -0.1% (4/6): a tie, as it should be, because the
+# hand information moved from one channel to another. The 11-05 set: stuff .224 loc .090
+# k .164 izwh .062 xrv .135 gb .147 gs -.022 park .154, W_LHP -.186.
+W_PH = {'stuff': 0.217, 'loc': 0.082, 'k': 0.162, 'izwh': 0.061,
+        'xrv': 0.135, 'gb': 0.144, 'gs': -0.023, 'park': 0.154}
+# Pitcher-hand term. ZERO since Stuff+ v18 (2026-11-18): the Stuff+ channel now holds
+# pitcher hand, and the hand weight fits to -.017 when it is left in. History: added
+# 2026-09-05 as ERA credit for a left-hander on the RAW indicator centered at the pool's
+# LHP share (-0.211 ROS-60; -0.254 NEXT-60, SE .013); -0.207 on 10-07; -0.186 on 11-05.
+# It was a calibration term for a Stuff+ that graded left-handers low. Do not restore it
+# while Stuff+ carries is_lhp. If Stuff+ ever drops the feature, refit this with W_PH.
+W_LHP = 0.0
 # Scratch/window rows only, when the metadata bundle predates the term:
 # mean LHP share of the 2021-2026 60-IP replicate pools (.314 .269 .247
 # .276 .263 .301). The season path measures the live share.
