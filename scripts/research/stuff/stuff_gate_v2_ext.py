@@ -62,6 +62,7 @@ ARMS = {
     'IDENT3_NOH': {'identity': 3, 'drop': ['height']},
     'IDENT3_NOARM': {'identity': 3, 'drop': ['arm_angle']},
     'IDENT3_NOCROSS': {'identity': 3, 'drop': ['cross', 'cross_abs']},
+    'V18DEF': {},                                 # the gate default after v18 (pitcher hand in the design)
 }
 EV_MIN = 50
 
@@ -208,7 +209,7 @@ def run(arms, pairs, seed):
             met = G.metrics_from(agg)
             d1 = Q[Y1]
             agg['py1x'] = d1.assign(_cn=-d1['t_cn']).groupby('pitcher').agg(tcn=('_cn', 'mean'))
-            if name == 'SHIPPED_CHK':
+            if name == 'SHIPPED_CHK' and os.path.exists(G.agg_path('SHIPPED', Y, seed)):
                 ref = G.metrics_from(pd.read_pickle(G.agg_path('SHIPPED', Y, seed)))
                 diff = abs(met['nxt_r'] - ref['nxt_r'])
                 print(f'  VALIDATION {Y}: ext nxt_r {met["nxt_r"]:.5f} vs gate SHIPPED {ref["nxt_r"]:.5f} '

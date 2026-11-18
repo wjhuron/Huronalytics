@@ -716,7 +716,31 @@ def design(d, spec, feats):
         if f in X.columns:
             X.loc[d['pitch_type'].isin(set(types)).values, f] = np.nan
     X['platoon_same'] = d['platoon_same'].values
+    # v18 (2026-11-18): pitcher hand is part of the SHIPPED design, appended beside
+    # platoon_same exactly as train_stuff.design() does (same column order). A spec that
+    # still lists is_lhp under 'add' keeps its column where 'add' put it.
+    if 'is_lhp' not in X.columns:
+        X['is_lhp'] = d['is_lhp'].values.astype('float32')
     return X
+
+
+DESIGN_TAIL = ['platoon_same', 'is_lhp']     # what design() appends to the spec's features
+
+
+def check_baseline(results):
+    """Stop when the cached SHIPPED record was built on another design. The gate reuses
+    any agg_SHIPPED_* that exists, so a design change (v18 added is_lhp) would pair every
+    new arm against a baseline of the OLD model with nothing wrong on screen."""
+    want = variant_feats({}) + DESIGN_TAIL
+    for y, seeds in (results.get('SHIPPED') or {}).items():
+        for s, met in seeds.items():
+            have = met.get('design_cols')
+            if have != want:
+                sys.exit('cached SHIPPED aggregates were built on another design '
+                         f'(pair {y} seed {s}: {"no design record" if have is None else have[-3:]}; '
+                         f'the gate now builds {want[-3:]}). Move agg_*.pkl and results.json '
+                         'aside into a dated folder under data/_gate_v2/ (build_loc() shows the '
+                         'pattern), then run SHIPPED again.')
 
 
 # ── rendered-unit grade ──────────────────────────────────────────────────
@@ -843,6 +867,7 @@ def run(spec_path, pairs, seeds, names_only=None):
     if names_only:
         variants = {k: v for k, v in variants.items() if k in names_only}
     results = json.load(open(RESULTS)) if os.path.exists(RESULTS) else {}
+    check_baseline(results)
     frames = {y: load_frame(y) for y in SEASONS}
     set_arm_side_sign(list(frames.values()))
     names = (['SHIPPED'] if 'SHIPPED' not in variants else []) + list(variants)
@@ -928,6 +953,7 @@ def run(spec_path, pairs, seeds, names_only=None):
                 met = metrics_from(agg)
                 met['n_train'] = n_train
                 met['feats'] = feats
+                met['design_cols'] = list(Xtr.columns)
                 met['partial_target'] = (Y == PARTIAL_Y)
                 pd.to_pickle(agg, agg_path(name, Y, seed))
                 results.setdefault(name, {}).setdefault(str(Y), {})[str(seed)] = met
@@ -1213,6 +1239,7 @@ def pool(rows, sd_seed, key):
 
 def summarize(names=None, quiet=False):
     results = json.load(open(RESULTS))
+    check_baseline(results)
     results = {k: v for k, v in results.items() if not k.startswith('_')}
     variants = [n for n in results if n != 'SHIPPED']
     if names:
