@@ -4,7 +4,9 @@ version notes sit above BASE_FEATS).
 A from-scratch rebuild of v10 in mid-2026. The architecture that won:
   - ONE pooled model across pitch types (not 9 per-type models)
   - ONE learned luck-neutral xRV target (not hand-weighted whiff/GB/contact)
-  - lean physics-only feature set (no SSW residuals, no location)
+  - lean physics feature set (no SSW residuals, no location), plus two
+    yes/no context columns: same-hand batter (platoon_same) and, since v18,
+    pitcher hand (is_lhp). Stuff+ is physics plus hand, not physics only.
 
 Current telemetry (data/stuff_metrics_history.csv, 2026-09): OOF descriptive
 |r| ~0.31 at the (pitcher, type) unit; split-half reliability ~0.97, which is

@@ -4886,7 +4886,7 @@ def _scratch_stuff_scores(norm_by_pitcher, k_shrink=None, shift=None, cont_out=N
     with open(_bundle_path, 'rb') as f:
         bundle = _pickle.load(f)
     if (any(f not in bundle.get('features', [])
-            for f in ('cross', 'height'))
+            for f in ('cross', 'height', 'is_lhp'))
             or bundle.get('version') != _sv.BUNDLE_VERSION):
         raise RuntimeError(
             f"stuff_models.pkl is version {bundle.get('version')!r}; the "
