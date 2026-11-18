@@ -62,6 +62,11 @@ ARMS = {
     'IDENT3_NOH': {'identity': 3, 'drop': ['height']},
     'IDENT3_NOARM': {'identity': 3, 'drop': ['arm_angle']},
     'IDENT3_NOCROSS': {'identity': 3, 'drop': ['cross', 'cross_abs']},
+    # left-hander level (2026-11-18): pitcher hand as a model feature, with and without identity.
+    # Since v18 the gate default already holds is_lhp, so LHP differs from V18DEF only in
+    # where the column sits.
+    'LHP': {'add': ['is_lhp']},
+    'IDENT3_LHP': {'identity': 3, 'add': ['is_lhp']},
     'V18DEF': {},                                 # the gate default after v18 (pitcher hand in the design)
 }
 EV_MIN = 50
