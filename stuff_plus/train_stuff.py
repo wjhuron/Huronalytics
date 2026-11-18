@@ -232,7 +232,22 @@ HEIGHT_CLIP = (70.0, 80.0)
 # HB on average, up to ~3.4 in for Coors arms). stuff_gate_v2's prepare()
 # already built the diffs from the adjusted columns, so the gate had scored
 # the consistent feature all along.
-BUNDLE_VERSION = 'v17'
+#
+# v18 (2026-11-18) = v17 plus pitcher hand as a model feature (`is_lhp`, appended in
+# design() beside platoon_same). Left-handers graded 5.2 points below right-handers
+# and beat that grade by 6.8 points the next season (SE 0.8, 5/5 pairs,
+# scripts/research/stuff/stuff_hand_calibration.py). Gate v2, three seeds against
+# SHIPPED on the same seed, base-period pool: pooled next-season r +.044 (seed SD
+# .001, 5/5 pairs on every seed), actual run value +.022, WITHIN hand +.007 raw /
+# +.011 rendered (4/5 on every seed), and +.041 / +.012 with the pitcher's own
+# seasons out of training, so the effect is not pitcher identity. The remaining
+# left-hander offset is 0.6 points (stuff_hand_level_methods.py). The 2026-09-05
+# rejection read -.001 within hand on the partial-2026 frames and the gate pool
+# that required 300 pitches in the target season; neither holds now. By type the
+# gain is FF +.018, SI +.034, FC +.028, SL +.021, CU +.073, CH -.008; the sweeper
+# is not helped. Stuff+ is therefore physics PLUS pitcher hand: the same shape
+# from the left side gets better results, and the grade now says so.
+BUNDLE_VERSION = 'v18'
 
 # Bundle FRESHNESS (2026-09-23). The version string guards the config, not
 # the data: a retrain on more data keeps the version, so the local
@@ -697,6 +712,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
             'date': p.get('Game Date'),
             'sheet_tab': p.get('_sheet_tab'), 'sheet_row': p.get('_sheet_row'),
             'pitch_type': pt, 'platoon_same': 1 if bats == thr else 0,
+            'is_lhp': 1.0 if thr == 'L' else 0.0,     # v18; thr is 'L' or 'R' here (row filter above)
             'velocity': v, 'ivb': iv, 'hb': hb, 'velo_diff': velo_diff,
             'pid': p.get('PitchID'),   # per-pitch join key (xRVOE loc join)
             'ivb_diff': ivb_diff, 'hb_diff': hb_diff, 'spin_rate': spin,
@@ -817,8 +833,12 @@ def design(df, feats=BASE_FEATS):
     # descriptive 0.333 -> 0.339, Rogers SI 126.5 -> 128.1. Also makes
     # training fully immune to cross-year retag drift (labels are no longer
     # model inputs).
+    # v18 (2026-11-18): pitcher hand rides beside platoon_same, OUTSIDE BASE_FEATS on
+    # purpose. BASE_FEATS is also the space the low-support flag measures distance in
+    # (a yes/no hand value there would split the two hands apart) and the list the
+    # no-arm companion is derived from; appending here keeps both unchanged.
     return pd.concat([df[feats].reset_index(drop=True),
-                      df[['platoon_same']].reset_index(drop=True)], axis=1)
+                      df[['platoon_same', 'is_lhp']].reset_index(drop=True)], axis=1)
 
 # Companion model trained on the same MLB data minus arm_angle. Until
 # 2026-07-25 this scored ALL of ROC/AAA, whose arm angle was 0% populated. The
