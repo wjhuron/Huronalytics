@@ -1,0 +1,1309 @@
+{
+ "pool": {
+  "2021_s0": {
+   "n_base": 588,
+   "no_y1": 112,
+   "under300": 83
+  },
+  "2021_s1": {
+   "n_base": 588,
+   "no_y1": 112,
+   "under300": 83
+  },
+  "2021_s2": {
+   "n_base": 588,
+   "no_y1": 112,
+   "under300": 83
+  },
+  "2022_s0": {
+   "n_base": 570,
+   "no_y1": 95,
+   "under300": 74
+  },
+  "2022_s1": {
+   "n_base": 570,
+   "no_y1": 95,
+   "under300": 74
+  },
+  "2022_s2": {
+   "n_base": 570,
+   "no_y1": 95,
+   "under300": 74
+  },
+  "2023_s0": {
+   "n_base": 580,
+   "no_y1": 112,
+   "under300": 79
+  },
+  "2023_s1": {
+   "n_base": 580,
+   "no_y1": 112,
+   "under300": 79
+  },
+  "2023_s2": {
+   "n_base": 580,
+   "no_y1": 112,
+   "under300": 79
+  },
+  "2024_s0": {
+   "n_base": 566,
+   "no_y1": 110,
+   "under300": 83
+  },
+  "2024_s1": {
+   "n_base": 566,
+   "no_y1": 110,
+   "under300": 83
+  },
+  "2024_s2": {
+   "n_base": 566,
+   "no_y1": 110,
+   "under300": 83
+  },
+  "2025_s0": {
+   "n_base": 569,
+   "no_y1": 102,
+   "under300": 73
+  },
+  "2025_s1": {
+   "n_base": 569,
+   "no_y1": 102,
+   "under300": 73
+  },
+  "2025_s2": {
+   "n_base": 569,
+   "no_y1": 102,
+   "under300": 73
+  }
+ },
+ "arms": {
+  "DEPTH5": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4086,
+    "d": -0.0038,
+    "se": 0.0027,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3165,
+    "d": -0.0018,
+    "se": 0.0024,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3996,
+    "d": -0.0039,
+    "se": 0.003,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3169,
+    "d": -0.0012,
+    "se": 0.0026,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4181,
+    "d": -0.0034,
+    "se": 0.0021,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3275,
+    "d": -0.002,
+    "se": 0.0019,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.4107,
+    "d": -0.0034,
+    "se": 0.0023,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.3271,
+    "d": -0.0017,
+    "se": 0.0021,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "DEPTH7": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0024,
+    "se": 0.0026,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0031,
+    "se": 0.0023,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0028,
+    "se": 0.0028,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0039,
+    "se": 0.0025,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": 0.0006,
+    "se": 0.0023,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": 0.001,
+    "se": 0.002,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0007,
+    "se": 0.0025,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": 0.0008,
+    "se": 0.0022,
+    "pos": 4,
+    "n_pairs": 5
+   }
+  },
+  "FBREF_RAW": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": 0.0008,
+    "se": 0.0015,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": 0.0,
+    "se": 0.0015,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0005,
+    "se": 0.0016,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0002,
+    "se": 0.0016,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": 0.0008,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0003,
+    "se": 0.0012,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0007,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0005,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   }
+  },
+  "LAMBDA05": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0001,
+    "se": 0.0012,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0001,
+    "se": 0.0012,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0001,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0001,
+    "se": 0.0009,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0001,
+    "se": 0.001,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0001,
+    "se": 0.001,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0,
+    "se": 0.001,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "LAMBDA5": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": 0.0006,
+    "se": 0.0012,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0007,
+    "se": 0.0013,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": 0.0002,
+    "se": 0.0014,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": 0.0006,
+    "se": 0.001,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0002,
+    "se": 0.001,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0006,
+    "se": 0.0011,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0002,
+    "se": 0.0011,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "LR0125": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0069,
+    "se": 0.0031,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0025,
+    "se": 0.003,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0076,
+    "se": 0.0034,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0019,
+    "se": 0.0032,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0076,
+    "se": 0.0026,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0047,
+    "se": 0.0025,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0081,
+    "se": 0.0029,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0047,
+    "se": 0.0026,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "LR05": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0028,
+    "se": 0.004,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0046,
+    "se": 0.0039,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0032,
+    "se": 0.0043,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0057,
+    "se": 0.0041,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0015,
+    "se": 0.0034,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.002,
+    "se": 0.0031,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0016,
+    "se": 0.0037,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0024,
+    "se": 0.0033,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "MCW40": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": 0.0,
+    "se": 0.0013,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0004,
+    "se": 0.0016,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0002,
+    "se": 0.0015,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0004,
+    "se": 0.0017,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": 0.0012,
+    "se": 0.0011,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": 0.0007,
+    "se": 0.0011,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0014,
+    "se": 0.0012,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": 0.0008,
+    "se": 0.0012,
+    "pos": 3,
+    "n_pairs": 5
+   }
+  },
+  "MCW5": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": 0.0005,
+    "se": 0.0013,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": 0.0003,
+    "se": 0.0015,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0005,
+    "se": 0.0014,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": 0.0,
+    "se": 0.0016,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": 0.0006,
+    "se": 0.001,
+    "pos": 5,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": 0.0008,
+    "se": 0.0011,
+    "pos": 5,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0007,
+    "se": 0.0011,
+    "pos": 5,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": 0.0006,
+    "se": 0.0012,
+    "pos": 4,
+    "n_pairs": 5
+   }
+  },
+  "NEST1200": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0007,
+    "se": 0.0023,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0012,
+    "se": 0.0022,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0011,
+    "se": 0.0025,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0022,
+    "se": 0.0023,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0002,
+    "se": 0.002,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0005,
+    "se": 0.0017,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0004,
+    "se": 0.0021,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0011,
+    "se": 0.0018,
+    "pos": 3,
+    "n_pairs": 5
+   }
+  },
+  "NEST400": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0061,
+    "se": 0.0028,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0017,
+    "se": 0.0028,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0066,
+    "se": 0.0031,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.001,
+    "se": 0.003,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.008,
+    "se": 0.0025,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0043,
+    "se": 0.0024,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0086,
+    "se": 0.0027,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0042,
+    "se": 0.0025,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "NOCLIP": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": 0.0008,
+    "se": 0.0014,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": 0.0006,
+    "se": 0.0014,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0013,
+    "se": 0.0015,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": 0.0009,
+    "se": 0.0015,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": 0.0004,
+    "se": 0.0012,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0002,
+    "se": 0.0012,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0008,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": 0.0001,
+    "se": 0.0013,
+    "pos": 3,
+    "n_pairs": 5
+   }
+  },
+  "NOHEIGHT": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0133,
+    "se": 0.0034,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0107,
+    "se": 0.0034,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0142,
+    "se": 0.0035,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0115,
+    "se": 0.0035,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0129,
+    "se": 0.0031,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0125,
+    "se": 0.0032,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0138,
+    "se": 0.0031,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0134,
+    "se": 0.0032,
+    "pos": 0,
+    "n_pairs": 5
+   }
+  },
+  "SHIPPED": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4086,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3165,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3996,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3169,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4181,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3275,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.4107,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.3271,
+    "d": 0.0,
+    "se": 0.0,
+    "pos": 0,
+    "n_pairs": 5
+   }
+  },
+  "USE_ALL": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0016,
+    "se": 0.0056,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0119,
+    "se": 0.0055,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0074,
+    "se": 0.0061,
+    "pos": 5,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0073,
+    "se": 0.006,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0027,
+    "se": 0.005,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0137,
+    "se": 0.0048,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0053,
+    "se": 0.0054,
+    "pos": 4,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0091,
+    "se": 0.0052,
+    "pos": 1,
+    "n_pairs": 5
+   }
+  },
+  "USE_BRK": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0005,
+    "se": 0.005,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0077,
+    "se": 0.0052,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": 0.0057,
+    "se": 0.005,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0028,
+    "se": 0.0051,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0012,
+    "se": 0.0043,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0089,
+    "se": 0.0042,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": 0.0034,
+    "se": 0.0043,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0056,
+    "se": 0.0042,
+    "pos": 2,
+    "n_pairs": 5
+   }
+  },
+  "VD_MASKALL": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0053,
+    "se": 0.0031,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0082,
+    "se": 0.0033,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0076,
+    "se": 0.0036,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0091,
+    "se": 0.0036,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0061,
+    "se": 0.0027,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0079,
+    "se": 0.0026,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0081,
+    "se": 0.003,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0091,
+    "se": 0.0029,
+    "pos": 0,
+    "n_pairs": 5
+   }
+  },
+  "VD_NOMASK": {
+   "pairs": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "seeds": [
+    0
+   ],
+   "gate:raw:t": {
+    "ship_r": 0.4081,
+    "d": -0.0032,
+    "se": 0.0032,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "gate:raw:rv": {
+    "ship_r": 0.3167,
+    "d": -0.0106,
+    "se": 0.0035,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "gate:rend:t": {
+    "ship_r": 0.3994,
+    "d": -0.0014,
+    "se": 0.0033,
+    "pos": 3,
+    "n_pairs": 5
+   },
+   "gate:rend:rv": {
+    "ship_r": 0.3176,
+    "d": -0.0091,
+    "se": 0.0036,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:raw:t": {
+    "ship_r": 0.4183,
+    "d": -0.0033,
+    "se": 0.0028,
+    "pos": 1,
+    "n_pairs": 5
+   },
+   "free:raw:rv": {
+    "ship_r": 0.3281,
+    "d": -0.0091,
+    "se": 0.0028,
+    "pos": 0,
+    "n_pairs": 5
+   },
+   "free:rend:t": {
+    "ship_r": 0.411,
+    "d": -0.0009,
+    "se": 0.0029,
+    "pos": 2,
+    "n_pairs": 5
+   },
+   "free:rend:rv": {
+    "ship_r": 0.328,
+    "d": -0.0073,
+    "se": 0.0029,
+    "pos": 0,
+    "n_pairs": 5
+   }
+  }
+ }
+}

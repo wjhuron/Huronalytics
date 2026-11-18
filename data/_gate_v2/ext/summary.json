@@ -1,0 +1,4962 @@
+{
+ "CAP_COARSE": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0026,
+   "se": 0.0019,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.002,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.001,
+   "se": 0.0036,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.002,
+   "se": 0.0023,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0019,
+   "se": 0.0023,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0025,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0034,
+   "se": 0.0026,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0022,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0029,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0026,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0021,
+   "se": 0.0023,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.002,
+   "se": 0.0023,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0017,
+   "se": 0.0026,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0035,
+   "se": 0.0026,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0029,
+   "se": 0.002,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0022,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0029,
+   "se": 0.002,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0029,
+   "se": 0.0021,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0023,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0022,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0027,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0023,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0037,
+   "se": 0.0026,
+   "pos": 1,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.001,
+   "se": 0.0051,
+   "pos": 2,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0188,
+   "se": 0.0092,
+   "pos": 1,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0063,
+   "se": 0.0098,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0024,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0029,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0029,
+   "se": 0.0021,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0025,
+   "se": 0.0019,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.002,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0024,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0023,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0026,
+   "se": 0.0027,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0038,
+   "se": 0.0028,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.0025,
+   "se": 0.0027,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0027,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.004,
+   "se": 0.0043,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0032,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0036,
+   "se": 0.0028,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0022,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0123,
+   "se": 0.0089,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0028,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  }
+ },
+ "CAP_FINE": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0017,
+   "se": 0.0014,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0009,
+   "se": 0.0013,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0016,
+   "se": 0.0022,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0005,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0004,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0012,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0014,
+   "se": 0.0016,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0011,
+   "se": 0.0014,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.002,
+   "se": 0.0014,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0017,
+   "se": 0.0015,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0007,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0007,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0041,
+   "se": 0.0022,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0011,
+   "se": 0.0016,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0017,
+   "se": 0.0015,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0013,
+   "se": 0.0014,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0016,
+   "se": 0.0015,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0015,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0013,
+   "se": 0.0014,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0011,
+   "se": 0.0013,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0013,
+   "se": 0.0015,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0012,
+   "se": 0.0014,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0017,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0032,
+   "se": 0.005,
+   "pos": 2,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0087,
+   "se": 0.007,
+   "pos": 1,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.001,
+   "se": 0.0059,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0012,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0011,
+   "se": 0.002,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0016,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0014,
+   "se": 0.0013,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0009,
+   "se": 0.0013,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.001,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0009,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0006,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0015,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.0005,
+   "se": 0.0019,
+   "pos": 4,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0014,
+   "se": 0.0015,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0016,
+   "se": 0.003,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0008,
+   "se": 0.0015,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.001,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0011,
+   "se": 0.0015,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0002,
+   "se": 0.0057,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0011,
+   "se": 0.002,
+   "pos": 4,
+   "n": 5
+  }
+ },
+ "CNEUT": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0036,
+   "se": 0.0015,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0025,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0019,
+   "se": 0.0024,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.002,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0021,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0028,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0038,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0025,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0042,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0032,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0031,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0031,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0017,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0042,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0028,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0036,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0029,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0014,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0037,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0036,
+   "se": 0.0014,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0019,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0034,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0042,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.005,
+   "se": 0.0044,
+   "pos": 1,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0232,
+   "se": 0.0089,
+   "pos": 0,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.0073,
+   "se": 0.0088,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0028,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0018,
+   "se": 0.0021,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0013,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0043,
+   "se": 0.0015,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0024,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0022,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0023,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0023,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0036,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.0024,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0018,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.002,
+   "se": 0.0036,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0035,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0036,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0025,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0026,
+   "se": 0.0061,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0018,
+   "se": 0.0021,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "EVCNT": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0159,
+   "se": 0.0045,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": 0.0019,
+   "se": 0.0046,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0068,
+   "se": 0.0053,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": 0.0017,
+   "se": 0.0052,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": 0.0008,
+   "se": 0.0052,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0094,
+   "se": 0.0054,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0163,
+   "se": 0.0051,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.0043,
+   "se": 0.0049,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0208,
+   "se": 0.0046,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0152,
+   "se": 0.0047,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0065,
+   "se": 0.0052,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0075,
+   "se": 0.0052,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0001,
+   "se": 0.0057,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0163,
+   "se": 0.0052,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0093,
+   "se": 0.0047,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0071,
+   "se": 0.0045,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0099,
+   "se": 0.0047,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": 0.0002,
+   "se": 0.0049,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0079,
+   "se": 0.0045,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.011,
+   "se": 0.0045,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0017,
+   "se": 0.0046,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0102,
+   "se": 0.0048,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0207,
+   "se": 0.0053,
+   "pos": 0,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": 0.0157,
+   "se": 0.012,
+   "pos": 4,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0172,
+   "se": 0.0313,
+   "pos": 2,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0092,
+   "se": 0.0277,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0103,
+   "se": 0.0054,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": 0.0004,
+   "se": 0.0059,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": 0.0009,
+   "se": 0.0049,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0168,
+   "se": 0.0046,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": 0.0027,
+   "se": 0.0046,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0023,
+   "se": 0.0054,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0031,
+   "se": 0.0054,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0036,
+   "se": 0.0058,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0152,
+   "se": 0.0055,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.0026,
+   "se": 0.0058,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.001,
+   "se": 0.0046,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0023,
+   "se": 0.0129,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0112,
+   "se": 0.005,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0103,
+   "se": 0.0055,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": 0.0035,
+   "se": 0.0049,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0194,
+   "se": 0.013,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0004,
+   "se": 0.0059,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "FBHAND": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0033,
+   "se": 0.0025,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0065,
+   "se": 0.0027,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0092,
+   "se": 0.0067,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0069,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0069,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0071,
+   "se": 0.0036,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.005,
+   "se": 0.0036,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0076,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0037,
+   "se": 0.0027,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0035,
+   "se": 0.0026,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0073,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0072,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0077,
+   "se": 0.0048,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0056,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.007,
+   "se": 0.0029,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0072,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0069,
+   "se": 0.0029,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0073,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0072,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0037,
+   "se": 0.0024,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0062,
+   "se": 0.0028,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0039,
+   "se": 0.0026,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0054,
+   "se": 0.0037,
+   "pos": 1,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": 0.016,
+   "se": 0.0078,
+   "pos": 3,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0212,
+   "se": 0.0211,
+   "pos": 1,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.0088,
+   "se": 0.0083,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.007,
+   "se": 0.0036,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0087,
+   "se": 0.004,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0074,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.004,
+   "se": 0.0026,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0066,
+   "se": 0.0027,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0065,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0064,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0091,
+   "se": 0.0038,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.006,
+   "se": 0.004,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.009,
+   "se": 0.0038,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0063,
+   "se": 0.0028,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": 0.0049,
+   "se": 0.004,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0053,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0064,
+   "se": 0.0038,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0076,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0094,
+   "se": 0.012,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0086,
+   "se": 0.004,
+   "pos": 1,
+   "n": 5
+  }
+ },
+ "IDENT3": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0782,
+   "se": 0.013,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.1107,
+   "se": 0.019,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.1306,
+   "se": 0.0303,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.1111,
+   "se": 0.0218,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.1107,
+   "se": 0.0217,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.1183,
+   "se": 0.0242,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0821,
+   "se": 0.0149,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.1101,
+   "se": 0.0181,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0806,
+   "se": 0.0138,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0766,
+   "se": 0.0127,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.116,
+   "se": 0.0242,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.1155,
+   "se": 0.0241,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0314,
+   "se": 0.0083,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.082,
+   "se": 0.0163,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.1184,
+   "se": 0.0212,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.1162,
+   "se": 0.021,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.1178,
+   "se": 0.0211,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.1111,
+   "se": 0.0181,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.1156,
+   "se": 0.0209,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0748,
+   "se": 0.0127,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.114,
+   "se": 0.0194,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0746,
+   "se": 0.0126,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0852,
+   "se": 0.0162,
+   "pos": 0,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.1175,
+   "se": 0.0226,
+   "pos": 0,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.1553,
+   "se": 0.0392,
+   "pos": 0,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.193,
+   "se": 0.0389,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.1177,
+   "se": 0.024,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.107,
+   "se": 0.0208,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.1118,
+   "se": 0.0182,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0778,
+   "se": 0.0137,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.1113,
+   "se": 0.0191,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.1141,
+   "se": 0.022,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.1137,
+   "se": 0.0218,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.1056,
+   "se": 0.0209,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0764,
+   "se": 0.0143,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.1053,
+   "se": 0.0208,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.1146,
+   "se": 0.0195,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.1044,
+   "se": 0.0215,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0785,
+   "se": 0.0148,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.074,
+   "se": 0.0143,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.1096,
+   "se": 0.018,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0624,
+   "se": 0.0247,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.1066,
+   "se": 0.0207,
+   "pos": 0,
+   "n": 5
+  }
+ },
+ "NOARM": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0028,
+   "se": 0.0031,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0073,
+   "se": 0.0031,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0132,
+   "se": 0.0062,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0034,
+   "se": 0.0034,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0033,
+   "se": 0.0034,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0019,
+   "se": 0.0038,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": 0.0007,
+   "se": 0.0033,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0086,
+   "se": 0.0034,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0033,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0028,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0027,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0025,
+   "se": 0.0035,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0031,
+   "se": 0.0039,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": 0.0006,
+   "se": 0.0033,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0069,
+   "se": 0.0034,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0078,
+   "se": 0.0032,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0068,
+   "se": 0.0034,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0076,
+   "se": 0.0036,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0076,
+   "se": 0.0032,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0034,
+   "se": 0.003,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0064,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0034,
+   "se": 0.0032,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": 0.0011,
+   "se": 0.0035,
+   "pos": 3,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0267,
+   "se": 0.0112,
+   "pos": 0,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0085,
+   "se": 0.0114,
+   "pos": 1,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.0302,
+   "se": 0.0118,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0018,
+   "se": 0.0037,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0033,
+   "se": 0.0041,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0077,
+   "se": 0.0036,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0038,
+   "se": 0.0031,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0075,
+   "se": 0.0031,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0026,
+   "se": 0.0036,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0025,
+   "se": 0.0036,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0039,
+   "se": 0.0039,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": 0.0007,
+   "se": 0.0036,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.0037,
+   "se": 0.0039,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0066,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0021,
+   "se": 0.0073,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": 0.0002,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": 0.0003,
+   "se": 0.0035,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0084,
+   "se": 0.0034,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0134,
+   "se": 0.0122,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0031,
+   "se": 0.0041,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "NOCROSS": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0021,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": 0.0002,
+   "se": 0.0026,
+   "pos": 3,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0052,
+   "se": 0.0087,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0002,
+   "se": 0.0029,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0005,
+   "se": 0.0029,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0021,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0039,
+   "se": 0.0031,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.001,
+   "se": 0.0028,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0023,
+   "se": 0.0026,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.002,
+   "se": 0.0027,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0008,
+   "se": 0.003,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0012,
+   "se": 0.003,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0003,
+   "se": 0.0048,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0033,
+   "se": 0.0031,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0002,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": 0.0002,
+   "se": 0.0027,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0007,
+   "se": 0.0029,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0001,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0003,
+   "se": 0.0027,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0017,
+   "se": 0.0024,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0002,
+   "se": 0.0028,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0015,
+   "se": 0.0026,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0045,
+   "se": 0.0032,
+   "pos": 1,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0127,
+   "se": 0.0072,
+   "pos": 1,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0061,
+   "se": 0.0112,
+   "pos": 2,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0012,
+   "se": 0.0097,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0024,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0009,
+   "se": 0.0033,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": 0.0003,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.002,
+   "se": 0.0025,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": 0.0007,
+   "se": 0.0026,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0013,
+   "se": 0.0031,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0016,
+   "se": 0.0031,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0005,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0037,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.0001,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": 0.0002,
+   "se": 0.0028,
+   "pos": 3,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0051,
+   "se": 0.0057,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0029,
+   "se": 0.003,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0025,
+   "se": 0.0032,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": 0.0006,
+   "se": 0.0028,
+   "pos": 3,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0177,
+   "se": 0.0084,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0012,
+   "se": 0.0033,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "REC06": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0025,
+   "se": 0.0029,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": 0.0003,
+   "se": 0.0027,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0046,
+   "se": 0.0047,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0022,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0022,
+   "se": 0.0032,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.002,
+   "se": 0.0035,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0055,
+   "se": 0.0036,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.0,
+   "se": 0.003,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0035,
+   "se": 0.003,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0028,
+   "se": 0.0031,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0026,
+   "se": 0.0033,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0026,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0066,
+   "se": 0.006,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0065,
+   "se": 0.0036,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": 0.0004,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0009,
+   "se": 0.0028,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": 0.0003,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": 0.0011,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.001,
+   "se": 0.0028,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0034,
+   "se": 0.0028,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": 0.0016,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0037,
+   "se": 0.003,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0061,
+   "se": 0.0037,
+   "pos": 2,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0116,
+   "se": 0.0085,
+   "pos": 1,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0093,
+   "se": 0.0181,
+   "pos": 3,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0057,
+   "se": 0.0129,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.002,
+   "se": 0.0035,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0037,
+   "se": 0.0039,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": 0.0011,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0045,
+   "se": 0.0029,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": 0.0005,
+   "se": 0.0028,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0016,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0015,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0041,
+   "se": 0.0037,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0069,
+   "se": 0.004,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.0041,
+   "se": 0.0037,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": 0.0016,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": 0.008,
+   "se": 0.0065,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0059,
+   "se": 0.0034,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0073,
+   "se": 0.0039,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0001,
+   "se": 0.003,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0104,
+   "se": 0.0097,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0037,
+   "se": 0.0039,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "REC08": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": 0.0015,
+   "se": 0.002,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": 0.002,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0061,
+   "se": 0.003,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": 0.001,
+   "se": 0.0021,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": 0.001,
+   "se": 0.0021,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": 0.0005,
+   "se": 0.0023,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": 0.0001,
+   "se": 0.0024,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.0022,
+   "se": 0.002,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": 0.0012,
+   "se": 0.002,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": 0.0017,
+   "se": 0.0021,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": 0.0011,
+   "se": 0.0021,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": 0.0012,
+   "se": 0.0022,
+   "pos": 3,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0069,
+   "se": 0.0052,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": 0.0005,
+   "se": 0.0024,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": 0.0018,
+   "se": 0.002,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": 0.0018,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": 0.0018,
+   "se": 0.002,
+   "pos": 4,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": 0.0023,
+   "se": 0.0021,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": 0.0017,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": 0.0014,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": 0.0022,
+   "se": 0.002,
+   "pos": 4,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": 0.0016,
+   "se": 0.002,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": 0.0,
+   "se": 0.0025,
+   "pos": 3,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0014,
+   "se": 0.005,
+   "pos": 3,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0107,
+   "se": 0.0112,
+   "pos": 3,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0037,
+   "se": 0.0092,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": 0.0006,
+   "se": 0.0023,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": 0.0,
+   "se": 0.0025,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": 0.0023,
+   "se": 0.0021,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": 0.0011,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": 0.002,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": 0.0005,
+   "se": 0.0022,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": 0.0006,
+   "se": 0.0022,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0006,
+   "se": 0.0024,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0001,
+   "se": 0.0026,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.0006,
+   "se": 0.0024,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": 0.0022,
+   "se": 0.002,
+   "pos": 4,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": 0.005,
+   "se": 0.0043,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": 0.0006,
+   "se": 0.0023,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": 0.0004,
+   "se": 0.0026,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": 0.0021,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.008,
+   "se": 0.0086,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": 0.0001,
+   "se": 0.0025,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "SHIPPED_CHK": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": 0.0,
+   "se": 0.0,
+   "pos": 0,
+   "n": 5
+  }
+ },
+ "SUB06": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.005,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0035,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0018,
+   "se": 0.0025,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0026,
+   "se": 0.0021,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0025,
+   "se": 0.0021,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.0038,
+   "se": 0.0023,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0041,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.004,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0054,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0052,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.003,
+   "se": 0.0022,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0029,
+   "se": 0.0022,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0024,
+   "se": 0.0024,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0038,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.005,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0042,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0049,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0048,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0041,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0041,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0043,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0043,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0045,
+   "se": 0.0022,
+   "pos": 1,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.005,
+   "se": 0.0051,
+   "pos": 1,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0034,
+   "se": 0.0106,
+   "pos": 2,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0031,
+   "se": 0.0085,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0037,
+   "se": 0.0023,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.004,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0049,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0046,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0036,
+   "se": 0.0016,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0034,
+   "se": 0.0022,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0033,
+   "se": 0.0022,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0031,
+   "se": 0.0023,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0046,
+   "se": 0.0022,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.003,
+   "se": 0.0023,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0044,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.003,
+   "se": 0.004,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0034,
+   "se": 0.0019,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0038,
+   "se": 0.0021,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0039,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0057,
+   "se": 0.0093,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0039,
+   "se": 0.0025,
+   "pos": 1,
+   "n": 5
+  }
+ },
+ "SWONLY": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": 0.0026,
+   "se": 0.007,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0179,
+   "se": 0.0069,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0139,
+   "se": 0.01,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": -0.0215,
+   "se": 0.0076,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": -0.0212,
+   "se": 0.0076,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": -0.018,
+   "se": 0.0081,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0017,
+   "se": 0.0082,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0138,
+   "se": 0.0074,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": 0.0015,
+   "se": 0.0073,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": 0.0024,
+   "se": 0.0074,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": -0.0215,
+   "se": 0.0079,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": -0.0211,
+   "se": 0.0079,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0139,
+   "se": 0.0108,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0012,
+   "se": 0.0082,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.016,
+   "se": 0.0071,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0206,
+   "se": 0.0071,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0158,
+   "se": 0.0071,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0136,
+   "se": 0.0074,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0201,
+   "se": 0.0071,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": 0.0013,
+   "se": 0.0069,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0135,
+   "se": 0.0068,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": 0.003,
+   "se": 0.0073,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0026,
+   "se": 0.0086,
+   "pos": 2,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0658,
+   "se": 0.0182,
+   "pos": 0,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0167,
+   "se": 0.0429,
+   "pos": 2,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0121,
+   "se": 0.0322,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0179,
+   "se": 0.0081,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0177,
+   "se": 0.0087,
+   "pos": 0,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0139,
+   "se": 0.0074,
+   "pos": 0,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": 0.0005,
+   "se": 0.0072,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0183,
+   "se": 0.0069,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0158,
+   "se": 0.0079,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0157,
+   "se": 0.0078,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": -0.0168,
+   "se": 0.0084,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0031,
+   "se": 0.0089,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": -0.0164,
+   "se": 0.0084,
+   "pos": 0,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0137,
+   "se": 0.0069,
+   "pos": 0,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0137,
+   "se": 0.0205,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.002,
+   "se": 0.0078,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": 0.0004,
+   "se": 0.0085,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0133,
+   "se": 0.0074,
+   "pos": 0,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0429,
+   "se": 0.0263,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0175,
+   "se": 0.0087,
+   "pos": 0,
+   "n": 5
+  }
+ },
+ "TWOHEAD": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": 0.0032,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": 0.0005,
+   "se": 0.0027,
+   "pos": 4,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0033,
+   "se": 0.0046,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": 0.0015,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": 0.0013,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": 0.0026,
+   "se": 0.0035,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": 0.0026,
+   "se": 0.0034,
+   "pos": 4,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.0013,
+   "se": 0.003,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": 0.0046,
+   "se": 0.0031,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": 0.0035,
+   "se": 0.0031,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": 0.0041,
+   "se": 0.0033,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": 0.0039,
+   "se": 0.0033,
+   "pos": 4,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": -0.0055,
+   "se": 0.0045,
+   "pos": 0,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": 0.0053,
+   "se": 0.0034,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": 0.0019,
+   "se": 0.003,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": 0.0026,
+   "se": 0.0028,
+   "pos": 4,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": 0.0016,
+   "se": 0.003,
+   "pos": 4,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": 0.0001,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": 0.0024,
+   "se": 0.0028,
+   "pos": 4,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": 0.0037,
+   "se": 0.0027,
+   "pos": 4,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0005,
+   "se": 0.0029,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": 0.0041,
+   "se": 0.003,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": 0.0043,
+   "se": 0.0036,
+   "pos": 4,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": 0.001,
+   "se": 0.0071,
+   "pos": 2,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": 0.0218,
+   "se": 0.0163,
+   "pos": 3,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": 0.0172,
+   "se": 0.0166,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": 0.0025,
+   "se": 0.0035,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": -0.0005,
+   "se": 0.0038,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": 0.0003,
+   "se": 0.0032,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": 0.005,
+   "se": 0.0029,
+   "pos": 4,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": 0.0007,
+   "se": 0.0027,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0001,
+   "se": 0.0034,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0002,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0011,
+   "se": 0.0036,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": 0.0022,
+   "se": 0.0037,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.0009,
+   "se": 0.0036,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0003,
+   "se": 0.0029,
+   "pos": 4,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0058,
+   "se": 0.0074,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": 0.0037,
+   "se": 0.0032,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": 0.0034,
+   "se": 0.0035,
+   "pos": 4,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": 0.001,
+   "se": 0.003,
+   "pos": 4,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0159,
+   "se": 0.0116,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": -0.0006,
+   "se": 0.0038,
+   "pos": 3,
+   "n": 5
+  }
+ },
+ "SEED1": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0014,
+   "se": 0.0017,
+   "pos": 1,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0005,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0032,
+   "se": 0.0026,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": 0.0014,
+   "se": 0.0028,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": 0.0014,
+   "se": 0.0028,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": 0.0003,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0008,
+   "se": 0.002,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": -0.0003,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0019,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0012,
+   "se": 0.0018,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": 0.0011,
+   "se": 0.0029,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": 0.0011,
+   "se": 0.0029,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0007,
+   "se": 0.0027,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0003,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0014,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0008,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0014,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0008,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0009,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.0008,
+   "se": 0.0015,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0009,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0005,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0012,
+   "se": 0.0021,
+   "pos": 1,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0032,
+   "se": 0.0049,
+   "pos": 2,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.004,
+   "se": 0.0087,
+   "pos": 3,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.0128,
+   "se": 0.0069,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": 0.0003,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": 0.0014,
+   "se": 0.0036,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0007,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.0011,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0004,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": 0.0008,
+   "se": 0.0031,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": 0.0008,
+   "se": 0.0031,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0021,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0005,
+   "se": 0.0021,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.002,
+   "se": 0.0034,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0008,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": 0.0006,
+   "se": 0.0032,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": 0.0003,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": -0.0003,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": 0.0074,
+   "se": 0.0062,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": 0.0014,
+   "se": 0.0036,
+   "pos": 2,
+   "n": 5
+  }
+ },
+ "SEED2": {
+  "pairs": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "free:pooled:rend:rv": {
+   "ship": 0.328,
+   "d": -0.0013,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:tcn": {
+   "ship": 0.4194,
+   "d": -0.0003,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SI": {
+   "ship": 0.3499,
+   "d": -0.0054,
+   "se": 0.0029,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:t": {
+   "ship": 0.4081,
+   "d": 0.0001,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:raw:tcn": {
+   "ship": 0.4094,
+   "d": 0.0,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:t": {
+   "ship": 0.4383,
+   "d": 0.0,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:rv": {
+   "ship": 0.3176,
+   "d": -0.0013,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:t": {
+   "ship": 0.368,
+   "d": 0.0001,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:rv": {
+   "ship": 0.3419,
+   "d": -0.0013,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:rv": {
+   "ship": 0.3016,
+   "d": -0.0011,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:raw:t": {
+   "ship": 0.4512,
+   "d": 0.0004,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:hand:raw:tcn": {
+   "ship": 0.4527,
+   "d": 0.0003,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "type:FF": {
+   "ship": 0.2799,
+   "d": 0.0038,
+   "se": 0.0026,
+   "pos": 4,
+   "n": 5
+  },
+  "gate:hand:raw:rv": {
+   "ship": 0.3359,
+   "d": -0.0008,
+   "se": 0.0019,
+   "pos": 2,
+   "n": 5
+  },
+  "free:hand:rend:t": {
+   "ship": 0.4453,
+   "d": -0.0001,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:t": {
+   "ship": 0.457,
+   "d": -0.0,
+   "se": 0.0016,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:rend:tcn": {
+   "ship": 0.446,
+   "d": -0.0002,
+   "se": 0.0018,
+   "pos": 3,
+   "n": 5
+  },
+  "free:role:rend:tcn": {
+   "ship": 0.3656,
+   "d": -0.0001,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:tcn": {
+   "ship": 0.4582,
+   "d": -0.0001,
+   "se": 0.0016,
+   "pos": 3,
+   "n": 5
+  },
+  "free:pooled:raw:rv": {
+   "ship": 0.3281,
+   "d": -0.001,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:tcn": {
+   "ship": 0.4117,
+   "d": -0.0004,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:rv": {
+   "ship": 0.3001,
+   "d": -0.0008,
+   "se": 0.0017,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:hand:rend:rv": {
+   "ship": 0.3344,
+   "d": -0.0013,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "type:CH": {
+   "ship": 0.4106,
+   "d": -0.0001,
+   "se": 0.0051,
+   "pos": 3,
+   "n": 5
+  },
+  "type:ST": {
+   "ship": 0.1088,
+   "d": -0.0021,
+   "se": 0.0102,
+   "pos": 2,
+   "n": 4
+  },
+  "type:CU": {
+   "ship": 0.2959,
+   "d": -0.0183,
+   "se": 0.0081,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:hand:rend:tcn": {
+   "ship": 0.439,
+   "d": -0.0,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:t": {
+   "ship": 0.339,
+   "d": 0.0001,
+   "se": 0.0021,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:rend:t": {
+   "ship": 0.365,
+   "d": -0.0,
+   "se": 0.0019,
+   "pos": 3,
+   "n": 5
+  },
+  "free:hand:raw:rv": {
+   "ship": 0.3445,
+   "d": -0.001,
+   "se": 0.0016,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:raw:t": {
+   "ship": 0.4183,
+   "d": -0.0002,
+   "se": 0.0016,
+   "pos": 3,
+   "n": 5
+  },
+  "gate:pooled:rend:t": {
+   "ship": 0.3994,
+   "d": -0.0002,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:pooled:rend:tcn": {
+   "ship": 0.4001,
+   "d": -0.0002,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:t": {
+   "ship": 0.3425,
+   "d": 0.0005,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:rend:rv": {
+   "ship": 0.2766,
+   "d": -0.0013,
+   "se": 0.0021,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:tcn": {
+   "ship": 0.344,
+   "d": 0.0004,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:pooled:rend:t": {
+   "ship": 0.411,
+   "d": -0.0003,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "type:SL": {
+   "ship": 0.2835,
+   "d": -0.0005,
+   "se": 0.0033,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:pooled:raw:rv": {
+   "ship": 0.3167,
+   "d": -0.0007,
+   "se": 0.0018,
+   "pos": 2,
+   "n": 5
+  },
+  "gate:role:raw:rv": {
+   "ship": 0.2725,
+   "d": -0.0007,
+   "se": 0.002,
+   "pos": 2,
+   "n": 5
+  },
+  "free:role:raw:tcn": {
+   "ship": 0.3691,
+   "d": 0.0,
+   "se": 0.0017,
+   "pos": 3,
+   "n": 5
+  },
+  "type:FC": {
+   "ship": 0.3845,
+   "d": -0.0047,
+   "se": 0.0076,
+   "pos": 1,
+   "n": 5
+  },
+  "gate:role:rend:tcn": {
+   "ship": 0.3398,
+   "d": 0.0,
+   "se": 0.0021,
+   "pos": 2,
+   "n": 5
+  }
+ }
+}

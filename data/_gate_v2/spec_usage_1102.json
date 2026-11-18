@@ -1,0 +1,4 @@
+{
+  "USE_ALL": {"add": ["use_share"]},
+  "USE_BRK": {"add_typed": {"use_share": ["SL", "CH", "CU"]}}
+}
