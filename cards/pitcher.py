@@ -2159,13 +2159,15 @@ def render_social_card(config, pitches, output_file):
                               edgecolor='none', zorder=zorder,
                               transform=a.transData, clip_on=False))
 
-    def gtint(g):
+    def gtint(g, kind='stuff', mix=None):
         # Grade tint on the print scale. The 4-points-per-percentile map is a
         # display convention (a +/-12.5 grade spans the full ramp), not a
-        # measured constant.
+        # measured constant. The centre is 100 on an MLB-ruled card; under the
+        # AAA ruler it is the AAA average on the MLB scale, for the pitch type
+        # or the mix (_aaa_grade_center), so the tint still reads against AAA.
         if g is None:
             return DARK_CELL
-        f, _ = _percentile_color(max(0, min(100, 50 + (g - 100) * 4)))
+        f, _ = _percentile_color(max(0, min(100, 50 + (g - _aaa_grade_center(kind, mix)) * 4)))
         return f
 
     # usage from the card's own pitches, largest first
@@ -2340,6 +2342,7 @@ def render_social_card(config, pitches, output_file):
                 if v is not None]
         sg = (sum(s_at) / len(s_at)) if s_at else None
         lg_ = (sum(l_at) / len(l_at)) if l_at else None
+        _mix_all = Counter(p.get('Pitch Type') for p in pitches if p.get('Pitch Type'))
         # Tile order per Wally 2026-09-05: IP | H | ER | K | BB, then the
         # grades — the line reads what happened (hits, runs) before how
         # (strikeouts, walks).
@@ -2349,8 +2352,8 @@ def render_social_card(config, pitches, output_file):
             {'v': str(box.get('er', '—')), 'k': 'ER'},
             {'v': str(box.get('so', '—')), 'k': 'K'},
             {'v': str(box.get('bb', '—')), 'k': 'BB'},
-            {'v': '—' if sg is None else f"{half_up(sg)}", 'k': 'STUFF+', 'fc': gtint(sg)},
-            {'v': '—' if lg_ is None else f"{half_up(lg_)}", 'k': 'LOC+', 'fc': gtint(lg_)},
+            {'v': '—' if sg is None else f"{half_up(sg)}", 'k': 'STUFF+', 'fc': gtint(sg, 'stuff', _mix_all)},
+            {'v': '—' if lg_ is None else f"{half_up(lg_)}", 'k': 'LOC+', 'fc': gtint(lg_, 'loc', _mix_all)},
         ]
         # Same two-line format as the STUFF+/LOC+ tiles (per Wally): value
         # over key, no sub-line — the percentile lives only in the tint.
@@ -3006,7 +3009,7 @@ def render_social_card(config, pitches, output_file):
                         # Tinted grade chips — no sample-size gate (2026-08-28,
                         # per Wally): every cell colors from its value.
                         g = r_[k]
-                        fc = gtint(g)
+                        fc = gtint(g, k, r_['pt'])
                         # A season Loc+ under its gate draws an open chip, not the
                         # beige fill, which reads as a league-average grade.
                         _gated = k == 'loc' and is_season and r_['n'] < SOCIAL_LOC_MIN_PITCHES
@@ -3153,7 +3156,7 @@ def render_social_card(config, pitches, output_file):
                     _x = _st_x0 + _i * _st_step
                     txt(_x, _st_y, pt_, _st_fs, PITCH_COLORS.get(pt_, '#777'), 'bold', ha='left')
                     _g = _sp_total.get(pt_)
-                    _fc = gtint(_g)
+                    _fc = gtint(_g, 'stuff', pt_)
                     _cx = _x + _st_code + 0.5 * _st_cw
                     rrect(_cx - 0.5 * _st_cw, _st_y - 0.5 * _st_h, _st_cw, _st_h, _fc, r=0.007)
                     txt(_cx, _st_y, '—' if _g is None else f'{half_up(_g)}', _st_fs,
@@ -3212,7 +3215,7 @@ def render_social_card(config, pitches, output_file):
         note_r = (('Data: MLB, Baseball Savant, FanGraphs' if _fg_src else 'Data: MLB, Baseball Savant')
                   + '  ·  disc size = usage  ·  '
                   + ('ring = expected movement  ·  ' if _expected else '')
-                  + ('100 = AAA avg' if config.get('aaa_ruler')
+                  + ('100 = MLB avg, tints vs AAA' if config.get('aaa_ruler')
                      else '100 = league avg'))
 
     # Footer height, tuned by measured clearance from the card's bottom edge
@@ -4575,7 +4578,9 @@ def render_card(config, pitches, output_file):
                     continue
             row_bg = DARKER if r == len(cell_data) else (DARK_CELL if r % 2 == 1 else ALT_ROW_BG)
             val_str = cell_data[r - 1][lp_col_idx]
-            tinted = _pitcher_stat_cell_color(val_str, 100.0, 10.0, True, row_bg, False)
+            # 100 on an MLB-ruled card; the AAA average on the MLB scale under the AAA ruler.
+            _ctr = _aaa_grade_center('loc', pitch_counts if r == len(cell_data) else pt_codes[r - 1])
+            tinted = _pitcher_stat_cell_color(val_str, _ctr, 10.0, True, row_bg, False)
             if tinted:
                 table.get_celld()[(r, lp_col_idx)].set_facecolor(tinted)
 
@@ -4592,7 +4597,9 @@ def render_card(config, pitches, output_file):
                     continue
             row_bg = DARKER if r == len(cell_data) else (DARK_CELL if r % 2 == 1 else ALT_ROW_BG)
             val_str = cell_data[r - 1][sp_col_idx]
-            tinted = _pitcher_stat_cell_color(val_str, 100.0, 10.0, True, row_bg, False)
+            # 100 on an MLB-ruled card; the AAA average on the MLB scale under the AAA ruler.
+            _ctr = _aaa_grade_center('stuff', pitch_counts if r == len(cell_data) else pt_codes[r - 1])
+            tinted = _pitcher_stat_cell_color(val_str, _ctr, 10.0, True, row_bg, False)
             if tinted:
                 table.get_celld()[(r, sp_col_idx)].set_facecolor(tinted)
 
@@ -5307,15 +5314,14 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
     leaderboard percentile pools, nVAA/nHAA regressions. stuff_k_shrink is
     passed through to Stuff+ scoring (light for daily cards).
 
-    aaa is the AAA pitcher pool (load_aaa_pitcher_pool): the grades are shifted
-    to 100 = AAA average and every pool is swapped for its AAA twin. keep_cont
-    keeps the unrounded MLB-anchored grade of every pitch, for the pool builder."""
+    aaa is the AAA pitcher pool (load_aaa_pitcher_pool): every pool is swapped
+    for its AAA twin, while Stuff+ and Loc+ stay on the MLB scale. keep_cont keeps
+    the unrounded MLB-anchored grade of every pitch, for the pool builder and for
+    the AAA-shifted pair that Pitcher+ scores."""
     from pipeline.locplus import compute_loc_plus
 
     t0 = time_module.time()
     ctx = {'norm_by_pitcher': norm_by_pitcher, 'aaa': aaa}
-    _shift = (aaa or {}).get('shift') or {}
-    _stuff_shift, _loc_shift = _shift.get('stuff') or {}, _shift.get('loc') or {}
 
     mlb = _load_mlb_pickle()
     print(f"  [ctx] {len(mlb)} MLB pitches ready ({time_module.time()-t0:.0f}s)")
@@ -5370,9 +5376,10 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
         return 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
 
     def _loc_atom(p):
-        # The AAA ruler takes the group's AAA mean (less 100) off before rounding.
+        # MLB scale on every card (2026-11-17, per Wally): the AAA ruler no longer
+        # shifts the grade; it moves only percentiles, tints and Pitcher+.
         c = _loc_cont(p)
-        return None if c is None else int(round(c - _loc_shift.get(group_of(p), 0.0)))
+        return None if c is None else int(round(c))
     ctx['loc_atom_fn'] = _loc_atom   # per-pitch fallback for blank sheet cells
     ctx['loc_cont_fn'] = _loc_cont
     ctx['loc_group_fn'] = group_of
@@ -5397,7 +5404,7 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
         ctx['stuff_cont_by_pid'] = {} if keep_cont else None
         (ctx['stuff_overall'], ctx['stuff_pt'],
          ctx['stuff_atoms_by_pid']) = _scratch_stuff_scores(
-            norm_by_pitcher, stuff_k_shrink, shift=_stuff_shift,
+            norm_by_pitcher, stuff_k_shrink, shift=None,
             cont_out=ctx['stuff_cont_by_pid'])
     except (FileNotFoundError, RuntimeError):
         # A missing or version-stale bundle is an operator problem with a
@@ -5475,11 +5482,13 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
 # ═══════════════════════════════════════════════════════════════
 # AAA RULER (2026-11-08, per Wally): a scratch-tab or MiLB-corpus season card
 # can read against 2026 AAA instead of MLB, as the AAA hitter cards do. Every
-# chip is a AAA percentile, every tint reads the AAA average, and Stuff+, Loc+
-# and Pitcher+ read 100 = AAA average. Stuff+ and Loc+ keep the MLB point
-# size: each pitch's grade is shifted by its type's (Loc+: group's) AAA mean
-# less 100 before it is rounded, so the atoms average 100 at AAA. Pitcher+ is
-# rebuilt on the AAA pool's (mu, sigma). The chip pools are Savant's line,
+# chip is a AAA percentile and every tint reads the AAA average. Stuff+ and Loc+
+# SHOW on the MLB scale since 2026-11-17 (per Wally): both models grade a pitch
+# against MLB outcomes, and the AAA mean only relabels the zero, by a different
+# amount per type, so a AAA arm's 97 mph sinker reads what it would in MLB. They
+# rank against the pool's MLB-scale grades, and a value tint centres on the type's
+# AAA mean on the MLB scale (_aaa_grade_center). Pitcher+ still reads 100 = AAA
+# average: it scores the AAA-shifted grades on the AAA pool's (mu, sigma). The chip pools are Savant's line,
 # 1.25 batters faced per AAA team game; the per-type, split and HR/FB pools
 # keep the conventions their MLB twins use. The pool is one season, built by
 # scripts/research/cards/aaa_pitcher_pool.py into AAA_PITCHER_POOL.
@@ -5487,6 +5496,28 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
 AAA_PITCHER_POOL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 'data', '_milb2026', 'pitcher_pool_AAA.json')
 AAA_POOL_BUILD_CMD = 'PYTHONHASHSEED=0 .venv/bin/python scripts/research/cards/aaa_pitcher_pool.py'
+
+# The pool's grade shift ({'stuff': {pt: AAA mean - 100}, 'loc': {group: ...}}), set
+# by _install_aaa_pools. The grades SHOW on the MLB scale; the shift only moves the
+# centre a value tint reads against, so a tint still says better or worse than AAA.
+_AAA_GRADE_SHIFT = None
+
+
+def _aaa_grade_center(kind, mix):
+    """The MLB-scale value of the AAA average for kind 'stuff' or 'loc': 100 on an
+    MLB-ruled card, else 100 plus the shift of the pitch type, or the count-weighted
+    shift of a {pitch type: count} mix. Loc+ shifts by location group."""
+    sh = (_AAA_GRADE_SHIFT or {}).get(kind)
+    if not sh or not mix:
+        return 100.0
+    if isinstance(mix, str):
+        mix = {mix: 1}
+    from pipeline.locplus import group_of_code
+    tot = sum(n for pt, n in mix.items() if pt)
+    if not tot:
+        return 100.0
+    return 100.0 + sum(n * sh.get(group_of_code(pt) if kind == 'loc' else pt, 0.0)
+                       for pt, n in mix.items() if pt) / tot
 
 
 def load_aaa_pitcher_pool():
@@ -5515,11 +5546,17 @@ def _install_aaa_pools(ctx, pool):
     """Swap every MLB ruler the scratch card reads for its AAA twin: the chip
     pools, Pitcher+'s baseline and pool, the per-type pools, and the social
     card's split, xwOBAcon and extension pools plus the HR/FB and PU pools."""
-    global _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS, _SOCIAL_EXT_POOL, _HRFB_PU_POOLS
+    global _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS, _SOCIAL_EXT_POOL, _HRFB_PU_POOLS, _AAA_GRADE_SHIFT
+    from pipeline.locplus import group_of_code
     q = aaa_qualified(pool)
+    _AAA_GRADE_SHIFT = pool['shift']
+    s_sh, l_sh = pool['shift']['stuff'], pool['shift']['loc']
+    # Stuff+ and Loc+ show on the MLB scale (2026-11-17, per Wally), so they rank
+    # against the pool's MLB-scale grades: a AAA percentile of an MLB-scale value.
+    _mlb_key = {'stuffScore': 'stuffScoreMLB', 'locPlus': 'locPlusMLB'}
     ctx['pitcher_pools'] = {
-        s: sorted(v for v in ((_stuff_rank_key(r.get(s)) if s == 'stuffScore' else r.get(s))
-                              for r in q) if v is not None)
+        s: sorted(v for v in ((_stuff_rank_key(r.get(_mlb_key[s])) if s == 'stuffScore'
+                               else r.get(_mlb_key.get(s, s))) for r in q) if v is not None)
         for s in list(_SCRATCH_POOL_STATS) + list(_SCRATCH_LINE_STATS)}
     ctx['pitcher_plus_pool'] = sorted(r['pitcherPlus'] for r in q if r.get('pitcherPlus') is not None)
     base = pool.get('pitcherPlusBase')
@@ -5529,8 +5566,15 @@ def _install_aaa_pools(ctx, pool):
         for pt, d in by_pt.items():
             for s in ('velocity', 'nVAA', 'stuffScore', 'locPlus'):
                 v = d.get(s)
-                if v is not None:
-                    pt_pools[pt][s].append(_stuff_rank_key(v) if s == 'stuffScore' else v)
+                if v is None:
+                    continue
+                # The pool stores per-type grades on the AAA shift; add it back for
+                # the MLB scale (exact up to each atom's half-point rounding).
+                if s == 'stuffScore':
+                    v = _stuff_rank_key(v + s_sh.get(pt, 0.0))
+                elif s == 'locPlus':
+                    v = v + l_sh.get(group_of_code(pt), 0.0)
+                pt_pools[pt][s].append(v)
     ctx['pitch_pools'] = {pt: {s: sorted(v) for s, v in d.items()} for pt, d in pt_pools.items()}
     tint = {}
     xwc = defaultdict(list)
@@ -5696,6 +5740,15 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
         _Lm = [int(round(c)) for c in (ctx['loc_cont_fn'](q) for q in pitches) if c is not None]
         row['_stuffScoreMLB'] = sum(_Sm) / len(_Sm) if _Sm else None
         row['_locPlusMLB'] = round(sum(_Lm) / len(_Lm), 1) if _Lm else None
+        # The AAA-shifted pair, for Pitcher+ alone: its baseline and pool were
+        # built on grades that read 100 = AAA average (aaa_pitcher_pool.py).
+        _ss, _ls = ctx['aaa']['shift']['stuff'], ctx['aaa']['shift']['loc']
+        _Sx = [int(round(_sc[k] - _ss.get(q.get('Pitch Type'), 0.0)))
+               for q, k in ((q, str(q.get('PitchID') or '')) for q in pitches) if k in _sc]
+        _Lx = [int(round(c - _ls.get(ctx['loc_group_fn'](q), 0.0)))
+               for q, c in ((q, ctx['loc_cont_fn'](q)) for q in pitches) if c is not None]
+        row['_stuffScoreAAA'] = sum(_Sx) / len(_Sx) if _Sx else None
+        row['_locPlusAAA'] = round(sum(_Lx) / len(_Lx), 1) if _Lx else None
 
     # Percentile bubbles — rank each computed stat into the MLB pool.
     for s in _SCRATCH_POOL_STATS:
@@ -5711,7 +5764,9 @@ def _compute_scratch_pitcher_context(pitcher_name, ctx):
     # `row`; a missing one shrinks to league average inside score_row.
     if ctx.get('pitcher_plus_base'):
         from pipeline.pitcherplus import score_row as _pp_score_row
-        row['pitcherPlus'] = _pp_score_row(row, ctx['pitcher_plus_base'])
+        _pp_in = (dict(row, stuffScore=row.get('_stuffScoreAAA'), locPlus=row.get('_locPlusAAA'))
+                  if ctx.get('aaa') else row)
+        row['pitcherPlus'] = _pp_score_row(_pp_in, ctx['pitcher_plus_base'])
         # score_row scores whatever channels exist. A composite missing Stuff+,
         # or resting on a nulled xRv100, is not Pitcher+; null it.
         if row.get('stuffScore') is None or row.get('xRv100') is None:
@@ -5949,7 +6004,7 @@ def main(new_level=None):
                         help='Corpus only: the mlbId when one name is two players')
     parser.add_argument('--aaa-ruler', action='store_true',
                         help='Rank and grade against 2026 AAA instead of MLB: AAA percentiles, '
-                             'AAA tints, Stuff+/Loc+/Pitcher+ at 100 = AAA average. Scratch-tab '
+                             'AAA tints, Pitcher+ at 100 = AAA average; Stuff+/Loc+ stay on the MLB scale. Scratch-tab '
                              'or MiLB-corpus season and date-range cards only')
     args = parser.parse_args()
 
@@ -6360,6 +6415,10 @@ def main(new_level=None):
     # all card pitchers. Heavy (loads the MLB pitch pickle) — scratch only.
     scratch_ctx = None
     _aaa_pool = None
+    # NEW runs its AAA, MLB and AFL passes in one process: clear the AAA tint centre
+    # so a pass without the ruler never reads the previous pass's shift.
+    global _AAA_GRADE_SHIFT
+    _AAA_GRADE_SHIFT = None
     if aaa_ruler and _new_lv == 'MLB':
         # The NEW MLB pass is the MLB card: MLB rows on MLB averages.
         print("  AAA ruler off: NEW MLB pass (MLB rows on the MLB ruler)")
