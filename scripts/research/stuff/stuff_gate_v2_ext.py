@@ -62,6 +62,9 @@ ARMS = {
     'IDENT3_NOH': {'identity': 3, 'drop': ['height']},
     'IDENT3_NOARM': {'identity': 3, 'drop': ['arm_angle']},
     'IDENT3_NOCROSS': {'identity': 3, 'drop': ['cross', 'cross_abs']},
+    # left-hander level (2026-11-18): pitcher hand as a model feature, with and without identity
+    'LHP': {'add': ['is_lhp']},
+    'IDENT3_LHP': {'identity': 3, 'add': ['is_lhp']},
 }
 EV_MIN = 50
 
