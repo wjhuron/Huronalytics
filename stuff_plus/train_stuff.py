@@ -354,17 +354,28 @@ def load_heights(path=HEIGHTS_PATH):
 # through build_df as inert columns.
 
 # Frozen nVAA constants: per-type OLS slope of VAA on PlateZ + league mean
-# PlateZ, measured on 2021-2026 pooled (4.05M pitches; 2026-08-09). Frozen
-# like build_historical_training_set's release-point calibration so every
-# scoring path (trainer, score-only, ROC, Cards scratch, explain pages) is
-# identical with no bundle plumbing. Types below the 2000-pitch fit floor
-# (KN) keep raw VAA. Re-measure only deliberately; slopes varied < 0.03
-# across 4-season subsets in the LOSO fits.
+# PlateZ. Frozen like build_historical_training_set's release-point calibration
+# so every scoring path (trainer, score-only, ROC, Cards scratch, explain pages)
+# is identical with no bundle plumbing. Types below the 2000-pitch fit floor
+# (KN) keep raw VAA. Re-measure only deliberately.
+#
+# REFIT 2026-11-18 (v18) on 2021-2026 pooled, 4,245,407 pitches, every season on
+# Savant-plane PlateZ (stuff_gate_v2.fit_vaa_slopes over the six gate frames). The
+# 2026-08-09 values pooled a 2026 season that was still on FEED PlateZ (the front
+# of the plate, which reads higher), 4.05M pitches. What moved: slopes by -.002 to
+# -.007, mean PlateZ by -.007 to -.023 ft, so nVAA shifts by a per-type constant of
+# -.008 to -.024 deg; the per-pitch change beyond that constant has SD .002-.007 deg
+# against a between-pitcher SD of .42-.92 deg. A retrained tree model does not see a
+# per-type constant, so this corrects a stale input and is not a ranking change.
+# KC and SV did not move (no 2026 pitches carry those tags). Single-season FF slopes
+# run 1.050-1.064. A bundle trained on the old constants must not be scored on these:
+# they ship with the v18 retrain only. The site's nVAA column uses its own live
+# slopes (process_data vaaRegressions) and is not affected.
 NVAA_SLOPES = {
-    'CH': (1.0556, 1.8315), 'CU': (1.0010, 1.8314), 'FC': (1.1703, 2.4074),
-    'FF': (1.0623, 2.8193), 'FS': (1.0604, 1.7300), 'KC': (0.9659, 1.7575),
-    'SI': (1.1030, 2.3694), 'SL': (1.1117, 1.8846), 'ST': (1.1356, 1.9935),
-    'SV': (1.0251, 1.8603),
+    'CH': (1.0526, 1.8172), 'CU': (0.9944, 1.8093), 'FC': (1.1666, 2.4003),
+    'FF': (1.0594, 2.8117), 'FS': (1.0589, 1.7071), 'KC': (0.9659, 1.7570),
+    'SI': (1.1000, 2.3588), 'SL': (1.1095, 1.8725), 'ST': (1.1317, 1.9745),
+    'SV': (1.0251, 1.8598),
 }
 # velo_diff is masked (None) on these types — see adoption note 2 above.
 #
