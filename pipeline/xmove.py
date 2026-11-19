@@ -35,6 +35,14 @@ Scoring is per pitch and the site sums the per-pitch expectations (micro rows
 sumXIVB/nXIVB/sumXHB/nXHB). For the hitter basis that is exact either way; it
 is kept per pitch so the physics basis, which is nonlinear in tilt, can be
 switched in without touching a consumer.
+
+Since 2026-11-19 a SECOND model is scored beside this one: the per-pitch
+physics expectation at the bottom of this module (`fit_physics`,
+`score_physics_all`). It reads no pitch type and answers a different question
+(where should a pitch with this velocity, spin, axis and slot go), on a
+different objective (held-out movement fit). It is not the per-type
+BASIS = 'physics' form described above, and it does not replace the hitter
+basis: the site and the cards offer both.
 """
 import math
 

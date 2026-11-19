@@ -24,7 +24,7 @@ The build. Sheets in, leaderboard JSON and gzipped embeds out. Read the root `CL
 | `fg_overrides.py` | Canonical FanGraphs values (wRC+, FIP, xFIP, SIERA) cached for the pipeline |
 | `guts.py` | The season's FanGraphs Guts row |
 | `refresh_pickle.py` | Fast refresh of `data/all_pitches_rs_cache.pkl` |
-| `xmove.py` | Expected movement (xIVB/xHB), per-type fit on slot + extension + velocity (the hitter's view), scored per pitch; physics basis kept for research |
+| `xmove.py` | Expected movement (xIVB/xHB), per-type fit on slot + extension + velocity (the hitter's view), scored per pitch; BESIDE it the per-pitch physics model (no pitch type; `fit_physics` / `score_physics_all`, the `p` keys, `data/xmove_physics_rs.json`); the per-type `BASIS = 'physics'` switch is the September research form, not scored |
 
 ## Constants are measured, not chosen
 
