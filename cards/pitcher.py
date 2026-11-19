@@ -5361,7 +5361,7 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
         for p in plist:
             by_pitcher[(name, 'AAA', p.get('Throws'))].append(p)
             by_pt[(name, 'AAA', p.get('Pitch Type'), p.get('Throws'))].append(p)
-    from pipeline.locplus import (group_of, LOC_SCALE_K, score_pitch,
+    from pipeline.locplus import (group_of, LOC_SCALE_K, location_value,
                                   _is_scorable as _loc_scorable)
     loc_pr, loc_ptr, _, _loc_anchors = compute_loc_plus(
         mlb, by_pitcher, by_pt, GUTS_LG_WOBA, GUTS_WOBA_SCALE,
@@ -5372,13 +5372,14 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
     _loc_S = _loc_anchors['surfaces']
     _loc_pt_anc = _loc_anchors['pt']
     def _loc_cont(p):
-        # The unrounded MLB-anchored Loc+ of one pitch.
+        # The unrounded MLB-anchored Loc+ of one pitch: the LOCATION value
+        # (expected value minus the situation mean), as locplus._pitch_grade.
         if not _loc_scorable(p):
             return None
         anc = _loc_pt_anc.get(group_of(p))
         if not anc or anc[0] is None or not anc[1] or anc[1] <= 1e-12:
             return None
-        v = score_pitch(p, _loc_S)
+        v = location_value(p, _loc_S)
         if v is None:
             return None
         return 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
