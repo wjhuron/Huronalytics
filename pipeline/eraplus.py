@@ -34,7 +34,7 @@ term; the eight hpERA channels are the rest of this table.
     izwh   -izWhiff%                             regression stands in for
     gb     -GB%                                  the measured n0=15)
     loc    +locPlusRaw (UNSHRUNK raw       xrv   +xRV/100 (make_rv_xrv,
-           ExpRV mean; Loc+ has had no            batter-positive, frozen
+           location mean; Loc+ has no             batter-positive, frozen
            pitcher prior since 2026-07-18,        LG/SCALE constants)
            and W_PH was fit on this input)  gs    starter share (gs/g)
                                             park  home park factor

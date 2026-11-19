@@ -86,7 +86,7 @@ Hand-signed shape metrics (`haa`, `nHAA`, `horzBrk`, `hbOE`) rank on absolute va
 - Do not round inside an aggregation. `runValue`, `xRunValue`, `rv100`, `xRv100` stay at full precision until the display layer.
 - Do not add a weight or threshold to a second file. `PITCHING_W_STUFF` ran 70/30 in one place and 80/20 in another for about three weeks.
 - Raw HAA is a location channel. Always residualize before using it as a shape feature.
-- Loc+ count mix carries location skill, not just stuff. Post-stratification, a BIP anchor, and a median-zone baseline were all tested and rejected.
+- Loc+ grades `location_value` since 2026-11-18, never `score_pitch`. `score_pitch` is the expected value in count currency (BIP anchor on); `location_value` subtracts the league mean for the pitch's (group, batter hand, pitcher hand, count). The earlier rejections of count-demeaning and of the BIP anchor were read on a pitcher-level forecast, which the count mix inflates. xRVOE is the one caller of `score_pitch(..., count_anchor=False)`, because its target prices a ball in play without the count.
 - The percentile pass is single-pass and late. A value written after it will have no rank.
 - `NVAA_SLOPES` in the Stuff+ build are frozen. Re-deriving them per run makes retrains unstable.
 - A debut arm with no measured arm angle falls back to its ROC/AAA angle. A NaN angle is retrain-unstable garbage, not a zero.
