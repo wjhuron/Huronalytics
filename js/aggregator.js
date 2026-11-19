@@ -2480,12 +2480,19 @@ const Aggregator = {
 
       // BIP medians
       const bipRecords = bipByHitter[teamMode ? String(g.teamIdx) : (g.hitterIdx + '|' + g.teamIdx)] || [];
-      const evsAll = [], allLA = [];
+      const evsAll = [], allLA = [], evsAir = [];
+      // BB+ EV ingredient (2026-11-19): EV95 over balls at launch angle >=
+      // the server's floor (metadata bbPlusEvMinLa, single home
+      // BB_PLUS_EV_MIN_LA in pipeline/utils.py). A ball with no launch angle
+      // stays out, as on the server.
+      const _mdEv = (DataStore && DataStore.metadata) || {};
+      const evMinLa = (_mdEv.bbPlusEvMinLa != null) ? _mdEv.bbPlusEvMinLa : 10;
       for (let bri = 0; bri < bipRecords.length; bri++) {
         const bev = bipRecords[bri][bci.exitVelo];
         const bla = bipRecords[bri][bci.launchAngle];
         if (bev !== null) evsAll.push(bev);
         if (bla !== null) allLA.push(bla);
+        if (bev !== null && bla !== null && bla >= evMinLa) evsAir.push(bev);
       }
 
       const avgEVAll = Aggregator.meanTenthsHalfUp(evsAll);
@@ -2512,6 +2519,8 @@ const Aggregator = {
       // on the identical value.
       const ev95 = evsAll.length > 0
         ? Math.round(percentileLinear(evsAll, 95) * 10) / 10 : null;
+      const ev95Air = evsAir.length > 0
+        ? Math.round(percentileLinear(evsAir, 95) * 10) / 10 : null;
 
       // hardHitPct and barrelPct: use EV-valid count as denominator (not total BIP)
       const hardHitPct = evsAll.length > 0 ? hardHit / evsAll.length : null;
@@ -2584,6 +2593,7 @@ const Aggregator = {
         ev50: ev50,
         medEV: medEV,
         ev95: ev95,
+        ev95Air: ev95Air,
         maxEV: maxEV,
         medLA: medLA,
         hardHitPct: hardHitPct,
@@ -2663,7 +2673,12 @@ const Aggregator = {
       const bbN0Ev = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusShrinkN0Ev);
       const n0Con = (bbN0Con != null) ? bbN0Con : 130;
       const n0Ev = (bbN0Ev != null) ? bbN0Ev : 0;
-      const lgEV95 = hLgAvgs.ev95;
+      // The row key the server's EV ingredient read (ev95Air since
+      // 2026-11-19). An artifact without bbPlusEvKey is the all-ball
+      // definition, so the fallback is the old key, not the new one.
+      const bbEvKey = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusEvKey) || 'ev95';
+      const lgEV95 = hLgAvgs[bbEvKey];
+      const bbEv = obj[bbEvKey];
       const bbBeta = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusBeta) || 4.205;
       const bbSlope = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusSlopeMatch) || 1.2352;
       const bbMinBip = (DataStore && DataStore.metadata && DataStore.metadata.bbPlusMinBip) || 30;
@@ -2673,7 +2688,7 @@ const Aggregator = {
       // The EV ingredient is required whenever it carries weight. Blanking
       // BB+ is the correct degrade: silently dropping the term would ship a
       // BB+ on a different scale from the server's.
-      const evOk = (wEv === 0) || (obj.ev95 != null && lgEV95);
+      const evOk = (wEv === 0) || (bbEv != null && lgEV95);
       if (obj.xwOBAcon != null && spOk && evOk && lgXC && bbW && nBipBB >= bbMinBip) {
         const conPlus = 100 * obj.xwOBAcon / lgXC;
         // evPlus is converted into xwOBAcon-PERCENT units before it is
@@ -2683,7 +2698,7 @@ const Aggregator = {
         // from metadata: it must be the value the SERVER used, because a
         // client-side refit would use the filtered pool and drift.
         const evPlus = (wEv === 0) ? 100
-          : 100 + (100 * obj.ev95 / lgEV95 - 100) * bbBeta;
+          : 100 + (100 * bbEv / lgEV95 - 100) * bbBeta;
         const spPlus = obj.sprayVal != null ? 100 * (lgXC + obj.sprayVal) / lgXC : 100;
         const conAdj = (nBipBB * conPlus + n0Con * 100) / (nBipBB + n0Con);
         const evAdj = (nBipBB * evPlus + n0Ev * 100) / (nBipBB + n0Ev);

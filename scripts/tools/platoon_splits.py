@@ -284,7 +284,12 @@ class League:
         self.lg_xwobacon = metadata['hitterLeagueAverages']['xwOBAcon']
         self.reanchor = metadata['plusReanchor']
         self.hstd = metadata['processPlusStandardization']
-        self.lg_ev95 = metadata['hitterLeagueAverages'].get('ev95')
+        # BB+ EV ingredient as the season run defined it: ev95Air (balls at
+        # launch angle >= bbPlusEvMinLa) since 2026-11-19, all-ball before.
+        self.bb_ev_key = metadata.get('bbPlusEvKey') or 'ev95'
+        self.bb_ev_min_la = (metadata.get('bbPlusEvMinLa')
+                             if self.bb_ev_key == 'ev95Air' else None)
+        self.lg_ev95 = metadata['hitterLeagueAverages'].get(self.bb_ev_key)
         self.bb_w = metadata.get('bbPlusWeights') or {'con': 0.60, 'ev': 0.40}
         self.bb_beta = metadata.get('bbPlusBeta') or 4.205
         self.team_games = metadata['teamGamesPlayed']
@@ -424,10 +429,10 @@ class League:
         raw = CT.compute_hitter_ct({('x', 'x'): pitches}, self.ct_table).get(('x', 'x'))
         return raw['raw_ct'] if raw else None
 
-    @staticmethod
-    def ev95(pitches):
+    def ev95(self, pitches):
         """95th-percentile exit velocity of the balls in play (linear
-        interpolation, numpy convention) — the BB+ EV ingredient."""
+        interpolation, numpy convention) — the BB+ EV ingredient. With a
+        launch-angle floor in the metadata, only balls at or above it."""
         evs = []
         for p in pitches:
             if p.get('Description') != 'In Play':
@@ -436,6 +441,13 @@ class League:
                 v = float(p.get('ExitVelo'))
             except (TypeError, ValueError):
                 continue
+            if self.bb_ev_min_la is not None:
+                try:
+                    la = float(p.get('LaunchAngle'))
+                except (TypeError, ValueError):
+                    continue
+                if not la >= self.bb_ev_min_la:
+                    continue
             if v == v:
                 evs.append(v)
         if not evs:

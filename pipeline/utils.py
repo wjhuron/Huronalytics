@@ -504,6 +504,17 @@ def median(values):
     return (nums[n // 2 - 1] + nums[n // 2]) / 2
 
 
+# BB+ exit-velocity ingredient (2026-11-19): the 95th-percentile exit velocity
+# over balls in play at this launch angle or above. A ground ball's exit
+# velocity adds no skill signal to the grade and carries the launch-angle
+# bias; the floor sweep (scripts/research/hitter/deep_dive/dd_follow.py t10b,
+# six seasons) brackets an interior optimum between 5 and 15 degrees and is
+# flat 8-12, so 10 is a convention inside the flat region. Single home: the
+# pipeline, scripts/tools/platoon_splits.py and (through metadata
+# bbPlusEvMinLa) js/aggregator.js all read it.
+BB_PLUS_EV_MIN_LA = 10.0
+
+
 def percentile(values, q):
     """Linear-interpolated percentile, ignoring None values. q is 0-100.
 

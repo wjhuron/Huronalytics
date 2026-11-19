@@ -55,6 +55,7 @@ from pipeline.compute import (
     HITTER_STAT_KEYS, HITTER_INVERT_PCTL,
     PITCHER_BB_KEYS, PITCHER_BB_INVERT,
 )
+from pipeline.utils import BB_PLUS_EV_MIN_LA
 
 
 # Stuff-injected keys preserved across re-processing (values are computed by
@@ -2983,6 +2984,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 'count': len(pt_pitches),
             }
             entry.update(compute_hitter_stats(pt_pitches))
+            entry.pop('ev95Air', None)   # BB+ input; season rows only
             details.append(entry)
         details.sort(key=lambda x: x['count'], reverse=True)
         hitter_pitch_details[hitter + '|' + (team or '')] = details
@@ -3105,6 +3107,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 '_isROC': is_roc,
             }
             row.update(compute_hitter_stats(pt_pitches))
+            row.pop('ev95Air', None)   # BB+ input; season rows only
             _hitter_pitch_row_finish(row, pt_pitches, ep_pitchers, WOBA_WEIGHTS,
                                      _xrv_lg, _xrv_scale, XRV_COUNT_OFFSETS,
                                      XRV_BIP_COUNT_MEANS)
@@ -3121,6 +3124,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             '_isROC': is_roc,
         }
         row_all.update(compute_hitter_stats(pitches))
+        row_all.pop('ev95Air', None)   # BB+ input; season rows only
         _hitter_pitch_row_finish(row_all, pitches, ep_pitchers, WOBA_WEIGHTS,
                                  _xrv_lg, _xrv_scale, XRV_COUNT_OFFSETS,
                                  XRV_BIP_COUNT_MEANS)
@@ -3145,6 +3149,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                     '_isROC': is_roc,
                 }
                 row_cat.update(compute_hitter_stats(cat_pitches))
+                row_cat.pop('ev95Air', None)   # BB+ input; season rows only
                 _hitter_pitch_row_finish(row_cat, cat_pitches, ep_pitchers,
                                          WOBA_WEIGHTS, _xrv_lg, _xrv_scale,
                                          XRV_COUNT_OFFSETS,
@@ -3206,7 +3211,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'rv100', 'xRv100',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
-    bip_stats = {'avgEVAll', 'ev50', 'medEV', 'ev95', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
+    bip_stats = {'avgEVAll', 'ev50', 'medEV', 'ev95', 'ev95Air', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
                  'xwOBAcon', 'xwOBAsp', 'sprayVal',
                  'gbPct', 'ldPct', 'fbPct', 'puPct',
                  'pullPct', 'middlePct', 'oppoPct', 'airPullPct'}
@@ -3234,6 +3239,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
 
     for stat in HITTER_STAT_KEYS:
         _compute_hitter_lg_avg(stat)
+    # The BB+ EV ingredient. Not a displayed column and not in
+    # HITTER_STAT_KEYS (no percentile), but BB+ and its js mirror need the
+    # league anchor.
+    _compute_hitter_lg_avg('ev95Air')
     hitter_league_avgs['count'] = len(hitter_lb_mlb)
 
     # (A 2026-08-19 first-cut header lived here — W_EV 0.70 / N0_CON 200,
@@ -3254,6 +3263,19 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # TWO INGREDIENTS: mean xwOBAcon and the 95th-percentile exit velocity.
     # A mean of a heavy-tailed per-BIP quantity is a weak estimator of the
     # skill; an EV ceiling measures the same skill far more stably.
+    #
+    # 2026-11-19: the EV statistic is EV95 over balls at launch angle >=
+    # BB_PLUS_EV_MIN_LA (row key ev95Air; the displayed EV95 column stays
+    # all-ball), and the weights are 55/45. Research and the grids:
+    # scripts/research/hitter/deep_dive/dd_follow.py t10b (floor) and
+    # dd_bb_air.py (every dependent constant). Against the all-ball 60/40,
+    # six seasons: Process+ next-season wOBA r +.0039 (5/5 pairs),
+    # same-season +.0011 (3/6), displayed BB+ against the next season's
+    # actual wOBAcon +.0009. W_EV: the next-season curve has an interior
+    # optimum at .50-.55 and is flat .45-.55; the same-season curve falls
+    # monotonically with W_EV (-.0064, 0/6, at .50). .45 is the point of the
+    # flat forward region where the same-season read is not lower. That is
+    # a choice between two objectives (per Wally), not one measured peak.
     #
     #   ev_c   = 100 + (evPlus - 100) * BETA      <- into xwOBAcon-% units
     #   raw    = (1-W)*shrink(conPlus, nBip, N0_CON) + W*shrink(ev_c, nBip, N0_EV)
@@ -3293,13 +3315,27 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # and would over-correct by 6% — the classic "tune at the sample size
     # you will actually run at" trap, which this metric fell into once
     # already with a different constant.
-    BB_PLUS_W_CON = 0.60
-    BB_PLUS_W_EV  = 0.40
+    BB_PLUS_W_CON = 0.55
+    BB_PLUS_W_EV  = 0.45
     BB_PLUS_W_SP  = 0.0
     BB_PLUS_N0_CON = 130
     BB_PLUS_N0_EV  = 0
     BB_PLUS_EV_PCT = 95
-    BB_PLUS_SLOPE_MATCH = 1.2352
+    # The row key the EV ingredient reads. Published as metadata bbPlusEvKey
+    # so the js mirror, window_pool and platoon_splits read the same one.
+    BB_PLUS_EV_KEY = 'ev95Air'
+    # 1.2352 was the all-ball 60/40 value. The estimator behind it is not in
+    # the repo (the closest replication reads 1.226), so the new value keeps
+    # the SHIPPED display scale instead of re-deriving it: 1.2352 times the
+    # ratio of the forward slopes (next-season xwOBAcon percent on this
+    # season's blend, 150+ BIP both years, five year pairs) of the new blend
+    # to the old one, .9611 (SE .0044). dd_bb_air.py s6.
+    BB_PLUS_SLOPE_MATCH = 1.1872
+    # UPDATE 2026-11-19: the numbers in the block below describe the all-ball
+    # 60/40 blend. On the air statistic at 55/45 the same measurement reads
+    # r +0.077 (from +0.094 on the same folds), quintile residuals -1.33 /
+    # -0.47 / +0.06 / +0.63 / +1.11 and a Q1-to-Q5 spread of 2.44 (from
+    # 3.08). dd_bb_air.py s7. The bias is smaller, not gone.
     # KNOWN BIAS, MEASURED AND ACCEPTED: BB+ slightly over-rates hitters who
     # hit the ball hard but on the ground, and under-rates steep fly-ball
     # hitters. The xwOBAcon channel (60%) prices launch angle, because
@@ -3340,12 +3376,13 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # (0/6 seasons improved), even though three of them nudge accuracy up.
     #
     # BETA is measured LIVE from the current pool, matching how Process+
-    # handles its own run-truth. Frozen fallback is the 2021-2026 mean; the
-    # per-season values were 4.017 / 4.017 / 4.393 / 4.099 / 4.326 / 4.378,
-    # a 9% spread, and live vs frozen changed held-out r by less than .0001.
+    # handles its own run-truth. Frozen fallback is the 2021-2026 mean on
+    # the air statistic; the per-season values were 3.906 / 4.095 / 4.225 /
+    # 4.119 / 4.213 / 4.299 (dd_bb_air.py s1; the all-ball mean was 4.205),
+    # and live vs frozen changed held-out r by less than .0001.
     # Live is preferred so a real league shift self-corrects; the band exists
     # so a thin or broken pool cannot silently move the scale.
-    BB_PLUS_BETA_FROZEN = 4.205
+    BB_PLUS_BETA_FROZEN = 4.143
     BB_PLUS_BETA_BAND = (3.0, 6.0)
     BB_PLUS_BETA_MIN_POOL = 40
     BB_PLUS_BETA_GATE_BIP = 80
@@ -3356,7 +3393,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # Display floor only. Below it a score is mostly prior, not worth a cell.
     BB_PLUS_MIN_BIP = 30
     lg_xwobacon_bb = hitter_league_avgs.get('xwOBAcon')
-    lg_ev95_bb = hitter_league_avgs.get('ev95')
+    lg_ev95_bb = hitter_league_avgs.get(BB_PLUS_EV_KEY)
 
     # ── BETA: league OLS slope of conPlus on evPlus, current pool ────────
     _beta_bb = BB_PLUS_BETA_FROZEN
@@ -3366,7 +3403,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         for _r in hitter_leaderboard:
             if _r.get('_isROC') or _r.get('_isCombined'):
                 continue
-            _xc, _ev = _r.get('xwOBAcon'), _r.get('ev95')
+            _xc, _ev = _r.get('xwOBAcon'), _r.get(BB_PLUS_EV_KEY)
             if (_xc is not None and _ev is not None
                     and (_r.get('nBip') or 0) >= BB_PLUS_BETA_GATE_BIP):
                 _bx.append(100.0 * _ev / lg_ev95_bb)
@@ -3384,7 +3421,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                     print(f"  WARNING: BB+ live beta {_cand:.3f} outside "
                           f"{BB_PLUS_BETA_BAND} — using frozen "
                           f"{BB_PLUS_BETA_FROZEN}. The EV-to-xwOBAcon unit "
-                          f"conversion is suspect; check the ev95 column.")
+                          f"conversion is suspect; check the {BB_PLUS_EV_KEY} values.")
         else:
             print(f"  WARNING: BB+ beta pool is {len(_bx)} hitters "
                   f"(< {BB_PLUS_BETA_MIN_POOL}) — using frozen "
@@ -3425,14 +3462,14 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     BB_PLUS_BT_POOL_SWINGS = 50    # pool-hygiene convention, not measured
     # Frozen anchor fallbacks in PRODUCTION (sheet) currency — the 2026
     # build pool. Used only when the live pool is thin (early season).
-    BB_PLUS_BT_FROZEN = {'raw': 99.932, 'bsMean': 71.197, 'bsSd': 2.688,
+    BB_PLUS_BT_FROZEN = {'raw': 99.456, 'bsMean': 71.197, 'bsSd': 2.688,
                          'squpMean': 0.6463, 'squpSd': 0.0614}
     _bt_pool = []
     if lg_xwobacon_bb and lg_ev95_bb:
         for _r in hitter_leaderboard:
             if _r.get('_isROC') or _r.get('_isCombined'):
                 continue
-            _xc, _ev = _r.get('xwOBAcon'), _r.get('ev95')
+            _xc, _ev = _r.get('xwOBAcon'), _r.get(BB_PLUS_EV_KEY)
             _bs, _sq = _r.get('batSpeed'), _r.get('squaredUpPct')
             if (_xc is None or _ev is None or _bs is None or _sq is None
                     or (_r.get('nBip') or 0) < BB_PLUS_BETA_GATE_BIP
@@ -3471,7 +3508,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     _bb_missing_ev = 0
     for row in hitter_leaderboard:
         xc = row.get('xwOBAcon')
-        ev = row.get('ev95')
+        ev = row.get(BB_PLUS_EV_KEY)
         sv = row.get('sprayVal')
         n_bip = row.get('nBip') or 0
         sp_ok = (BB_PLUS_W_SP == 0.0 or sv is not None)
@@ -3532,9 +3569,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             row['_procBb'] = None
     if _bb_missing_ev:
         # Fail loud: an EV feed gap silently blanks BB+ and therefore Process+.
-        print(f"  WARNING: {_bb_missing_ev} hitters have xwOBAcon but no ev95 "
-              f"— BB+ and Process+ are None for them. Check the ExitVelo "
-              f"column in the sheets before publishing.")
+        print(f"  WARNING: {_bb_missing_ev} hitters have xwOBAcon but no "
+              f"{BB_PLUS_EV_KEY} — BB+ and Process+ are None for them. Check "
+              f"the ExitVelo and LaunchAngle columns in the sheets before "
+              f"publishing.")
     # The applied/skipped split is the degrade tell: skipped covers every
     # ROC row (AAA has no bat tracking) plus real MLB gaps. "0 applied" on
     # an MLB run means the bat-tracking columns are missing — a bad run
@@ -3952,6 +3990,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         'bbPlusShrinkN0Con': BB_PLUS_N0_CON,
         'bbPlusShrinkN0Ev': BB_PLUS_N0_EV,
         'bbPlusEvPct': BB_PLUS_EV_PCT,
+        'bbPlusEvKey': BB_PLUS_EV_KEY,
+        'bbPlusEvMinLa': BB_PLUS_EV_MIN_LA,
         'bbPlusMinBip': BB_PLUS_MIN_BIP,
         # Bat-tracking prior (D1): the client applies the same blend under
         # filters, with the SERVER's anchors — season anchors on a filtered

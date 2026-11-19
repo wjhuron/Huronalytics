@@ -7,6 +7,7 @@ from collections import defaultdict
 from pipeline.hwar import gdp_extra_cost
 from pipeline.utils import (
     safe_float, median, percentile, is_barrel, barrel_flag, is_swing, round_half_up,
+    BB_PLUS_EV_MIN_LA,
     mean_tenths_half_up,
     spray_angle, spray_direction,
     SWING_DESCRIPTIONS, WHIFF_DESCRIPTIONS, CSW_DESCRIPTIONS, BALL_DESCRIPTIONS, HIT_EVENTS, K_EVENTS, BB_EVENTS, HBP_EVENTS,
@@ -515,6 +516,7 @@ def compute_hitter_stats(pitches):
     total = len(pitches)
     if total == 0:
         empty = {k: None for k in HITTER_STAT_KEYS}
+        empty['ev95Air'] = None
         empty.update({'pa': 0, 'nSwings': 0, 'nBip': 0, 'nCompSwings': 0,
                       'doubles': 0, 'triples': 0, 'hr': 0, 'xbh': 0})
         return empty
@@ -620,6 +622,16 @@ def compute_hitter_stats(pitches):
         # stable. Stored rounded so the server value and the client's filtered
         # recompute in js/aggregator.js agree exactly.
         ev95 = round_half_up(percentile(all_evs, 95), 1)
+    # BB+ reads the air-ball version since 2026-11-19: EV95 over balls at
+    # launch angle >= BB_PLUS_EV_MIN_LA. A ball with no launch angle cannot
+    # be placed and stays out. Stored rounded like ev95, for the same client
+    # parity reason. The displayed EV95 column stays the all-ball value.
+    air_evs = []
+    for p in bip:
+        _ev, _la = safe_float(p.get('ExitVelo')), safe_float(p.get('LaunchAngle'))
+        if _ev is not None and _la is not None and _la >= BB_PLUS_EV_MIN_LA:
+            air_evs.append(_ev)
+    ev95_air = round_half_up(percentile(air_evs, 95), 1) if air_evs else None
 
     has_barrel_col = any(barrel_flag(p.get('Barrel')) is not None for p in bip)
     if has_barrel_col:
@@ -747,6 +759,7 @@ def compute_hitter_stats(pitches):
         'ev50': ev50,
         'medEV': med_ev,
         'ev95': ev95,
+        'ev95Air': ev95_air,
         'maxEV': round(max(ev_valid), 1) if ev_valid else None,
         'medLA': round(median(all_la), 1) if all_la else None,
         'medSpray': round(median(all_spray), 1) if all_spray else None,

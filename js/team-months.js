@@ -59,7 +59,7 @@ window.TeamMonths = (function () {
       ['pa', 'nCompSwings'], ['batSpeed', 'swingLength', 'attackAngle', 'blastPct', 'squaredUpPct']] }
   };
   const OWN_DESC = {
-    bbPlusU: 'BB+ RAW: batted-ball quality (60% xwOBAcon, 40% 95th-percentile EV), NOT regressed toward 100, so a month shows what happened. The Hitters leaderboard shows the regressed value.',
+    bbPlusU: 'BB+ RAW: batted-ball quality (55% xwOBAcon, 45% 95th-percentile EV on balls at a launch angle of 10 degrees or more), NOT regressed toward 100, so a month shows what happened. The Hitters leaderboard shows the regressed value.',
     ctPlusU: 'CT+ RAW: leverage-weighted contact rate on swings against the league on the same pitches, NOT regressed toward 100. Blank under 65 swings.',
     sdPlusU: 'SD+ RAW: run value of each swing or take for its location and count, NOT regressed toward 100. Blank under 190 decisions.',
     wOBAcon: 'wOBA on balls in play (bunts out, home runs in). Read beside xwOBAcon: the gap is luck and defense.',
