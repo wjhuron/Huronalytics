@@ -46,9 +46,12 @@ The expected value is a DECOMPOSITION over smooth league surfaces:
     K_* pseudo-count is in KERNEL-WEIGHTED units, so K and bandwidth are
     coupled (see _smooth).
   - score_pitch returns the value at TRUE count level, in count currency
-    (BIP_COUNT_ANCHOR on since 2026-11-18): xRVOE and every other caller that
-    needs the expected run value of a pitch reads that. The Loc+ grade subtracts
-    the cell mean (location_value). The older finding that count-demeaning was
+    (BIP_COUNT_ANCHOR on since 2026-11-18). The Loc+ grade subtracts the cell
+    mean (location_value). xRVOE is the one caller that passes
+    count_anchor=False: its target prices a ball in play without the count
+    (train_stuff build_df), so its expectation must too. Measured 2026-11-18
+    on 2026, cross-fit R2 of the expectation on that target: .0733 without
+    the anchor, .0692 with it (xrvoe_location_compare.py). The older finding that count-demeaning was
     less predictive is true and is the point: what it removed was the count mix.
   - Contact (xwOBAcon) surface is heavily shrunk toward the group mean because
     location-driven contact suppression is mostly luck (THT command study).
@@ -824,9 +827,11 @@ def _cell_means(baseline, S):
 # ═════════════════════════════════════════════════════════════════════════
 #  SCORE
 # ═════════════════════════════════════════════════════════════════════════
-def score_pitch(p, S):
+def score_pitch(p, S, count_anchor=True):
     """Expected hitter-perspective RV for one pitch (lower = better for the
-    pitcher). None if context missing or the (group,hand) surface is absent."""
+    pitcher). None if context missing or the (group,hand) surface is absent.
+    count_anchor=False leaves the ball-in-play branch count-neutral (no
+    BIPOFF term); only xRVOE asks for that, to match its target's currency."""
     key = (group_of(p), p.get('Bats'), p.get('Throws'))
     if key not in S['WH']:
         return None
@@ -840,9 +845,10 @@ def score_pitch(p, S):
     pfl = S['FL'][key][i][j]
     pbip = max(0.0, 1.0 - pwh - pfl)
     # BIP value: contact-quality count offset (XWOFF, 2026-08-15) plus the
-    # legacy anchor slot (BIPOFF, empty while BIP_COUNT_ANCHOR is off).
-    vbip = (S['XW'][key][i][j] + S['XWOFF'].get(c, 0.0)
-            + S['BIPOFF'].get(c, 0.0))
+    # count-currency anchor (BIPOFF, empty while BIP_COUNT_ANCHOR is off).
+    vbip = S['XW'][key][i][j] + S['XWOFF'].get(c, 0.0)
+    if count_anchor:
+        vbip += S['BIPOFF'].get(c, 0.0)
     pcs = S['PCS'][p['Bats']][c][i][j]
     RV = S['RV']
     swing_val = pwh * RV['whiff'].get(c, 0.0) + pfl * RV['foul'].get(c, 0.0) + pbip * vbip

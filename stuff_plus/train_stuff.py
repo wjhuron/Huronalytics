@@ -1799,8 +1799,10 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None, by_hand=False):
     baseline = [p for p in pitches if LOC.is_eligible_baseline(p)]
     S = LOC.build_surfaces(baseline, LG_WOBA, WOBA_SCALE)
     exprv = {}
+    # count_anchor=False: target_xrv prices a ball in play without the count
+    # (build_df), so the expectation leaves the Loc+ count anchor off as well.
     for p in baseline:
-        v = LOC.score_pitch(p, S)
+        v = LOC.score_pitch(p, S, count_anchor=False)
         if v is not None and p.get('PitchID'):
             exprv[p['PitchID']] = v
     # ROC scored against the MLB surfaces. is_eligible_baseline() is
@@ -1810,7 +1812,7 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None, by_hand=False):
         for p in roc_pitches:
             if not LOC._is_scorable(p):
                 continue
-            v = LOC.score_pitch(p, S)
+            v = LOC.score_pitch(p, S, count_anchor=False)
             if v is not None and p.get('PitchID'):
                 exprv[p['PitchID']] = v
 
