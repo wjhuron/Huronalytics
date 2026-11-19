@@ -711,6 +711,8 @@ var PlayerPage = {
     if (pitchTable) pitchTable.style.display = '';
     var sprayToggle = document.getElementById('spray-toggle-inline');
     if (sprayToggle) sprayToggle.style.display = 'none';
+    var xmoveToggle = document.getElementById('xmove-toggle');
+    if (xmoveToggle) xmoveToggle.style.display = '';
     var sprayLegend = document.getElementById('spray-legend-inline');
     if (sprayLegend) sprayLegend.style.display = 'none';
     var hitterSections = ['player-spray-section', 'player-la-spray-section', 'player-swing-heatmaps-section',
@@ -744,6 +746,8 @@ var PlayerPage = {
     if (pitchTable) pitchTable.style.display = 'none';
     var sprayToggle = document.getElementById('spray-toggle-inline');
     if (sprayToggle) sprayToggle.style.display = '';
+    var xmoveToggleH = document.getElementById('xmove-toggle');
+    if (xmoveToggleH) xmoveToggleH.style.display = 'none';
     var sprayLegend = document.getElementById('spray-legend-inline');
     if (sprayLegend) sprayLegend.style.display = '';
     var pitcherSections = ['player-stats-section', 'player-platoon-split-section',
@@ -1443,8 +1447,47 @@ var PlayerPage = {
   },
 
 
+  // Expected-movement basis for the Movement Profile overlay. Two models are
+  // scored per pitch in the pipeline (pipeline/xmove.py) and both ride in the
+  // pitch details: 'physics' (xivbp/xhbp: the pitch itself, no pitch type
+  // read) and 'hitter' (xivb/xhb: slot, extension, velocity per pitch type).
+  // Physics is the default (per Wally, 2026-11-19); the choice is a per-viewer
+  // convenience, so it lives in localStorage and the page works without it.
+  XMOVE_DEFAULT: 'physics',
+  _getXmoveBasis: function () {
+    if (this._xmoveBasis) return this._xmoveBasis;
+    var b = null;
+    try { b = window.localStorage.getItem('xmoveBasis'); } catch (e) { b = null; }
+    this._xmoveBasis = (b === 'hitter' || b === 'physics') ? b : this.XMOVE_DEFAULT;
+    return this._xmoveBasis;
+  },
+  _bindXmoveToggle: function () {
+    var toggle = document.getElementById('xmove-toggle');
+    if (!toggle) return;
+    var basis = this._getXmoveBasis();
+    var btns = toggle.querySelectorAll('.xmove-toggle-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-basis') === basis);
+    }
+    if (this._xmoveToggleBound) return;
+    this._xmoveToggleBound = true;
+    var self = this;
+    toggle.addEventListener('click', function (e) {
+      var btn = e.target.closest('.xmove-toggle-btn');
+      if (!btn) return;
+      var next = btn.getAttribute('data-basis');
+      if (next === self._xmoveBasis) return;
+      self._xmoveBasis = next;
+      try { window.localStorage.setItem('xmoveBasis', next); } catch (err) { /* private window: the choice lasts for this page only */ }
+      if (self._lastMovementData) self._renderMovementChart(self._lastMovementData);
+    });
+  },
+
   _renderMovementChart: function (data) {
     this.destroyChart();
+    this._lastMovementData = data;
+    this._bindXmoveToggle();
+    var xmovePhysics = this._getXmoveBasis() === 'physics';
 
     var pitcherName = data.pitcher;
     var team = data.team;
@@ -1486,8 +1529,10 @@ var PlayerPage = {
       if (!es) es = expSums[fp.pt] = { aV: 0, nAV: 0, aH: 0, nAH: 0, eV: 0, nEV: 0, eH: 0, nEH: 0 };
       es.aV += fp.ivb; es.nAV++;
       es.aH += fp.hb; es.nAH++;
-      if (fp.xivb != null) { es.eV += fp.xivb; es.nEV++; }
-      if (fp.xhb != null) { es.eH += fp.xhb; es.nEH++; }
+      var fxV = xmovePhysics ? fp.xivbp : fp.xivb;
+      var fxH = xmovePhysics ? fp.xhbp : fp.xhb;
+      if (fxV != null) { es.eV += fxV; es.nEV++; }
+      if (fxH != null) { es.eH += fxH; es.nEH++; }
     }
     if (Object.keys(groups).length === 0) return;
 
@@ -1528,8 +1573,8 @@ var PlayerPage = {
       }
 
       // Expected-movement marker (2026-08-27, per Wally): ghost at the model
-      // expectation (per-pitch xivb/xhb from pipeline/xmove.py, spin + release
-      // axis since 2026-09-03), disc at the actual mean, dashed connector between
+      // expectation (per-pitch values from pipeline/xmove.py, in the basis the
+      // viewer chose: see _getXmoveBasis), disc at the actual mean, dashed connector between
       // them — ivbOE/hbOE drawn instead of printed. Needs 10+ modeled pitches;
       // types without model values (draw nothing) degrade silently by design.
       var es2 = expSums[pt];
