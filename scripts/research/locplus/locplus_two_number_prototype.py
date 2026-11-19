@@ -59,10 +59,21 @@ def atoms(d, col):
 
 def main():
     y = int(sys.argv[1]) if len(sys.argv) > 1 else 2026
+    # optional kernel for the LOCATION and situation columns, "x_in:z_frac" (2026-11-18 sweep: 2:0.12).
+    # The rebuilt shipped Loc+ column always uses the shipped kernel.
+    kern = tuple(float(v) for v in sys.argv[2].split(':')) if len(sys.argv) > 2 else None
     pitches = FR.load_season(y)
     base_p = [p for p in pitches if lp.is_eligible_baseline(p)]
     S = lp.build_surfaces(base_p, FR.LG, FR.SCALE)
     off = lp.build_bip_count_offsets(base_p, FR.LG, FR.SCALE)
+    S_loc = S
+    if kern:
+        FR.apply({'PHYS_X_IN': kern[0], 'PHYS_Z_FRAC': kern[1]})
+        try:
+            S_loc = lp.build_surfaces(base_p, FR.LG, FR.SCALE)
+        finally:
+            FR.restore()
+        print(f'location kernel {kern[0]:g} in / {kern[1]:g}; shipped Loc+ column on {FR.SHIPPED["PHYS_X_IN"]:g} / {FR.SHIPPED["PHYS_Z_FRAC"]:g}')
     rows = []
     for p in pitches:
         if not lp._is_scorable(p):
@@ -72,7 +83,7 @@ def main():
             continue
         c = lp.get_count(p)
         rows.append((p.get('Pitcher'), p.get('Throws'), p.get('PTeam'), p.get('Pitch Type'), lp.group_of(p),
-                     p.get('Bats'), f'{c[0]}-{c[1]}', v0, CC.score(p, S, off, None)))
+                     p.get('Bats'), f'{c[0]}-{c[1]}', v0, CC.score(p, S_loc, off, None)))
     del pitches, base_p
     d = pd.DataFrame(rows, columns=['pitcher', 'throws', 'team', 'pt', 'grp', 'bats', 'count', 'v_ship', 'v_anch'])
     d['situation'] = d.groupby(['grp', 'bats', 'throws', 'count'])['v_anch'].transform('mean')
