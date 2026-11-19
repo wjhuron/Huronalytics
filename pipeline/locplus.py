@@ -4,10 +4,27 @@ The pitcher analog of a command grade: "is this pitcher putting pitches in
 valuable spots, given the count, pitch type, and matchup, independent of his
 stuff or what the hitter happened to do?"
 
-MODEL (rebuilt 2026-06). For each pitch we look up the league-average
-EXPECTED hitter-perspective run value of a pitch of that type/handedness at
-that exact plate location, in that count, then average across the pitcher's
-pitches and normalize. Lower expected RV = better location for the pitcher.
+MODEL (rebuilt 2026-06; grade redefined 2026-11-18). For each pitch we look up
+the league-average EXPECTED hitter-perspective run value of a pitch of that
+type/handedness at that exact plate location, in that count (score_pitch).
+The GRADE is the LOCATION VALUE (location_value): that expected value minus the
+league mean expected value of the pitch's own (group, batter hand, pitcher
+hand, count) cell. So a grade says where the ball went against an average
+location for the same pitch in the same situation, and it holds no count
+level, no matchup level and no pitcher-hand level. Lower = better for the
+pitcher; the mean over a pitcher's pitches is normalized per group.
+
+WHY THE GRADE CHANGED (2026-11-18, scripts/research/locplus/
+locplus_within_hand_role.py, locplus_count_calibration.py,
+locplus_two_number_build.py, locplus_location_sweep.py). Until then the grade
+was the expected value itself, standardized per group only. That number kept
+the level of the count (mean grade 35 at 3-1, 145 at 0-2), of the matchup and
+of the pitcher's hand: 58% of the variance between pitchers needed no location
+input at all, and next season it forecast no better than a grade with every
+location surface flattened (.256 against .250, partial on Stuff+). The
+location value is the part this docstring always described. On its own it
+forecasts .13 next season within hand and role; in hpERA it replaces the old
+channel at equal accuracy, because K% and xRV already hold the count mix.
 
 The expected value is a DECOMPOSITION over smooth league surfaces:
 
@@ -28,8 +45,11 @@ The expected value is a DECOMPOSITION over smooth league surfaces:
     Gaussian (PHYS_X_IN horizontal, PHYS_Z_FRAC of the zone vertical); every
     K_* pseudo-count is in KERNEL-WEIGHTED units, so K and bandwidth are
     coupled (see _smooth).
-  - Scoring at TRUE count level (no count-demeaning): empirically this is more
-    predictive and no less stuff-independent than demeaning.
+  - score_pitch returns the value at TRUE count level, in count currency
+    (BIP_COUNT_ANCHOR on since 2026-11-18): xRVOE and every other caller that
+    needs the expected run value of a pitch reads that. The Loc+ grade subtracts
+    the cell mean (location_value). The older finding that count-demeaning was
+    less predictive is true and is the point: what it removed was the count mix.
   - Contact (xwOBAcon) surface is heavily shrunk toward the group mean because
     location-driven contact suppression is mostly luck (THT command study).
 
@@ -65,34 +85,30 @@ PCS_BY_HAND = True             # called-strike surface per batter hand (the
                                # takes are ~half of pitches and shadow takes
                                # are where location value concentrates).
                                # WON: rel 0.568->0.575, pred 0.079->0.082.
-BIP_COUNT_ANCHOR = False       # add offset(c) to the BIP value branch
-                               # (pipeline_sdplus.build_bip_count_offsets).
-                               # LOST decisively for Loc+ and stays OFF:
-                               # velo leak 0.29->0.38, whiff leak
-                               # 0.031->0.072, predictive 0.079->-0.029.
-                               # Anchoring makes ExpRV strongly count-mix
-                               # dependent. (The anchor is correct and ON in
-                               # SD+/CT+, which score hitter decisions against
-                               # the count state.)
-                               # RE-TESTED 2026-07-25 under CS_COUNT_TRANSFORM
-                               # (scripts/archive/locplus_phase3_eval.py) — still loses:
-                               # rel 0.600->0.586, whiff leak 0.056->0.089,
-                               # velo 0.305->0.382, pred 0.075->-0.025.
-                               # CORRECTION to the original reasoning: count
-                               # mix is NOT purely a stuff/sequencing effect.
-                               # Neutralizing it directly (count-mix post-
-                               # stratification: per-count means recombined at
-                               # LEAGUE count weights) DOUBLED the stuff leak
-                               # and killed prediction outright (0.075->-0.002),
-                               # and did not rescue the anchor underneath it
-                               # (0.576/-0.024). Throwing quality strikes is HOW
-                               # a pitcher gets ahead, so count mix carries real
-                               # LOCATION signal; stripping it discards skill and
-                               # upweights sparse counts (3-0, 3-1) where
-                               # per-pitcher samples are noisiest. The BIP
-                               # branch's count-invariance is therefore an
-                               # ACCEPTED cost, not an open item — do not
-                               # re-litigate without a new mechanism.
+BIP_COUNT_ANCHOR = True        # add offset(c) to the BIP value branch
+                               # (pipeline_sdplus.build_bip_count_offsets), so
+                               # a ball in play is priced in the same count
+                               # currency as a whiff, foul, called strike or
+                               # ball. ON since 2026-11-18. Pitch by pitch, out
+                               # of sample (even dates score odd dates), it
+                               # fits actual run value better in 6/6 seasons
+                               # (z -52; two strikes -4.1e-4, 3-1 -14e-4 per
+                               # pitch), and the mean expected value by count
+                               # no longer runs from -2.6 (0-2) to +2.3 (3-1)
+                               # runs per 100 against an actual near zero
+                               # (scripts/research/locplus/
+                               # locplus_count_calibration.py).
+                               # HISTORY. It was off from 2026-07-02: at the
+                               # PITCHER level it lost (2026: pred .079 ->
+                               # -.029; replicates 0/5; 2026-09-17 z -2.7 to
+                               # -7.6), and a count-mix post-stratification
+                               # lost too (2026-07-25). Those tests graded the
+                               # expected value itself, whose forecast came
+                               # from the count mix; the anchor removed that.
+                               # The grade is now the location value, which
+                               # holds no count level under either pricing
+                               # (location forecasts the same, .133 against
+                               # .130), so the per-pitch fit decides.
 SWING_PRIOR_COUNT_LEVEL = True # count-specific swing surfaces shrink toward
                                # collapsed-surface × league count multiplier
                                # (a sparse 3-0 surface otherwise shrinks
@@ -225,8 +241,25 @@ Z_MIN, Z_MAX = -0.6, 1.6           # zone-normalized (0 = bottom, 1 = top)
 # QUARTER-season surfaces the old harness builds. 0.10 stays as a convention.
 BIN_Z = 0.10
 NZ = int(round((Z_MAX - Z_MIN) / BIN_Z))           # 22
-PHYS_X_IN = 6.0                    # physical smoothing bandwidths
-PHYS_Z_FRAC = 0.30
+PHYS_X_IN = 2.0                    # physical smoothing bandwidths
+PHYS_Z_FRAC = 0.12
+# 2026-11-18: 6.0 / 0.30 -> 2.0 / 0.12, swept on the LOCATION VALUE over 35 kernels
+# and six seasons (scripts/research/locplus/locplus_location_sweep.py). Pitch level
+# (even dates score odd dates, squared error against actual run value): an interior
+# optimum, BRACKETED at 2 in (1.5 and 3 are worse) and .09-.12 (a tie; .06 and .17 are
+# worse); -5.9e-4 per pitch against 6 / 0.30, 6/6 seasons. Pitcher level (next season,
+# partial on Stuff+, within hand and role): +.022 against 6 / 0.30 (z 2.8, 5/5 pairs);
+# FLAT from 1 to 2 in (1 / 0.06 against 2 / 0.12: +.006, z 1.7); 3 in and wider lose.
+# It is also the 2026-09-02 cell-fit value (30/30 season pairs). Split-half
+# reliability FALLS as the kernel narrows (.69 -> .585); that is a diagnostic, any
+# smoothing raises it. The pitcher-level curves in the notes below were measured on
+# the old grade (the expected value with its count level), where a wide kernel won
+# by turning the grade into the count mix; they are history, not guidance.
+# Every K_* is in kernel-weighted units, so the shipped K values act about 7x
+# stronger at this kernel (mass 7.5 cells against 56). Tested at 2 / 0.12: the
+# flat-prior K x0.25 fits pitches better (6/6) and loses at pitcher level (0/5); x4
+# does the reverse. The shipped values sit between the two and are a COMPROMISE,
+# not a measured optimum.
 # ADOPTED 2026-09-02 (per Wally): 4.5 / 0.22 -> 6.0 / 0.30, the conservative
 # step on the pitcher-level curve below. On full-season surfaces 2021-2026 it
 # wins every pitcher objective: rendered +0.011 (6/6, t 5.7), rendered
@@ -757,8 +790,28 @@ def build_surfaces(baseline, lg_woba, woba_scale):
             if n >= XW_CLEVEL_MIN_BIP:
                 XWOFF[c] = s / n - overall
 
-    return {'RV': RV, 'PCS': PCS, 'WH': WH, 'FL': FL, 'XW': XW, 'SW': SW,
-            'BIPOFF': BIPOFF, 'XWOFF': XWOFF}
+    S = {'RV': RV, 'PCS': PCS, 'WH': WH, 'FL': FL, 'XW': XW, 'SW': SW,
+         'BIPOFF': BIPOFF, 'XWOFF': XWOFF}
+    S['CELL'] = _cell_means(baseline, S)
+    return S
+
+
+def cell_key(p):
+    """The situation of a pitch: (group, batter hand, pitcher hand, count)."""
+    return (group_of(p), p.get('Bats'), p.get('Throws'), get_count(p))
+
+
+def _cell_means(baseline, S):
+    """League mean expected value per situation, over the baseline pitches that
+    built the surfaces. location_value() subtracts it."""
+    acc = defaultdict(lambda: [0.0, 0])
+    for p in baseline:
+        v = score_pitch(p, S)
+        if v is not None:
+            a = acc[cell_key(p)]
+            a[0] += v
+            a[1] += 1
+    return {k: s / n for k, (s, n) in acc.items()}
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -790,8 +843,19 @@ def score_pitch(p, S):
     return psw * swing_val + (1 - psw) * take_val
 
 
+def location_value(p, S):
+    """The Loc+ grade input for one pitch: its expected value minus the league
+    mean for its situation (cell_key). None when the pitch cannot be scored or its
+    situation has no baseline pitch; such a pitch takes no grade."""
+    v = score_pitch(p, S)
+    if v is None:
+        return None
+    m = S['CELL'].get(cell_key(p))
+    return None if m is None else v - m
+
+
 def _aggregate(pitches_by_key, S, want_zone=False, want_heatmap=False):
-    """Mean ExpRV per key, plus optional zone rollups / heatmap grid."""
+    """Mean location value per key, plus optional zone rollups / heatmap grid."""
     out = {}
     for key, pitches in pitches_by_key.items():
         vals = []
@@ -800,7 +864,7 @@ def _aggregate(pitches_by_key, S, want_zone=False, want_heatmap=False):
         for p in pitches:
             if not _is_scorable(p):
                 continue
-            v = score_pitch(p, S)
+            v = location_value(p, S)
             if v is None:
                 continue
             vals.append(v)
@@ -938,6 +1002,7 @@ def serialize_surfaces(S):
                    'nPriorPt': N_PRIOR_PT, 'groups': GROUPS,
                    'pcsByHand': PCS_BY_HAND,
                    'bipCountAnchor': BIP_COUNT_ANCHOR,
+                   'grade': 'location value: expected value minus the (group, bats, throws, count) mean',
                    'swingPriorCountLevel': SWING_PRIOR_COUNT_LEVEL,
                    'csCountTransform': CS_COUNT_TRANSFORM,
                    'whCountLevel': WH_COUNT_LEVEL,
@@ -1003,7 +1068,7 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
         if _is_scorable(p):
             anc = group_anchors.get(group_of(p))
             if anc and anc[1] is not None and anc[1] > 1e-12:
-                v = score_pitch(p, S)
+                v = location_value(p, S)
                 if v is not None:
                     g = 100.0 - LOC_SCALE_K * (v - anc[0]) / anc[1]
         _grade_memo[pid] = g
@@ -1049,8 +1114,9 @@ def compute_loc_plus(all_pitches, pitches_by_pitcher, pitches_by_pitch_type,
 
     if return_anchors:
         # 'surfaces' = the raw surface object (NOT serialized) so callers can
-        # score additional pitches per-pitch via score_pitch(p, surfaces) with
-        # the exact same anchors — the card window-grade path uses this.
+        # grade additional pitches per-pitch via location_value(p, surfaces)
+        # with the exact same anchors — the card window-grade path uses this.
+        # (score_pitch(p, surfaces) is the expected value, NOT the grade input.)
         return (pitcher_results, pitch_results, serialize_surfaces(S),
                 {'overall': ov_anchors, 'pt': group_anchors, 'surfaces': S})
     return pitcher_results, pitch_results, serialize_surfaces(S)
