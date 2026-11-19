@@ -435,7 +435,11 @@ STABILIZE_N_UNVALIDATED = float('inf')
 # seasons; its control arm reproduces the 11-18 gates: 196 190 198 148 180 100): FF 204
 # (178 / 204 / 207), SI 185 (171 / 185 / 231), FC 213 (220 / 213 / 209), CH 105 (102 / 105 /
 # 109); SL and CU have no class surface and do not move.
-STABILIZE_N_PT = {'FF': 204, 'SI': 185, 'FC': 213, 'SL': 148, 'CU': 180, 'CH': 105}
+# RE-MEASURED 2026-11-19 with the far-miss rule on (locplus_shape_gates.py; its control, the
+# rule off, reproduces 204 185 213 148 180 105): FF 198 (172 / 198 / 220), SI 182 (160 / 182 /
+# 223), FC 205 (212 / 205 / 199), SL 133 (133 / 140 / 119), CU 160 (160 / 125 / 165), CH 97
+# (97 / 104 / 90). A far miss was a large, noisy value in a cell; without it a cell repeats sooner.
+STABILIZE_N_PT = {'FF': 198, 'SI': 182, 'FC': 205, 'SL': 133, 'CU': 160, 'CH': 97}
 # Re-measured AGAIN 2026-09-03 under the 6.0 in / 0.30 bandwidth adopted the
 # same day (same script, 10 seeds, Savant PlateZ, 160 dates): smoother
 # surfaces give less noisy per-pitch atoms, so every group stabilizes ~30%
@@ -453,7 +457,7 @@ STABILIZE_N_PT = {'FF': 204, 'SI': 185, 'FC': 213, 'SL': 148, 'CU': 180, 'CH': 1
 # CH 79 -> 76. Five moved inside their seed spread; FC did not.
 # Leaderboard pitch-CATEGORY rows pool several types (js/aggregator.js
 # PITCH_CATEGORIES), so they take the stiffest member gate.
-STABILIZE_N_CATEGORY = {'Hard': 204, 'Breaking': 213, 'Offspeed': 105}
+STABILIZE_N_CATEGORY = {'Hard': 198, 'Breaking': 205, 'Offspeed': 97}
 
 
 def stabilize_n(pitch_type):
@@ -643,6 +647,30 @@ def _sig(x):
 #           a pitcher with 1,000 pitches moves 0.4 points on average, 2.9 at most.
 SHAPE_ON = True
 SHAPE_K = 3
+# ── FAR MISS (2026-11-19) ──────────────────────────────────────────────────
+# A pitch outside the grid is clamped into an edge cell, and in a two-strike
+# count an edge cell is a chase location: a changeup 34.6 in off the plate
+# graded 152. Beyond these cutoffs score_pitch returns the count's BALL value
+# (a certain take). The grade then subtracts the situation mean as for every
+# pitch, and the cell means are built with the rule on.
+# Measured on the released grade (scripts/research/locplus/locplus_farmiss_location.py,
+# surfaces on even dates scoring odd dates and the reverse, six seasons, squared
+# error x 1e-4 against the grade without the rule; inside the optimum the rule is
+# WORSE, so the cutoff cannot be gamed inward):
+#   side  18 +.243  20 +.007  22 -.046  24 -.053  26 -.040  28 -.029  32 -.012
+#   low   0.6 +.231  0.8 -.033  1.0 -.062  1.25 -.031  1.5 -.013
+#   high  0.4 +.095  0.5 -.008  0.6 -.029  0.8 -.020  1.0 -.008
+# Each is an interior optimum on its grid (best on the grid, steps 2 in and
+# .1-.25), better in 6/6 seasons; together -.140 (z -21.9). Pitcher level
+# (next season, Stuff+ held equal, within hand and role): +.0009 (z +0.4), no
+# harm. The LOW cutoff alone reads slightly negative there (-.002, z -1.4): a
+# low far miss holds a little pitcher signal; adopted with the others (Wally,
+# 2026-11-19, the full rule). With the 6 in / 0.30 kernel the optima were 18 in
+# / 0.75 / 0.45; they are bandwidth-dependent, so re-measure after any kernel
+# change.
+FAR_MISS_X_IN = 24.0      # inches from the centre of the plate
+FAR_MISS_Z_LO = 1.0       # zone heights below the bottom of the zone
+FAR_MISS_Z_HI = 0.6       # zone heights above the top of the zone
 SHAPE_VAR = {'FF': 'ivb', 'CH': 'ivb', 'SI': 'hb', 'FC': 'ivb'}
 SHAPE_W = {'FF': 0.5, 'CH': 0.5, 'SI': 0.25, 'FC': 0.25}
 
@@ -934,6 +962,8 @@ def score_pitch(p, S, count_anchor=True, gfn=None):
     px = safe_float(p.get('PlateX')); zn = _znorm(p)
     if c is None or px is None or zn is None:
         return None
+    if abs(px) * 12.0 > FAR_MISS_X_IN or zn < -FAR_MISS_Z_LO or zn > 1.0 + FAR_MISS_Z_HI:
+        return S['RV']['ball'].get(c, 0.0)      # far miss: a certain take (see FAR_MISS_*)
     i = _xbin(px); j = _zbin(zn)
     psw = S['SW'][key][c][i][j]
     pwh = S['WH'][key][c][i][j]
@@ -1123,6 +1153,7 @@ def serialize_surfaces(S):
                    'pcsByHand': PCS_BY_HAND,
                    'bipCountAnchor': BIP_COUNT_ANCHOR,
                    'grade': 'location value: expected value minus the (group, bats, throws, count) mean',
+                   'farMiss': {'xIn': FAR_MISS_X_IN, 'zLo': FAR_MISS_Z_LO, 'zHi': FAR_MISS_Z_HI},
                    'shapeClasses': ({'k': SHAPE_K, 'var': SHAPE_VAR, 'w': SHAPE_W,
                                      'cuts': (S.get('SHAPE') or {}).get('cuts')} if SHAPE_ON else None),
                    'swingPriorCountLevel': SWING_PRIOR_COUNT_LEVEL,

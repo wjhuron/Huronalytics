@@ -599,7 +599,7 @@ STUFF_COLOR_MIN_PITCHES = 15
 # card/Arsenal-leaderboard parity.
 # Mirrors js/aggregator.js QUAL.MIN_PITCH_LOCPLUS + LOCPLUS_GROUP and
 # pipeline/locplus.py STABILIZE_N_PT; the three move together.
-LOCPLUS_COLOR_MIN = {'FF': 204, 'SI': 185, 'FC': 213, 'SL': 148, 'CU': 180, 'CH': 105}   # shape-class blend, 2026-11-19
+LOCPLUS_COLOR_MIN = {'FF': 198, 'SI': 182, 'FC': 205, 'SL': 133, 'CU': 160, 'CH': 97}   # shape classes and the far-miss rule, 2026-11-19
 LOCPLUS_COLOR_GROUP = {
     'FF': 'FF', 'FA': 'FF', 'SI': 'SI', 'FC': 'FC', 'CF': 'FC',
     'SL': 'SL', 'ST': 'SL', 'SW': 'SL', 'SV': 'SL',
@@ -2012,7 +2012,8 @@ _AA_RAY_HB = 20.0
 # Loc+ on the social table's cell (pitcher x batter hand x type): k 134 pitches on the location
 # value (132 / 142 / 134 on 2024-2026, scripts/research/locplus/locplus_location_gates.py social;
 # the same run reads 43-44 on the old grade, whose gate was 50). 135 is that k at a round number.
-SOCIAL_LOC_MIN_PITCHES = 135
+# 125 with the far-miss rule on (2026-11-19, locplus_shape_gates.py: 134 with the rule off, 125 on).
+SOCIAL_LOC_MIN_PITCHES = 125
 _SOCIAL_TINT_POOLS = None
 
 

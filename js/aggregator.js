@@ -42,7 +42,7 @@ var QUAL = {
   // again 2026-11-18 on the location value (count and matchup level out of
   // the grade): three to four times the old gates, median of three seasons.
   // Keep in sync with pipeline_locplus.py STABILIZE_N_PT.
-  MIN_PITCH_LOCPLUS:         { FF: 204, SI: 185, FC: 213, SL: 148, CU: 180, CH: 105 },   // shape-class blend, 2026-11-19
+  MIN_PITCH_LOCPLUS:         { FF: 198, SI: 182, FC: 205, SL: 133, CU: 160, CH: 97 },   // shape classes and the far-miss rule, 2026-11-19
   // Pitch types with NO measured constant (today only EP: 40 cells, largest
   // 105 pitches, so k can't be measured). Policy, not a measurement: don't
   // color what we can't validate. Colors zero cells today either way.
@@ -64,7 +64,7 @@ QUAL.LOCPLUS_GROUP = {
 };
 // Category rows (PITCH_CATEGORIES) pool several types — take the stiffest
 // member gate. Mirrors pipeline_locplus.py STABILIZE_N_CATEGORY.
-QUAL.LOCPLUS_CATEGORY = { Hard: 204, Breaking: 213, Offspeed: 105 };
+QUAL.LOCPLUS_CATEGORY = { Hard: 198, Breaking: 205, Offspeed: 97 };
 
 // Minimum pitches for a pitch-type (or category) Loc+ cell to clear r >= 0.5.
 QUAL.locPlusMinPitches = function (pitchType) {
