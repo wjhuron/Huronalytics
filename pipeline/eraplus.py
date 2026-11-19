@@ -286,8 +286,18 @@ DH_B_AAA = 1.069
 # that one: NEXT MSE -0.2% (2/5), ROS -0.1% (4/6): a tie, as it should be, because the
 # hand information moved from one channel to another. The 11-05 set: stuff .224 loc .090
 # k .164 izwh .062 xrv .135 gb .147 gs -.022 park .154, W_LHP -.186.
-W_PH = {'stuff': 0.217, 'loc': 0.082, 'k': 0.162, 'izwh': 0.061,
-        'xrv': 0.135, 'gb': 0.144, 'gs': -0.023, 'park': 0.154}
+# REFIT 2026-11-18 for the Loc+ release (scripts/research/era/hpera_location_input.py and
+# hpera_location_refit.py, arm 'n@0', final fit on every replicate): the loc channel is now
+# the pitcher's mean LOCATION value (locPlusRaw after the release: kernel 2 in / 0.12, count
+# currency, minus the situation mean), z-scored unshrunk as production does. Same rows and
+# design as the v18 refit, which the reference arm reproduces (MSE 1.5323 / 2.9653). Held
+# out by year against the v18 set on the old loc input: NEXT -0.01% (3/5), ROS +0.12% (1/6,
+# z +1.4): a tie inside the noise; the channel is worth 0.1-0.2% of MSE on either input.
+# Loc shrinkage before the z-score is FLAT from 0 to 1,360 pitches (all within 0.06%), so
+# the unshrunk input stays. The v18 set: stuff .217 loc .082 k .162 izwh .061 xrv .135
+# gb .144 gs -.023 park .154.
+W_PH = {'stuff': 0.222, 'loc': 0.062, 'k': 0.152, 'izwh': 0.076,
+        'xrv': 0.149, 'gb': 0.135, 'gs': -0.018, 'park': 0.156}
 # Pitcher-hand term. ZERO since Stuff+ v18 (2026-11-18): the Stuff+ channel now holds
 # pitcher hand, and the hand weight fits to -.017 when it is left in. History: added
 # 2026-09-05 as ERA credit for a left-hander on the RAW indicator centered at the pool's
