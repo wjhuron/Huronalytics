@@ -28,6 +28,10 @@ Rebuild once a season is complete:
     python3 scripts/research/projection/pull_frv_history.py
     python3 scripts/research/projection/pull_park_history.py
     python3 scripts/research/projection/stuff_2026_sidecar.py    # the base season's held-out Stuff+; project_players stops without it
+After a Stuff+ design change (v18, 2026-11-18), rebuild the Stuff+ history first, all on the gate's shipped design:
+    python3 scripts/research/era/era_stuff_loso_v2.py              # data/_era_internal_stuff.json, 2021-2025
+    python3 scripts/research/projection/stuff_2026_sidecar.py
+    python3 scripts/research/projection/pit_stuff_clean_build.py   # move data/_proj/_stuff_clean.json aside first: the build resumes from it
     python3 scripts/builders/build_hpwar.py          # runs project_players.py, then writes the JSON
 
 Usage: python3 scripts/builders/build_hpwar.py
