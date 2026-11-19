@@ -3492,9 +3492,31 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # The next-season skill test (addendum A4) showed the blend never
     # degrades full-season prediction; the heavier D2 form did, and was
     # rejected.
-    BB_PLUS_BT_BETA_BS = 14.24
-    BB_PLUS_BT_BETA_SQUP = 4.97
-    BB_PLUS_BT_K = 20
+    #
+    # 2026-11-19: BAT SPEED ONLY, K 50. The paragraph above describes the
+    # two-term prior (14.24 / 4.97, K 20) that shipped until then. Re-test
+    # on the air-EV blend, scripts/research/hitter/deep_dive/dd_bb_air.py
+    # s9 and s10: call-up simulation, first 20 / 40 / 80 / 150 BIP against
+    # the REMAINDER'S ACTUAL wOBAcon, 2024-2026, 12 cells.
+    #   two-term K 20   r .5502   error to the remainder blend 8.447
+    #   bat speed K 50  r .5734   error 8.091   (+.0232, SE .008, 11/12)
+    # BETA_BS 9.63: standardized slope, 9.58-9.68 by season, 9.60-9.66
+    # leave-season-out. K: interior optimum on each objective (actual
+    # wOBAcon 50-55, xwOBAcon 45, error 70) and FLAT 40-60 on the first,
+    # where 40 / 50 / 60 differ by less than one SE; 50 is the argmax on
+    # that objective and the one value that loses clearly on none. S0 10:
+    # flat 0-10. Next-season test (the one that rejected D2), 2 pairs:
+    # .6038 against .6007 two-term and .5986 no prior, so no degrade.
+    # Footprint against no prior at 80+ BIP: corr .9916, mean |d| 0.89 raw
+    # points, max 7.2 (two-term: .9977 / 0.46 / 3.5). That larger footprint
+    # is the accepted cost. The squared-up term stays in the formula with a
+    # zero beta, so the metadata contract and the js mirror keep one shape.
+    # The guards still ask for squaredUpPct on the row: it comes from the
+    # same swings as bat speed, and the applied / skipped print is the tell
+    # if that ever stops being true.
+    BB_PLUS_BT_BETA_BS = 9.63
+    BB_PLUS_BT_BETA_SQUP = 0.0
+    BB_PLUS_BT_K = 50
     BB_PLUS_BT_S0 = 10
     BB_PLUS_BT_MIN_POOL = 40
     BB_PLUS_BT_POOL_SWINGS = 50    # pool-hygiene convention, not measured

@@ -339,6 +339,145 @@ def s7():
         RES['s7 ' + label] = dict(r=float(np.mean(rs)), q=Q.tolist())
 
 
+def _bt_setup():
+    import dd_bt as BT
+    if not BT.SW:
+        BT.prep()
+    YS = BT.YS; FULL = {}
+    for Y in YS:
+        A = frame(BIPS[Y]); anc = anchors(A); A['raw'] = blend(A, anc, WN)
+        T = BT.traits(BT.SW[Y]); p = A[A.nbip >= 80].join(T, how='inner'); p = p[(p.nsw >= 50) & p.raw.notna()]
+        FULL[Y] = dict(anc=anc, mean=float(p.raw.mean()), bs=(float(p.bs.mean()), float(p.bs.std())), sq=(float(p.squp.mean()), float(p.squp.std())), pool=p, A=A, T=T)
+
+    def beta1(excl):
+        X, y = [], []
+        for Y in YS:
+            if Y != excl:
+                F = FULL[Y]; X.append(((F['pool'].bs - F['bs'][0]) / F['bs'][1]).values); y.append(F['pool'].raw.values - F['mean'])
+        X = np.concatenate(X); y = np.concatenate(y); return float((X * y).sum() / (X * X).sum())
+
+    def prior(Y, bs, squp, kind, excl=None):
+        F = FULL[Y]; zb = (bs - F['bs'][0]) / F['bs'][1]
+        if kind == 'ship':
+            return F['mean'] + 14.24 * zb + 4.97 * ((squp - F['sq'][0]) / F['sq'][1]).fillna(0)
+        return F['mean'] + beta1(Y if excl is None else excl) * zb
+
+    def sim(Y, n, min_rem=100):
+        b = BIPS[Y]; anc = FULL[Y]['anc']
+        c = b.groupby(['bid', 'date'], observed=True).size().rename('k').reset_index().sort_values(['bid', 'date']); c['cum'] = c.groupby('bid').k.cumsum()
+        cut = c[c.cum >= n].groupby('bid').date.first(); cm = b.bid.map(cut)
+        E = frame(b[cm.notna() & (b.date <= cm)]); Rm = frame(b[cm.notna() & (b.date > cm)]); Rm = Rm[Rm.nbip >= min_rem]
+        sw = BT.SW[Y]; sm = sw.bid.map(cut); T = BT.traits(sw[sm.notna() & (sw.date <= sm)])
+        k = E.index.intersection(Rm.index).intersection(T.index); E, Rm, T = E.loc[k], Rm.loc[k], T.loc[k]
+        con, evc = parts(E, anc)
+        return pd.DataFrame({'n': E.nbip, 'con': con, 'evc': evc, 'tgt': blend(Rm, anc, WN), 'wcon': Rm.wcon, 'xwcon': Rm.xwcon, 'nsw': T.nsw, 'bs': T.bs, 'squp': T.squp}).dropna(subset=['con', 'evc', 'tgt', 'bs'])
+    return BT, YS, FULL, beta1, prior, sim
+
+
+def _est(s, Y, prior, kind, K, S0=10, n0c=130, n0e=0):
+    e = (1 - WN) * (s.n * s.con + n0c * 100) / (s.n + n0c) + WN * (s.n * s.evc + n0e * 100) / (s.n + n0e)
+    if kind is not None:
+        pe = (s.nsw * prior(Y, s.bs, s.squp, kind) + S0 * 100) / (s.nsw + S0); e = (s.n * e + K * pe) / (s.n + K)
+    return e
+
+
+def s8():
+    """n0_ev with the prior ON, graded on an OUTCOME (the remainder's actual wOBAcon) as well as on the remainder raw blend."""
+    print("\n=== S8 EV shrinkage n0_ev with the bat prior on (call-up simulation 2024-2026, first n BIP -> remainder) ===")
+    BT, YS, FULL, beta1, prior, sim = _bt_setup()
+    cells = [(Y, n) for Y in YS for n in (20, 40, 80, 150)]; SIM = {c: sim(*c) for c in cells}
+    NE = (0, 3, 5, 10, 15, 20, 30, 40)
+    for label, kind in (('shipped prior (K 20)', 'ship'), ('no prior', None)):
+        print(f" {label}: n0_ev | r with remainder ACTUAL wOBAcon | r with remainder xwOBAcon | RMSE to remainder raw blend")
+        base = None
+        for ne in NE:
+            ra, rx, rm = [], [], []
+            for c in cells:
+                s = SIM[c]; e = _est(s, c[0], prior, kind, 20, n0e=ne); ra.append(L.wcorr(e.values, s.wcon.values)); rx.append(L.wcorr(e.values, s.xwcon.values)); rm.append(float(np.sqrt(np.mean((e - s.tgt) ** 2))))
+            ra, rx, rm = np.array(ra), np.array(rx), np.array(rm)
+            if base is None:
+                base = (ra, rx, rm)
+            d = ra - base[0]
+            print(f"   {ne:3d} | {ra.mean():.4f} (vs 0: {d.mean():+.4f}, SE {d.std(ddof=1) / np.sqrt(len(d)):.4f}, wins {int((d > 0).sum())}/{len(d)}) | {rx.mean():.4f} | {rm.mean():.3f}" + "  by n: " + " ".join(f"{n}:{np.mean([ra[i] for i, c in enumerate(cells) if c[1] == n]):.4f}" for n in (20, 40, 80, 150)))
+            RES[f's8 {label} {ne}'] = dict(r_actual=float(ra.mean()), r_x=float(rx.mean()), rmse=float(rm.mean()))
+    # full-season size, Y -> Y+1 actual wOBAcon, six seasons, no prior (five pairs)
+    print(" full season Y -> Y+1 actual wOBAcon (30+ BIP in Y, weights Y+1 BIP, no prior, five pairs): " + " ".join(
+        f"{ne}:{np.mean([L.wcorr(blend(frame(BIPS[y0]), anchors(frame(BIPS[y0])), WN, 130, ne).reindex(k).values, frame(BIPS[y1]).wcon.reindex(k).values, frame(BIPS[y1]).nbip.reindex(k).values) for y0, y1 in L.PAIRS for k in [frame(BIPS[y0]).index[frame(BIPS[y0]).nbip >= 30].intersection(frame(BIPS[y1]).index)]]):.4f}" for ne in (0, 5, 10, 20, 40)))
+
+
+def s9():
+    """Bat-speed-only prior against the shipped two-term prior on the released blend: small samples (outcome and raw
+    targets), the full-season footprint, and the next-season test that rejected the heavier D2 form."""
+    print("\n=== S9 bat-speed-only BB+ prior on the released blend ===")
+    BT, YS, FULL, beta1, prior, sim = _bt_setup()
+    print(" standardized bat-speed beta: all seasons " + f"{beta1(None):.2f}; leave-season-out " + ", ".join(f"{Y} {beta1(Y):.2f}" for Y in YS)
+          + "; single season " + ", ".join(f"{Y} {float((((FULL[Y]['pool'].bs - FULL[Y]['bs'][0]) / FULL[Y]['bs'][1]) * (FULL[Y]['pool'].raw - FULL[Y]['mean'])).sum() / (((FULL[Y]['pool'].bs - FULL[Y]['bs'][0]) / FULL[Y]['bs'][1]) ** 2).sum()):.2f}" for Y in YS))
+    cells = [(Y, n) for Y in YS for n in (20, 40, 80, 150)]; SIM = {c: sim(*c) for c in cells}
+    KS = (10, 20, 30, 40, 50, 60, 80, 100, 120, 160)
+
+    def score(kind, K, S0=10):
+        ra, rm = [], []
+        for c in cells:
+            s = SIM[c]; e = _est(s, c[0], prior, kind, K, S0); ra.append(L.wcorr(e.values, s.wcon.values)); rm.append(float(np.sqrt(np.mean((e - s.tgt) ** 2))))
+        return np.array(ra), np.array(rm)
+    sa, sm = score('ship', 20); na, nm = score(None, 20)
+    print(f" no prior: r actual {na.mean():.4f}, RMSE {nm.mean():.3f} | shipped two-term K 20: r actual {sa.mean():.4f}, RMSE {sm.mean():.3f}")
+    print(" bat speed only (leave-season-out beta), S0 10: K | r with remainder actual wOBAcon (vs shipped, SE, wins/12) | RMSE to remainder raw (cells better than shipped /12)")
+    for K in KS:
+        a, m = score('bs', K); d = a - sa
+        print(f"   K {K:3d} | {a.mean():.4f} ({d.mean():+.4f}, SE {d.std(ddof=1) / np.sqrt(len(d)):.4f}, {int((d > 0).sum())}/12) | {m.mean():.3f} ({int((m < sm).sum())}/12)  RMSE by n: " + " ".join(f"{n}:{np.mean([m[i] for i, c in enumerate(cells) if c[1] == n]):.2f}" for n in (20, 40, 80, 150)))
+        RES[f's9 bs K{K}'] = dict(r=float(a.mean()), rmse=float(m.mean()))
+    print(" shipped two-term, K sweep (r actual | RMSE): " + " ".join(f"K{K}:{score('ship', K)[0].mean():.4f}|{score('ship', K)[1].mean():.3f}" for K in (10, 20, 30, 40, 60)))
+    print(" S0 sweep, bat speed only, K 60: " + " ".join(f"S{S}:{score('bs', 60, S)[1].mean():.3f}" for S in (0, 5, 10, 25, 50, 100)))
+    # full-season footprint and next-season test
+    print(" full season (30+ BIP): displayed BB of Y with each prior -> Y+1 actual wOBAcon / xwOBAcon (weights Y+1 BIP), and the footprint against no prior")
+    for kind, K in ((None, 0), ('ship', 20), ('bs', 20), ('bs', 40), ('bs', 60), ('bs', 80), ('bs', 120)):
+        ra, rx, cr, md, mx = [], [], [], [], []
+        for y0 in (2024, 2025):
+            F = FULL[y0]; A = F['A'].join(F['T'][['nsw', 'bs', 'squp']], how='left'); B = frame(BIPS[y0 + 1])
+            con, evc = parts(A, F['anc']); s = pd.DataFrame({'n': A.nbip, 'con': con, 'evc': evc, 'nsw': A.nsw.fillna(0), 'bs': A.bs, 'squp': A.squp})
+            e0 = _est(s, y0, prior, None, 0); e = e0.copy()
+            if kind is not None:
+                m = s.bs.notna() & (s.nsw > 0); e[m] = _est(s[m], y0, prior, kind, K)
+            k = A.index[(A.nbip >= 30) & e.notna()].intersection(B.index[B.nbip >= 1]); w = B.nbip[k].values
+            ra.append(L.wcorr(e[k].values, B.wcon[k].values, w)); rx.append(L.wcorr(e[k].values, B.xwcon[k].values, w))
+            q = A.index[(A.nbip >= 80) & e.notna()]; cr.append(np.corrcoef(e[q], e0[q])[0, 1]); md.append(float(np.mean(np.abs(e[q] - e0[q])))); mx.append(float(np.max(np.abs(e[q] - e0[q]))))
+        print(f"   {str(kind):5s} K {K:3d}: next actual {np.mean(ra):.4f} {np.round(ra, 4)} | next xwOBAcon {np.mean(rx):.4f} | 80+ BIP footprint corr {np.mean(cr):.4f}, mean |d| {np.mean(md):.2f}, max {np.max(mx):.1f}")
+        RES[f's9 full {kind} {K}'] = dict(next_actual=float(np.mean(ra)), next_x=float(np.mean(rx)), corr=float(np.mean(cr)), mean_d=float(np.mean(md)))
+
+
+def s10():
+    """K for the bat-speed-only prior: fine grid, leave-one-season-out choice, paired differences 40 / 50 / 60."""
+    print("\n=== S10 bat-speed-only prior: K fine grid (call-up simulation, 12 cells) ===")
+    BT, YS, FULL, beta1, prior, sim = _bt_setup()
+    cells = [(Y, n) for Y in YS for n in (20, 40, 80, 150)]; SIM = {c: sim(*c) for c in cells}
+    KS = list(range(25, 91, 5)); R, M, X = {}, {}, {}
+    for K in KS:
+        for c in cells:
+            s_ = SIM[c]; e = _est(s_, c[0], prior, 'bs', K)
+            R[(K, c)] = L.wcorr(e.values, s_.wcon.values); X[(K, c)] = L.wcorr(e.values, s_.xwcon.values); M[(K, c)] = float(np.sqrt(np.mean((e - s_.tgt) ** 2)))
+    print(" K | r actual wOBAcon | r xwOBAcon | RMSE raw | RMSE of actual wOBAcon% on the estimate is not defined (scale); see r")
+    for K in KS:
+        print(f"   {K:3d} | {np.mean([R[(K, c)] for c in cells]):.4f} | {np.mean([X[(K, c)] for c in cells]):.4f} | {np.mean([M[(K, c)] for c in cells]):.3f}")
+    for nm, D, best in (('r actual', R, max), ('r xwOBAcon', X, max), ('RMSE raw', M, min)):
+        print(f" {nm}: by sample size, best K " + ", ".join(f"n={n}: {best(KS, key=lambda K: np.mean([D[(K, (Y, n))] for Y in YS]))}" for n in (20, 40, 80, 150))
+              + " | leave-one-season-out choice " + ", ".join(f"{Y}: {best(KS, key=lambda K: np.mean([D[(K, c)] for c in cells if c[0] != Y]))}" for Y in YS))
+    for a, b in ((50, 40), (50, 60), (60, 40)):
+        for nm, D in (('r actual', R), ('r xwOBAcon', X), ('RMSE raw', M)):
+            d = np.array([D[(a, c)] - D[(b, c)] for c in cells]); print(f"   K {a} minus K {b}, {nm}: {d.mean():+.4f} (SE {d.std(ddof=1) / np.sqrt(len(d)):.4f}) positive in {int((d > 0).sum())}/12")
+    print(" next season (full season Y -> Y+1, 2 pairs) and footprint (80+ BIP, against no prior):")
+    for K in (40, 50, 60):
+        ra, rx, cr, md, mx = [], [], [], [], []
+        for y0 in (2024, 2025):
+            F = FULL[y0]; A = F['A'].join(F['T'][['nsw', 'bs', 'squp']], how='left'); B = frame(BIPS[y0 + 1])
+            con, evc = parts(A, F['anc']); s_ = pd.DataFrame({'n': A.nbip, 'con': con, 'evc': evc, 'nsw': A.nsw.fillna(0), 'bs': A.bs, 'squp': A.squp})
+            e0 = _est(s_, y0, prior, None, 0); e = e0.copy(); m = s_.bs.notna() & (s_.nsw > 0); e[m] = _est(s_[m], y0, prior, 'bs', K)
+            k = A.index[(A.nbip >= 30) & e.notna()].intersection(B.index[B.nbip >= 1]); w = B.nbip[k].values
+            ra.append(L.wcorr(e[k].values, B.wcon[k].values, w)); rx.append(L.wcorr(e[k].values, B.xwcon[k].values, w))
+            q = A.index[(A.nbip >= 80) & e.notna()]; cr.append(np.corrcoef(e[q], e0[q])[0, 1]); md.append(float(np.mean(np.abs(e[q] - e0[q])))); mx.append(float(np.max(np.abs(e[q] - e0[q]))))
+        print(f"   K {K}: next actual {np.mean(ra):.4f} | next xwOBAcon {np.mean(rx):.4f} | footprint corr {np.mean(cr):.4f}, mean |d| {np.mean(md):.2f}, max {np.max(mx):.1f}")
+
+
 if __name__ == '__main__':
     which = sys.argv[1:] or ['s1', 's2', 's3', 's4', 's5', 's6', 's7']
     prep()

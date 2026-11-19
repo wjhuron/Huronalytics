@@ -435,7 +435,11 @@ class League:
         launch-angle floor in the metadata, only balls at or above it."""
         evs = []
         for p in pitches:
-            if p.get('Description') != 'In Play':
+            # The pipeline's ball-in-play rule (compute_hitter_stats): a
+            # batted-ball type that is not a bunt. Bunts were counted here
+            # until 2026-11-19.
+            bb = p.get('BBType')
+            if not bb or bb in BUNT_BB_TYPES:
                 continue
             try:
                 v = float(p.get('ExitVelo'))

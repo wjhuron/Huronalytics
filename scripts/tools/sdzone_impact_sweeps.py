@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Tune the zone x count impact-page constants for SD+ / CT+ hitter pages.
 
+NOTE 2026-11-19: shipped SD+ is now mix-neutral over (zone, two-strike flag)
+(pipeline.sdplus.league_mix_weights). The SD+ cell formula below still
+weights by the league ZONE share only and counts the within-zone count mix
+as the hitter's impact, so its cells no longer sum to the leaderboard value
+exactly; kappa absorbs the gap. The decomposition needs a redesign before
+it is used for a deliverable again.
+
 v2 (2026-08-10): re-swept for the CARD-COHERENT cell formulas after Wally
 rejected the v1 decomposition (it counted pitch diet / swing selection,
 which the leaderboard metrics deliberately neutralize, so page and card

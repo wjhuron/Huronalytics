@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Zone x count SD+/CT+ impact matrices, CARD-COHERENT version.
 
+NOTE 2026-11-19: shipped SD+ is now mix-neutral over (zone, two-strike flag)
+(pipeline.sdplus.league_mix_weights). The SD+ cell formula below still
+weights by the league ZONE share only and counts the within-zone count mix
+as the hitter's impact, so its cells no longer sum to the leaderboard value
+exactly; kappa absorbs the gap. The decomposition needs a redesign before
+it is used for a deliverable again.
+
 v2 (2026-08-10): cells now decompose the SHIPPED metric's own aggregate,
 so the season page's 15 cells sum to (leaderboard value - 100) and the
 headline number IS the hitter-card number. The v1 decomposition counted
