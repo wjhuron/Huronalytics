@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'data', '_pplus_outing_tables_location.pkl')
 KERNEL = {'PHYS_X_IN': 2.0, 'PHYS_Z_FRAC': 0.12}
 OUT_SHAPE = os.path.join(ROOT, 'data', '_pplus_outing_tables_shape.pkl')   # branch locplus-shape (2026-11-19)
+OUT_FAR = os.path.join(ROOT, 'data', '_pplus_outing_tables_far.pkl')       # branch locplus-farmiss (2026-11-19)
 BRANCH = None          # set by build_shape: the branch Loc+ module; add_location then grades with its location_value
 
 
@@ -147,12 +148,12 @@ def fit():
         R.main()
 
 
-def build_shape(branch_path):
+def build_shape(branch_path, out=None):
     global BRANCH
     sys.path.insert(0, os.path.join(ROOT, 'scripts', 'research', 'locplus'))
     import locplus_shape_loader as SL
     BRANCH = SL.branch(branch_path)
-    build(OUT_SHAPE)
+    build(out or OUT_SHAPE)
 
 
 def lock(pairs=None):
@@ -195,5 +196,9 @@ if __name__ == '__main__':
         build_shape(sys.argv[2])
     elif sys.argv[1] == 'lock_shape':
         lock((('location', OUT), ('shape', OUT_SHAPE)))
+    elif sys.argv[1] == 'build_far':
+        build_shape(sys.argv[2], OUT_FAR)
+    elif sys.argv[1] == 'lock_far':
+        lock((('shape', OUT_SHAPE), ('far', OUT_FAR)))
     else:
         {'build': build, 'fit': fit, 'lock': lock}[sys.argv[1]]()

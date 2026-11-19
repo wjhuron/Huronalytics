@@ -52,6 +52,7 @@ def surf_path(y, arm):
 
 def build_all():
     os.makedirs(CACHE, exist_ok=True)
+    lp.SHAPE_ON = False      # the test reads score_pitch (group surfaces); the class bundle is not needed here
     orig = dict(lp.GROUP)
     for y in YEARS:
         if all(os.path.exists(surf_path(y, a)) for a in ('g', 's')):
@@ -74,11 +75,15 @@ def build_all():
 def main():
     build_all()
     orig = dict(lp.GROUP)
-    rv_x = make_rv_xrv(FR.LG, FR.SCALE)
     acc = defaultdict(lambda: defaultdict(lambda: np.zeros(3)))   # [(type, target, w)][pair]
     for yb in YEARS:
         trains = [ya for ya in (yb - 1, yb + 1) if ya in YEARS]
-        test = [p for p in FR.load_season(yb) if lp.is_eligible_baseline(p) and p.get('Pitch Type') in TYPES]
+        # 2026-11-19: score_pitch is in count currency since the Loc+ release, so the luck-neutral
+        # target takes the test season's own ball-in-play count offsets (it was unanchored before).
+        allp = [p for p in FR.load_season(yb) if lp.is_eligible_baseline(p)]
+        rv_x = make_rv_xrv(FR.LG, FR.SCALE, count_offsets=lp.build_bip_count_offsets(allp, FR.LG, FR.SCALE))
+        test = [p for p in allp if p.get('Pitch Type') in TYPES]
+        del allp
         for ya in trains:
             Sg = pickle.load(open(surf_path(ya, 'g'), 'rb'))
             Ss = pickle.load(open(surf_path(ya, 's'), 'rb'))

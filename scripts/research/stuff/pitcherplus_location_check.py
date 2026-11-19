@@ -40,7 +40,8 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts', 'archive'))
 DATA = os.path.join(ROOT, 'data')
 CSV = {'ship': os.path.join(DATA, '_pplus_locplus_ship_1118.csv'),
        'location': os.path.join(DATA, '_pplus_locplus_location_1118.csv'),
-       'shape': os.path.join(DATA, '_pplus_locplus_shape_1119.csv')}
+       'shape': os.path.join(DATA, '_pplus_locplus_shape_1119.csv'),
+       'far': os.path.join(DATA, '_pplus_locplus_far_1119.csv')}
 STUFF_V18 = os.path.join(DATA, '_pplus_stuff_v18.csv')
 OUT = os.path.join(DATA, '_pplus_location_check.json')
 K_GRID = [30, 60, 100, 150, 215, 300, 450, 700, 1000, 2000]
@@ -89,7 +90,7 @@ def build(branch_path):
               f'{np.corrcoef(m.locRaw, m.locRaw_old)[0, 1]:.4f}, max |diff| {(m.locRaw - m.locRaw_old).abs().max():.6f}')
 
 
-def build_shape(branch_path):
+def build_shape(branch_path, tag='shape', ref_tag='location'):
     """Branch locplus-shape (2026-11-19): the shape-class grade needs the movement fields,
     so the season dicts are rebuilt here with IndVertBrk and HorzBrk (sheet convention:
     -pfx_x). Two series from the BRANCH module on the same pitches: 'location' (its bundle
@@ -138,15 +139,15 @@ def build_shape(branch_path):
         del scorable, S, S0
         gc.collect()
     d, r = pd.DataFrame(rows), pd.DataFrame(ref)
-    d.to_csv(CSV['shape'] + '.tmp', index=False)
-    os.replace(CSV['shape'] + '.tmp', CSV['shape'])
-    old = pd.read_csv(CSV['location'])
-    for tag, t in (('branch released grade', r), ('shape-class grade', d)):
+    d.to_csv(CSV[tag] + '.tmp', index=False)
+    os.replace(CSV[tag] + '.tmp', CSV[tag])
+    old = pd.read_csv(CSV[ref_tag])
+    for lab, t in (('branch grade without the newest part', r), ('branch grade', d)):
         m = t.merge(old, on=['pid', 'season', 'half'], suffixes=('', '_old'))
         m = m[(m['half'] == 'full') & (m['locN'] >= 300)]
-        print(f'{tag} against the 2026-11-18 location series, full rows 300+: r {np.corrcoef(m.locRaw, m.locRaw_old)[0, 1]:.4f}, '
+        print(f'{lab} against the reference series ({ref_tag}), full rows 300+: r {np.corrcoef(m.locRaw, m.locRaw_old)[0, 1]:.4f}, '
               f'max |diff| {(m.locRaw - m.locRaw_old).abs().max():.6f}')
-    print(f'wrote {CSV["shape"]} ({len(d)} rows)')
+    print(f'wrote {CSV[tag]} ({len(d)} rows)')
 
 
 def check(tags=('ship', 'location')):
@@ -204,5 +205,10 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'check_shape':
         OUT = OUT.replace('.json', '_shape.json')
         check(('location', 'shape'))
+    elif sys.argv[1] == 'build_far':          # branch locplus-farmiss: the reference is the shape series
+        build_shape(sys.argv[2], 'far', 'shape')
+    elif sys.argv[1] == 'check_far':
+        OUT = OUT.replace('.json', '_far.json')
+        check(('shape', 'far'))
     else:
         check()

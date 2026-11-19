@@ -173,7 +173,7 @@ def season_job2(y):
     dates = sorted({p['Game Date'] for p in base_p if p['Game Date']})
     par = {d: i % 2 for i, d in enumerate(dates)}
     orig_group = dict(lp.GROUP)
-    pre, pre_s, meta, far, child = [], [], [], [], []
+    pre, pre_s, meta, far, child, geo = [], [], [], [], [], []
     for p in base_p:
         c = lp.get_count(p)
         px, zn = lp.safe_float(p.get('PlateX')), lp._znorm(p)
@@ -188,10 +188,12 @@ def season_job2(y):
         pre_s.append(((gs, p.get('Bats'), p.get('Throws')), c, i, j, p['Bats']))
         child.append(pt in CHILD)
         far.append(abs(px) * 12.0 > FAR[0] or zn < -FAR[1] or zn > 1.0 + FAR[2])
+        geo.append((abs(px) * 12.0, zn))
         meta.append((p.get('Pitcher'), p.get('Throws'), (g, p.get('Bats'), p.get('Throws'), c), par.get(p['Game Date'], 0),
                      p['Game Date'], (-re if re is not None else np.nan), c))
     m = pd.DataFrame(meta, columns=['pitcher', 'throws', 'cell', 'half', 'date', 'y', 'count'])
     child, far = np.array(child), np.array(far)
+    geo = np.array(geo)
     half = m['half'].values
     fold_base = {f: [p for p in base_p if par.get(p['Game Date']) != f] for f in (0, 1)}
 
@@ -213,9 +215,16 @@ def season_job2(y):
             vs = value(Ss, off, [pre_s[i] for i in idx])
             par_ = ~child[idx]
             v = np.where(par_, vs, v)          # parents from the surfaces built without the small types
-        if flag == 'far':
+        if flag == 'far' or (isinstance(flag, tuple) and flag[0] == 'far'):
+            # ('far', x_in, lo, hi) carries its own cutoffs (2026-11-19, locplus_farmiss_location.py);
+            # the plain string keeps FAR, the 2026-09-19 optima.
             ball = np.array([S['RV']['ball'].get(c, 0.0) for c in m['count'].values[idx]])
-            v = np.where(far[idx], ball, v)
+            if flag == 'far':
+                mask = far[idx]
+            else:
+                dx, zn = geo[idx, 0], geo[idx, 1]
+                mask = (dx > flag[1]) | (zn < -flag[2]) | (zn > 1.0 + flag[3])
+            v = np.where(mask, ball, v)
         return v
 
     allidx = np.arange(len(pre))
