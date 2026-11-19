@@ -283,3 +283,198 @@ def export(models):
                 'n': v['n'],
             }
     return out
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Per-pitch physics expectation (2026-11-19, per Wally). Lives BESIDE the
+# hitter basis above; neither replaces the other.
+#
+# Question it answers: given what a pitch IS at release (velocity, spin rate,
+# release spin axis, arm slot, extension), where should it go? No pitch type
+# and no pitcher grouping enter, so the expectation of "his sweeper" is only
+# the mean over the pitches that carry the name. A rename or a regroup cannot
+# move any pitch's expectation, which the per-type basis above cannot say
+# (median 5.1 in on a slider-to-sweeper relabel).
+#
+# Objective: held-out-PITCHER 2D miss of the movement itself, in inches. It is
+# not the results test that decides the hitter basis; the two answer different
+# questions (scripts/research/xmove/xmove_physics_fit.py holds the search).
+#   settings  10 leaves, 200 rounds at learning rate 0.1: every leaves row has
+#             an interior optimum in rounds; the curve is FLAT across 5-22
+#             leaves at each row's own best rounds (2022: 5.570-5.580 in), and
+#             5 leaves is worse in 6/6 seasons at 200 rounds. Min leaf 200 sits
+#             on a flat region (20-600).
+#   inputs    slot helps (.14 in), one model for both hands on hand-signed
+#             inputs helps (.05-.07); release height and side HURT (.02-.03),
+#             so they serve only the no-arm-angle fallback; extension is flat.
+#             Velocity against the pitcher's own top velocity helps .08-.09 in
+#             and is left out on purpose: it reads his OTHER pitches.
+#   result    the tuned form beats the untuned one in 6/6 seasons 2021-2026
+#             (four never tuned on), 5.3-5.5 in RMSE, R^2 .81 ride / .85 run.
+#
+# Every pitcher is scored by a model that never saw him: PHYS_FOLDS models,
+# each fit without one fold of pitchers (fold = crc32 of the name). One model
+# fit on everyone learns the most unusual arms and shortens their arrows (99th
+# percentile 2.2 in, max 7.3 in on 2026). A pitcher who is in no training set
+# (ROC, the NEW tab, the MiLB corpus) takes his name's fold too; that model
+# never saw him either.
+#
+# The observed tilt (OTilt) and spin efficiency are calculated FROM the
+# movement and must never become inputs: expected would equal actual.
+#
+# The fitted trees are exported as plain arrays and scored with numpy alone
+# (`score_physics_all`), in the pipeline and on the cards alike, so a card
+# needs neither scikit-learn nor the same version of it. The export equals
+# scikit-learn's own predict exactly (xmove_physics_release_checks.py).
+# ════════════════════════════════════════════════════════════════════════
+import zlib
+
+PHYS_LEAVES = 10
+PHYS_ROUNDS = 200
+PHYS_LR = 0.1
+PHYS_MIN_LEAF = 200
+PHYS_FOLDS = 5
+PHYS_MIN_TRAIN = 20000          # a guard on the pool, not a tuned value: below it no model is fit
+PHYS_TERMS = {'aa': ['velo', 'spin', 'ct', 'st', 'aa', 'ext'],
+              'relpt': ['velo', 'spin', 'ct', 'st', 'ext', 'rz', 'rx']}
+PHYS_VERSION = 1
+
+
+def pitcher_fold(name):
+    return zlib.crc32(str(name or '').encode('utf-8')) % PHYS_FOLDS
+
+
+def _phys_frame(all_pitches, mlb_only):
+    """Column arrays for the pitches that carry velocity, spin and a release
+    axis. NaN marks an absent optional input (arm angle, release point,
+    movement); nothing is imputed."""
+    idx, cols = [], {k: [] for k in ('fold', 's', 'velo', 'spin', 'theta', 'aa', 'ext', 'rz', 'rx', 'ivb', 'hb')}
+    nan = float('nan')
+    for i, p in enumerate(all_pitches):
+        if mlb_only and p.get('_source', 'MLB') != 'MLB':
+            continue
+        throws = p.get('Throws')
+        if throws not in ('L', 'R'):
+            continue
+        velo = safe_float(p.get('Velocity'))
+        spin = safe_float(p.get('Spin Rate'))
+        theta = release_theta(p.get('RTilt'), throws)
+        ext = safe_float(p.get('Extension'))
+        if None in (velo, spin, theta, ext):
+            continue
+        s = hand_sign(throws)
+        aa = safe_float(p.get('ArmAngle'))
+        rz = safe_float(p.get('RelPosZ'))
+        rx = safe_float(p.get('RelPosX'))
+        ivb = safe_float(p.get('xIndVrtBrk'))
+        hb = safe_float(p.get('xHorzBrk'))
+        idx.append(i)
+        cols['fold'].append(pitcher_fold(p.get('Pitcher')))
+        cols['s'].append(s)
+        cols['velo'].append(velo)
+        cols['spin'].append(spin)
+        cols['theta'].append(theta)
+        cols['ext'].append(ext)
+        cols['aa'].append(nan if aa is None else aa)
+        cols['rz'].append(nan if rz is None else rz)
+        cols['rx'].append(nan if rx is None else rx * s)
+        cols['ivb'].append(nan if ivb is None else ivb)
+        cols['hb'].append(nan if hb is None else hb * s)
+    F = {k: np.asarray(v, dtype='f8') for k, v in cols.items()}
+    F['idx'] = np.asarray(idx, dtype=np.int64)
+    F['fold'] = F['fold'].astype(np.int64)
+    F['ct'], F['st'] = np.cos(F['theta']), np.sin(F['theta'])
+    return F
+
+
+def _export_trees(model):
+    """Plain arrays of a fitted HistGradientBoostingRegressor: the baseline and
+    one node table per tree. Inputs never carry a missing value, so the
+    missing-value branch is not exported."""
+    trees = []
+    for (pred,) in model._predictors:
+        nd = pred.nodes
+        trees.append({'f': nd['feature_idx'].astype(int).tolist(),
+                      't': nd['num_threshold'].astype(float).tolist(),
+                      'l': nd['left'].astype(int).tolist(),
+                      'r': nd['right'].astype(int).tolist(),
+                      'v': nd['value'].astype(float).tolist(),
+                      'leaf': nd['is_leaf'].astype(int).tolist()})
+    return {'base': float(np.ravel(model._baseline_prediction)[0]), 'trees': trees}
+
+
+def _predict_trees(ex, X):
+    out = np.full(len(X), ex['base'], dtype='f8')
+    rows = np.arange(len(X))
+    for t in ex['trees']:
+        f, th, lf, rt = np.asarray(t['f']), np.asarray(t['t']), np.asarray(t['l']), np.asarray(t['r'])
+        v, leaf = np.asarray(t['v']), np.asarray(t['leaf'])
+        node = np.zeros(len(X), dtype=np.int64)
+        live = leaf[node] == 0
+        while live.any():
+            ix = rows[live]
+            n = node[ix]
+            node[ix] = np.where(X[ix, f[n]] <= th[n], lf[n], rt[n])
+            live = leaf[node] == 0
+        out += v[node]
+    return out
+
+
+def fit_physics(all_pitches):
+    """PHYS_FOLDS pitcher-held-out models per variant, MLB pitches only.
+    Returns {} (and the caller logs it) when the pool is under PHYS_MIN_TRAIN."""
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    F = _phys_frame(all_pitches, mlb_only=True)
+    out = {'version': PHYS_VERSION, 'folds': PHYS_FOLDS, 'variants': {},
+           'settings': {'leaves': PHYS_LEAVES, 'rounds': PHYS_ROUNDS, 'lr': PHYS_LR, 'minLeaf': PHYS_MIN_LEAF}}
+    has_move = np.isfinite(F['ivb']) & np.isfinite(F['hb'])
+    for variant, terms in PHYS_TERMS.items():
+        X = np.column_stack([F[c] for c in terms])
+        ok = has_move & np.isfinite(X).all(axis=1)
+        if ok.sum() < PHYS_MIN_TRAIN:
+            continue
+        v = {'terms': terms, 'n': int(ok.sum()), 'ivb': [], 'hb': []}
+        for fold in range(PHYS_FOLDS):
+            tr = ok & (F['fold'] != fold)
+            for tgt in ('ivb', 'hb'):
+                m = HistGradientBoostingRegressor(max_iter=PHYS_ROUNDS, learning_rate=PHYS_LR, max_leaf_nodes=PHYS_LEAVES,
+                                                  min_samples_leaf=PHYS_MIN_LEAF, early_stopping=False, random_state=0)
+                m.fit(X[tr], F[tgt][tr])
+                v[tgt].append(_export_trees(m))
+        out['variants'][variant] = v
+    return out if out['variants'] else {}
+
+
+def score_physics_all(model, all_pitches):
+    """Writes '_xivbP' and '_xhbP' (display frame) onto each pitch dict that
+    carries the inputs; absent when unscored. Arm-angle variant first, the
+    release-point variant only for a pitch with no arm angle. Returns
+    (scored, scored through the fallback)."""
+    variants = (model or {}).get('variants') or {}
+    if not variants:
+        return 0, 0
+    F = _phys_frame(all_pitches, mlb_only=False)
+    n = len(F['idx'])
+    xi, xh = np.full(n, np.nan), np.full(n, np.nan)
+    todo = np.ones(n, dtype=bool)
+    n_fallback = 0
+    for variant in ('aa', 'relpt'):
+        v = variants.get(variant)
+        if not v:
+            continue
+        X = np.column_stack([F[c] for c in v['terms']])
+        use = todo & np.isfinite(X).all(axis=1)
+        for fold in range(len(v['ivb'])):
+            m = use & (F['fold'] == fold)
+            if m.any():
+                xi[m] = _predict_trees(v['ivb'][fold], X[m])
+                xh[m] = _predict_trees(v['hb'][fold], X[m])
+        if variant == 'relpt':
+            n_fallback = int(use.sum())
+        todo &= ~use
+    xh = xh * F['s']
+    done = np.isfinite(xi) & np.isfinite(xh)
+    for i, a, b in zip(F['idx'][done].tolist(), xi[done].tolist(), xh[done].tolist()):
+        all_pitches[i]['_xivbP'] = a
+        all_pitches[i]['_xhbP'] = b
+    return int(done.sum()), n_fallback
