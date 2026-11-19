@@ -42,7 +42,7 @@ PITCH_BB_PCTL_KEYS = ['avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct
 # = good for pitcher) and is already in PITCH_STAT_KEYS.
 PITCH_BB_INVERT = {'avgEVAgainst', 'hardHitPct', 'barrelPctAgainst', 'hrFbPct', 'ldPct', 'fbPct', 'babip'}
 
-PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA', 'ivbOE', 'hbOE'] + PITCH_STAT_KEYS + PITCH_BB_PCTL_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'locPlus']
+PITCH_PCTL_KEYS = list(METRIC_KEYS.values()) + ['nVAA', 'nHAA', 'ivbOE', 'hbOE', 'ivbOEp', 'hbOEp'] + PITCH_STAT_KEYS + PITCH_BB_PCTL_KEYS + ['runValue', 'rv100', 'xRunValue', 'xRv100', 'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'xwOBAsp', 'locPlus']
 
 PITCHER_INVERT_PCTL = {'bbPct', 'babip', 'era', 'fip', 'xFIP', 'siera'}
 

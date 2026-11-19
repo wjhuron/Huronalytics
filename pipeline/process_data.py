@@ -41,7 +41,8 @@ from pipeline.fetch import (
     WOBA_WEIGHTS_FALLBACK, FIP_CONSTANT_FALLBACK,
 )
 from pipeline.xmove import (fit_models as fit_xmove_models, score_all as score_xmove,
-                            export as export_xmove)
+                            export as export_xmove, fit_physics as fit_xmove_physics,
+                            score_physics_all as score_xmove_physics)
 from pipeline.hwar import apply_batting_runs, apply_hitter_war, apply_hpwar
 from pipeline.eraplus import _load_park as load_park_factors_savant
 from pipeline.compute import (
@@ -380,6 +381,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
     #  55:sumXIVB 56:nXIVB  57:sumXHB 58:nXHB
     #  (per-pitch expected movement, pipeline/xmove.py; the site divides
     #  sum/count and never scores the model itself)
+    #  59:sumXIVBp 60:nXIVBp  61:sumXHBp 62:nXHBp
+    #  (the same, for the per-pitch physics expectation)
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('xIndVrtBrk', 26),
@@ -388,7 +391,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         ('PlateZ', 42), ('PlateX', 47),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 59)
+    pitch_micro = defaultdict(lambda: [0.0] * 63)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -482,6 +485,9 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         if p.get('_xivb') is not None:
             c[55] += p['_xivb']; c[56] += 1
             c[57] += p['_xhb']; c[58] += 1
+        if p.get('_xivbP') is not None:
+            c[59] += p['_xivbP']; c[60] += 1
+            c[61] += p['_xhbP']; c[62] += 1
 
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
@@ -505,6 +511,8 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # Expected-movement sums/counts
         row.append(round(c[55], 4)); row.append(int(c[56]))
         row.append(round(c[57], 4)); row.append(int(c[58]))
+        row.append(round(c[59], 4)); row.append(int(c[60]))
+        row.append(round(c[61], 4)); row.append(int(c[62]))
         pitch_rows.append(row)
 
     # ==========================================================
@@ -1285,6 +1293,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             'sumTiltSin', 'sumTiltCos', 'nTilt',
             'sumStuff', 'nStuff', 'sumLoc', 'nLoc',
             'sumXIVB', 'nXIVB', 'sumXHB', 'nXHB',
+            'sumXIVBp', 'nXIVBp', 'sumXHBp', 'nXHBp',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -1912,6 +1921,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     for _xk, _xs in sorted(xmove_models.items()):
         print(f"  {_xk}: mlb n={_xs.get('mlb', {}).get('n', 0)}, roc n={_xs.get('roc', {}).get('n', 0)}")
 
+    # Per-pitch physics expectation (no pitch type; pipeline/xmove.py). Scored
+    # beside the hitter basis: '_xivbP' / '_xhbP' on the pitch dict, the 'p'
+    # keys on rows, details and micro rows. Neither basis replaces the other.
+    xmove_physics = fit_xmove_physics(all_pitches)
+    _n_xphys, _n_xphys_fb = score_xmove_physics(xmove_physics, all_pitches)
+    print(f"Per-pitch physics expected movement: "
+          f"{', '.join(f'{_k} n={_v[chr(110)]}' for _k, _v in (xmove_physics.get('variants') or {}).items()) or 'NO MODEL'}; "
+          f"{_n_xphys} of {len(all_pitches)} pitches scored, {_n_xphys_fb} through the release-point fallback")
+    if not xmove_physics:
+        print("  WARNING: 0 physics expected-movement models (MLB pool under PHYS_MIN_TRAIN); "
+              "xIVBp/xHBp/ivbOEp/hbOEp will be blank everywhere")
+
     pitch_leaderboard = []
     for (pitcher, team, pitch_type, throws), pitches in pitch_groups.items():
         if not pitch_type:
@@ -1961,6 +1982,25 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         else:
             row['xHB'] = None
             row['hbOE'] = None
+        # The same for the per-pitch physics expectation ('p' keys).
+        _xi = [p['_xivbP'] for p in pitches if p.get('_xivbP') is not None]
+        _xh = [p['_xhbP'] for p in pitches if p.get('_xhbP') is not None]
+        if _xi:
+            _xivb = sum(_xi) / len(_xi)
+            row['xIVBp'] = round(_xivb, 1)
+            row['ivbOEp'] = (round(row['indVertBrk'] - _xivb, 1)
+                             if row.get('indVertBrk') is not None else None)
+        else:
+            row['xIVBp'] = None
+            row['ivbOEp'] = None
+        if _xh:
+            _xhb = sum(_xh) / len(_xh)
+            row['xHBp'] = round(_xhb, 1)
+            row['hbOEp'] = (round(row['horzBrk'] - _xhb, 1)
+                            if row.get('horzBrk') is not None else None)
+        else:
+            row['xHBp'] = None
+            row['hbOEp'] = None
 
         # Observed (Break) Tilt — circular mean of OTilt clock-notation values.
         tilt_minutes = [break_tilt_to_minutes(p.get('OTilt') or p.get('Break Tilt')) for p in pitches]
@@ -2381,6 +2421,9 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
             if p.get('_xivb') is not None:
                 detail['xivb'] = round(p['_xivb'], 1)
                 detail['xhb'] = round(p['_xhb'], 1)
+            if p.get('_xivbP') is not None:
+                detail['xivbp'] = round(p['_xivbP'], 1)
+                detail['xhbp'] = round(p['_xhbP'], 1)
             pitch_details[pitcher + '|' + (team or '')].append(detail)
 
     # Synthesize combined (2TM/3TM) pitch details entries
@@ -5052,10 +5095,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     # pitch type's own measured split-half r=0.5 crossing, not the flat 25.
     # Mirrored in js/aggregator.js QUAL.MIN_PITCH_LOCPLUS.
     from pipeline.locplus import stabilize_n as locplus_min_pitch
-    PITCH_SHAPE_KEYS = set(METRIC_KEYS.values()) | {'nVAA', 'nHAA', 'ivbOE', 'hbOE'}
+    PITCH_SHAPE_KEYS = set(METRIC_KEYS.values()) | {'nVAA', 'nHAA', 'ivbOE', 'hbOE', 'ivbOEp', 'hbOEp'}
     # Hand-signed shape metrics stored in an absolute frame — rank on |value| so
     # LHP/RHP aren't split by sign. Mirrors js/aggregator.js ABS_PCTL_KEYS.
-    ABS_PCTL_KEYS = {'horzBrk', 'haa', 'nHAA', 'hbOE'}
+    ABS_PCTL_KEYS = {'horzBrk', 'haa', 'nHAA', 'hbOE', 'hbOEp'}
     # Batted-ball stats use a BIP-count qualifier (>=25 BIPs of that pitch
     # type) instead of pitch count, since their denominator is BIPs. Includes
     # gbPct (which lives in PITCH_STAT_KEYS for historical reasons but is a
@@ -5233,6 +5276,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         'hitter_pitch_leaderboard': hitter_pitch_leaderboard,
         'metadata': metadata,
         'micro_data': micro_data,
+        'xmove_physics': xmove_physics,
         'pitch_details': pitch_details,
         'hitter_pitch_details': hitter_pitch_details,
         'hitter_swing_locations': hitter_swing_locations,
@@ -5371,6 +5415,18 @@ def write_json_outputs(result, suffix):
         json.dump(round_floats_inplace(result['metadata']), f, indent=2)
     with open(os.path.join(DATA_DIR, f'micro_data{suffix}.json'), 'w') as f:
         json.dump(round_floats_inplace(result['micro_data']), f, separators=(',', ':'))
+    # Per-pitch physics expected-movement trees (pipeline/xmove.py). The cards
+    # score from this file. Full precision on purpose: a rounded threshold
+    # sends a pitch down the other branch. Temp file then move, so a card never
+    # reads half a model; with no model the prior file is kept and it is said.
+    _xphys_path = os.path.join(DATA_DIR, f'xmove_physics{suffix}.json')
+    if result.get('xmove_physics'):
+        with open(_xphys_path + '.tmp', 'w') as f:
+            json.dump(result['xmove_physics'], f, separators=(',', ':'))
+        os.replace(_xphys_path + '.tmp', _xphys_path)
+    else:
+        print(f"  WARNING: no physics expected-movement model this run; kept the prior "
+              f"{os.path.basename(_xphys_path)} ({'present' if os.path.exists(_xphys_path) else 'ABSENT'})")
     print(f"  Wrote JSON files with suffix '{suffix}'")
 
 
