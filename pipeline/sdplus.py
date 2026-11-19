@@ -26,9 +26,11 @@ Design highlights (config validated 2026-07-02, scripts/research/hitter/phase2_s
   effect. CT+ KEEPS its anchor (flat/helpful there); Loc+ rejected the
   same anchor 0/5, so all three models now agree.
 - Cell smoothing: Bayesian shrinkage cell → zone, k=CELL_SHRINK_K.
-- Aggregation: MIX-NEUTRAL — per-zone mean dv reweighted to the league
-  zone distribution, so opportunity (the pitch diet faced) doesn't leak
-  into the decision score.
+- Aggregation: MIX-NEUTRAL — mean dv per (zone, two-strike flag) cell
+  reweighted to the league distribution of those cells, so opportunity
+  (the pitch diet faced, and how often he is in a two-strike count)
+  doesn't leak into the decision score. Two-strike flag added 2026-11-19;
+  see compute_hitter_sd.
 - Per-hitter regression: Bayesian regression toward the league mean with
   n_prior=HITTER_PRIOR_N pseudo-obs (= measured n0, MMSE-optimal).
 - Normalization: ratio-to-league ×100 (see regress_and_normalize), NOT a
@@ -142,6 +144,13 @@ HITTER_PRIOR_N = 190      # hitter → league regression pseudo-obs. Set to
                           # per-decision expectation, so the hitter estimate
                           # stabilizes more slowly. Re-run this whenever
                           # CELL_SHRINK_K moves; the two are coupled.
+                          # RE-MEASURED 2026-11-19 for the (zone, two-strike)
+                          # aggregation, same protocol (scripts/research/
+                          # hitter/deep_dive/dd_sd_n0.py): implied 183-208
+                          # across N 90-375, consensus 191, against 194 for
+                          # the zone-only control on the same harness. Inside
+                          # method noise, so 190 stays; r = .506 at N=190, so
+                          # the floor below stays too.
 MIN_HITTER_DECISIONS = 190  # floor = split-half r=.50 point (signal=
                             # noise), = n0 by construction; moves with the
                             # re-measure above (r = .503 at N=190). Costs
@@ -412,18 +421,52 @@ def compute_dv(p, table):
         return take_rv - swing_rv
 
 
-def compute_hitter_sd(pitches_by_hitter, table, lg_zone_w=None):
+def mix_key(p):
+    """(zone, two-strike flag): the cell of the mix-neutral aggregation."""
+    c = get_count(p)
+    return (classify_zone(p), 1 if (c is not None and c[1] == 2) else 0)
+
+
+def league_mix_weights(eligible):
+    """League share of decisions in each (zone, two-strike flag) cell. The
+    single home of the weights compute_hitter_sd reweights to; any caller
+    that scores hitters outside compute_sd_plus builds its weights here."""
+    counts = defaultdict(int)
+    for p in eligible:
+        counts[mix_key(p)] += 1
+    tot = sum(counts.values())
+    return {k: n / tot for k, n in counts.items()} if tot else None
+
+
+def compute_hitter_sd(pitches_by_hitter, table, lg_mix_w=None):
     """dict[(hitter, team)] -> {'raw_sd', 'n_decisions', 'zone_dv'}.
 
-    raw_sd is MIX-NEUTRAL (2026-07-02): the hitter's per-zone mean dv is
-    reweighted to the LEAGUE zone distribution (lg_zone_w), so seeing a more
-    separable pitch diet (more heart+waste, fewer coin-flip shadow pitches)
-    no longer inflates the score — that is opportunity, not decision skill
-    (SEAGER controls the same confound). Weights renormalize over the zones
-    the hitter actually has. Validated: split-half r +0.02-0.03 and the
-    stabilization n0 drops ~10-15% vs the plain per-decision mean
-    (scripts/research/hitter/phase2_sdplus_extensions.py). Falls back to the plain mean when
-    lg_zone_w is None."""
+    raw_sd is MIX-NEUTRAL: the hitter's mean dv in each (zone, two-strike
+    flag) cell is reweighted to the LEAGUE distribution of those cells
+    (lg_mix_w, from league_mix_weights), so neither the pitch diet nor the
+    share of his decisions made with two strikes moves the score. Both are
+    opportunity, not decision skill. Weights renormalize over the cells the
+    hitter actually has. Falls back to the plain mean when lg_mix_w is None.
+
+    Zone only, 2026-07-02: a more separable diet (more heart + waste, fewer
+    shadow pitches) no longer inflates the score. Split-half r +0.02-0.03
+    (scripts/research/hitter/phase2_sdplus_extensions.py).
+
+    Two-strike flag added 2026-11-19 (scripts/research/hitter/deep_dive/
+    dd_sd2.py, seasons 2021-2026). A two-strike decision carries larger
+    swing-minus-take stakes, so a hitter who is often in two-strike counts
+    had more of his score set by them: that count-mix part was 3% of the
+    raw variance and correlated +.43 with K%. With it removed the Process+
+    composite gains +.0052 on same-season wOBA (6/6 seasons) and +.0021 on
+    next-season wOBA (4/5 pairs); split-half r .771 -> .782. A permuted-
+    strike-label placebo changes nothing. Partition sweep: the flag equals
+    strikes 0/1/2; balls, ahead/even/behind and the full count are worse.
+
+    zone_dv stays the plain per-zone mean dv (the player-page columns)."""
+    if lg_mix_w and not all(isinstance(k, tuple) for k in lg_mix_w):
+        raise ValueError(
+            'compute_hitter_sd: weights must be keyed (zone, two-strike flag). '
+            'Build them with pipeline.sdplus.league_mix_weights(eligible).')
     results = {}
     for key, pitches in pitches_by_hitter.items():
         elig = [p for p in pitches if is_eligible(p)]
@@ -431,12 +474,18 @@ def compute_hitter_sd(pitches_by_hitter, table, lg_zone_w=None):
             continue
         dvs = [compute_dv(p, table) for p in elig]
         zone_dvs = defaultdict(list)
+        cell_sum = defaultdict(float)
+        cell_n = defaultdict(int)
         for p, dv in zip(elig, dvs):
-            zone_dvs[classify_zone(p)].append(dv)
+            mk = mix_key(p)
+            zone_dvs[mk[0]].append(dv)
+            cell_sum[mk] += dv
+            cell_n[mk] += 1
         zone_means = {z: sum(vs) / len(vs) for z, vs in zone_dvs.items() if vs}
-        if lg_zone_w:
-            wsum = sum(lg_zone_w.get(z, 0.0) for z in zone_means)
-            raw_sd = (sum(m * lg_zone_w.get(z, 0.0) for z, m in zone_means.items()) / wsum
+        if lg_mix_w:
+            wsum = sum(lg_mix_w.get(k, 0.0) for k in cell_n)
+            raw_sd = (sum(cell_sum[k] / cell_n[k] * lg_mix_w.get(k, 0.0)
+                          for k in cell_n) / wsum
                       if wsum > 0 else sum(dvs) / len(dvs))
         else:
             raw_sd = sum(dvs) / len(dvs)
@@ -603,17 +652,13 @@ def compute_sd_plus(all_pitches, pitches_by_hitter, lg_woba, woba_scale,
     zone_means = zone_level_means(eligible, rv_fn)
     smoothed = shrink_table(raw_table, zone_means)
 
-    # League zone distribution for the mix-neutral aggregation.
-    zone_counts = defaultdict(int)
-    for p in eligible:
-        zone_counts[classify_zone(p)] += 1
-    tot = sum(zone_counts.values())
-    lg_zone_w = {z: n / tot for z, n in zone_counts.items()} if tot else None
+    # League (zone, two-strike flag) distribution for the mix-neutral aggregation.
+    lg_mix_w = league_mix_weights(eligible)
 
-    hitter_raw = compute_hitter_sd(pitches_by_hitter, smoothed, lg_zone_w)
+    hitter_raw = compute_hitter_sd(pitches_by_hitter, smoothed, lg_mix_w)
     if extra_groups is None:
         normalized = regress_and_normalize(hitter_raw)
         return normalized, serialize_weight_table(smoothed)
-    extra_raw = compute_hitter_sd(extra_groups, smoothed, lg_zone_w)
+    extra_raw = compute_hitter_sd(extra_groups, smoothed, lg_mix_w)
     normalized, extra = regress_and_normalize(hitter_raw, extra_raw=extra_raw)
     return normalized, serialize_weight_table(smoothed), extra

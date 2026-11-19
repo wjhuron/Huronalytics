@@ -317,11 +317,7 @@ class League:
         sd_rv = SD.make_rv_xrv(self.lg_woba, self.woba_scale, sd_off)
         self.sd_table = SD.shrink_table(SD.build_weight_table(sd_elig, sd_rv),
                                         SD.zone_level_means(sd_elig, sd_rv))
-        zc = defaultdict(int)
-        for p in sd_elig:
-            zc[SD.classify_zone(p)] += 1
-        tot = sum(zc.values())
-        self.sd_zone_w = {z: n / tot for z, n in zc.items()} if tot else None
+        self.sd_zone_w = SD.league_mix_weights(sd_elig)   # (zone, two-strike flag) cells
 
         print("  Building CT+ cell table...")
         ct_sw = [p for p in all_pitches
