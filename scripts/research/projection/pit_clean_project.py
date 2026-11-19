@@ -62,10 +62,15 @@ def score(beta, n0, gs):
 
 
 ship = {int(r['mlbId']): r for r in csv.DictReader(open(os.path.join(P, 'projections_pitchers.csv')))}
-b0 = fit('FILE', 250); sp0 = score(b0, 250, 1.0)
+b0 = fit('FILE', 250)
+# CONTROL (corrected 2026-11-19): the shipped projection has trained on the TARGET-FREE Stuff+ history since 2026-11-05
+# (project_players.py reads _stuff_clean.json), so the fit that must reproduce projections_pitchers.csv is CLEAN at N0 250.
+# The control read the FILE fit before, which was the shipped design only until that day; it then failed by design
+# (max gap .236 on 2026-11-19).
+sp0 = score(fit('CLEAN', 250), 250, 1.0)
 gap = [abs(sp0[i][1] - float(ship[i]['RA9_SP_2027'])) for i in sp0 if i in ship and ship[i].get('RA9_SP_2027')]
 gap3 = [abs(sp0[i][3] - float(ship[i]['RA9_SP_2029'])) for i in sp0 if i in ship and ship[i].get('RA9_SP_2029')]
-print(f'control: FILE fit v shipped RA9, n {len(gap)}, max gap 2027 {max(gap):.3f}, 2029 {max(gap3):.3f}')
+print(f'control: CLEAN 250 fit v shipped RA9, n {len(gap)}, max gap 2027 {max(gap):.3f}, 2029 {max(gap3):.3f}')
 if max(gap) > .011:
     raise SystemExit('control failed: code does not reproduce the shipped projection')
 n50, d = A.cmp(A.run('CLEAN', 50, (), 'ra9')[0], A.run('CLEAN', 250, (), 'ra9')[0], 'ra9'); print('N0 50 v 250, RA9:', n50)

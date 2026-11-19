@@ -288,5 +288,103 @@ def which():
     print(f'wrote {fn}')
 
 
+def stuff_test():
+    """Does the value of a spot depend on how GOOD the pitch is? (2026-11-19)
+
+    locplus_within_between.py: pitch by pitch the released location value is calibrated for
+    every type (within-pitcher slope 1.0-1.2), but BETWEEN pitchers it carries far less for
+    secondary pitches (slope .2-.6) and nothing for the splitter. That is selection: a pitcher
+    with a better pitch throws it to spots an average pitch should not go. If so, a location
+    value that knows the pitch's quality should recover the between-pitcher signal.
+
+    Quality = the pitch's Stuff+ prediction from a model fit on neither its season nor the next
+    (data/_platoon_split/pred_{Y}.pkl, row-aligned with the gate frames; 2021-2025).
+      NOLOC  shape + situation + stuff
+      ADD    + location, with location x (shape, stuff) interactions forbidden
+      STF    + location, where ONLY stuff may interact with location
+    A. pitch level, fit on one season, score an adjacent one (8 ordered pairs): ADD -> STF.
+    B. units (pitcher x type, 300+ pitches in both seasons of a pair), one model fit on the
+       other three seasons: location value = model - NOLOC, minus its cell mean; r with the
+       unit's next-season result beyond NOLOC, by pitch type, ADD against STF, unit bootstrap."""
+    yrs = (2021, 2022, 2023, 2024, 2025)
+    D = {}
+    for y in yrs:
+        d = load(y)
+        raw = pd.read_pickle(os.path.join(GATE, f'season_{y}.pkl'))
+        ok = raw['target_xrv'].notna() & raw['plate_x'].notna() & raw['plate_z'].notna()
+        sc = pd.read_pickle(os.path.join(GATE, f'sidecar_{y}.pkl'))
+        ok &= sc['balls'].notna().values & raw['pitch_type'].map(lp.group_of_code).isin(GROUPS).values
+        pr = pd.read_pickle(os.path.join(ROOT, 'data', '_platoon_split', f'pred_{y}.pkl'))
+        if len(pr) != len(raw) or int(ok.sum()) != len(d):
+            sys.exit(f'{y}: prediction rows do not line up with the frame. Stopped.')
+        d['stuff'] = pr['stuff'].values[ok.values].astype('float32')
+        D[y] = d[d['stuff'].notna()].reset_index(drop=True)
+    ST = ['stuff']
+    f_noloc = SHAPE + SIT + ST
+    f_all = LOCF + SHAPE + SIT + ST
+    c_add = [LOCF + SIT, SHAPE + SIT + ST]
+    c_stf = [LOCF + SIT + ST, SHAPE + SIT + ST]
+    types = ('FF', 'SI', 'FC', 'SL', 'ST', 'CU', 'CH', 'FS')
+    acc = {t: [] for t in ('ALL',) + types}
+    for a, b in [(a, b) for a in yrs for b in yrs if abs(a - b) == 1]:
+        te = D[b]
+        t = te['target_xrv'].values
+        e_add = (fit_predict(D[a], te, f_all, c_add) - t) ** 2
+        e_stf = (fit_predict(D[a], te, f_all, c_stf) - t) ** 2
+        for k in acc:
+            m = np.ones(len(te), bool) if k == 'ALL' else (te['pitch_type'] == k).values
+            acc[k].append(float((e_stf[m] - e_add[m]).mean()))
+        print(f'{a}->{b} scored', flush=True)
+    print('\nA. pitch level: STF minus ADD squared error x 1e4 (negative = the spot value depends on stuff), 8 pairs')
+    for k, v in acc.items():
+        v = np.array(v)
+        print(f'  {k:>4s}  {v.mean() * 1e4:+.3f}   wins {int((v < 0).sum())}/{len(v)}   z {v.mean() / (v.std(ddof=1) / np.sqrt(len(v))):+.1f}')
+    cell = ['gname', 'platoon_same', 'is_lhp', 'balls', 'strikes']
+    keys = ['pitcher', 'pitch_type']
+    pooled = []
+    for Y in yrs[:-1]:
+        tr = pd.concat([D[y] for y in yrs if y not in (Y, Y + 1)], ignore_index=True)
+        tabs = {}
+        for y in (Y, Y + 1):
+            te = D[y]
+            nol = fit_predict(tr, te, f_noloc)
+            u = te[keys + cell].copy()
+            u['lvA'] = fit_predict(tr, te, f_all, c_add) - nol
+            u['lvS'] = fit_predict(tr, te, f_all, c_stf) - nol
+            u['res'] = te['target_xrv'].values - nol
+            for c in ('lvA', 'lvS', 'res'):
+                u[c] = u[c] - u.groupby(cell)[c].transform('mean')
+            g = u.groupby(keys).agg(lvA=('lvA', 'mean'), lvS=('lvS', 'mean'), res=('res', 'mean'), n=('lvA', 'size'))
+            tabs[y] = g[g['n'] >= MIN_UNIT]
+        j = tabs[Y].join(tabs[Y + 1], lsuffix='_y', rsuffix='_n', how='inner').reset_index()
+        j['pair'] = Y
+        for c in ('lvA_y', 'lvS_y', 'res_n', 'res_y'):
+            j[c] = j[c] - j.groupby('pitch_type')[c].transform('mean')
+        pooled.append(j)
+        print(f'pair {Y}->{Y + 1}: {len(j)} units', flush=True)
+        del tr
+        gc.collect()
+    J = pd.concat(pooled)
+    rng = np.random.default_rng(0)
+    out = {}
+    print('\nB. units: r(location value Y, result Y+1). POSITIVE = a worse (hitter-positive) value is followed by worse results = the grade works')
+    print(f'{"type":>5s}{"units":>7s}{"ADD":>9s}{"STF":>9s}{"STF - ADD (se)":>18s} | same season: {"ADD":>7s}{"STF":>7s}')
+    for k in ('ALL',) + types:
+        s = J if k == 'ALL' else J[J['pitch_type'] == k]
+        if len(s) < 40:
+            continue
+        v = {c: s[c].values for c in ('lvA_y', 'lvS_y', 'res_n', 'res_y')}
+        cr = lambda a, b, i=None: float(np.corrcoef(v[a] if i is None else v[a][i], v[b] if i is None else v[b][i])[0, 1])
+        bs = [cr('lvS_y', 'res_n', i) - cr('lvA_y', 'res_n', i) for i in rng.integers(0, len(s), size=(1000, len(s)))]
+        out[k] = {'units': len(s), 'add': cr('lvA_y', 'res_n'), 'stf': cr('lvS_y', 'res_n'), 'se': float(np.std(bs)),
+                  'add_same': cr('lvA_y', 'res_y'), 'stf_same': cr('lvS_y', 'res_y')}
+        r = out[k]
+        print(f'{k:>5s}{r["units"]:>7d}{r["add"]:>+9.3f}{r["stf"]:>+9.3f}{f"{r["stf"] - r["add"]:+.3f} ({r["se"]:.3f})":>18s} |              {r["add_same"]:>+7.3f}{r["stf_same"]:>+7.3f}')
+    fn = OUT.replace('.json', '_stuff.json')
+    json.dump({'pitch': {k: [float(x) for x in v] for k, v in acc.items()}, 'units': out}, open(fn + '.tmp', 'w'), indent=1)
+    os.replace(fn + '.tmp', fn)
+    print(f'wrote {fn}')
+
+
 if __name__ == '__main__':
-    {'pairs': stage2, 'which': which}.get(sys.argv[1] if len(sys.argv) > 1 else '', main)()
+    {'pairs': stage2, 'which': which, 'stuff': stuff_test}.get(sys.argv[1] if len(sys.argv) > 1 else '', main)()

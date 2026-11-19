@@ -74,6 +74,38 @@ SIGNED = {
     642546: 'Jonathan Hernández, under contract per Wally 2026-11-05',
     672335: 'Cionel Pérez, under contract per Wally 2026-11-05',
     682515: 'Logan Porter, under contract per Wally 2026-11-05',
+    # Signed per the 2026/27 MLB Offseason sheet, read 2026-11-19 (a New Team next to the name, or a row in an MLB Signings /
+    # MiLB Signings column; deals abroad count). scripts/research/projection/fa_offseason_sheet_sync.py lists them by id.
+    681520: 'Antoine Kelly, CLE (MiLB)',
+    641386: 'Ben Bowden, ATH (MiLB)',
+    675448: 'Blake Hunt, MiLB signing with PHI',
+    640459: 'Brian Navarreto, PHI (MiLB)',
+    670280: 'David Bednar, NYY (MLB)',
+    669160: 'Dustin May, CWS (MLB)',
+    641941: 'Emilio Pagán, DET (MLB)',
+    623465: 'Evan Phillips, ATL (MLB)',
+    664129: 'Geoff Hartlieb, PHI (MiLB)',
+    641343: 'Jake Bauers, BOS (MLB)',
+    669270: 'Joel Kuhnel, NYM (MiLB)',
+    681006: 'Josh Simpson, PHI (MiLB)',
+    676480: 'José Barrero, BAL (MiLB)',
+    664744: 'José Espada, MIN (MiLB)',
+    678577: 'Junior Pérez, BAL (MiLB)',
+    681432: 'Luke Little, ATH (MiLB)',
+    663897: 'Luke Williams, ATL (MiLB)',
+    680689: 'Lyon Richardson, SSG (KBO)',
+    668820: 'Max Kranick, PHI (MiLB)',
+    642133: 'Rowdy Tellez, Rakuten (NPB)',
+    680777: 'Ryan Jeffers, MIN (MLB)',
+    680802: 'Ryan Weiss, SDP (MLB)',
+    671111: 'Sammy Peralta, LAA (MiLB)',
+    543243: 'Sonny Gray, MIN (MLB)',
+    669298: 'TJ Shook, COL (MiLB)',
+    657612: 'Tim Hill, NYY (MLB)',
+    663941: 'Tristan Beck, LG (KBO)',
+    671289: 'Tyler Freeman, ATL (MiLB)',
+    592826: 'Vince Velasquez, KCR (MiLB)',
+    678576: 'Wilkin Ramos, ATH (MiLB)',
 }
 # Retired, per Wally 2026-11-02. A source list can still carry them (the MLBPA XX(B) release did), so they are dropped by id.
 RETIRED = {
@@ -224,6 +256,10 @@ HAND_ADDED = {
     669310: ('CJ Van Eyk', 'elected'),
     676680: ('Tom Cosgrove', 'elected'),
     686610: ('Ken Waldichuk', 'elected'),
+    # Released, unsigned, with a 2026 MLB row on the offseason sheet read 2026-11-19 (per Wally: everyone who elected MLB or
+    # MiLB free agency or was released, has MLB time and did not sign anywhere).
+    677161: ('Zack Kelly', 'released'),
+    693312: ('Kyle Nicolas', 'released'),
 }
 # Removed by hand per Wally. A source list can still carry them, so they are dropped by id.
 REMOVED = {
@@ -429,6 +465,8 @@ def overrides_only():
             players[mid] = {'mlbId': mid, 'name': idx[mid]['name'], 'sources': ['mlbpa']}
             print(f'added {idx[mid]["name"]} ({mid})')
     for mid, (name, source) in HAND_ADDED.items():
+        if mid in SIGNED or mid in RETIRED or mid in REMOVED:
+            continue                    # a later decision wins: he signed, retired or was taken out after the hand add
         if mid not in idx:
             sys.exit(f'HAND_ADDED {name} ({mid}) has no 2026 MLB row; nothing written.')
         if mid not in players:
