@@ -14,6 +14,10 @@ and adds it to data/_era_new_inputs.json:
 
   PYTHONHASHSEED=0 .venv/bin/python scripts/research/era/hpera_location_input.py \
       /Users/wallyhuron/Huronalytics-locplus
+
+A second argument names the output key (default loc_new). Any other key, for
+example loc_shape for the branch locplus-shape, also switches the season loader to
+locplus_shape_loader, which carries the movement fields that grade reads.
 """
 import gc
 import importlib.util
@@ -40,6 +44,12 @@ MIN_N = 50
 
 def main():
     path = sys.argv[1]
+    key = sys.argv[2] if len(sys.argv) > 2 else 'loc_new'
+    nkey = 'n_' + key.replace('_', '')
+    load = FR.load_season
+    if key != 'loc_new':
+        import locplus_shape_loader as SL
+        load = SL.load_season
     spec = importlib.util.spec_from_file_location('pipeline.locplus_branch', os.path.join(path, 'pipeline', 'locplus.py'))
     BR = importlib.util.module_from_spec(spec)
     sys.modules['pipeline.locplus_branch'] = BR
@@ -49,7 +59,7 @@ def main():
     print(f'branch kernel {BR.PHYS_X_IN:g} in / {BR.PHYS_Z_FRAC:g}, BIP count anchor {BR.BIP_COUNT_ANCHOR}', flush=True)
     res = json.load(open(OUT))
     for Y in YEARS:
-        pitches = FR.load_season(Y)
+        pitches = load(Y)
         base_p = [p for p in pitches if BR.is_eligible_baseline(p)]
         S = BR.build_surfaces(base_p, FR.LG, FR.SCALE)
         asg, nm = TARGETS[str(Y)]['asg'], name_map(Y)
@@ -73,13 +83,14 @@ def main():
                     miss += 1
                     continue
                 res.setdefault(str(Y), {}).setdefault(str(pid), {}).update(
-                    {f'loc_new_{scope}': float(r['mean']), f'n_locnew_{scope}': int(r['size'])})
+                    {f'{key}_{scope}': float(r['mean']), f'{nkey}_{scope}': int(r['size'])})
         a, b = [], []
         for r in res[str(Y)].values():
-            if 'loc_new_full' in r and 'loc_part_full' in r and r['n_locnew_full'] >= 300:
-                a.append(r['loc_new_full']); b.append(r['loc_part_full'])
+            ref = 'loc_part_full' if key == 'loc_new' else 'loc_new_full'
+            if f'{key}_full' in r and ref in r and r[f'{nkey}_full'] >= 300:
+                a.append(r[f'{key}_full']); b.append(r[ref])
         print(f'{Y}: league mean location value {d["v"].mean() * 100:+.4f} runs/100 on {len(d)} pitches; '
-              f'{len(g)} pitchers (h1), {miss} unmatched names; r with the shipped-kernel location part '
+              f'{len(g)} pitchers (h1), {miss} unmatched names; r with the reference location input (loc_part for loc_new, else loc_new) '
               f'{np.corrcoef(a, b)[0, 1]:.3f} (n {len(a)})', flush=True)
         del d
         gc.collect()
