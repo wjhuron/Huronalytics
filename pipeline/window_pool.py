@@ -223,7 +223,10 @@ def bb_plus_chain(row, metadata):
     # working, not a bug.
     _lg = metadata.get('hitterLeagueAverages') or {}
     lg_con = _lg.get('xwOBAcon')
-    lg_ev95 = _lg.get('ev95')
+    # The EV row key the season run used (ev95Air since 2026-11-19). An
+    # artifact without the key is the all-ball definition.
+    _ev_key = metadata.get('bbPlusEvKey') or 'ev95'
+    lg_ev95 = _lg.get(_ev_key)
     _bw = metadata.get('bbPlusWeights') or {}
     _w_con = _bw.get('con', 0.60)
     _w_ev = _bw.get('ev', 0.40)
@@ -233,7 +236,7 @@ def bb_plus_chain(row, metadata):
     _bb_beta = metadata.get('bbPlusBeta') or 4.205
     _bb_slope = metadata.get('bbPlusSlopeMatch') or 1.2352
     xc, nb = row.get('xwOBAcon'), row.get('nBip') or 0
-    _ev95 = row.get('ev95')
+    _ev95 = row.get(_ev_key)
     _ev_ok = (_w_ev == 0) or (_ev95 is not None and lg_ev95)
     if xc is not None and lg_con and _ev_ok and nb > 0:
         _con_plus = 100.0 * xc / lg_con
