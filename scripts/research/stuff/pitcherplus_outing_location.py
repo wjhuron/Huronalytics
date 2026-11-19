@@ -32,6 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 OUT = os.path.join(ROOT, 'data', '_pplus_outing_tables_location.pkl')
 KERNEL = {'PHYS_X_IN': 2.0, 'PHYS_Z_FRAC': 0.12}
+OUT_SHAPE = os.path.join(ROOT, 'data', '_pplus_outing_tables_shape.pkl')   # branch locplus-shape (2026-11-19)
+BRANCH = None          # set by build_shape: the branch Loc+ module; add_location then grades with its location_value
 
 
 def add_location(df, year):
@@ -54,7 +56,20 @@ def add_location(df, year):
         'xwOBA': df['estimated_woba_using_speedangle'],
     }, index=df.index)
     recs['_source'] = 'MLB'
+    if BRANCH is not None:
+        # sheet convention for the class variable: IVB in inches, HorzBrk = -pfx_x
+        recs['IndVertBrk'], recs['HorzBrk'] = df['pfx_z'] * 12.0, -df['pfx_x'] * 12.0
     dicts = recs.to_dict('records')
+    if BRANCH is not None:
+        scorable = [(i, p) for i, p in zip(recs.index, dicts) if BRANCH._is_scorable(p)]
+        S = BRANCH.build_surfaces([p for _, p in scorable], lg, scale)
+        loc = pd.Series(np.nan, index=df.index)
+        for i, p in scorable:
+            v = BRANCH.location_value(p, S)
+            if v is not None:
+                loc[i] = -v                  # pitcher perspective, higher = better
+        df['loc_pitch'] = loc
+        return df
     scorable = [(i, p) for i, p in zip(recs.index, dicts) if lp._is_scorable(p)]
     base = [p for _, p in scorable]
     off = lp.build_bip_count_offsets(base, lg, scale)
@@ -82,7 +97,8 @@ def add_location(df, year):
     return df
 
 
-def build():
+def build(out=None):
+    out_path = out or OUT
     import leaderboard_metric_battery as bat
     import pitcherplus_search as ps
     import pitcherplus_outing_tables as OT
@@ -113,10 +129,10 @@ def build():
     ok = m.dropna()
     print(f'outings {len(out)}; location present on {out["locRaw"].notna().mean():.3f}; '
           f'r(outing shipped Loc+ value, outing location part) {np.corrcoef(ok.locRaw_old, ok.locRaw_new)[0, 1]:.3f}')
-    tmp = OUT + '.tmp'
+    tmp = out_path + '.tmp'
     pickle.dump(out, open(tmp, 'wb'))
-    os.replace(tmp, OUT)
-    print(f'wrote {OUT}')
+    os.replace(tmp, out_path)
+    print(f'wrote {out_path}')
 
 
 def fit():
@@ -131,7 +147,15 @@ def fit():
         R.main()
 
 
-def lock():
+def build_shape(branch_path):
+    global BRANCH
+    sys.path.insert(0, os.path.join(ROOT, 'scripts', 'research', 'locplus'))
+    import locplus_shape_loader as SL
+    BRANCH = SL.branch(branch_path)
+    build(OUT_SHAPE)
+
+
+def lock(pairs=None):
     """Loc-k sweep on the outing composite (the stabilization crossing is a diagnostic;
     the composite's own curve decides). Frozen shipped weights, and weights refit out of
     fold by season, on the shipped tables and on the location tables."""
@@ -140,7 +164,7 @@ def lock():
     four = ['stuffAtom', 'locRaw', 'cswPct', 'xrv100']
     grid = (30, 60, 100, 150, 185, 236, 300, 450, 700, 1000, 2000, 5000)
     out = {}
-    for tag, tables in (('shipped', R.TABLES), ('location', OUT)):
+    for tag, tables in (pairs or (('shipped', R.TABLES), ('location', OUT))):
         R.TABLES = tables
         t = R.load_tables()[0]
         params = R.pool_params(t, four)
@@ -160,11 +184,16 @@ def lock():
             ff = r['frozen_folds']
             ff = ff.values() if isinstance(ff, dict) else ff
             print(f'{r["k"]:>6d}{r["frozen_r"]:>10.4f}{r["oof_r"]:>9.4f}   ' + ' '.join(f'{x:.4f}' for x in ff))
-    fn = os.path.join(R.DATA, '_pplus_outing_loc_k_sweep_1118.json')
+    fn = os.path.join(R.DATA, '_pplus_outing_loc_k_sweep_1118.json' if not pairs else '_pplus_outing_loc_k_sweep_shape_1119.json')
     json.dump(out, open(fn + '.tmp', 'w'), indent=1, default=float)
     os.replace(fn + '.tmp', fn)
     print(f'wrote {fn}')
 
 
 if __name__ == '__main__':
-    {'build': build, 'fit': fit, 'lock': lock}[sys.argv[1]]()
+    if sys.argv[1] == 'build_shape':
+        build_shape(sys.argv[2])
+    elif sys.argv[1] == 'lock_shape':
+        lock((('location', OUT), ('shape', OUT_SHAPE)))
+    else:
+        {'build': build, 'fit': fit, 'lock': lock}[sys.argv[1]]()

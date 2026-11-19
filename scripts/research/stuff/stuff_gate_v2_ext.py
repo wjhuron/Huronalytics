@@ -68,7 +68,33 @@ ARMS = {
     'LHP': {'add': ['is_lhp']},
     'IDENT3_LHP': {'identity': 3, 'add': ['is_lhp']},
     'V18DEF': {},                                 # the gate default after v18 (pitcher hand in the design)
+    # arsenal context beyond the fastball (2026-11-18). The shipped design already holds the
+    # differences to the primary fastball; these add the rest of the arsenal. arsenal().
+    'ARS_NN': {'arsenal': True, 'add': ['ars_n', 'ars_nn', 'nn_dv', 'nn_divb', 'nn_dhb']},
+    'ARS_BRK': {'arsenal': True, 'add': ['brk_dv', 'brk_divb', 'brk_dhb']},
+    'ARS_OFF': {'arsenal': True, 'add': ['off_dv', 'off_divb', 'off_dhb']},
+    'ARS_FB2': {'arsenal': True, 'add': ['fb2_dv', 'fb2_divb', 'fb2_dhb']},
+    'ARS_SI': {'arsenal': True, 'add': ['si_dv', 'si_divb', 'si_dhb']},
+    'ARS_ALL': {'arsenal': True, 'add': ['ars_n', 'ars_nn', 'nn_dv', 'nn_divb', 'nn_dhb', 'brk_dv', 'brk_divb', 'brk_dhb',
+                                         'off_dv', 'off_divb', 'off_dhb', 'fb2_dv', 'fb2_divb', 'fb2_dhb']},
+    'ARS_USE': {'arsenal': True, 'add': ['ars_share']},     # usage share: NOT physics, the pitcher's own choice
+    'IDENT3_ARS_ALL': {'identity': 3, 'arsenal': True,
+                       'add': ['ars_n', 'ars_nn', 'nn_dv', 'nn_divb', 'nn_dhb', 'brk_dv', 'brk_divb', 'brk_dhb',
+                               'off_dv', 'off_divb', 'off_dhb', 'fb2_dv', 'fb2_divb', 'fb2_dhb']},
+    'IDENT3_ARS_NN': {'identity': 3, 'arsenal': True, 'add': ['ars_n', 'ars_nn', 'nn_dv', 'nn_divb', 'nn_dhb']},
+    'IDENT3_ARS_USE': {'identity': 3, 'arsenal': True, 'add': ['ars_share']},
+    # other model classes on the shipped design (2026-11-18). No new dependency: xgboost and sklearn.
+    'GAM1': {'params': {'max_depth': 1, 'n_estimators': 3000, 'learning_rate': 0.05}},   # additive: no interactions
+    'GAM2': {'params': {'max_depth': 2, 'n_estimators': 2000, 'learning_rate': 0.05}},   # pairwise interactions only
+    'HGB': {'model': 'hgb'},                      # sklearn histogram gradient boosting, shipped-like settings
+    'MLP': {'model': 'mlp'},                      # sklearn neural net, two hidden layers
+    'ENS_HGB': {'model': 'hgb', 'ens': True},     # mean of the shipped xgboost and HGB predictions
+    'ENS_MLP': {'model': 'mlp', 'ens': True},
 }
+BRK, OFF, FBT = ('SL', 'ST', 'CU', 'KC', 'SV'), ('CH', 'FS'), ('FF', 'SI', 'FC')
+ARS_MIN_N, ARS_MIN_SHARE = 30, 0.03             # a type is part of the arsenal from 30 pitches and 3% usage (conventions)
+ARS_SCALE = (5.0, 7.0, 9.0)                     # mph, in IVB, in HB per unit of the nearest-type distance (conventions,
+                                                # near the across-type SDs; the three components also enter raw)
 EV_MIN = 50
 
 
@@ -125,6 +151,92 @@ def fbhand(d):
     return d
 
 
+def arsenal(d):
+    """Arsenal-context columns for one prepared season frame. A type mean is the pitcher's
+    season mean of velocity / ivb / hb for a type in his arsenal (ARS_MIN_N, ARS_MIN_SHARE).
+      brk_*, off_*, fb2_*, si_*   this pitch minus the mean of his primary breaking ball, primary
+                                  offspeed pitch, SECOND fastball type, and sinker; NaN when he has
+                                  none or the pitch is that type
+      ars_n                       types in the arsenal
+      ars_nn, nn_d*               distance from this pitch's type mean to his nearest other type
+                                  mean (ARS_SCALE units) and the three raw differences to it
+      ars_share                   usage share of this pitch's type"""
+    d = d.copy()
+    g = d.groupby(['pitcher', 'pitch_type'], observed=True)
+    m = g[['velocity', 'ivb', 'hb']].mean()
+    m['n'] = g.size()
+    m['share'] = m['n'] / m.groupby(level=0)['n'].transform('sum')
+    d['ars_share'] = m['share'].reindex(pd.MultiIndex.from_arrays([d['pitcher'], d['pitch_type']])).values.astype('float32')
+    q = m[(m['n'] >= ARS_MIN_N) & (m['share'] >= ARS_MIN_SHARE)].reset_index()
+    pt = d['pitch_type'].values
+
+    def ref(sub, pref):
+        r = sub.sort_values('n', ascending=False).drop_duplicates('pitcher').set_index('pitcher')
+        j = d[['pitcher']].join(r[['pitch_type', 'velocity', 'ivb', 'hb']].add_suffix('_r'), on='pitcher')
+        ok = j['pitch_type_r'].notna().values & (j['pitch_type_r'].values != pt)
+        for c, a in (('dv', 'velocity'), ('divb', 'ivb'), ('dhb', 'hb')):
+            d[f'{pref}_{c}'] = np.where(ok, d[a].values - j[a + '_r'].values, np.nan).astype('float32')
+        return ok.mean()
+    cov = {'brk': ref(q[q['pitch_type'].isin(BRK)], 'brk'), 'off': ref(q[q['pitch_type'].isin(OFF)], 'off'),
+           'si': ref(q[q['pitch_type'] == 'SI'], 'si')}
+    fb = q[q['pitch_type'].isin(FBT)].sort_values('n', ascending=False)
+    cov['fb2'] = ref(fb[fb.groupby('pitcher').cumcount() == 1], 'fb2')
+    # nearest other type in the arsenal, on type means
+    rows = {}
+    sc = np.array(ARS_SCALE)
+    for pit, gq in q.groupby('pitcher'):
+        X = gq[['velocity', 'ivb', 'hb']].values
+        k = len(gq)
+        for i, t in enumerate(gq['pitch_type'].values):
+            if k < 2:
+                rows[(pit, t)] = (k, np.nan, np.nan, np.nan, np.nan)
+                continue
+            diff = X[i] - np.delete(X, i, axis=0)
+            dist = np.sqrt(((diff / sc) ** 2).sum(1))
+            b = int(dist.argmin())
+            rows[(pit, t)] = (k, dist[b], diff[b, 0], diff[b, 1], diff[b, 2])
+    nn = pd.DataFrame.from_dict(rows, orient='index', columns=['ars_n', 'ars_nn', 'nn_dv', 'nn_divb', 'nn_dhb'])
+    nn.index = pd.MultiIndex.from_tuples(nn.index)
+    v = nn.reindex(pd.MultiIndex.from_arrays([d['pitcher'], d['pitch_type']]))
+    for c in nn.columns:
+        d[c] = v[c].values.astype('float32')
+    print('    arsenal: coverage ' + ' '.join(f'{k} {x:.0%}' for k, x in cov.items())
+          + f' nn {d["ars_nn"].notna().mean():.0%}', flush=True)
+    return d
+
+
+def fit_other(Xtr, ytr, XY, spec, seed):
+    """A model class other than xgboost, on the same design. hgb: sklearn histogram gradient
+    boosting at shipped-like settings with the monotone velocity rule. mlp: sklearn neural net,
+    inputs median-imputed with a missing flag and standardized, target standardized."""
+    kind = spec['model']
+    if kind == 'hgb':
+        from sklearn.ensemble import HistGradientBoostingRegressor
+        mono = [(-1 if c == T.MONO_FEAT else 0) for c in Xtr.columns]
+        m = HistGradientBoostingRegressor(max_iter=800, learning_rate=0.025, max_depth=6, max_leaf_nodes=64,
+                                          min_samples_leaf=20, l2_regularization=1.5, monotonic_cst=mono,
+                                          early_stopping=False, random_state=seed)
+        m.fit(Xtr, ytr)
+        return m.predict(XY)
+    from sklearn.neural_network import MLPRegressor
+    A, Bm = Xtr.to_numpy('float32'), XY.to_numpy('float32')
+    med = np.nanmedian(A, axis=0)
+    miss = np.isnan(A).any(0)
+    def prep(M):
+        flags = np.isnan(M[:, miss]).astype('float32')
+        M = np.where(np.isnan(M), med, M)
+        return M, flags
+    A, fa = prep(A)
+    Bm, fb_ = prep(Bm)
+    mu, sd = A.mean(0), A.std(0) + 1e-9
+    A, Bm = np.hstack([(A - mu) / sd, fa]), np.hstack([(Bm - mu) / sd, fb_])
+    ym, ys = float(ytr.mean()), float(ytr.std())
+    m = MLPRegressor(hidden_layer_sizes=(64, 32), alpha=1e-4, batch_size=4096, learning_rate_init=1e-3,
+                     max_iter=8, early_stopping=False, random_state=seed)
+    m.fit(A, (ytr - ym) / ys)
+    return m.predict(Bm) * ys + ym
+
+
 def params_for(X, spec, seed, clf=False):
     p = T._params_for(X)
     p.update(spec.get('params') or {})
@@ -162,7 +274,7 @@ def run(arms, pairs, seed):
         print(f'\n=== pair {Y}->{Y1} (train {train_years}) ===', flush=True)
         slopes = G.fit_vaa_slopes([frames[y] for y in train_years])
         P = {y: attach_sidecar(G.prepare(frames[y], slopes, 'true'), y) for y in train_years + [Y, Y1]}
-        PH = None
+        PH = PA = None
         gc.collect()
         for name in todo:
             spec = ARMS[name]
@@ -172,6 +284,10 @@ def run(arms, pairs, seed):
                 if PH is None:
                     PH = {y: fbhand(P[y]) for y in P}
                 Q = PH
+            if spec.get('arsenal'):
+                if PA is None:
+                    PA = {y: arsenal(P[y]) for y in P}
+                Q = PA
             feats = G.variant_feats(spec)
             Xtr = pd.concat([G.design(Q[y], spec, feats) for y in train_years], ignore_index=True)
             col = {'cneutral': 't_cn', 'evcount': 't_ev'}.get(spec.get('label'), 'target_xrv')
@@ -208,6 +324,11 @@ def run(arms, pairs, seed):
             elif spec.get('rows'):
                 keep = np.random.default_rng(1000 + seed).random(len(Xtr)) < float(spec['rows'])
                 pred = fit_reg(Xtr[keep], ytr[keep], XY, spec, seed)
+            elif spec.get('model'):
+                keep = np.isfinite(ytr)
+                pred = fit_other(Xtr[keep], ytr[keep], XY, spec, seed)
+                if spec.get('ens'):
+                    pred = 0.5 * (pred + fit_reg(Xtr, ytr, XY, spec, seed))
             else:
                 pred = fit_reg(Xtr, ytr, XY, spec, seed, w)
             agg = G.aggregates(dY.assign(stuff=-pred), Q[Y1])
@@ -228,7 +349,7 @@ def run(arms, pairs, seed):
                   f'rv {met["nxt_rv_r"]:.4f} rel {met["rel"]:.4f} [{time.time() - t0:.0f}s]', flush=True)
             del Xtr, XY, agg, ytr, pred
             gc.collect()
-        del P, PH
+        del P, PH, PA
         gc.collect()
 
 

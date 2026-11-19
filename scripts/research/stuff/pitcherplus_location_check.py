@@ -39,7 +39,8 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts', 'archive'))
 
 DATA = os.path.join(ROOT, 'data')
 CSV = {'ship': os.path.join(DATA, '_pplus_locplus_ship_1118.csv'),
-       'location': os.path.join(DATA, '_pplus_locplus_location_1118.csv')}
+       'location': os.path.join(DATA, '_pplus_locplus_location_1118.csv'),
+       'shape': os.path.join(DATA, '_pplus_locplus_shape_1119.csv')}
 STUFF_V18 = os.path.join(DATA, '_pplus_stuff_v18.csv')
 OUT = os.path.join(DATA, '_pplus_location_check.json')
 K_GRID = [30, 60, 100, 150, 215, 300, 450, 700, 1000, 2000]
@@ -88,7 +89,67 @@ def build(branch_path):
               f'{np.corrcoef(m.locRaw, m.locRaw_old)[0, 1]:.4f}, max |diff| {(m.locRaw - m.locRaw_old).abs().max():.6f}')
 
 
-def check():
+def build_shape(branch_path):
+    """Branch locplus-shape (2026-11-19): the shape-class grade needs the movement fields,
+    so the season dicts are rebuilt here with IndVertBrk and HorzBrk (sheet convention:
+    -pfx_x). Two series from the BRANCH module on the same pitches: 'location' (its bundle
+    without the class part = the released grade; checked against the 2026-11-18 series) and
+    'shape'. Only the shape CSV is written."""
+    import pitcherplus_locplus_hist as H
+    import leaderboard_metric_battery as bat
+    sys.path.insert(0, os.path.join(ROOT, 'scripts', 'research', 'locplus'))
+    import locplus_shape_loader as SL
+    BR = SL.branch(branch_path)
+    rows, ref = [], []
+    for year in H.SEASONS:
+        df = bat.load_season(year).reset_index(drop=True)
+        df = bat.add_half(df, 'pitcher').reset_index(drop=True)
+        ev = df['events'].fillna('')
+        desc = df['description'].fillna('').map(lambda d: H.DESC_MAP.get(d, d))
+        recs = pd.DataFrame({
+            'pid': df['pitcher'], 'half': df['half'], 'Description': desc,
+            'Count': df['balls'].fillna(-1).astype(int).astype(str) + '-' + df['strikes'].fillna(-1).astype(int).astype(str),
+            'PlateX': df['plate_x'], 'PlateZ': df['plate_z'], 'SzTop': df['sz_top'], 'SzBot': df['sz_bot'],
+            'Bats': df['stand'], 'Throws': df['p_throws'], 'Pitch Type': df['pitch_type'],
+            'BBType': np.where(ev.isin(H.SH_EV), 'bunt', df['bb_type'].fillna('')),
+            'Event': np.where(ev == 'intent_walk', 'Intent Walk', ''), 'RunExp': df['rv'],
+            'xwOBA': df['estimated_woba_using_speedangle'],
+            'IndVertBrk': df['pfx_z'] * 12.0, 'HorzBrk': -df['pfx_x'] * 12.0})
+        recs['_source'] = 'MLB'
+        pitches = recs.to_dict('records')
+        del df, recs
+        lg, scale = H.GUTS[year]
+        scorable = [p for p in pitches if BR._is_scorable(p)]
+        del pitches
+        S = BR.build_surfaces(scorable, lg, scale)
+        S0 = {k: v for k, v in S.items() if k != 'SHAPE'}
+        for store, bundle in ((ref, S0), (rows, S)):
+            acc = {}
+            for p in scorable:
+                v = BR.location_value(p, bundle)
+                if v is None:
+                    continue
+                for h in ('full', p['half']):
+                    a = acc.setdefault((p['pid'], h), [0.0, 0])
+                    a[0] += v
+                    a[1] += 1
+            store += [{'pid': pid, 'season': year, 'half': h, 'locRaw': -s / n, 'locN': n} for (pid, h), (s, n) in acc.items()]
+        print(f'{year}: {len(scorable)} scorable pitches', flush=True)
+        del scorable, S, S0
+        gc.collect()
+    d, r = pd.DataFrame(rows), pd.DataFrame(ref)
+    d.to_csv(CSV['shape'] + '.tmp', index=False)
+    os.replace(CSV['shape'] + '.tmp', CSV['shape'])
+    old = pd.read_csv(CSV['location'])
+    for tag, t in (('branch released grade', r), ('shape-class grade', d)):
+        m = t.merge(old, on=['pid', 'season', 'half'], suffixes=('', '_old'))
+        m = m[(m['half'] == 'full') & (m['locN'] >= 300)]
+        print(f'{tag} against the 2026-11-18 location series, full rows 300+: r {np.corrcoef(m.locRaw, m.locRaw_old)[0, 1]:.4f}, '
+              f'max |diff| {(m.locRaw - m.locRaw_old).abs().max():.6f}')
+    print(f'wrote {CSV["shape"]} ({len(d)} rows)')
+
+
+def check(tags=('ship', 'location')):
     import pitcherplus_v14_audit as A
     import pitcherplus_k_sweep as KS
     import pitcherplus_v18_hand_check as HC
@@ -96,7 +157,7 @@ def check():
     hm, rng = HC.hands(), np.random.default_rng(0)
     ship_k = {f: k for f, _w, k in A.SHIPPED}
     res = {}
-    for tag in ('ship', 'location'):
+    for tag in tags:
         ps.LOC_CSV = CSV[tag]
         t = A.load_tables(STUFF_V18)
         r_s, r_y = A.frozen_eval(t)
@@ -138,5 +199,10 @@ def check():
 if __name__ == '__main__':
     if sys.argv[1] == 'build':
         build(sys.argv[2])
+    elif sys.argv[1] == 'build_shape':
+        build_shape(sys.argv[2])
+    elif sys.argv[1] == 'check_shape':
+        OUT = OUT.replace('.json', '_shape.json')
+        check(('location', 'shape'))
     else:
         check()
