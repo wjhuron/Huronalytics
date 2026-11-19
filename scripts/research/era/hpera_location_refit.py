@@ -41,6 +41,10 @@ NEED = ('stuff_hand', 'loc_ship', 'loc_new')
 if any('loc_shape_full' in r for r in NEW.get('2023', {}).values()):
     KEYS['h'] = ('loc_shape', 'n_locshape')
     NEED = NEED + ('loc_shape',)
+# branch locplus-farmiss (2026-11-19): a fourth loc input
+if any('loc_far_full' in r for r in NEW.get('2023', {}).values()):
+    KEYS['f'] = ('loc_far', 'n_locfar')
+    NEED = NEED + ('loc_far',)
 
 
 def patch(loc_key, n_key):
@@ -128,14 +132,15 @@ def main():
                                  'wins': int((d < 0).sum()), 'n': len(labels), 'z': float(z)}
             print(f'   {a:<9s}{m.mean():>8.4f}{r:>7.3f}{100 * d.mean() / b.mean():>+9.2f}%{int((d < 0).sum()):>4d}/{len(labels)}{z:>+6.1f}   '
                   + ' '.join(f'{x:.3f}' for x in m))
+    new_k, old_k = ('f', 'h') if 'f' in KEYS else ('h', 'n')
     if 'h' in KEYS:
-        print('\nshape-class input against the released input, both unshrunk (h@0 minus n@0):')
+        print(f'\nnewest loc input against the one before it, both unshrunk ({new_k}@0 minus {old_k}@0):')
         for obj in ('next', 'ros'):
             labels = [rp['label'] for rp in reps if rp['obj'] == obj]
-            d = np.array([res['h@0'][l][0] - res['n@0'][l][0] for l in labels])
-            b0 = np.mean([res['n@0'][l][0] for l in labels])
+            d = np.array([res[f'{new_k}@0'][l][0] - res[f'{old_k}@0'][l][0] for l in labels])
+            b0 = np.mean([res[f'{old_k}@0'][l][0] for l in labels])
             z = d.mean() / (d.std(ddof=1) / np.sqrt(len(d))) if d.std() > 0 else 0.0
-            out[f'{obj}|h_minus_n'] = {'pct': float(100 * d.mean() / b0), 'wins': int((d < 0).sum()), 'n': len(d), 'z': float(z)}
+            out[f'{obj}|{new_k}_minus_{old_k}'] = {'pct': float(100 * d.mean() / b0), 'wins': int((d < 0).sum()), 'n': len(d), 'z': float(z)}
             print(f'   {obj.upper()}: {100 * d.mean() / b0:+.3f}%  wins {int((d < 0).sum())}/{len(d)}  z {z:+.1f}')
     final = {a: dict(zip(['intercept'] + cands[a], [float(x) for x in HR.fit(reps, a)])) for a in cands}
     print('\nweights fit on every replicate (ERA per z unit):')

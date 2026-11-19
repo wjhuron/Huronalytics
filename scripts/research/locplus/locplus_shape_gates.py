@@ -70,12 +70,29 @@ def main():
     res = {}
     for y in years:
         base = [p for p in SL.load_season(y) if BR.is_eligible_baseline(p)]
-        S = BR.build_surfaces(base, FR.LG, FR.SCALE)
-        S0 = {k: v for k, v in S.items() if k != 'SHAPE'}
+        if hasattr(BR, 'FAR_MISS_X_IN'):
+            # far-miss branch (2026-11-19): the control is the same module with the rule off
+            # (= the live shape-class grade); the cell means differ, so it is a second build
+            cut = (BR.FAR_MISS_X_IN, BR.FAR_MISS_Z_LO, BR.FAR_MISS_Z_HI)
+            BR.FAR_MISS_X_IN = BR.FAR_MISS_Z_LO = BR.FAR_MISS_Z_HI = float('inf')
+            S0 = BR.build_surfaces(base, FR.LG, FR.SCALE)
+            BR.FAR_MISS_X_IN, BR.FAR_MISS_Z_LO, BR.FAR_MISS_Z_HI = cut
+            S = BR.build_surfaces(base, FR.LG, FR.SCALE)
+            pairs_ = ((S0, cut), (S, cut))
+        else:
+            S = BR.build_surfaces(base, FR.LG, FR.SCALE)
+            S0 = {k: v for k, v in S.items() if k != 'SHAPE'}
+            pairs_ = None
         cells = {'rel': defaultdict(list), 'shape': defaultdict(list)}
         rows = []
         for p in base:
-            a, b = BR.location_value(p, S0), BR.location_value(p, S)
+            if pairs_:
+                BR.FAR_MISS_X_IN = BR.FAR_MISS_Z_LO = BR.FAR_MISS_Z_HI = float('inf')
+                a = BR.location_value(p, S0)
+                BR.FAR_MISS_X_IN, BR.FAR_MISS_Z_LO, BR.FAR_MISS_Z_HI = pairs_[1][1]
+                b = BR.location_value(p, S)
+            else:
+                a, b = BR.location_value(p, S0), BR.location_value(p, S)
             if a is None or b is None:
                 continue
             pt = p.get('_pt0') or p.get('Pitch Type')

@@ -88,6 +88,15 @@ def load_branch(path, name='pipeline.locplus_branch'):
     return m
 
 
+def _sp(LOC, p, S):
+    """The expected value as compute_xrvoe reads it: without the count anchor since 2026-11-18
+    (a module that predates the option keeps its plain call)."""
+    try:
+        return LOC.score_pitch(p, S, count_anchor=False)
+    except TypeError:
+        return LOC.score_pitch(p, S)
+
+
 def exprv_for(LOC, base, lg, scale, fold=None):
     """PitchID -> expected value. fold: PitchID -> 0/1, then each pitch is scored on
     surfaces built from the OTHER fold (cross-fit)."""
@@ -95,7 +104,7 @@ def exprv_for(LOC, base, lg, scale, fold=None):
     if fold is None:
         S = LOC.build_surfaces(base, lg, scale)
         for p in base:
-            v = LOC.score_pitch(p, S)
+            v = _sp(LOC, p, S)
             if v is not None and p.get('PitchID'):
                 out[p['PitchID']] = v
         return out
@@ -104,7 +113,7 @@ def exprv_for(LOC, base, lg, scale, fold=None):
         for p in base:
             if fold.get(p.get('PitchID')) != k:
                 continue
-            v = LOC.score_pitch(p, S)
+            v = _sp(LOC, p, S)
             if v is not None:
                 out[p['PitchID']] = v
         del S
@@ -152,15 +161,13 @@ def main():
     BR = load_branch(branch_path)
     # third arm: the branch kernel with the ball in play left count-neutral, the
     # currency of the xRVOE target (train_stuff does not count-anchor a BIP target)
-    BRN = load_branch(branch_path, 'pipeline.locplus_branch_noanchor')
-    BRN.BIP_COUNT_ANCHOR = False
     print(f'\nship   kernel {SHIP.PHYS_X_IN:g} in / {SHIP.PHYS_Z_FRAC:g}, BIP count anchor {getattr(SHIP, "BIP_COUNT_ANCHOR", None)}')
     print(f'branch kernel {BR.PHYS_X_IN:g} in / {BR.PHYS_Z_FRAC:g}, BIP count anchor {getattr(BR, "BIP_COUNT_ANCHOR", None)}')
     base = [p for p in pitches if SHIP.is_eligible_baseline(p)]
     meta = {p['PitchID']: (SHIP.get_count(p), p.get('Throws'), p.get('Bats')) for p in base if p.get('PitchID')}
     fold = {pid: (int(str(pid).split('_')[0]) % 2 if str(pid).split('_')[0].isdigit() else 0) for pid in meta}
     res, out = {}, {}
-    for name, LOC in (('ship', SHIP), ('branch', BR), ('kernel_only', BRN)):
+    for name, LOC in (('ship', SHIP), ('branch', BR)):
         d, betas = residuals(T, df, exprv_for(LOC, base, lg, scale), SHIP.group_of_code)
         dx, _ = residuals(T, df, exprv_for(LOC, base, lg, scale, fold), SHIP.group_of_code)
         d['count'] = d['pid'].map(lambda k: '%d-%d' % meta[k][0])
@@ -213,7 +220,7 @@ def main():
                          'max_abs': float(np.abs(a[:, 0] - a[:, 1]).max())}
 
     for tag, keys, mn in (('pitch type', ['pitcher', 'team', 'pitch_type'], T.XRVOE_MIN_PT), ('pitcher', ['pitcher', 'team'], T.XRVOE_MIN_OV)):
-        for other in ('branch', 'kernel_only'):
+        for other in ('branch',):
             a, b = units(T, res['ship'], keys, mn), units(T, res[other], keys, mn)
             m = a.join(b, lsuffix='_s', rsuffix='_b', how='inner')
             dv = m['v_b'] - m['v_s']
