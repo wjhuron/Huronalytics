@@ -669,6 +669,11 @@ def _compute_pitch_rv(pitches_list):
 # call site in main), mean gap 0.10 pts to the next-day rerun, p95 0.30,
 # against 0.53 / 1.54 with the slot at league average (2026-09-21).
 PP_OUTING_W = {'stuff': 0.205, 'loc': 0.169, 'csw': 0.252, 'xrv100': 0.374}
+# Loc k re-swept 2026-11-18 for the Loc+ release (location value; scripts/research/stuff/
+# pitcherplus_outing_location.py `lock`, 2021-2025, frozen weights): the composite's r
+# to the other half peaks at k 150-185 (.0781; 236 reads .0779, 100 .0773, 450 .0770),
+# an interior optimum bracketed on 30-5,000, with every season's peak at 150-236. The
+# reliability crossing moved 185 -> 236, but the composite's curve decides, so 185 stays.
 PP_OUTING_K = {'stuff': 42.0, 'loc': 185.0, 'csw': 398.0, 'xrv100': 1581.0}
 # Two floors, deliberately different (2026-08-28, per Wally):
 #   POOL_MIN 20 — the standardization pool keeps the research analysis floor,
