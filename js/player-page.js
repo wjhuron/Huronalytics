@@ -1515,6 +1515,18 @@ var PlayerPage = {
         }
       }
     }
+    // Data built before the physics model shipped carries no xivbp. Show the
+    // hitter rings then, and say so, instead of an overlay with no rings.
+    if (xmovePhysics) {
+      var anyPhys = false;
+      for (var xi = 0; xi < filteredPitches.length; xi++) {
+        if (filteredPitches[xi].xivbp != null) { anyPhys = true; break; }
+      }
+      if (!anyPhys) {
+        xmovePhysics = false;
+        console.info('Movement chart: no physics expected movement in this data, the rings show the hitter view');
+      }
+    }
     var groups = {};
     var expSums = {};
     for (var fi = 0; fi < filteredPitches.length; fi++) {
