@@ -1568,6 +1568,7 @@
 "Miller, Bryce": 74.0,
 "Miller, Erik": 77.0,
 "Miller, Gage": 71.0,
+"Miller, Jake": 74.0,
 "Miller, Justin": 75.0,
 "Miller, Mason": 77.0,
 "Miller, Owen": 71.0,
@@ -7386,6 +7387,9 @@
 "Miller, Gage": [
 824028
 ],
+"Miller, Jake": [
+805725
+],
 "Miller, Justin": [
 502522
 ],
@@ -10718,5 +10722,5 @@
 ]
 },
 "league_mean": 73.74,
-"n": 2677
+"n": 2678
 }
