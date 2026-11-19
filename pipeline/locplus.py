@@ -421,7 +421,14 @@ N_PRIOR_PT_DEFAULT = 0
 # anyone had validated at the cell level.) To start coloring a new type, measure
 # it with scripts/research/locplus/locplus_stabilize_celllevel.py and add it to STABILIZE_N_PT.
 STABILIZE_N_UNVALIDATED = float('inf')
-STABILIZE_N_PT = {'FF': 52, 'SI': 59, 'FC': 55, 'SL': 49, 'CU': 62, 'CH': 62}
+# RE-MEASURED 2026-11-18 on the LOCATION VALUE at 2.0 in / 0.12 (scripts/research/locplus/
+# locplus_location_gates.py: the method of locplus_stabilize_celllevel.py, 10 seeds, on 2024,
+# 2025 and 2026; it reproduces the old gates on the old grade, 51 54 55 47 61 68 on 2026). The
+# median over seasons: FF 196 (179 / 196 / 203), SI 190 (175 / 190 / 235), FC 202 (210 / 196 /
+# 202), SL 148 (148 / 157 / 136), CU 180 (180 / 136 / 201), CH 100 (98 / 100 / 104). Three to
+# four times the old gates: the count level made the old grade repeat itself quickly, and that
+# part was not location. The older notes below describe the old grade.
+STABILIZE_N_PT = {'FF': 196, 'SI': 190, 'FC': 202, 'SL': 148, 'CU': 180, 'CH': 100}
 # Re-measured AGAIN 2026-09-03 under the 6.0 in / 0.30 bandwidth adopted the
 # same day (same script, 10 seeds, Savant PlateZ, 160 dates): smoother
 # surfaces give less noisy per-pitch atoms, so every group stabilizes ~30%
@@ -439,7 +446,7 @@ STABILIZE_N_PT = {'FF': 52, 'SI': 59, 'FC': 55, 'SL': 49, 'CU': 62, 'CH': 62}
 # CH 79 -> 76. Five moved inside their seed spread; FC did not.
 # Leaderboard pitch-CATEGORY rows pool several types (js/aggregator.js
 # PITCH_CATEGORIES), so they take the stiffest member gate.
-STABILIZE_N_CATEGORY = {'Hard': 59, 'Breaking': 62, 'Offspeed': 62}
+STABILIZE_N_CATEGORY = {'Hard': 196, 'Breaking': 202, 'Offspeed': 100}
 
 
 def stabilize_n(pitch_type):

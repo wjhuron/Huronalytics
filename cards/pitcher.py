@@ -594,12 +594,12 @@ SOCIAL_BUBBLE_SIDE_GAP_PT = 6.0   # label offset past a usage disc's edge (R/L s
 # Stuff+ is shape-family: measured per-type k = 13 (seeds 12.9-13.8), so 15
 # colors only cells that are >=half signal without hiding real information.
 STUFF_COLOR_MIN_PITCHES = 15
-# Loc+ rides the site's measured per-group gates (re-measured 2026-09-03 under
-# the 6.0 in / 0.30 bandwidth, Savant PlateZ) — keeps card/Arsenal-leaderboard
-# parity.
+# Loc+ rides the site's measured per-group gates (re-measured 2026-11-18 on the
+# location value at 2.0 in / 0.12, median of 2024-2026) — keeps
+# card/Arsenal-leaderboard parity.
 # Mirrors js/aggregator.js QUAL.MIN_PITCH_LOCPLUS + LOCPLUS_GROUP and
 # pipeline/locplus.py STABILIZE_N_PT; the three move together.
-LOCPLUS_COLOR_MIN = {'FF': 52, 'SI': 59, 'FC': 55, 'SL': 49, 'CU': 62, 'CH': 62}
+LOCPLUS_COLOR_MIN = {'FF': 196, 'SI': 190, 'FC': 202, 'SL': 148, 'CU': 180, 'CH': 100}
 LOCPLUS_COLOR_GROUP = {
     'FF': 'FF', 'FA': 'FF', 'SI': 'SI', 'FC': 'FC', 'CF': 'FC',
     'SL': 'SL', 'ST': 'SL', 'SW': 'SL', 'SV': 'SL',
@@ -1995,7 +1995,7 @@ def _render_single_game_panel(fig, pitches, config=None):
 # (pitcher hand, batter hand, pitch type) -> sorted MLB cell values, read once per run.
 # Season-card color gates (2026-11-03, per Wally), set near the k where half the visible
 # spread is signal (scripts/research/cards/social_stabilize.py): Strike% k 106 pitches,
-# Whiff% k 40 swings, Loc+ k 44 pitches. Stuff+ (k 1-2) has no gate. The .50 point is a
+# Whiff% k 40 swings, Loc+ k 44 pitches (134 since the 2026-11-18 grade change, see SOCIAL_LOC_MIN_PITCHES). Stuff+ (k 1-2) has no gate. The .50 point is a
 # convention, not an optimum. xwOBAcon (k about 336 BIP) never reaches it: its tint gates at
 # the card's 25 BIP convention so the column matches the others (2026-11-05, per Wally), about
 # 7% signal at the gate, so read that color as description of the sample, not as skill.
@@ -2004,7 +2004,10 @@ SOCIAL_WHIFF_MIN_SWINGS = 40
 # Where the arm-angle ray stops, in inches of horizontal break on the arm side (a display
 # convention, per Wally 2026-11-06: the frame is 25, the ray read too long).
 _AA_RAY_HB = 20.0
-SOCIAL_LOC_MIN_PITCHES = 50
+# Loc+ on the social table's cell (pitcher x batter hand x type): k 134 pitches on the location
+# value (132 / 142 / 134 on 2024-2026, scripts/research/locplus/locplus_location_gates.py social;
+# the same run reads 43-44 on the old grade, whose gate was 50). 135 is that k at a round number.
+SOCIAL_LOC_MIN_PITCHES = 135
 _SOCIAL_TINT_POOLS = None
 
 
