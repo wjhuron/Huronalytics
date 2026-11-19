@@ -381,8 +381,9 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
     #  55:sumXIVB 56:nXIVB  57:sumXHB 58:nXHB
     #  (per-pitch expected movement, pipeline/xmove.py; the site divides
     #  sum/count and never scores the model itself)
-    #  59:sumXIVBp 60:nXIVBp  61:sumXHBp 62:nXHBp
-    #  (the same, for the per-pitch physics expectation)
+    #  (the per-pitch physics expectation has NO micro columns: the site shows
+    #  expected movement only on the player-page chart, which reads the pitch
+    #  details. Add sums here only with a consumer; this is per-visitor payload.)
     # ==========================================================
     METRIC_OFFSETS = [
         ('Velocity', 22), ('Spin Rate', 24), ('xIndVrtBrk', 26),
@@ -391,7 +392,7 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         ('PlateZ', 42), ('PlateX', 47),
     ]
 
-    pitch_micro = defaultdict(lambda: [0.0] * 63)
+    pitch_micro = defaultdict(lambda: [0.0] * 59)
 
     for p in all_pitches:
         pitcher = p.get('Pitcher')
@@ -485,9 +486,6 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         if p.get('_xivb') is not None:
             c[55] += p['_xivb']; c[56] += 1
             c[57] += p['_xhb']; c[58] += 1
-        if p.get('_xivbP') is not None:
-            c[59] += p['_xivbP']; c[60] += 1
-            c[61] += p['_xhbP']; c[62] += 1
 
     pitch_rows = []
     for (pi, ti, throws, pti, di, bh), c in pitch_micro.items():
@@ -511,8 +509,6 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
         # Expected-movement sums/counts
         row.append(round(c[55], 4)); row.append(int(c[56]))
         row.append(round(c[57], 4)); row.append(int(c[58]))
-        row.append(round(c[59], 4)); row.append(int(c[60]))
-        row.append(round(c[61], 4)); row.append(int(c[62]))
         pitch_rows.append(row)
 
     # ==========================================================
@@ -1293,7 +1289,6 @@ def generate_micro_data(all_pitches, mlb_id_cache=None, ep_pitchers=None,
             'sumTiltSin', 'sumTiltCos', 'nTilt',
             'sumStuff', 'nStuff', 'sumLoc', 'nLoc',
             'sumXIVB', 'nXIVB', 'sumXHB', 'nXHB',
-            'sumXIVBp', 'nXIVBp', 'sumXHBp', 'nXHBp',
         ],
         'pitchMicro': pitch_rows,
         'hitterCols': [
@@ -1923,7 +1918,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
 
     # Per-pitch physics expectation (no pitch type; pipeline/xmove.py). Scored
     # beside the hitter basis: '_xivbP' / '_xhbP' on the pitch dict, the 'p'
-    # keys on rows, details and micro rows. Neither basis replaces the other.
+    # keys on rows and pitch details. Neither basis replaces the other.
     xmove_physics = fit_xmove_physics(all_pitches)
     _n_xphys, _n_xphys_fb = score_xmove_physics(xmove_physics, all_pitches)
     print(f"Per-pitch physics expected movement: "
