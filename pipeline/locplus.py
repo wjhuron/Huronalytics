@@ -612,9 +612,89 @@ def _sig(x):
 # ═════════════════════════════════════════════════════════════════════════
 #  BUILD LEAGUE SURFACES
 # ═════════════════════════════════════════════════════════════════════════
-def build_surfaces(baseline, lg_woba, woba_scale):
+# ── SHAPE CLASSES (RESEARCH BRANCH locplus-shape, 2026-11-19; not shipped) ──
+# The value of a spot depends on the pitch's movement, and the group surfaces
+# cannot see it. For the groups in SHAPE_W the location value is a BLEND of the
+# group surface and a surface built from pitches of the same movement CLASS:
+#     loc = (1 - w) * (group value - group cell mean) + w * (class value - class cell mean)
+# Each part has its own situation mean removed, so the class's level (stuff, not
+# location) never enters the grade. score_pitch, the expected value xRVOE reads,
+# is NOT changed.
+#   class   thirds (SHAPE_K) of the pitch's OWN induced vertical break, or arm-side
+#           horizontal break for the sinker, cut at the season's pitch-weighted
+#           quantiles inside the group. A class from the pitcher's season mean
+#           does not work (measured, 0/10 pairs at every strength above .25).
+#   w       pitch-level, surfaces of one full season scoring an adjacent season,
+#           10 ordered pairs 2021-2026 (locplus_shape_split_fit.py), squared error
+#           x 1e-4 against the luck-neutral value at w .25 / .5 / .75 / 1:
+#             FF -.131 -.187 -.167 -.073   interior optimum near .5, 10/10 pairs
+#             CH -.179 -.234 -.165 +.029   interior optimum near .5, 10/10
+#             SI -.052 -.034 +.055 +.215   best at .25 (10/10), bracketed by 0 and .5
+#             FC -.036 +.023 +.176 +.425   best at .25 (8/10), bracketed by 0 and .5
+#             SL -.030 +.011 ...           no class surface; CU loses at every w (0/10)
+#           The grid step is .25: "best on the grid", not a fitted optimum.
+#   pitcher level (locplus_shape_pitcher.py, the released grade's decider: next
+#           season, Stuff+ held equal, within hand and role, 5 pairs): +.0043 on
+#           .156 (se .0011, 5/5). Grades correlate .999 with the group-only grade;
+#           a pitcher with 1,000 pitches moves 0.4 points on average, 2.9 at most.
+SHAPE_ON = True
+SHAPE_K = 3
+SHAPE_VAR = {'FF': 'ivb', 'CH': 'ivb', 'SI': 'hb', 'FC': 'ivb'}
+SHAPE_W = {'FF': 0.5, 'CH': 0.5, 'SI': 0.25, 'FC': 0.25}
+
+
+def shape_value(p):
+    """The class variable of a pitch: IVB in inches, or arm-side HB for the sinker
+    group. None when the group has no class surface or the movement is missing."""
+    var = SHAPE_VAR.get(group_of(p))
+    if var == 'ivb':
+        return safe_float(p.get('IndVertBrk'))
+    if var == 'hb':
+        h = safe_float(p.get('HorzBrk'))
+        if h is None or p.get('Throws') not in HANDS:
+            return None
+        return h if p.get('Throws') == 'R' else -h
+    return None
+
+
+def shape_cuts(baseline):
+    """{group: [cut points]} = the SHAPE_K-quantiles of shape_value over the baseline
+    pitches of each class group. A group with too few valued pitches gets no cuts."""
+    vals = defaultdict(list)
+    for p in baseline:
+        v = shape_value(p)
+        if v is not None:
+            vals[group_of(p)].append(v)
+    cuts = {}
+    for g, xs in vals.items():
+        if len(xs) < 1000 * SHAPE_K:
+            continue
+        xs.sort()
+        cuts[g] = [xs[min(len(xs) - 1, int(len(xs) * i / SHAPE_K))] for i in range(1, SHAPE_K)]
+    return cuts
+
+
+def shape_group(p, cuts):
+    """Surface group for the CLASS surfaces: 'FF#2' for a classed pitch, the plain
+    group for every other pitch (they still feed the count values and the
+    called-strike surface of that bundle, and are never scored from it)."""
+    g = group_of(p)
+    c = cuts.get(g)
+    if c is None:
+        return g
+    v = shape_value(p)
+    if v is None:
+        return g
+    return f'{g}#{sum(1 for x in c if v >= x)}'
+
+
+def build_surfaces(baseline, lg_woba, woba_scale, gfn=None):
     """Build all league surfaces + count value scalars from MLB baseline pitches.
-    Returns a dict bundle consumed by score_pitch()."""
+    Returns a dict bundle consumed by score_pitch(). gfn maps a pitch to its
+    surface group; the default is group_of, and that top-level call also builds
+    the shape-class bundle (S['SHAPE']) when SHAPE_ON."""
+    top = gfn is None
+    gfn = gfn or group_of
     has_guts = (lg_woba is not None and woba_scale not in (None, 0))
     if not has_guts:
         # Announce the degrade (repo rule): without Guts every ball in play is
@@ -663,7 +743,7 @@ def build_surfaces(baseline, lg_woba, woba_scale):
 
     for p in baseline:
         bh = p['Bats']
-        key = (group_of(p), bh, p['Throws'])
+        key = (gfn(p), bh, p['Throws'])
         c = get_count(p)
         i = _xbin(safe_float(p.get('PlateX'))); j = _zbin(_znorm(p))
         d = p.get('Description')
@@ -802,23 +882,34 @@ def build_surfaces(baseline, lg_woba, woba_scale):
 
     S = {'RV': RV, 'PCS': PCS, 'WH': WH, 'FL': FL, 'XW': XW, 'SW': SW,
          'BIPOFF': BIPOFF, 'XWOFF': XWOFF}
-    S['CELL'] = _cell_means(baseline, S)
+    S['CELL'] = _cell_means(baseline, S, gfn)
+    if top and SHAPE_ON:
+        cuts = shape_cuts(baseline)
+        if cuts:
+            S['SHAPE'] = {'cuts': cuts,
+                          'S': build_surfaces(baseline, lg_woba, woba_scale,
+                                              gfn=lambda p: shape_group(p, cuts))}
+            print('  Loc+ shape classes: ' + '  '.join(
+                f"{g} {' / '.join(f'{x:.1f}' for x in c)}" for g, c in sorted(cuts.items())))
+        else:
+            print('  Loc+ shape classes: NO group has enough movement data; '
+                  'the grade is the group surface only')
     return S
 
 
-def cell_key(p):
+def cell_key(p, gfn=None):
     """The situation of a pitch: (group, batter hand, pitcher hand, count)."""
-    return (group_of(p), p.get('Bats'), p.get('Throws'), get_count(p))
+    return ((gfn or group_of)(p), p.get('Bats'), p.get('Throws'), get_count(p))
 
 
-def _cell_means(baseline, S):
+def _cell_means(baseline, S, gfn=None):
     """League mean expected value per situation, over the baseline pitches that
     built the surfaces. location_value() subtracts it."""
     acc = defaultdict(lambda: [0.0, 0])
     for p in baseline:
-        v = score_pitch(p, S)
+        v = score_pitch(p, S, gfn=gfn)
         if v is not None:
-            a = acc[cell_key(p)]
+            a = acc[cell_key(p, gfn)]
             a[0] += v
             a[1] += 1
     return {k: s / n for k, (s, n) in acc.items()}
@@ -827,12 +918,12 @@ def _cell_means(baseline, S):
 # ═════════════════════════════════════════════════════════════════════════
 #  SCORE
 # ═════════════════════════════════════════════════════════════════════════
-def score_pitch(p, S, count_anchor=True):
+def score_pitch(p, S, count_anchor=True, gfn=None):
     """Expected hitter-perspective RV for one pitch (lower = better for the
     pitcher). None if context missing or the (group,hand) surface is absent.
     count_anchor=False leaves the ball-in-play branch count-neutral (no
     BIPOFF term); only xRVOE asks for that, to match its target's currency."""
-    key = (group_of(p), p.get('Bats'), p.get('Throws'))
+    key = ((gfn or group_of)(p), p.get('Bats'), p.get('Throws'))   # gfn: the bundle's surface-group function
     if key not in S['WH']:
         return None
     c = get_count(p)
@@ -864,7 +955,19 @@ def location_value(p, S):
     if v is None:
         return None
     m = S['CELL'].get(cell_key(p))
-    return None if m is None else v - m
+    if m is None:
+        return None
+    loc = v - m
+    sh = S.get('SHAPE')
+    w = SHAPE_W.get(group_of(p)) if sh else None
+    if w:
+        gfn = lambda q: shape_group(q, sh['cuts'])
+        if gfn(p) != group_of(p):                 # the pitch has a class
+            vs = score_pitch(p, sh['S'], gfn=gfn)
+            ms = sh['S']['CELL'].get(cell_key(p, gfn))
+            if vs is not None and ms is not None:
+                loc = (1.0 - w) * loc + w * (vs - ms)
+    return loc
 
 
 def _aggregate(pitches_by_key, S, want_zone=False, want_heatmap=False):
@@ -1016,6 +1119,8 @@ def serialize_surfaces(S):
                    'pcsByHand': PCS_BY_HAND,
                    'bipCountAnchor': BIP_COUNT_ANCHOR,
                    'grade': 'location value: expected value minus the (group, bats, throws, count) mean',
+                   'shapeClasses': ({'k': SHAPE_K, 'var': SHAPE_VAR, 'w': SHAPE_W,
+                                     'cuts': (S.get('SHAPE') or {}).get('cuts')} if SHAPE_ON else None),
                    'swingPriorCountLevel': SWING_PRIOR_COUNT_LEVEL,
                    'csCountTransform': CS_COUNT_TRANSFORM,
                    'whCountLevel': WH_COUNT_LEVEL,
