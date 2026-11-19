@@ -881,6 +881,21 @@ def load_xmove_models():
         print(f"  WARNING: Could not load expected-movement models from {METADATA_PATH}: {e}")
         return {}
 
+XMOVE_PHYSICS_PATH = os.path.join(os.path.dirname(METADATA_PATH), 'xmove_physics_rs.json')
+
+
+def load_xmove_physics():
+    """Per-pitch physics expected-movement trees (pipeline/xmove.py), written by
+    the pipeline. {} when the file is absent or unreadable; the caller then
+    falls back to the hitter basis and says so."""
+    try:
+        with open(XMOVE_PHYSICS_PATH) as f:
+            return json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"  WARNING: Could not load the physics expected-movement model from {XMOVE_PHYSICS_PATH}: {e}")
+        return {}
+
+
 def fmt_fi(v):
     if v is None: return '—'
     neg = v < 0; av = abs(v); ft = int(av); inc = round((av-ft)*12)
@@ -2656,17 +2671,32 @@ def render_social_card(config, pitches, output_file):
                     _o = mv.text(_x, _cy, _t, ha='right', color=_col, path_effects=_halo, **_kw)
                     _x = _inv.transform(_o.get_window_extent(_rend))[0][0]
 
-    # Expected movement (2026-11-03, per Wally): a small dotted ring at what a
-    # pitcher who looks like this usually throws (pipeline/xmove.py, the hitter
-    # basis), joined to the actual disc by a dotted line. Mean of the per-pitch
-    # expectations, the site's rule. A type with no model or input gets no ring.
-    from pipeline.xmove import score_all
+    # Expected movement (2026-11-03, per Wally): a small dotted ring at the
+    # model expectation (pipeline/xmove.py), joined to the actual disc by a
+    # dotted line. Mean of the per-pitch expectations, the site's rule. A type
+    # with no model or input gets no ring. Two bases since 2026-11-19, chosen
+    # by xmove_basis: 'physics' (default: the pitch itself, no pitch type read)
+    # or 'hitter' (slot, extension, velocity per pitch type).
+    from pipeline.xmove import score_all, score_physics_all
     _x_acc = {}
-    _x_rows = [dict(p) for p in pitches]   # score_all writes onto each dict
-    score_all(config.get('social_xmove') or {}, _x_rows)
+    _x_rows = [dict(p) for p in pitches]   # the scorers write onto each dict
+    for p in _x_rows:                      # never read a score a cache carried in
+        for _k in ('_xivb', '_xhb', '_xivbP', '_xhbP'):
+            p.pop(_k, None)
+    _x_basis = config.get('xmove_basis') or 'physics'
+    if _x_basis == 'physics' and not (config.get('social_xmove_physics') or {}).get('variants'):
+        print("  Expected movement: no physics model on disk, the rings show the HITTER basis")
+        _x_basis = 'hitter'
+    if _x_basis == 'physics':
+        score_physics_all(config['social_xmove_physics'], _x_rows)
+        _xk_i, _xk_h = '_xivbP', '_xhbP'
+    else:
+        score_all(config.get('social_xmove') or {}, _x_rows)
+        _xk_i, _xk_h = '_xivb', '_xhb'
+    print(f"  Expected movement basis: {_x_basis}")
     for p in _x_rows:
-        if p.get('_xivb') is not None:
-            _x_acc.setdefault(p.get('Pitch Type'), []).append((p['_xhb'], p['_xivb']))
+        if p.get(_xk_i) is not None:
+            _x_acc.setdefault(p.get('Pitch Type'), []).append((p[_xk_h], p[_xk_i]))
     _expected = {k: (sum(q[0] for q in v) / len(v), sum(q[1] for q in v) / len(v))
                  for k, v in _x_acc.items()}
     _RING_S = 62.0     # pt^2 (about 8 pt across), a display convention
@@ -5933,6 +5963,7 @@ def main(new_level=None):
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
     card_height     = "fit"              # Season social card height: "fit" (follows the rows) or "fixed" (1350 px)
     stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
+    xmove_basis     = "physics"          # Expected-movement rings on the social card: "physics" (the pitch itself, no pitch type read) or "hitter" (slot, extension, velocity per pitch type)
     social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xwobacon"; force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
@@ -5960,6 +5991,8 @@ def main(new_level=None):
                         help='Season-card RV columns: per-100 rates (default), cumulative '
                              'totals (PitchRV/xPitchRV), or both pairs. Single-game cards '
                              'always show cumulative xPitchRV.')
+    parser.add_argument('--xmove-basis', default=None, choices=['physics', 'hitter'],
+                        help='Expected-movement rings on the social card: physics (default) or hitter')
     parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both', 'xwobacon'],
                         help='Social-table run-value slot(s); default: both (RV, xRV) on '
                              'a daily card, xwobacon (xwOBAcon) on a season card')
@@ -6030,6 +6063,7 @@ def main(new_level=None):
     bats_filter = bats
     if args.rv_mode is not None: rv_mode = args.rv_mode
     if args.social_rv is not None: social_rv = args.social_rv
+    if args.xmove_basis is not None: xmove_basis = args.xmove_basis
     if args.stuff_place: stuff_place = args.stuff_place
     if args.card_height: card_height = args.card_height
     if args.pitch_qual is not None: pitch_qual = args.pitch_qual
@@ -6547,6 +6581,7 @@ def main(new_level=None):
     # Expected-movement models: presence is the season-layout switch.
     xmove_models = load_xmove_models()
     print(f"  Loaded expected-movement models for {len(xmove_models)} pitch-type+hand groups")
+    xmove_physics = load_xmove_physics() if xmove_basis == 'physics' else {}
 
     print("\nStep 4: Generating cards...")
     generated = []
@@ -6942,6 +6977,8 @@ def main(new_level=None):
             'rv_mode': rv_mode,
             'social_rv': social_rv,
             'social_xmove': xmove_models,
+            'social_xmove_physics': xmove_physics,
+            'xmove_basis': xmove_basis,
             'stuff_place': stuff_place,
             'card_height': card_height,
             'pitch_qual': pitch_qual,
