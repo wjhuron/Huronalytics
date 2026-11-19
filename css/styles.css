@@ -1494,6 +1494,13 @@ body.compact #table-pinned-body td { padding: 4px 8px; font-size: 12px; }
   white-space: nowrap;
 }
 
+.process-pm {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
 .pctl-section-header {
   font-size: 11px;
   font-weight: 700;

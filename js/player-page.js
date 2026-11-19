@@ -112,6 +112,31 @@ var PlayerPage = {
   // micro counters; wRC+ (the pipeline formula on the season's Guts and park
   // constants, a couple of points off the FanGraphs season number) and
   // Process+ come from the hand-split file (pipeline/splits.py).
+  // Sampling noise of one Process+ grade, in Process+ points, for a sample of
+  // `pa` plate appearances: sqrt(noiseB / PA) composite-z units times the
+  // points one z is worth on this run's scale. Both numbers come from the
+  // metadata (processPlusStandardization, PROCESS_PLUS_NOISE_B in
+  // pipeline/process_data.py); null when either is missing, so an older
+  // artifact prints the grade alone. It describes the sample, not the hitter:
+  // a grade and its split can differ by this much from chance alone.
+  processPlusPm: function (pa) {
+    var st = (typeof DataStore !== 'undefined' && DataStore.metadata &&
+              DataStore.metadata.processPlusStandardization) || null;
+    if (!st || !st.noiseB || !st.scale || !(pa > 0)) return null;
+    var f = (st.wrcScaleMatch && st.wrcScaleMatch.factor) || 1;
+    return Math.sqrt(st.noiseB / pa) * st.scale * f;
+  },
+
+  _appendProcessPm: function (el, pa) {
+    var pm = this.processPlusPm(pa);
+    if (pm == null) return;
+    var sp = document.createElement('span');
+    sp.className = 'process-pm';
+    sp.textContent = ' \u00b1 ' + Math.round(pm);
+    sp.title = 'Sampling noise of this grade at ' + pa + ' PA (one standard error, in Process+ points)';
+    el.appendChild(sp);
+  },
+
   HITTER_PLATOON_STATS_COLS: [
     { key: 'pa', label: 'PA', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
     { key: 'ab', label: 'AB', format: function(v) { return v != null ? v : '—'; }, noPctl: true, noDiff: true },
@@ -1183,6 +1208,7 @@ var PlayerPage = {
       var valEl = document.createElement('span');
       valEl.className = 'pctl-value';
       valEl.textContent = stat.format(val);
+      if (stat.key === 'processPlus' && val != null) this._appendProcessPm(valEl, data.pa);
 
       var circleWrap = document.createElement('div');
       circleWrap.className = 'pctl-circle-wrap';
@@ -2337,6 +2363,7 @@ var PlayerPage = {
         var td = document.createElement('td');
         var val = row ? row[col.key] : null;
         td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+        if (col.key === 'processPlus' && val != null) self._appendProcessPm(td, row.pa);
         // Percentile coloring uses the same-handedness pool, which is the
         // honest comparison group for a split. Qualification gates color on
         // the SEASON total (IP for pitchers, paAll for hitters), not on the
@@ -2384,6 +2411,18 @@ var PlayerPage = {
         td2.textContent = (diff < 0 ? '-' : '') + Math.abs(diff).toFixed(3).replace(/^0/, '');
       } else {
         td2.textContent = dcol.format ? dcol.format(lv - rv) : String(lv - rv);
+        // The gap between two noisy grades is noisier than either one:
+        // its standard error is the root sum of squares of the two sides.
+        if (dcol.key === 'processPlus') {
+          var pmL = self.processPlusPm(vsL.pa), pmR = self.processPlusPm(vsR.pa);
+          if (pmL != null && pmR != null) {
+            var spd = document.createElement('span');
+            spd.className = 'process-pm';
+            spd.textContent = ' \u00b1 ' + Math.round(Math.sqrt(pmL * pmL + pmR * pmR));
+            spd.title = 'Sampling noise of the gap between the two sides (one standard error, in Process+ points)';
+            td2.appendChild(spd);
+          }
+        }
       }
       diffRow.appendChild(td2);
     }
@@ -4526,6 +4565,7 @@ var PlayerPage = {
       var td = document.createElement('td');
       var val = data[col.key];
       td.textContent = col.format ? col.format(val) : (val != null ? val : '—');
+      if (col.key === 'processPlus' && val != null) this._appendProcessPm(td, data.pa);
       if (!col.noPctl) {
         var pctl = data[col.key + '_pctl'];
         if (pctl != null) {

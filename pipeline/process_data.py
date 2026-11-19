@@ -3848,6 +3848,18 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     PROCESS_PLUS_W_BB = 0.52
     PROCESS_PLUS_W_SD = 0.17
     PROCESS_PLUS_W_CT = 0.31
+    # Sampling noise of ONE Process+ grade (2026-11-19): the variance of the
+    # composite z is NOISE_B / PA. The player page prints
+    #   +/- sqrt(NOISE_B / PA) x scale x wrcScaleMatch.factor
+    # beside the season grade and beside each hand split. It changes no grade.
+    # Measured on the released atoms, scripts/research/hitter/deep_dive/
+    # dd_noise.py: random half-season date splits, 3 seeds, 2021-2026, 7,893
+    # hitter-halves of 60+ PA, both halves scored on the full season's
+    # anchors. b = mean(half-difference^2 / 2 x PA) = 20.67 (SE .35; seasons
+    # 18.5-22.8; 20.3-20.9 for any lower cutoff from 40 to 100 PA). The 1/PA
+    # law holds: observed over predicted SE is .97-1.07 in every band from
+    # 40 to 420 PA, and 1.13 at 20-40 PA, below the Process+ floors.
+    PROCESS_PLUS_NOISE_B = 20.7
     PROCESS_PLUS_TARGET_SD = 40  # interim/fallback scale. The final display
                                 # scale is set AFTER the FG override fills
                                 # wRC+: the wRC+ scale-match step re-scales
@@ -3904,6 +3916,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         'weights': {'bb': PROCESS_PLUS_W_BB, 'sd': PROCESS_PLUS_W_SD, 'ct': PROCESS_PLUS_W_CT},
         'scale': None,  # set below after the realized-SD rescale is computed
         'nQualified': len(_hplus_qual),
+        # Read by js/player-page.js for the plus-minus beside Process+.
+        'noiseB': PROCESS_PLUS_NOISE_B,
     }
 
     def _composite_z(row):
