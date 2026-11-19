@@ -599,7 +599,7 @@ STUFF_COLOR_MIN_PITCHES = 15
 # card/Arsenal-leaderboard parity.
 # Mirrors js/aggregator.js QUAL.MIN_PITCH_LOCPLUS + LOCPLUS_GROUP and
 # pipeline/locplus.py STABILIZE_N_PT; the three move together.
-LOCPLUS_COLOR_MIN = {'FF': 196, 'SI': 190, 'FC': 202, 'SL': 148, 'CU': 180, 'CH': 100}
+LOCPLUS_COLOR_MIN = {'FF': 204, 'SI': 185, 'FC': 213, 'SL': 148, 'CU': 180, 'CH': 105}   # shape-class blend, 2026-11-19
 LOCPLUS_COLOR_GROUP = {
     'FF': 'FF', 'FA': 'FF', 'SI': 'SI', 'FC': 'FC', 'CF': 'FC',
     'SL': 'SL', 'ST': 'SL', 'SW': 'SL', 'SV': 'SL',

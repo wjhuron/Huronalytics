@@ -296,8 +296,12 @@ DH_B_AAA = 1.069
 # Loc shrinkage before the z-score is FLAT from 0 to 1,360 pitches (all within 0.06%), so
 # the unshrunk input stays. The v18 set: stuff .217 loc .082 k .162 izwh .061 xrv .135
 # gb .144 gs -.023 park .154.
-W_PH = {'stuff': 0.222, 'loc': 0.062, 'k': 0.152, 'izwh': 0.076,
-        'xrv': 0.149, 'gb': 0.135, 'gs': -0.018, 'park': 0.156}
+# REFIT 2026-11-19 for the shape-class Loc+ blend (hpera_location_input.py with key loc_shape,
+# hpera_location_refit.py arm 'h@0'): the input correlates .998-.999 with the 11-18 one; held out
+# by year NEXT -0.025% (5/5), ROS +0.010% (4/6): a tie. The 11-18 set: stuff .222 loc .062 k .152
+# izwh .076 xrv .149 gb .135 gs -.018 park .156.
+W_PH = {'stuff': 0.222, 'loc': 0.065, 'k': 0.152, 'izwh': 0.077,
+        'xrv': 0.147, 'gb': 0.135, 'gs': -0.019, 'park': 0.156}
 # Pitcher-hand term. ZERO since Stuff+ v18 (2026-11-18): the Stuff+ channel now holds
 # pitcher hand, and the hand weight fits to -.017 when it is left in. History: added
 # 2026-09-05 as ERA credit for a left-hander on the RAW indicator centered at the pool's

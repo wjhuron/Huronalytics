@@ -431,7 +431,11 @@ STABILIZE_N_UNVALIDATED = float('inf')
 # 202), SL 148 (148 / 157 / 136), CU 180 (180 / 136 / 201), CH 100 (98 / 100 / 104). Three to
 # four times the old gates: the count level made the old grade repeat itself quickly, and that
 # part was not location. The older notes below describe the old grade.
-STABILIZE_N_PT = {'FF': 196, 'SI': 190, 'FC': 202, 'SL': 148, 'CU': 180, 'CH': 100}
+# RE-MEASURED 2026-11-19 for the shape-class blend (locplus_shape_gates.py, same method and
+# seasons; its control arm reproduces the 11-18 gates: 196 190 198 148 180 100): FF 204
+# (178 / 204 / 207), SI 185 (171 / 185 / 231), FC 213 (220 / 213 / 209), CH 105 (102 / 105 /
+# 109); SL and CU have no class surface and do not move.
+STABILIZE_N_PT = {'FF': 204, 'SI': 185, 'FC': 213, 'SL': 148, 'CU': 180, 'CH': 105}
 # Re-measured AGAIN 2026-09-03 under the 6.0 in / 0.30 bandwidth adopted the
 # same day (same script, 10 seeds, Savant PlateZ, 160 dates): smoother
 # surfaces give less noisy per-pitch atoms, so every group stabilizes ~30%
@@ -449,7 +453,7 @@ STABILIZE_N_PT = {'FF': 196, 'SI': 190, 'FC': 202, 'SL': 148, 'CU': 180, 'CH': 1
 # CH 79 -> 76. Five moved inside their seed spread; FC did not.
 # Leaderboard pitch-CATEGORY rows pool several types (js/aggregator.js
 # PITCH_CATEGORIES), so they take the stiffest member gate.
-STABILIZE_N_CATEGORY = {'Hard': 196, 'Breaking': 202, 'Offspeed': 100}
+STABILIZE_N_CATEGORY = {'Hard': 204, 'Breaking': 213, 'Offspeed': 105}
 
 
 def stabilize_n(pitch_type):
