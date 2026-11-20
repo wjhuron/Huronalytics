@@ -16,28 +16,20 @@ import json
 from io import StringIO
 
 
-# ── Weather-adjustment constants and helpers ──────────────────────────────────
+# ── Neutral-environment movement ──────────────────────────────────────────────
+# xIndVrtBrk / xHorzBrk are the movement a pitch would have had in a neutral
+# environment (standard air, no wind, no roof effect). The model, its constants and
+# its degrade paths live in pipeline/neutral_move.py (constants in
+# data/neutral_movement_rs.json); this file only gathers the inputs per game.
+# The old single density exponent (1.05, and 2/3 before it) is retired: measured on
+# six seasons it left a fastball 0.4 in short of ride and a sinker 0.8 in short of
+# run at Coors (scripts/research/weather/, 2026-11-20).
+from pipeline import neutral_move as NM
+from scrapers import weather_obs
 
-STANDARD_RHO = 1.195  # kg/m³ reference: sea level at ~72.4°F (101325 Pa / 287.05 / 295.6 K)
-
-# Density→movement exponent. Calibrated 2026-07-02 from our own data
-# (scripts/research/misc/weather_exponent_calibration.py): within-pitcher fixed-effects
-# fit of log|movement| on log(rho) over 307-364k pitches / 1,298 games gave
-# e = 1.01 (IVB), 1.11 (HB), ~1.15 (total, month-controlled) — matching
-# Nathan trajectory theory (~1.0-1.1) and rejecting the original 2/3.
-# 1.05 is the adopted middle. Historical sheet x-columns were backfilled to
-# this exponent on 2026-07-02 (scripts/builders/backfill_weather_exponent.py);
-# per-game density inputs live in data/game_weather_rs.json.
-WEATHER_EXPONENT = 1.05
-
-# Fallback temperature when the feed omits weather.temp, and the clamp used
-# when the roof is closed / dome (feeds occasionally report the OUTDOOR temp
-# for closed-roof games, which would inject a spurious density error).
-# Elevation is ~90% of the density signal at altitude parks, so an assumed
-# indoor-ish temperature beats silently skipping the adjustment entirely.
-DEFAULT_TEMP_F = 70.0
-ROOF_CLOSED_TEMP_F = 72.0
-ROOF_CLOSED_CONDITIONS = {'dome', 'roof closed'}
+DEFAULT_TEMP_F = NM.DEFAULT_TEMP_F
+ROOF_CLOSED_TEMP_F = NM.ROOF_CLOSED_TEMP_F
+ROOF_CLOSED_CONDITIONS = NM.ROOF_CLOSED_CONDITIONS
 
 # MLB's live feed omits venue.location.elevation for most international
 # parks, so without an override Mexico City games look like sea level and
@@ -129,29 +121,11 @@ VENUE_ELEVATION_FT_OVERRIDE = {
 
 
 def compute_air_density(elevation_ft, temp_f):
-    """Air density (kg/m³) from elevation and temperature using barometric formula."""
-    elevation_m = elevation_ft * 0.3048
-    P = 101325 * (1 - 2.2558e-5 * elevation_m) ** 5.2556
-    T = (temp_f - 32) * 5 / 9 + 273.15
-    return P / (287.05 * T)
+    """Dry-air density (kg/m³) from elevation and temperature on the standard atmosphere.
 
-
-def compute_weather_adj_factor(rho_game):
-    """Density-only adjustment factor for pitch movement.
-
-    xIndVrtBrk = rawIVB × factor,  xHorzBrk = rawHB × factor.
-
-    Uses ρ^WEATHER_EXPONENT scaling (1.05, empirically calibrated — see the
-    constant's comment). Magnus force ∝ ρ, and thinner air also means less
-    drag so the ball arrives SOONER: both effects compound, which is why the
-    exponent is ~1, not the old 2/3's "partial compensation" story.
-
-    Returns 1.0 when inputs are missing or invalid.
-    """
-    if not rho_game or rho_game <= 0:
-        return 1.0
-
-    return (STANDARD_RHO / rho_game) ** WEATHER_EXPONENT
+    Kept for the research and audit scripts that score the pre-2026-11 model. The
+    shipped columns do NOT use it: pipeline.neutral_move.game_air does the work."""
+    return float(NM.moist_density(NM.standard_pressure_hpa(elevation_ft), temp_f, 0.0))
 
 
 class BaseballSavantFocusedDownloader:
@@ -175,6 +149,22 @@ class BaseballSavantFocusedDownloader:
 
         # Initialize team mappings
         self._initialize_team_mappings()
+
+    def _measured_weather(self, game_pk, lat, lon, elevation_ft, start_iso):
+        """Measured pressure / humidity / temperature for the game. An ARCHIVE reading
+        already in the sidecar is final and is reused; a forecast reading is fetched
+        again so a later run upgrades it once the archive has the day."""
+        sidecar = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               'data', 'game_weather_rs.json')
+        try:
+            with open(sidecar) as f:
+                prev = (json.load(f).get(str(game_pk)) or {}).get('obs')
+        except (FileNotFoundError, ValueError):
+            prev = None
+        if prev and prev.get('source') == 'archive':
+            return prev
+        got = weather_obs.fetch_measured(lat, lon, elevation_ft, start_iso, game_pk)
+        return got or prev
 
     def _record_game_weather(self, game_pk, info):
         """Append/refresh one game's density inputs in data/game_weather_rs.json.
@@ -809,55 +799,59 @@ class BaseballSavantFocusedDownloader:
             venue_location = venue.get('location', {})
             venue_field_info = venue.get('fieldInfo', {})
 
-            game_temp = None
+            game_temp = None          # the feed reading, as reported
             game_elevation = None
-            game_rho = None
+            game_air = None           # NM.game_air result; None = no elevation = no adjustment
+            measured = None
 
             try:
                 temp_str = weather.get('temp')
                 elev_val = venue_location.get('elevation')
                 if elev_val is None:
                     elev_val = VENUE_ELEVATION_FT_OVERRIDE.get(venue.get('id'))
-
                 if temp_str is not None:
                     game_temp = float(temp_str)
                 if elev_val is not None:
                     game_elevation = float(elev_val)
-
-                # Roof closed / dome: clamp to indoor temp. Feeds sometimes
-                # report the outdoor reading (e.g. 104°F Phoenix with the
-                # roof shut), which would inject a ~4% spurious density error.
-                condition = (weather.get('condition') or '').strip().lower()
-                if condition in ROOF_CLOSED_CONDITIONS:
-                    game_temp = ROOF_CLOSED_TEMP_F
-
-                # Air density. Missing temp falls back to DEFAULT_TEMP_F
-                # rather than skipping the adjustment: elevation is ~90% of
-                # the signal at altitude parks, and a silent factor of 1.0 at
-                # Coors is a far bigger error than an assumed 70°F (this
-                # failure mode bit the Las Vegas homestand).
-                if game_elevation is not None:
-                    game_rho = compute_air_density(
-                        game_elevation,
-                        game_temp if game_temp is not None else DEFAULT_TEMP_F)
             except (ValueError, TypeError):
-                pass  # any parse failure → defaults (no adjustment)
+                pass  # an unparseable field stays None and is reported below
 
-            # Persist per-game density inputs to a sidecar so adjustments are
-            # auditable and re-derivable if the exponent ever changes (the
-            # sheet x-columns bake the factor in; without this the LV-style
-            # forensic rebuild from feeds is the only recovery path).
+            if game_elevation is not None:
+                lat, lon = weather_obs.venue_coords(venue)
+                measured = self._measured_weather(game_pk, lat, lon, game_elevation,
+                                                  game_data.get('datetime', {}).get('dateTime'))
+                game_air = NM.game_air(game_elevation, game_temp, weather.get('condition'),
+                                       venue.get('id'), measured, weather.get('wind'))
+                if game_air['source'] != 'measured':
+                    print(f"  WARNING: game {game_pk}: no measured weather; x movement uses "
+                          f"standard-atmosphere pressure and the feed temperature")
+            else:
+                # The loud version of the old silent factor of 1.0: every Triple-A and
+                # spring park the feed has no elevation for went unadjusted this way.
+                print(f"  WARNING: game {game_pk}: venue {venue.get('id')} ({venue.get('name')}) has NO "
+                      f"elevation; xIndVrtBrk/xHorzBrk are left equal to the raw values. Add the park "
+                      f"to VENUE_ELEVATION_FT_OVERRIDE in scrapers/pitcher2026.py.")
+
+            # Persist the per-game inputs so the columns can be audited and rebuilt.
+            # tempF is the FEED reading as reported (the roof rule is applied in the
+            # model, not here; until 2026-11 this field held the clamped 72 F).
             try:
                 self._record_game_weather(game_pk, {
                     'venueId': venue.get('id'),
                     'condition': weather.get('condition'),
                     'tempF': game_temp,
+                    'wind': weather.get('wind'),
                     'elevationFt': game_elevation,
-                    'rho': round(game_rho, 5) if game_rho else None,
-                    'factor': round(compute_weather_adj_factor(game_rho), 5),
+                    'obs': measured,
+                    'rho': round(game_air['rho'], 5) if game_air else None,
+                    'lnP': round(game_air['lnP'], 6) if game_air else None,
+                    'lnT': round(game_air['lnT'], 6) if game_air else None,
+                    'source': game_air['source'] if game_air else None,
+                    'model': NM.load_coefficients().get('version'),
                 })
-            except Exception as e:
+            except OSError as e:
                 print(f"  WARNING: could not record game weather sidecar: {e}")
+            nm_modes = {}
 
             # Extract all plays
             all_plays = data['liveData']['plays'].get('allPlays', [])
@@ -1062,15 +1056,17 @@ class BaseballSavantFocusedDownloader:
                         pitch_velo = pitch.get('pitchData', {}).get('startSpeed')
                         adj_ivb = None
                         adj_hb = None
-                        try:
-                            adj_factor = compute_weather_adj_factor(game_rho)
-                            if ivb is not None:
-                                adj_ivb = round(ivb * adj_factor, 1)
-                            if hb is not None:
-                                adj_hb = round(hb * adj_factor, 1)
-                        except (ValueError, TypeError):
-                            adj_ivb = ivb  # fall back to raw
-                            adj_hb = hb
+                        if ivb is not None or hb is not None:
+                            # the PITCHER of this pitch, not the of-record finisher
+                            _nm_throws = (p_throws if cur_pitcher_id == pitcher_id
+                                          else self._throws_of(cur_pitcher_id, game_data))
+                            adj_ivb, adj_hb, _mode = NM.neutral_movement(
+                                ivb, hb, _nm_throws, release_tilt, pitch_velo, game_air)
+                            nm_modes[_mode] = nm_modes.get(_mode, 0) + 1
+                            if adj_ivb is not None:
+                                adj_ivb = round(adj_ivb, 1)
+                            if adj_hb is not None:
+                                adj_hb = round(adj_hb, 1)
 
                         # Per-pitch pitcher/batter identity + handedness. Differs
                         # from the of-record finisher ONLY on mid-PA substitutions;
@@ -1158,6 +1154,13 @@ class BaseballSavantFocusedDownloader:
                         # Cap strikes at 2 for foul balls with 2 strikes
                         if pre_pitch_strikes > 2:
                             pre_pitch_strikes = 2
+
+            # Every degrade path of the neutral-movement model announces itself.
+            _degraded = {k: v for k, v in nm_modes.items() if k != 'full'}
+            if _degraded:
+                print(f"  neutral movement, game {game_pk}: " + ", ".join(
+                    f"{v} pitches '{k}'" for k, v in sorted(_degraded.items()))
+                    + f" ({nm_modes.get('full', 0)} full)")
 
             # Create DataFrame from pitch data
             if not pitches:

@@ -12,7 +12,7 @@ git pull). Do not move them without updating `~/Library/LaunchAgents/`.
 | `audits/` | Read-only data-integrity audits: drift checks, attribution audits, tag audits, PA completeness, PlateZ resync. `scrapers/backfill_supplement.py` dynamically loads resync_recent_platez from here. |
 | `builders/` | Asset and cache builders: training pickles, augmentations, park factors, priors, Statcast pulls. Outputs land in `data/` or GitHub release assets. |
 | `tradevalue/` | The trade-value program: corpus pulls, engines, market fit, stuffedge. Ships `data/tradevalue_data.json.gz` for trade.html. |
-| `research/<topic>/` | Metric research (era, locplus, commandplus, hitter, stuff, xmove, comps, cards, misc). Scripts run from the repo root: `python3 scripts/research/era/era_weights_final.py`. Cross-topic imports declare an explicit `sys.path.insert` next to the import. |
+| `research/<topic>/` | Metric research (era, locplus, commandplus, hitter, stuff, xmove, comps, cards, weather, misc). Scripts run from the repo root: `python3 scripts/research/era/era_weights_final.py`. Cross-topic imports declare an explicit `sys.path.insert` next to the import. |
 | `tools/` | Standalone utilities and render one-offs (catch_prob, platoon cards, zone renders, prospect pulls, MiLB FA sheets). |
 | `archive/` | Superseded scripts, kept greppable. See its README before re-running anything. |
 
