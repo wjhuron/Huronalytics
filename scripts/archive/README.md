@@ -45,3 +45,8 @@ data with stale corrections:
 | `stuff_data.py`, `stuff_v10_compare.py` | pre-v11 dataset builder; v10 comparison | superseded |
 
 `results/` holds committed output artifacts that used to sit loose in scripts/.
+
+- `backfill_weather_exponent.py` (archived 2026-11-20): rewrote the sheet x columns with the
+  retired single density exponent. DO NOT RE-RUN: it would overwrite the neutral-movement
+  values, and it imports names the scraper no longer has. The current writer is
+  `scripts/builders/backfill_neutral_movement.py`.

@@ -117,6 +117,30 @@ VENUE_ELEVATION_FT_OVERRIDE = {
     2532: 1247,  # Scottsdale Stadium, Scottsdale AZ
     3809: 1040,  # Camelback Ranch, Glendale AZ
     3834: 965,   # Goodyear Ballpark, Goodyear AZ
+    # ── Added 2026-11-20 (weather audit): parks that were silently unadjusted ──
+    # DEM readings (Open-Meteo elevation API, the method above) at the venue API's
+    # coordinates, except where noted. NOTE two older entries above carry the wrong
+    # venue: id 5160 is Hartwall Arena (Helsinki) and id 4895 is Privateer Park
+    # (Metairie LA), so the real Tokyo Dome (2397) and London Stadium (5381) games
+    # had no elevation until these lines.
+    2397: 23,    # Tokyo Dome, Tokyo (2025 Tokyo Series)
+    5381: 33,    # London Stadium, London (2023 / 2024 London Series); DEM at the stadium,
+                 # the venue API's coordinates point at central London
+    3949: 554,   # Rickwood Field, Birmingham AL (2024 special event)
+    6130: 1276,  # Bristol Motor Speedway, Bristol TN (2025 special event); DEM at the
+                 # speedway (36.5157, -82.2570), the venue API's coordinates are in Georgia
+    # Florida State League / spring parks and Arizona complexes (MiLB corpus, NEW tab)
+    2520: 13,    # Roger Dean Chevrolet Stadium, Jupiter FL
+    2856: 30,    # Clover Park, Port St. Lucie FL
+    2526: 20,    # LECOM Park, Bradenton FL
+    2862: 13,    # Lee Health Sports Complex, Fort Myers FL
+    2534: 10,    # Charlotte Sports Park, Port Charlotte FL
+    4309: 36,    # JetBlue Park, Fort Myers FL
+    5380: 20,    # CoolToday Park, North Port FL
+    5000: 26,    # CACTI Park of the Palm Beaches, West Palm Beach FL
+    2518: 1112,  # American Family Fields of Phoenix, Phoenix AZ
+    2500: 1168,  # Tempe Diablo Stadium, Tempe AZ
+    2507: 1263,  # Hohokam Stadium, Mesa AZ
 }
 
 

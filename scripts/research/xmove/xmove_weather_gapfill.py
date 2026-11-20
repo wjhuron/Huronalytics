@@ -20,9 +20,12 @@ import requests
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, ROOT)
-from scrapers.Pitcher2026 import (compute_air_density, compute_weather_adj_factor,
+from scrapers.Pitcher2026 import (compute_air_density,
                                   VENUE_ELEVATION_FT_OVERRIDE, DEFAULT_TEMP_F,
                                   ROOF_CLOSED_TEMP_F, ROOF_CLOSED_CONDITIONS)
+
+# the retired single-exponent model this script audited (the scraper no longer carries it)
+compute_weather_adj_factor = lambda rho: (1.195 / rho) ** 1.05 if rho else 1.0
 
 PKL = os.path.join(ROOT, 'data', 'all_pitches_rs_cache.pkl')
 SIDECAR = os.path.join(ROOT, 'data', 'game_weather_rs.json')

@@ -28,9 +28,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, ROOT)
 
 from pipeline.fetch import _gspread_client, read_sheet_with_retry
-from scrapers.Pitcher2026 import (compute_air_density, compute_weather_adj_factor,
-                                  VENUE_ELEVATION_FT_OVERRIDE, DEFAULT_TEMP_F,
-                                  ROOF_CLOSED_TEMP_F, ROOF_CLOSED_CONDITIONS)
+from scrapers.pitcher2026 import VENUE_ELEVATION_FT_OVERRIDE
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from augment_training_neutral_movement import apply_to_pitches
+from backfill_neutral_movement import upgrade_sidecar
 
 SHEET_IDS = {
     'AL2025': '1ayBv-pQ7tJMdMTKcVils2yShCt3wDozhSW00mNQiKH8',
@@ -227,26 +228,14 @@ def add_weather(pitches):
             json.dump(store, open(WEATHER_SIDECAR, 'w'), indent=0, sort_keys=True)
     json.dump(store, open(WEATHER_SIDECAR, 'w'), indent=0, sort_keys=True)
 
-    def rho_of(info):
-        if not info or info.get('error') or info.get('elevationFt') is None:
-            return None
-        temp = info.get('tempF')
-        cond = (info.get('condition') or '').strip().lower()
-        if cond in ROOF_CLOSED_CONDITIONS:
-            temp = ROOF_CLOSED_TEMP_F
-        if temp is None:
-            temp = DEFAULT_TEMP_F
-        return compute_air_density(info['elevationFt'], temp)
-
-    factor_by_pk = {}
-    for pk in pks:
-        rho = rho_of(store.get(str(pk)))
-        factor_by_pk[pk] = compute_weather_adj_factor(rho) if rho else 1.0
-    for p in pitches:
-        f = factor_by_pk.get(p.get('_game_pk'), 1.0)
-        iv, hb = p.get('IndVertBrk'), p.get('HorzBrk')
-        p['xIndVrtBrk'] = round(iv * f, 1) if iv is not None else None
-        p['xHorzBrk'] = round(hb * f, 1) if hb is not None else None
+    # x columns from the neutral-movement model (pipeline/neutral_move.py). At this
+    # point the rows carry no SpinAxis (augment_2025_spinaxis.py adds it later), so
+    # the values here are the exponents-and-wind form. Run
+    # scripts/builders/augment_training_neutral_movement.py LAST: it writes the full
+    # values, with the spin-axis cell shift, on the finished pickle.
+    store = upgrade_sidecar(store, [str(pk) for pk in pks])
+    json.dump(store, open(WEATHER_SIDECAR, 'w'), indent=0, sort_keys=True)
+    apply_to_pitches(pitches, store, '2025 (provisional, no spin axis yet)')
     return pitches
 
 

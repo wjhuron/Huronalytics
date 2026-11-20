@@ -30,9 +30,12 @@ HOURLY = 'temperature_2m,relative_humidity_2m,surface_pressure'
 GAME_HOURS = 4                    # start hour plus the next three
 FORECAST_PAST_DAYS = 14           # the forecast endpoint serves this many past days
 
-# Parks whose feed entry has no coordinates (venue id -> lat, lon).
+# Parks whose feed entry has no coordinates, or wrong ones (venue id -> lat, lon).
+# An entry here WINS over the feed.
 VENUE_COORDS_OVERRIDE = {
-    5340: (19.4040, -99.0855),    # Estadio Alfredo Harp Helu, Mexico City
+    5340: (19.4040, -99.0855),    # Estadio Alfredo Harp Helu, Mexico City (feed has none)
+    6130: (36.5157, -82.2570),    # Bristol Motor Speedway, Bristol TN (feed points at Georgia)
+    5381: (51.5387, -0.0166),     # London Stadium (feed points at central London)
 }
 
 
@@ -96,8 +99,8 @@ def fetch_measured(lat, lon, elevation_ft, start_iso, game_pk=None):
 
 def venue_coords(venue):
     """(lat, lon) from a feed venue dict, with the override table as the fallback."""
+    vid = (venue or {}).get('id')
+    if vid in VENUE_COORDS_OVERRIDE:
+        return VENUE_COORDS_OVERRIDE[vid]
     co = ((venue or {}).get('location') or {}).get('defaultCoordinates') or {}
-    lat, lon = co.get('latitude'), co.get('longitude')
-    if lat is None or lon is None:
-        return VENUE_COORDS_OVERRIDE.get((venue or {}).get('id'), (None, None))
-    return lat, lon
+    return co.get('latitude'), co.get('longitude')
