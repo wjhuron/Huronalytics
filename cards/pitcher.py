@@ -2675,15 +2675,15 @@ def render_social_card(config, pitches, output_file):
     # model expectation (pipeline/xmove.py), joined to the actual disc by a
     # dotted line. Mean of the per-pitch expectations, the site's rule. A type
     # with no model or input gets no ring. Two bases since 2026-11-19, chosen
-    # by xmove_basis: 'physics' (default: the pitch itself, no pitch type read)
-    # or 'hitter' (slot, extension, velocity per pitch type).
+    # by xmove_basis: 'hitter' (default since 2026-11-20: slot, extension,
+    # velocity per pitch type) or 'physics' (the pitch itself, no pitch type read).
     from pipeline.xmove import score_all, score_physics_all
     _x_acc = {}
     _x_rows = [dict(p) for p in pitches]   # the scorers write onto each dict
     for p in _x_rows:                      # never read a score a cache carried in
         for _k in ('_xivb', '_xhb', '_xivbP', '_xhbP'):
             p.pop(_k, None)
-    _x_basis = config.get('xmove_basis') or 'physics'
+    _x_basis = config.get('xmove_basis') or 'hitter'
     if _x_basis == 'physics' and not (config.get('social_xmove_physics') or {}).get('variants'):
         print("  Expected movement: no physics model on disk, the rings show the HITTER basis")
         _x_basis = 'hitter'
@@ -5963,7 +5963,7 @@ def main(new_level=None):
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
     card_height     = "fit"              # Season social card height: "fit" (follows the rows) or "fixed" (1350 px)
     stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
-    xmove_basis     = "physics"          # Expected-movement rings on the social card: "physics" (the pitch itself, no pitch type read) or "hitter" (slot, extension, velocity per pitch type)
+    xmove_basis     = "hitter"           # Expected-movement rings on the social card: "hitter" (slot, extension, velocity per pitch type; the default) or "physics" (the pitch itself, no pitch type read)
     social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xwobacon"; force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
