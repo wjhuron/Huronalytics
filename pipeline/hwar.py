@@ -95,7 +95,8 @@ their actual outcome.
               pulled-air term (XWOBA_PULLAIR_C), K 0, BB and HBP at their weights; IBB, SH,
               CI and bunt ABs out (compute_expected_stats). Read at full precision from the
               private _xwOBAraw / _xwOBAn fields, never from the rounded column.
-    shrink    (rate x n + HWAR_N0_BAT x lgXW) / (n + HWAR_N0_BAT), n = the rate's denominator
+    shrink    (rate x n + HWAR_N0_BAT x mu) / (n + HWAR_N0_BAT), n = the rate's denominator, mu = a + b ln(season PA)
+              fitted live on the season's MLB hitters (the league mean until 2026-11-19)
     rate_adj  shrink - HWAR_PARK_PASS_BAT x (exposure - 1) x lgRPA x wOBAscale
               exposure = (PF/100 + 1)/2 of his club on the Savant runs factor
               (data/park_factors.json, the pitcher side's file, eraplus._load_park); a
@@ -112,8 +113,9 @@ pulled-air basis loses .003 r of prediction to plain xwOBA and wins .007 r of sa
 description (5/6, hwar_hitter_rate_desc.py); a value metric is descriptive, and one
 deserved-hitting number on the site beats two.
 HWAR_N0_BAT: the shrink where the LOSO slope of actual wOBA on the park-adjusted rate is
-1.0 (hwar_hitter_rate_desc.py: 77 PA, bracketed 75-100), so runs on the linear-weights
-scale need no fitted slope. Next-season prediction prefers 300-500, but that is a
+1.0 among hitters with 300+ PA (hwar_hitter_rate_desc.py: 77 PA, bracketed 75-100), so runs
+on the linear-weights scale need no fitted slope. Since 2026-11-19 the shrink target is the
+mean for the hitter's own playing-time level, not the league mean (see HWAR_N0_BAT below). Next-season prediction prefers 300-500, but that is a
 forecast, not a value. The hitter selection gradient is mild (.89/.82/.82 by PA tercile),
 so the same-season criterion is usable here; it is not on the pitcher side.
 HWAR_PARK_PASS_BAT: the share of the published runs factor that reaches xwOBA, measured
@@ -129,6 +131,22 @@ from pipeline.utils import current_team_by_player, player_key, is_combined_team
 from pipeline.eraplus import WAR_PYTH_EXP, WAR_XW_PA_SD, WAR_POOL, WAR_POOL_GAMES, WAR_POOL_SHARE_HITTERS
 
 HWAR_N0_BAT = 77            # PA; LOSO calibration slope of actual wOBA on the park-adjusted rate = 1.0
+                            # among regulars. Re-measured 72 on the playing-time target below (2026-11-19).
+# The shrink TARGET (2026-11-19, scripts/research/war_era_deep_dive/wed_batslope.py, wed_batslope2.py).
+# Until then every hitter was shrunk toward the LEAGUE mean. Playing time follows talent: over
+# 2021-2026 hitters with 1-50 PA sit .075 of xwOBA under the league, 50-150 PA .042 under, 500+ PA
+# .020 over. Shrinking a 60-PA hitter toward the league gives him credit he did not earn: the
+# calibration slope of actual wOBA on the shipped rate read 2.56 under 100 PA and 1.33 at 100-300
+# PA, and club runs scored on summed batting runs read 1.153 (SE .057). The target is now
+#     mu(PA) = a + b x ln(season PA)
+# fitted each run, PA weighted, on the MLB hitters of the season (one row per player). It uses
+# this season's playing time only, so it stays descriptive. Same six seasons: under 100 PA 1.16,
+# all hitters 1.084 (from 1.205), club slope 1.094 (SE .051), club rmse 36.35 (from 37.73), and
+# r with actual wOBA unchanged. Forms compared: PA bands and a quadratic in ln(PA) read the same
+# at club level and worse under 100 PA. N0 is NOT settled by one criterion: regulars calibrate at
+# 72, the all-hitter slope crosses 1.0 near 13 and the club slope near 20. 77 keeps the shipped
+# criterion (regulars); the lower values are an open choice, not an error.
+HWAR_TARGET_MIN_POOL = 50   # players for the live fit; below it the target is the league mean (announced)
 HWAR_FLD_NOISE_SD = 4.3     # runs; ceiling on Savant FRV noise at HWAR_FLD_NOISE_OUTS, sd x sqrt(1 - r) year to year
 HWAR_FLD_NOISE_OUTS = 3000  # (2023-2026 pairs: 4.03 / 4.33 / 4.67 at medians 2944 / 2953 / 3088 outs). Scaled by sqrt(outs).
 HWAR_BSR_NOISE_SD = 1.7     # runs; ceiling on Savant BRV noise, same design (1.77 / 1.59 / 1.65), measured on listed runners
@@ -180,6 +198,30 @@ def apply_batting_runs(rows, park, lg_rpa, woba_scale, woba_weights=None, aaa_te
         return None
     den = sum(r['_xwOBAn'] for r in mlb)
     lg_xw = sum(r['_xwOBAraw'] * r['_xwOBAn'] for r in mlb) / den
+    # Playing-time target: one row per player, his largest MLB row (the combined 2TM.. row holds
+    # the season for a traded hitter), so a stint is judged at the player's season playing time.
+    season_row = {}
+    for r in mlb:
+        k = player_key(r, 'hitter')
+        if k not in season_row or r['_xwOBAn'] > season_row[k]['_xwOBAn']:
+            season_row[k] = r
+    t_a, t_b, t_form = lg_xw, 0.0, 'league'
+    if len(season_row) >= HWAR_TARGET_MIN_POOL:
+        _w = [float(r['_xwOBAn']) for r in season_row.values()]
+        _x = [math.log(max(float(r['_xwOBAn']), 1.0)) for r in season_row.values()]
+        _y = [float(r['_xwOBAraw']) for r in season_row.values()]
+        _sw = sum(_w); _mx = sum(w * x for w, x in zip(_w, _x)) / _sw; _my = sum(w * y for w, y in zip(_w, _y)) / _sw
+        _sxx = sum(w * (x - _mx) ** 2 for w, x in zip(_w, _x))
+        _sxy = sum(w * (x - _mx) * (y - _my) for w, x, y in zip(_w, _x, _y))
+        if _sxx > 1e-9 and _sxy / _sxx > 0:
+            t_b = _sxy / _sxx; t_a = _my - t_b * _mx; t_form = 'logPA'
+        else:
+            print(f'  hwar WARNING: the playing-time target did not fit (slope {(_sxy / _sxx) if _sxx > 1e-9 else None}); '
+                  f'shrink target is the LEAGUE mean this run')
+    else:
+        print(f'  hwar WARNING: {len(season_row)} MLB hitters (< {HWAR_TARGET_MIN_POOL}); '
+              f'shrink target is the LEAGUE mean this run')
+    season_n = {k: float(r['_xwOBAn']) for k, r in season_row.items()}
     pmap = hitter_park_map(rows, park, aaa)
     adj = {}     # id(row) -> shrunk, park-adjusted rate
     bunt = {}    # id(row) -> (B, W): bunt-in-play PAs and the weight sum of their outcomes
@@ -187,7 +229,8 @@ def apply_batting_runs(rows, park, lg_rpa, woba_scale, woba_weights=None, aaa_te
         n = r.get('_xwOBAn') or 0
         if r.get('team') in aaa or r.get('_xwOBAraw') is None or n <= 0 or not r.get('pa'):
             continue
-        sh = (r['_xwOBAraw'] * n + HWAR_N0_BAT * lg_xw) / (n + HWAR_N0_BAT)
+        mu = t_a + t_b * math.log(max(season_n.get(player_key(r, 'hitter'), float(n)), 1.0))
+        sh = (r['_xwOBAraw'] * n + HWAR_N0_BAT * mu) / (n + HWAR_N0_BAT)
         exposure = (pmap.get(id(r), 100.0) / 100.0 + 1.0) / 2.0
         adj[id(r)] = sh - HWAR_PARK_PASS_BAT * (exposure - 1.0) * lg_rpa * woba_scale
         if bunt_w is None:
@@ -221,12 +264,14 @@ def apply_batting_runs(rows, park, lg_rpa, woba_scale, woba_weights=None, aaa_te
     club_sum = sum(r['hBatRuns'] for r in rows
                    if r.get('hBatRuns') is not None and not is_combined_team(r.get('team')))
     const = {'lgXW': round(lg_xw, 4), 'shift': round(lg_adj - lg_xw, 4), 'n0': HWAR_N0_BAT,
+             'target': t_form, 'targetA': round(t_a, 5), 'targetB': round(t_b, 5), 'targetPlayers': len(season_row),
              'parkPass': HWAR_PARK_PASS_BAT, 'lgRPA': lg_rpa, 'wobaScale': woba_scale,
              'nRows': n_set, 'clubSum': round(club_sum, 1),
              'buntPa': bunt_pa, 'buntWoba': round(bunt_wsum / bunt_pa, 4) if bunt_pa else None,
              'buntRuns': round(bunt_runs, 1), 'buntPriced': bunt_w is not None}
     print(f'  hWAR batting runs: {n_set} rows, league xwOBA {lg_xw:.4f}, shift {lg_adj - lg_xw:+.4f}, '
-          f'N0 {HWAR_N0_BAT} PA, park pass {HWAR_PARK_PASS_BAT}, club-row sum {club_sum:+.1f}; '
+          f'N0 {HWAR_N0_BAT} PA toward {t_form} ({t_a:.4f} + {t_b:.4f} ln PA, {len(season_row)} players), '
+          f'park pass {HWAR_PARK_PASS_BAT}, club-row sum {club_sum:+.1f}; '
           f'bunts in play {bunt_pa} PA at wOBA {const["buntWoba"]} = {bunt_runs:+.1f} runs over own-rate pricing'
           + ('' if bunt_w is not None else ' (NOT priced: no weights)'))
     return const
