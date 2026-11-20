@@ -12,8 +12,9 @@ HITTERS, WAR per 600 PA (rate, per Wally 2026-10-02):
             league) through the shipped hWAR fill relation: k x (a + b x sprint) x times on base per
             600 PA (metadata hwarConstants.bsrFill). Times on base from OBP history weighted like the
             batting and shrunk at the batting N0 (BORROWED constant, labeled). No sprint -> 0.
-  fielding  FRV per 1000 outs (fld_rate_backtest pooled) x outs per PA (his own, weighted) x 600.
-            Measured at 1 season out only; the 3/5-year rows reuse it with the target age.
+  fielding  FRV per 1000 outs x outs per PA (his own, weighted) x 600. One shape (d .7, peak 28,
+            yi .05, od .10, prior 0) with the regression set per horizon (n0 2000 / 4500 / 8000),
+            measured at 1, 3 and 5 seasons out with no target-season gate (2026-11-19).
   position  his 2026 shipped hPosRuns per PA x 600 (the shipped positional table on his 2026 innings
             mix); a hitter without a 2026 MLB row gets 0 and is flagged. Position drift with age: none.
   replace.  metadata hwarConstants.replPerPa x 600.     WAR = sum / RPW (2026).
@@ -110,7 +111,10 @@ def main():
     # experience shape k ran to infinity). Outs per PA capped at the regulars' 90th percentile (a
     # convention, measured live): a 600-PA rate describes a full-timer, and a defensive replacement's
     # innings without plate appearances inflated the ratio (Pinckney 7.6 against a regular's 5.8).
-    FLD_PRIOR = -1.0
+    # 2026-11-19: the prior is 0 again and the other fielding constants changed with it (FLD / FLD_N0
+    # below). The -1.0 was measured with d, peak, yi and od held at values chosen on a target-gated pool;
+    # with every constant free on the honest pool the level sits at 0 (interior between -.5 and .5).
+    FLD_PRIOR = 0.0
     _r = []
     for _pid, _f in frv[BASE].items():
         _l = lines[BASE].get(int(_pid))
@@ -140,7 +144,18 @@ def main():
         if tot > 0:
             pos600[q] = sum(v / tot * posadj[pp] for pp, v in sh.items()) * FULL_INN / 1458.0
     bh = json.load(open(os.path.join(P, '_bat_horizon_backtest.json')))
-    fld = json.load(open(os.path.join(P, '_fld_rate_backtest.json')))['pooled']
+    # Fielding constants (2026-11-19, scripts/research/war_era_deep_dive/wed_fld_build.py). They were read
+    # from data/_proj/_fld_rate_backtest.json: d .55, n0 2000, peak 34, yi .05, od .20, one setting for
+    # every horizon, chosen one season out on fielders with 1,500+ outs in the TARGET season. That gate
+    # hides decline (a fielder who slips loses his innings). On every fielder with 1+ out in the target,
+    # target-outs weighted, every constant swept jointly: ONE shape with a horizon-specific n0. Each
+    # shape constant sits at an interior optimum (d flat .55-.85, peak 27-28, od .10, prior 0) and each
+    # n0 is interior (2000; 4500; flat 6500-10000 at five seasons, 8000 taken). Held out by base season
+    # against the old setting: h 1 -.08% (SE .35, 4/8, a tie), h 3 -3.4% (SE .65, 6/6), h 5 -8.9%
+    # (SE .74, 4/4). At five seasons the old setting was worse than a league-average projection (6.49
+    # against 6.35 runs per 1000 outs squared). Constants live here now, not in a scratch JSON.
+    fld = {'d': 0.7, 'peak': 28, 'yi': 0.05, 'od': 0.10}
+    FLD_N0 = {1: 2000, 3: 4500, 5: 8000}
     lg_obp = {y: sum(int(r.get('hits') or 0) + int(r.get('baseOnBalls') or 0) + int(r.get('hitByPitch') or 0)
                      for r in lines[y].values()) / max(1, sum(int(r.get('atBats') or 0) + int(r.get('baseOnBalls') or 0)
                      + int(r.get('hitByPitch') or 0) + int(r.get('sacFlies') or 0) for r in lines[y].values())) for y in X}
@@ -226,7 +241,7 @@ def main():
                 elif pa_y > 0:
                     outs_pa_d += fld['d'] ** k * pa_y        # a DH season: PA with no fielding outs
             f_age = (fld['yi'] * (fld['peak'] - age) if age < fld['peak'] else -fld['od'] * (age - fld['peak']))
-            frv1000 = (fn + fld['n0'] * FLD_PRIOR) / (fd + fld['n0']) + f_age
+            frv1000 = (fn + FLD_N0[h] * FLD_PRIOR) / (fd + FLD_N0[h]) + f_age
             outs_per_pa = min(outs_pa_n / outs_pa_d, OUTS_PA_CAP) if outs_pa_d else 0.0
             fldr = frv1000 / 1000 * outs_per_pa * 600
             posr = pos600.get(pid)
