@@ -1477,9 +1477,11 @@ var PlayerPage = {
   // scored per pitch in the pipeline (pipeline/xmove.py) and both ride in the
   // pitch details: 'physics' (xivbp/xhbp: the pitch itself, no pitch type
   // read) and 'hitter' (xivb/xhb: slot, extension, velocity per pitch type).
-  // Physics is the default (per Wally, 2026-11-19); the choice is a per-viewer
+  // Hitter is the default (per Wally, 2026-11-20; physics was for one day:
+  // with no pitch type it puts every sinker ring at the four-seam ring, because
+  // the seams, not the spin, make the run); the choice is a per-viewer
   // convenience, so it lives in localStorage and the page works without it.
-  XMOVE_DEFAULT: 'physics',
+  XMOVE_DEFAULT: 'hitter',
   _getXmoveBasis: function () {
     if (this._xmoveBasis) return this._xmoveBasis;
     var b = null;
