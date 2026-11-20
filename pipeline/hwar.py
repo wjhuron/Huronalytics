@@ -118,6 +118,15 @@ on the linear-weights scale need no fitted slope. Since 2026-11-19 the shrink ta
 mean for the hitter's own playing-time level, not the league mean (see HWAR_N0_BAT below). Next-season prediction prefers 300-500, but that is a
 forecast, not a value. The hitter selection gradient is mild (.89/.82/.82 by PA tercile),
 so the same-season criterion is usable here; it is not on the pitcher side.
+STATUS OF 77 (2026-11-20, scripts/research/war_era_deep_dive/wed_n0.py, six seasons, PA-level
+target, no target gate): 77 is NOT a measured optimum. Its pool (300+ PA in the same season)
+is gated on playing time, which follows results. The ungated criteria read lower: all-hitter
+slope 13, club slope of runs scored on summed batting runs 20 (one SE 0-49), club run error
+with the slope fixed at 1 an interior 40 (flat 25-50), regulars by PREVIOUS-season PA 37. The
+club level cannot separate 20 from 77: slope at 77 1.094 (SE .051), run error .55% worse than
+at 40, lower values win 3 of 6 held-out seasons. So 77 stays as "flat at club level", kept
+because no alternative wins most replicates. If it is changed, 40 is the candidate. Re-test
+after the 2027 season.
 HWAR_PARK_PASS_BAT: the share of the published runs factor that reaches xwOBA, measured
 WITHIN batter, home minus road (hwar_park_pass_within.py: .37 +/- .04 on 2021-2026 with the
 complete 2026, LOSO .36-.41; .35 on the partial season until 2026-10-02; actual wOBA
@@ -132,6 +141,8 @@ from pipeline.eraplus import WAR_PYTH_EXP, WAR_XW_PA_SD, WAR_POOL, WAR_POOL_GAME
 
 HWAR_N0_BAT = 77            # PA; LOSO calibration slope of actual wOBA on the park-adjusted rate = 1.0
                             # among regulars. Re-measured 72 on the playing-time target below (2026-11-19).
+                            # That pool is gated on same-season PA; ungated criteria read 13-40 and the club
+                            # level cannot separate 20 from 77 (2026-11-20, see the docstring). Kept: flat, not optimal.
 # The shrink TARGET (2026-11-19, scripts/research/war_era_deep_dive/wed_batslope.py, wed_batslope2.py).
 # Until then every hitter was shrunk toward the LEAGUE mean. Playing time follows talent: over
 # 2021-2026 hitters with 1-50 PA sit .075 of xwOBA under the league, 50-150 PA .042 under, 500+ PA
