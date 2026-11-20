@@ -881,7 +881,9 @@ BUBBLE_COLUMNS = [
         # EV95 is the exact BB+ ingredient the 2026-08-19 battery validated
         # (percentile sweep p50..p95+max: monotone rising to p95, max
         # rejected via the nBIP audit) — the card now displays the quantity
-        # the metric uses.
+        # the metric uses. Since 2026-11-19 BB+ reads the air-ball version
+        # (row key ev95Air, balls at launch angle >= 10); this chip stays
+        # the all-ball EV95, per Wally.
         ('EV95',        'ev95',         'ev95_pctl',         'mph'),
         ('Hard-Hit%',   'hardHitPct',   'hardHitPct_pctl',   'pct1'),
         ('Barrel%',     'barrelPct',    'barrelPct_pctl',    'pct1'),
