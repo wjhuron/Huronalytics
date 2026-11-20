@@ -318,7 +318,17 @@ W_LHP = 0.0
 LHP_SHARE_FALLBACK = 0.278
 
 # ── hWAR (2026-09-05) ────────────────────────────────────────────────────
-WAR_PYTH_EXP = 0.287     # PythagenPat exponent; RPW = 4r/(2r)^0.287 = 9.4-9.9 at 2021-2026 run environments
+WAR_PYTH_EXP = 0.262     # exponent of RPW = 4r/(2r)^e: 9.8-10.3 at 2021-2026 run environments. Measured
+                         # 2026-11-19 on 2000-2026 (the public PythagenPat .287 gave 9.4-9.9, 5.5% low).
+                         # Two methods agree. (1) One more run in a random game is half a win when it
+                         # breaks a regulation tie or makes one (line scores, 64,000 games): the needed
+                         # exponent is .265 / .259 / .261 for 2000-09 / 2010-19 / 2021-26, .262 +/- .004
+                         # over the seasons, no time trend (z 1.0), above the .287 value in 24/26 seasons;
+                         # the slope on ln r reads .702 against the form's .713, so the form holds.
+                         # (2) Club records, W% on run differential, 780 club-seasons: interior optimum
+                         # .260, flat .255-.270. Club records for 2021-2026 alone read .235 (10.7 runs
+                         # per win); that is a six-season sample the stable method does not support.
+                         # scripts/research/war_era_deep_dive/wed_rpw.py, wed_rpw_marginal.py.
 WAR_POOL = 1000.0        # wins above replacement in a full season of WAR_POOL_GAMES: the .294
 WAR_POOL_GAMES = 2430.0  # replacement winning percentage (FanGraphs/B-Ref unification, 2013). Convention.
 WAR_POOL_SHARE_HITTERS = 0.57  # fWAR's split ("the role we believe each plays"): position players 570,
