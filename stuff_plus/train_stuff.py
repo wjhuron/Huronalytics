@@ -1765,8 +1765,28 @@ def _pctl(sc, pool):
 # xRVOE to the expectation lifts next-year actual-xRV prediction r from
 # .366 to .492. It is a durable pitch trait (deception / seam effects /
 # tunneling / framing — everything the stuff+loc models can't see).
-XRVOE_N0 = 275        # shrinkage pseudo-pitches toward 0 (measured n0)
-XRVOE_MIN_PT = 150    # display floor per pitch type (below: >2/3 prior)
+# SHRINKAGE (2026-11-19). The 2026-07-14 value was 275 pseudo-pitches for every unit. Re-measured on
+# six seasons it is far too small: a pitcher's true xRVOE has SD .35 runs/100 against an observed
+# .64, so about half of the shipped spread was noise. Two constants now, because a pitcher-level
+# residual averages over his pitch types and carries less true variance per pitch than one type:
+#   pitcher     N0 1700   pitch type   N0 800
+# Objective that decides: the shrunk value of one half of a season against the RAW value of the
+# other half (pitch-weighted MSE, both directions), swept per season 2021-2026
+# (scripts/research/war_era_deep_dive/wed_xrvoe_rep.py; residuals from leave-one-season-out
+# Stuff+ fits of the gate's shipped design). Pitcher: interior optimum 1700 on the pooled curve,
+# flat 1400-2000, per-season best 1100-2500, leave-one-season-out choice 1700 or 2000; 275 loses
+# 14% and is worse in 6/6 seasons. Pitch type: flat 700-850 (800 taken inside it), per-season best
+# 550-1200; 275 loses 3.9%, worse in 6/6. The real score path on 2026 (wed_xrvoe.py) agrees:
+# best 1400 and 700, flat 1100-2000 and 550-1000. Variance-ratio estimates (per-pitch residual
+# variance over true unit variance) read 1500 and 764 over the six seasons. In 2021-2025 the gate
+# frames' location term was inert, which leaves location skill in the residual and biases those
+# seasons LOW, so the constants are not overstated.
+XRVOE_N0_OV = 1700    # pitcher-level units (and pitcher x batter hand)
+XRVOE_N0_PT = 800     # pitch-type units (and pitch type x batter hand)
+# Display floors: conventions, not swept. They predate the constants above ("below: more than 2/3
+# prior" was true at N0 275). At the measured N0 a 150-pitch type keeps 16% of its raw value and a
+# 300-pitch pitcher 15%, so a value just over a floor is mostly prior and reads near zero.
+XRVOE_MIN_PT = 150    # display floor per pitch type
 XRVOE_MIN_OV = 300    # display floor pitcher-level
 # leaderboard field -> compute_xrvoe unit-record key. xrvoe100 is the shrunk
 # skill estimate; rvoe/xrvoe/rvoe100 are raw accounting (unshrunk).
@@ -1879,6 +1899,7 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None, by_hand=False):
                       f'the MLB expectation')
 
     def _units(keys, min_n, frame=None):
+        n0 = XRVOE_N0_PT if 'pitch_type' in keys else XRVOE_N0_OV
         # v (xRVOE/100) is the shrunk skill estimate; xrvoe/rvoe/rvoe100 are
         # raw accounting (unshrunk, full precision — display layer rounds),
         # matching the site's RV/xRV convention.
@@ -1890,7 +1911,7 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None, by_hand=False):
         for key, r in g.iterrows():
             if r['n'] < min_n:
                 continue
-            shrunk = (r['n'] / (r['n'] + XRVOE_N0)) * r['resid']
+            shrunk = (r['n'] / (r['n'] + n0)) * r['resid']
             has_raw = r['raw_n'] > 0
             out[key] = {'v': round(-shrunk * 100.0, 2), 'n': int(r['n']),
                         'xrvoe': -r['resid_sum'],
@@ -2199,7 +2220,7 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
               f'{_pp_base.get("_projPriorSeason")} prior)')
     if xrvoe_ov:
         print(f'  injected xRVOE/100: pitcher-level {n_x}/{len(pp)} rows '
-              f'(floors {XRVOE_MIN_PT}/{XRVOE_MIN_OV} pitches, n0 {XRVOE_N0})')
+              f'(floors {XRVOE_MIN_PT}/{XRVOE_MIN_OV} pitches, n0 {XRVOE_N0_PT}/{XRVOE_N0_OV})')
 
 if __name__ == '__main__':
     main()

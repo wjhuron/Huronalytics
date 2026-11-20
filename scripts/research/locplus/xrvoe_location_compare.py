@@ -145,7 +145,7 @@ def residuals(T, df, exprv, group_of_code):
 def units(T, d, keys, min_n):
     g = d.groupby(keys).agg(resid=('resid', 'mean'), n=('resid', 'size'))
     g = g[g['n'] >= min_n]
-    g['v'] = -(g['n'] / (g['n'] + T.XRVOE_N0)) * g['resid'] * 100.0
+    g['v'] = -(g['n'] / (g['n'] + (T.XRVOE_N0_PT if 'pitch_type' in keys else T.XRVOE_N0_OV))) * g['resid'] * 100.0
     return g
 
 
