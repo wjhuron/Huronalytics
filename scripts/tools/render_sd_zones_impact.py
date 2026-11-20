@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Zone x count SD+/CT+ impact matrices, CARD-COHERENT version.
 
-NOTE 2026-11-19: shipped SD+ is now mix-neutral over (zone, two-strike flag)
-(pipeline.sdplus.league_mix_weights). The SD+ cell formula below still
-weights by the league ZONE share only and counts the within-zone count mix
-as the hitter's impact, so its cells no longer sum to the leaderboard value
-exactly; kappa absorbs the gap. The decomposition needs a redesign before
-it is used for a deliverable again.
+2026-11-19: the SD+ cells follow shipped SD+, which is mix-neutral over
+(zone, two-strike flag). The math lives in sd_impact_cells.py (shared with
+sdzone_impact_sweeps.py): each displayed cell sums its two strata, weighted
+by the league share of (zone, two-strike). The formula text below shows the
+earlier zone-only form.
 
 v2 (2026-08-10): cells now decompose the SHIPPED metric's own aggregate,
 so the season page's 15 cells sum to (leaderboard value - 100) and the
@@ -60,6 +59,8 @@ from matplotlib.patches import Rectangle
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sd_impact_cells as SDC  # noqa: E402
 from pipeline.sdplus import (  # noqa: E402
     is_eligible, classify_zone, classify_decision, get_count, cat_of,
     HITTER_PRIOR_N as SD_N0,
@@ -104,7 +105,16 @@ CAT_NAMES = {'FB': 'Fastballs', 'BRK': 'Breaking', 'OFF': 'Offspeed'}
 CELLS = [(z, s) for z in ZONES for s in STATES]
 
 METRICS = {
-    'SD': {'label': 'SD+', 'k': 5, 'lam': 0.25, 'span': 3.0,
+    # SD k / lam re-swept 2026-11-19 on the stratified cells
+    # (sdzone_impact_sweeps.py, 2026, cross-half). lam: interior at .75,
+    # flat .5-.75, so .75. k: the sweep is best at the boundary 0 (.1945
+    # against .1911 at 5), but it runs on units of 250+ decisions and a
+    # category panel here opens at 100, where k 0 put a cell of under 10
+    # decisions at the top of the callouts. k stays 5: a convention for the
+    # smaller sample this page runs at, not the sweep's argmax. One season,
+    # so neither value is a replicated optimum. The CT values were not
+    # changed; the same run reads CT k 10 (flat 5-20) and lam .5.
+    'SD': {'label': 'SD+', 'k': 5, 'lam': 0.75, 'span': 3.0,
            'gate': 100, 'noun': 'decisions', 'n0': SD_N0,
            'title': 'What His Swing Decisions Add and Cost',
            'lb_key': 'sdPlus'},
@@ -167,69 +177,24 @@ def fit_font(text, base=11.0, max_chars=116):
 
 # ── SD cell machinery ───────────────────────────────────────────────────
 
-def sd_league(atoms):
-    acc = defaultdict(lambda: [0.0, 0.0, 0])
-    for v, z, st in atoms:
-        c = acc[(z, st)]
-        c[0] += v
-        c[1] += v * v
-        c[2] += 1
-    tot = len(atoms)
-    joint = {}
-    for cell in CELLS:
-        s, ss, n = acc.get(cell, [0.0, 0.0, 0])
-        if n:
-            m = s / n
-            joint[cell] = (n / tot, m, math.sqrt(max(ss / n - m * m, 0.0)))
-        else:
-            joint[cell] = (0.0, 0.0, 0.0)
-    wz = {z: sum(joint[(z, st)][0] for st in STATES) for z in ZONES}
-    slg = {(z, st): (joint[(z, st)][0] / wz[z] if wz[z] else 0.0)
-           for z in ZONES for st in STATES}
-    state = {st: sum(joint[(z, st)][0] for z in ZONES) for st in STATES}
-    return {'joint': joint, 'wz': wz, 'slg': slg, 'state': state}
-
-
 def sd_cells(atoms, lg, k, kappa):
-    """{cell: dict} with impact (calibrated pts), mix/exec, display stats."""
-    acc = defaultdict(lambda: [0.0, 0])
-    for v, z, st in atoms:
-        acc[(z, st)][0] += v
-        acc[(z, st)][1] += 1
-    nz = {z: sum(acc.get((z, st), [0, 0])[1] for st in STATES) for z in ZONES}
+    """{cell: dict} with impact (calibrated pts), mix/exec, display stats.
+    The math is sd_impact_cells.sd_cells_from_acc (stratified by the
+    two-strike flag, as shipped SD+ is); this adds kappa and the league
+    figures the panel prints."""
+    raw = SDC.sd_cells_from_acc(SDC.sd_cell_agg(atoms), lg, k)
     out = {}
-    for z in ZONES:
-        for st in STATES:
-            _ls, lgg, sd = lg['joint'][(z, st)]
-            s_sum, n = acc.get((z, st), [0.0, 0])
-            s_lg = lg['slg'][(z, st)]
-            if nz[z] == 0:
-                out[(z, st)] = {'n': 0, 'nz': 0, 'share': None, 'g_raw': None,
-                                'lg_share': s_lg, 'lg_grade': lgg, 'sd': sd,
-                                'impact': 0.0, 'mix': 0.0, 'exec': 0.0,
-                                'wz': lg['wz'][z]}
-                continue
-            s_h = n / nz[z]
-            g_raw = (s_sum / n) if n else None
-            g_shr = ((n * (s_sum / n) + k * lgg) / (n + k)) if n else lgg
-            w = lg['wz'][z]
-            impact = kappa * w * (s_h * g_shr - s_lg * lgg)
-            mix = kappa * w * lgg * (s_h - s_lg)
-            execu = kappa * w * s_h * (g_shr - lgg)
-            out[(z, st)] = {'n': n, 'nz': nz[z], 'share': s_h, 'g_raw': g_raw,
-                            'lg_share': s_lg, 'lg_grade': lgg, 'sd': sd,
-                            'impact': impact, 'mix': mix, 'exec': execu,
-                            'wz': w}
+    for cell, c in raw.items():
+        _ls, lgg, sd = lg['joint'][cell]
+        out[cell] = {'n': c['n'], 'nz': c['nz'], 'share': c['share'], 'g_raw': c['g_raw'],
+                     'lg_share': lg['slg_zone'][cell], 'lg_grade': lgg, 'sd': sd,
+                     'impact': kappa * c['impact'], 'mix': kappa * c['mix'],
+                     'exec': kappa * c['exec'], 'se_raw': c['se'], 'wz': lg['wz'][cell[0]]}
     return out
 
 
 def sd_se(c, kappa):
-    if not c['n'] or not c['nz']:
-        return 0.0
-    se_g = c['sd'] / math.sqrt(c['n'])
-    se_s = math.sqrt(max(c['share'] * (1 - c['share']), 1e-9) / c['nz'])
-    return kappa * c['wz'] * math.sqrt((c['share'] * se_g) ** 2
-                                       + (c['lg_grade'] * se_s) ** 2)
+    return kappa * c['se_raw']
 
 
 # ── CT cell machinery ───────────────────────────────────────────────────
@@ -363,7 +328,9 @@ def main():
 
     def sd_atom(p):
         st = count_state_hitter(p)
-        return (100.0 * dv(p) / lg_mean_dv, classify_zone(p), st)
+        c = get_count(p)
+        return (100.0 * dv(p) / lg_mean_dv, classify_zone(p), st,
+                1 if (c is not None and c[1] == 2) else 0)
 
     def ct_tuple(p):
         # cat3 key format since 2026-08-15 (zone|cat|b-s)
@@ -382,7 +349,7 @@ def main():
             continue
         lg_sd_atoms['ALL'].append(a)
         lg_sd_atoms[cat_of(p)].append(a)
-    sd_lg = {g: sd_league(v) for g, v in lg_sd_atoms.items()}
+    sd_lg = {g: SDC.sd_league(v) for g, v in lg_sd_atoms.items()}
 
     # League state shares for CT column headers.
     ct_lg_state = defaultdict(lambda: defaultdict(int))
@@ -458,7 +425,7 @@ def main():
                     continue
                 cells = sd_cells(sub, sd_lg[key], cfg['k'], kappa)
                 state_n = defaultdict(int)
-                for _v, _z, st in sub:
+                for _v, _z, st, _t in sub:
                     state_n[st] += 1
                 panels.append((key, cells, state_n, len(sub)))
             else:
@@ -517,14 +484,13 @@ def main():
         if mkey == 'SD':
             expl = (
                 f'Each cell: its IMPACT in {label} points; the 15 cells sum '
-                f'to his card {label} minus 100. Cells match the card’s '
-                'diet-neutral math: every zone carries the LEAGUE’s share of '
-                'pitches\n(so which zones pitchers put him in moves nothing), '
-                'and within a zone his impact is his count-state share times '
-                'his decision grade there versus the league’s.\nAHEAD/BEHIND '
-                'are the hitter’s counts. Grade = mean per-decision value on '
-                'the 100 scale, unshrunken; share = his split of that zone’s '
-                'decisions across count states.')
+                f'to his card {label} minus 100. Zones and two-strike counts '
+                'carry the LEAGUE’s share\nof pitches (where pitchers put '
+                'him and how often he reaches two strikes move nothing); '
+                'inside each, impact = his count-state share\ntimes his '
+                'decision grade there versus the league’s. AHEAD/BEHIND are '
+                'the hitter’s counts. Grade = mean per-decision value, 100 '
+                'scale.')
         else:
             expl = (
                 f'Each cell: its IMPACT in {label} points; the 15 cells sum '

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Tune the zone x count impact-page constants for SD+ / CT+ hitter pages.
 
-NOTE 2026-11-19: shipped SD+ is now mix-neutral over (zone, two-strike flag)
-(pipeline.sdplus.league_mix_weights). The SD+ cell formula below still
-weights by the league ZONE share only and counts the within-zone count mix
-as the hitter's impact, so its cells no longer sum to the leaderboard value
-exactly; kappa absorbs the gap. The decomposition needs a redesign before
-it is used for a deliverable again.
+2026-11-19: the SD+ cells follow shipped SD+, which is mix-neutral over
+(zone, two-strike flag). The math lives in sd_impact_cells.py (shared with
+render_sd_zones_impact.py). The two table-key formats were also brought up
+to the shipped ones (SD 'zone|ALL|b-s', CT 'zone|cat|b-s'); this script
+did not run on a current metadata file before that. Constants re-swept on
+the full 2026 season the same day: see METRICS in the render tool.
 
 v2 (2026-08-10): re-swept for the CARD-COHERENT cell formulas after Wally
 rejected the v1 decomposition (it counted pitch diet / swing selection,
@@ -55,6 +55,8 @@ from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sd_impact_cells as SDC  # noqa: E402
 from pipeline.sdplus import (  # noqa: E402
     is_eligible, classify_zone, classify_decision, get_count, cat_of,
 )
@@ -88,66 +90,20 @@ def pearson(a, b):
 
 
 # ── SD machinery ────────────────────────────────────────────────────────
-# league table per grp: {cell: (joint_share, grade, sd)}; derived zone
-# weights w_z and within-zone shares s_lg(st|z).
+# The math is sd_impact_cells.py (stratified by the two-strike flag, as
+# shipped SD+ is). An atom is (value, zone, state, two).
 
-def sd_league(atoms):
-    acc = defaultdict(lambda: [0.0, 0.0, 0])
-    for v, z, st in atoms:
-        c = acc[(z, st)]
-        c[0] += v
-        c[1] += v * v
-        c[2] += 1
-    tot = len(atoms)
-    joint = {}
-    for cell in CELLS:
-        s, ss, n = acc.get(cell, [0.0, 0.0, 0])
-        if n:
-            m = s / n
-            joint[cell] = (n / tot, m, math.sqrt(max(ss / n - m * m, 0.0)))
-        else:
-            joint[cell] = (0.0, 0.0, 0.0)
-    wz = {z: sum(joint[(z, st)][0] for st in STATES) for z in ZONES}
-    slg = {(z, st): (joint[(z, st)][0] / wz[z] if wz[z] else 0.0)
-           for z in ZONES for st in STATES}
-    return {'joint': joint, 'wz': wz, 'slg': slg}
-
-
-def sd_cell_agg(atoms):
-    acc = defaultdict(lambda: [0.0, 0])
-    for v, z, st in atoms:
-        acc[(z, st)][0] += v
-        acc[(z, st)][1] += 1
-    return acc
+sd_league = SDC.sd_league
+sd_cell_agg = SDC.sd_cell_agg
 
 
 def sd_impact_vector(acc, lg, k):
-    nz = {z: sum(acc.get((z, st), [0, 0])[1] for st in STATES) for z in ZONES}
-    out = []
-    for z in ZONES:
-        for st in STATES:
-            if nz[z] == 0:
-                out.append(0.0)
-                continue
-            _ls, lgg, _sd = lg['joint'][(z, st)]
-            s_sum, n = acc.get((z, st), [0.0, 0])
-            s_h = n / nz[z]
-            g_shr = ((n * (s_sum / n) + k * lgg) / (n + k)) if n else lgg
-            out.append(lg['wz'][z] * (s_h * g_shr - lg['slg'][(z, st)] * lgg))
-    return out
+    cells = SDC.sd_cells_from_acc(acc, lg, k)
+    return [cells[c]['impact'] for c in CELLS]
 
 
 def sd_se(acc, lg, cell):
-    z, st = cell
-    nz = sum(acc.get((z, s2), [0, 0])[1] for s2 in STATES)
-    if nz == 0:
-        return 0.0
-    _ls, lgg, sd = lg['joint'][cell]
-    _sum, n = acc.get(cell, [0.0, 0])
-    s_h = n / nz
-    se_g = sd / math.sqrt(n) if n else 0.0
-    se_s = math.sqrt(max(s_h * (1 - s_h), 1e-9) / nz)
-    return lg['wz'][z] * math.sqrt((s_h * se_g) ** 2 + (lgg * se_s) ** 2)
+    return SDC.sd_cells_from_acc(acc, lg, 0)[cell]['se']
 
 
 # ── CT machinery ────────────────────────────────────────────────────────
@@ -251,9 +207,10 @@ def main():
     mlb = [p for p in allp if p.get('_source', 'MLB') == 'MLB' and is_eligible(p)]
 
     def dv(p):
-        z, c, cat = classify_zone(p), get_count(p), cat_of(p)
-        s = sdw[f'{z}|{cat}|{c[0]}-{c[1]}|swing']['rv']
-        t = sdw[f'{z}|{cat}|{c[0]}-{c[1]}|take']['rv']
+        # SD+ cells are category-collapsed since 2026-08-15 ('ALL' key)
+        z, c = classify_zone(p), get_count(p)
+        s = sdw[f'{z}|ALL|{c[0]}-{c[1]}|swing']['rv']
+        t = sdw[f'{z}|ALL|{c[0]}-{c[1]}|take']['rv']
         return (s - t) if classify_decision(p) == 'swing' else (t - s)
 
     lg_mean_dv = sum(dv(p) for p in mlb) / len(mlb)
@@ -268,9 +225,10 @@ def main():
             continue
         a = 100.0 * dv(p) / lg_mean_dv
         z, grp = classify_zone(p), cat_of(p)
-        lg_atoms[grp].append((a, z, st))
-        by_unit[(p.get('Batter'), p.get('BTeam'), grp)].append((a, z, st))
-        by_hitter[(p.get('Batter'), p.get('BTeam'))][grp].append((a, z, st))
+        two = 1 if get_count(p)[1] == 2 else 0
+        lg_atoms[grp].append((a, z, st, two))
+        by_unit[(p.get('Batter'), p.get('BTeam'), grp)].append((a, z, st, two))
+        by_hitter[(p.get('Batter'), p.get('BTeam'))][grp].append((a, z, st, two))
     sd_lg = {g: sd_league(v) for g, v in lg_atoms.items()}
 
     sd_units = []
@@ -314,7 +272,8 @@ def main():
     mlb_sw = [p for p in mlb if is_ct_eligible(p)]
 
     def ct_tuple(p):
-        cell = ctw[f'{classify_zone(p)}|{get_count(p)[0]}-{get_count(p)[1]}']
+        # cat3 key format since 2026-08-15 (zone|cat|b-s)
+        cell = ctw[f'{classify_zone(p)}|{cat_of(p)}|{get_count(p)[0]}-{get_count(p)[1]}']
         lev = cell['rv_contact'] - cell['rv_whiff']
         E = 1.0 - cell['p_whiff']
         made = 1.0 if classify_contact_outcome(p) == 'contact' else 0.0
