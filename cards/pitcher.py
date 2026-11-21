@@ -4798,6 +4798,11 @@ def _normalize_scratch_pitch(row):
     read_pitches_from_sheet."""
     from pipeline.utils import compute_in_zone, is_barrel
     p = {k: (None if v == '' else v) for k, v in row.items()}
+    # Neutral-environment metrics: the same swap the pipeline read does (adjusted under the
+    # plain column name, tracked under <column>_raw). A corpus row arrives already swapped.
+    from pipeline import neutral_move as _NM
+    if 'Velocity' + _NM.RAW_SUFFIX not in p and all(x in p for x in _NM.X_METRIC_COLUMNS):
+        _NM.swap_in_neutral_metrics(p)
     if not p.get('Barrel'):
         p['Barrel'] = '6' if is_barrel(sf(p.get('ExitVelo')), sf(p.get('LaunchAngle'))) else ''
     p['InZone'] = compute_in_zone(p)

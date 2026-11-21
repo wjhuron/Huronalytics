@@ -155,6 +155,7 @@ def score_batch(path, ibb):
     rows_all = df.to_dict('records')
     del df
     mc._to_mlb_currency(rows_all)
+    mc._swap_neutral_metrics(rows_all, os.path.basename(path))      # adjusted, as every card reads
     by = defaultdict(list)
     for r in rows_all:
         by[r.pop('mlbId')].append(r)
