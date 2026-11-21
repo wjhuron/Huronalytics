@@ -28,7 +28,7 @@ Design decisions (see the README block the writer emits):
 Sources
   data/all_pitches_rs_cache.pkl  — retagged league pitch data (the site's source)
   data/metadata_rs.json          — shipped league tables / constants
-  NLE2026 'NEW' tab              — the three players new to the org, whose data
+  MiLB2026 'NEW' tab              — the three players new to the org, whose data
                                    is NOT in the pipeline cache
 
 Usage:  python3 scripts/tools/platoon_splits.py [--outdir ~/Downloads] [--no-new-tab]
@@ -160,7 +160,7 @@ def load_pitches(use_new_tab=True):
         import pipeline.fetch as pf
         gc = pf._gspread_client()
         raw = pf.read_pitches_from_sheet(
-            gc, pf.DIVISION_WORKBOOK_IDS['NLE2026'], extra_tabs={'NEW'})
+            gc, pf.DIVISION_WORKBOOK_IDS[pf.NEW_TAB_WORKBOOK], extra_tabs={'NEW'})
         raw = [r for r in raw if r.get('_sheet_tab') == 'NEW'
                and r.get('Pitcher') in NEW_TAB_MLB_TEAM]
         # The NEW tab is a superset: it re-lists the player's MLB pitches. Those

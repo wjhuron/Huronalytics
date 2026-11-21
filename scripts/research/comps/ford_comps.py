@@ -37,7 +37,7 @@ Usage examples:
   python3 scripts/research/comps/ford_comps.py --team ROC --role both
   python3 scripts/research/comps/ford_comps.py --team ROC --exclude "Jordan, Levi;Wallace, Cayden"
   python3 scripts/research/comps/ford_comps.py --pitcher "Cruz, Yovanny" --tab NEW   scratch-tab
-      (NLE2026) pitches as the target's complete MLB+MiLB line
+      (MiLB2026) pitches as the target's complete MLB+MiLB line
 """
 import os, sys, csv, json, pickle, math, argparse
 from collections import defaultdict
@@ -489,11 +489,11 @@ def _load_cache(start, end):
         yield p
 
 
-_NLE2026 = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
+_MILB2026 = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
 
 
 def load_tab_pitches(tab, role, start=None, end=None):
-    """Pitches from a scratch tab of the NLE2026 workbook (e.g. NEW).
+    """Pitches from a scratch tab of the MiLB2026 workbook (e.g. NEW).
 
     Scratch tabs hold player_id pulls — a player's COMPLETE data (MLB +
     other-org MiLB), which never reaches the pipeline cache or leaderboards.
@@ -502,7 +502,7 @@ def load_tab_pitches(tab, role, start=None, end=None):
     re-teamed to the tab name so each player aggregates to ONE combined row."""
     import gspread
     from pipeline.utils import compute_in_zone, is_barrel
-    ws = gspread.service_account().open_by_key(_NLE2026).worksheet(tab)
+    ws = gspread.service_account().open_by_key(_MILB2026).worksheet(tab)
     out = []
     for r in ws.get_all_records():
         d = r.get('Game Date') or ''
@@ -941,7 +941,7 @@ def main():
     ap.add_argument('--start', default=None, help='date window start (recomputed from cache)')
     ap.add_argument('--end', default=None, help='date window end (inclusive)')
     ap.add_argument('--tab', default=None,
-                    help='scratch tab in the NLE2026 workbook (e.g. NEW): use '
+                    help='scratch tab in the MiLB2026 workbook (e.g. NEW): use '
                          "the tab's pitches as the target's COMPLETE data "
                          '(MLB + other-org MiLB); pool recomputed from the '
                          'cache. Combine with --pitcher/--hitter, or with '
@@ -1006,7 +1006,7 @@ def interactive():
     team       = "ROC"      # batch mode: team whose players get comped
     level      = "both"     # which of the TARGET's stat lines to use: "mlb",
                             #   "aaa", or "both" (comp pool is ALWAYS MLB-only)
-    tab        = None       # scratch tab (NLE2026 workbook) as the target's
+    tab        = None       # scratch tab (MiLB2026 workbook) as the target's
                             #   complete data, or None for pipeline data only
     start_date = None       # "yyyy-mm-dd", or None for full season
     end_date   = None       # "yyyy-mm-dd", or None for through today

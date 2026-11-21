@@ -571,12 +571,16 @@ def read_pitches_from_supabase(teams=None):
 
 
 # Six 2026 per-division workbooks (replaced the two AL/NL books, on the
-# huronalytics account). NLE2026 also holds ROC/AAA/FCL.
+# huronalytics account). ROC / AAA / NEW live in a seventh workbook, MiLB2026, since
+# 2026-11-21: NL East had grown past the 10,000,000-cell limit with them (11.9M).
+# MiLB2026 sits right after NLE2026 ON PURPOSE: the pipeline reads the workbooks in
+# this order, so ROC and AAA rows keep their old place in the pitch list.
 DIVISION_WORKBOOK_IDS = {
     'ALE2026': '1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI',
     'ALC2026': '14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E',
     'ALW2026': '1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs',
     'NLE2026': '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA',
+    'MiLB2026': '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ',
     'NLC2026': '1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w',
     'NLW2026': '1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0',
 }
@@ -608,12 +612,15 @@ def _gspread_client():
     return gspread.service_account()
 
 
-NEW_TAB_WORKBOOK = 'NLE2026'
+# The one workbook that holds the non-MLB tabs (ROC, AAA, NEW). Every tool that needs
+# those tabs reads this constant; none of them may name a workbook itself.
+EXTRA_TABS_WORKBOOK = 'MiLB2026'
+NEW_TAB_WORKBOOK = EXTRA_TABS_WORKBOOK
 NEW_TAB_NAME = 'NEW'
 
 
 def read_new_tab_pitches(gc=None):
-    """Read the NLE2026 'NEW' tab — the scratch space for arms new to the org.
+    """Read the MiLB2026 'NEW' tab — the scratch space for arms new to the org.
 
     SCORING ONLY. These rows exist so Stuff+/Loc+ get written back into the
     tab's grade columns; they are deliberately kept out of `all_pitches` by the
@@ -690,7 +697,7 @@ def split_aaa_postseason(pitches, pks):
 
 def read_all_pitches_from_sheets(include_no_pitch=False):
     """Read all RS pitches from the six 2026 division workbooks (the Sheets the
-    site reads). NLE2026's ROC/AAA tabs come in via extra_tabs; FCL is skipped
+    site reads). MiLB2026's ROC/AAA tabs come in via extra_tabs; FCL is skipped
     (not in MLB_TEAMS).
 
     No-pitch plate appearances are EXCLUDED by default. Since 2017 an automatic
@@ -713,7 +720,7 @@ def read_all_pitches_from_sheets(include_no_pitch=False):
     gc = _gspread_client()
     pitches = []
     for name, wid in DIVISION_WORKBOOK_IDS.items():
-        extra = {'ROC', 'AAA'} if name == 'NLE2026' else None
+        extra = {'ROC', 'AAA'} if name == EXTRA_TABS_WORKBOOK else None
         pitches += read_pitches_from_sheet(gc, wid, extra_tabs=extra)
     if include_no_pitch:
         return pitches

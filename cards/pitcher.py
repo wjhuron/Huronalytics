@@ -6014,7 +6014,7 @@ def main(new_level=None):
                              'tables); the boxscore strip (G/GS/IP/ERA) stays '
                              'whole-outing because runs cannot be split by hand.')
     parser.add_argument('--tab', default=None,
-                        help='Read pitches from this scratch tab in the NLE2026 '
+                        help='Read pitches from this scratch tab in the MiLB2026 '
                              'workbook (e.g. Sheet2) instead of a team tab. '
                              'Scratch data never touches the leaderboards; cards '
                              'render MiLB-style (no percentile bubbles).')
@@ -6082,7 +6082,7 @@ def main(new_level=None):
     # Teams: a comma-separated --team (e.g. TOR,LAD) combines a multi-team
     # pitcher's full season. Pitch data is read from each team's worksheet; the
     # bubbles use the pipeline's synthetic 2TM/3TM combined leaderboard row.
-    # team = "NEW" selects the scratch tab of the same name in the NLE2026
+    # team = "NEW" selects the scratch tab of the same name in the MiLB2026
     # workbook (never read by the pipeline, so it cannot reach the site);
     # --tab overrides for other scratch tab names.
     scratch_tab = args.tab or ('NEW' if str(team).strip().upper() == 'NEW' else None)
@@ -6294,8 +6294,8 @@ def main(new_level=None):
         print("Step 1: Loading pitch data from Google Sheets...")
         gc = gspread.service_account()
     for t in ([] if milb_corpus else teams):
-        _NLE2026 = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
-        ws = gc.open_by_key(_NLE2026 if scratch_tab else _workbook_id_for_team(t)).worksheet(t)
+        from pipeline.fetch import DIVISION_WORKBOOK_IDS as _WB, NEW_TAB_WORKBOOK as _SCRATCH_WB
+        ws = gc.open_by_key(_WB[_SCRATCH_WB] if scratch_tab else _workbook_id_for_team(t)).worksheet(t)
         for attempt in range(3):
             try:
                 t_rows = ws.get_all_records()

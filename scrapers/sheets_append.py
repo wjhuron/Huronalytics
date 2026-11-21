@@ -64,12 +64,13 @@ ROC_AAA_TEAMS = {'ROC', 'AAA'}
 
 # 2026 layout: six per-division workbooks (replaces the two AL/NL books to stay
 # under the Sheets cell limit). Each team appends to its division's workbook;
-# ROC/AAA/FCL live in NL East.
+# ROC/AAA/FCL live in the seventh workbook, MiLB2026 (moved out of NL East 2026-11-21).
 WORKBOOKS = {
     'ALE2026': '1YbgAliQzXePiFan-ruwJ50G80l4AjeyTGN8cO3KJ1XI',
     'ALC2026': '14gglESfgJoT90crQb5hHoEZNUFDZ5chPLbUIV9mlm4E',
     'ALW2026': '1eSFfKRo5kSImjP0SZ1SMssGrOhrKSZM9GOHiwntIlhs',
     'NLE2026': '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA',
+    'MiLB2026': '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ',
     'NLC2026': '1-I8BVEw9bR9rzGVYJao_Ar0bjYZF54pi5pm3YEluB9w',
     'NLW2026': '1vm257A676FORcSRzXcNj6txgehGhYI7k5mnmsgQCYH0',
 }
@@ -78,7 +79,7 @@ TEAM_DIVISION = {
     'CLE': 'ALC2026', 'CWS': 'ALC2026', 'DET': 'ALC2026', 'KCR': 'ALC2026', 'MIN': 'ALC2026',
     'ATH': 'ALW2026', 'HOU': 'ALW2026', 'LAA': 'ALW2026', 'SEA': 'ALW2026', 'TEX': 'ALW2026',
     'ATL': 'NLE2026', 'MIA': 'NLE2026', 'NYM': 'NLE2026', 'PHI': 'NLE2026', 'WSH': 'NLE2026',
-    'ROC': 'NLE2026', 'AAA': 'NLE2026', 'FCL': 'NLE2026',
+    'ROC': 'MiLB2026', 'AAA': 'MiLB2026', 'FCL': 'MiLB2026',
     'CHC': 'NLC2026', 'CIN': 'NLC2026', 'MIL': 'NLC2026', 'PIT': 'NLC2026', 'STL': 'NLC2026',
     'ARI': 'NLW2026', 'COL': 'NLW2026', 'LAD': 'NLW2026', 'SDP': 'NLW2026', 'SFG': 'NLW2026',
 }

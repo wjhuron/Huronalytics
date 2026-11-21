@@ -158,7 +158,7 @@ MLB_TEAMS = {
     'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH',
     'WBC',
 }
-# 'AAA' included defensively: AAA-source rows (the NLE2026 AAA tab) carry
+# 'AAA' included defensively: AAA-source rows (the MiLB2026 AAA tab) carry
 # team 'AAA', which would otherwise slip past `team not in AAA_TEAMS`
 # checks and leak into MLB normalization pools.
 AAA_TEAMS = {'ROC', 'AAA'}

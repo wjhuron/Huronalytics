@@ -34,7 +34,7 @@ end_date   = None
 
 # Set specific teams, or None for all teams.  e.g. ["BOS", "NYY"].
 # Tab names are accepted in any case, and "ROC" / "AAA" work here the same as
-# an MLB club (they live on NLE2026). e.g. ["ROC", "AAA"] runs just those tabs.
+# an MLB club (they live on MiLB2026). e.g. ["ROC", "AAA"] runs just those tabs.
 filter_teams = None
 
 # Produce an Excel report of all changes? "yes" or "no"
@@ -53,7 +53,7 @@ backfill_milb = "yes"
 
 # Six 2026 per-division workbooks — single-homed in pipeline.fetch so the
 # audit layer and the pipeline can never point at different books. main()
-# opens each book and walks its team tabs; NLE2026 also carries ROC/AAA/FCL.
+# opens each book and walks its team tabs; MiLB2026 carries ROC/AAA/NEW.
 from pipeline.fetch import DIVISION_WORKBOOK_IDS as SPREADSHEET_IDS
 
 # Spreadsheet column name -> Statcast CSV column name

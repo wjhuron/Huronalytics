@@ -74,7 +74,7 @@ PITCHERS = {
 # pitches are fetched from the tab and Loc+ atoms re-scored live, exactly as
 # Cards.py does for scratch tabs.
 NEW_TAB_ARMS = {'Bird, Jake', 'Cruz, Yovanny', 'Dion, Will'}
-NEW_TAB_WORKBOOK = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
+NEW_TAB_WORKBOOK = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
 
 ZONES = ['heart', 'shadow_in', 'shadow_out', 'chase', 'waste']
 ZONE_NAMES = {'heart': 'Heart', 'shadow_in': 'Shadow-In',

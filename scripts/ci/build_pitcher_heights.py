@@ -9,7 +9,7 @@ unresolved. Heights come from /api/v1/people. Ambiguous names (several ids)
 take the mean.
 
 Names are collected from data/all_pitches_rs_cache.pkl (MLB + ROC/AAA) and
-from the NLE2026 NEW tab (see collect_new_pitchers). A NEW-tab pitcher is
+from the MiLB2026 NEW tab (see collect_new_pitchers). A NEW-tab pitcher is
 resolved BY ID only: the builder reads the boxscore of a game he pitched in
 (gamePk from the PitchID prefix) and takes the id of the pitcher in that game
 whose name matches. No name search is used for NEW, so a common name cannot

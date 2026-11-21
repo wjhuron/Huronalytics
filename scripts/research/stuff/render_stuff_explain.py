@@ -60,7 +60,7 @@ SLATE = (66 / 255, 100 / 255, 138 / 255)
 ROC_ARMS = {'Perales, Luis': ['ROC'], 'Kent, Jackson': ['ROC'],
             'Sinclair, Jack': ['ROC'], 'Tolman, Erik': ['ROC']}
 NEW_TAB_ARMS = {'Bird, Jake', 'Cruz, Yovanny', 'Dion, Will'}
-NEW_TAB_WORKBOOK = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
+NEW_TAB_WORKBOOK = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
 
 PITCH_NAMES = {'FF': 'Fastball', 'SI': 'Sinker', 'FC': 'Cutter', 'SL': 'Slider',
                'ST': 'Sweeper', 'SV': 'Slurve', 'CU': 'Curveball',

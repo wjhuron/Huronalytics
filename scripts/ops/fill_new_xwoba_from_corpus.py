@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """fill_new_xwoba_from_corpus.py — write the MiLB corpus xwOBA into blank NEW-tab cells.
 
-The NEW tab (NLE2026 workbook) leaves some xwOBA cells blank that Savant has since
+The NEW tab (MiLB2026 workbook) leaves some xwOBA cells blank that Savant has since
 priced, and the MiLB corpus (data/_milb2026/milb2026_pitches.csv.gz) pulled them later.
 On 2026-11-13 two such balls in play put Cornielle's NEW-card hdERA at 3.93 against 4.00
 on his corpus card. The NEW card fills them at read time (cards/pitcher.py); this script
@@ -29,7 +29,7 @@ from cards.milb_corpus import corpus_xwoba, CORPUS_PATH
 from scrapers.sheet_precision import fmt, domain_problem
 from scrapers.sheets_append import _get_client, _col_letter, _sheets_retry
 
-NLE2026 = '1BypxxlWgQAltETOLqccOYigeo8nXX-FIuVv6rhT4anA'
+MILB2026 = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
 TAB = 'NEW'
 
 
@@ -39,7 +39,7 @@ def main():
                     help='write the cells; without it nothing is written')
     a = ap.parse_args()
 
-    ws = _sheets_retry(lambda: _get_client().open_by_key(NLE2026).worksheet(TAB),
+    ws = _sheets_retry(lambda: _get_client().open_by_key(MILB2026).worksheet(TAB),
                        label=f'{TAB} open')
     values = _sheets_retry(lambda: ws.get_all_values(), label=f'{TAB} read')
     header = values[0]
