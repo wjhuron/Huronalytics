@@ -809,6 +809,8 @@ const Aggregator = {
                      // merged here; a conditional fallback below covers
                      // pre-atom embeds where the atoms are absent.
                      'locPlusRaw', 'stuffScore_lowSupport',
+                     // Raw Stuff+ is season-level: the micro rows carry no raw atoms
+                     'rawStuffScore', 'rawStuffScore_pctl',
                      'xrvoe100', 'xrvoe100_pctl', 'rvoe100', 'rvoe100_pctl',
                      'rvoe', 'rvoe_pctl', 'xrvoe', 'xrvoe_pctl',
                      // Pitcher+ is season-level like SIERA/FIP/xRV100: its
@@ -1928,6 +1930,8 @@ const Aggregator = {
         // value only as a fallback for rows without atoms (pre-atom embeds).
         if (rows[pmi].stuffScore == null && ppre.stuffScore !== undefined) rows[pmi].stuffScore = ppre.stuffScore;
         if (ppre.stuffScore_lowSupport !== undefined) rows[pmi].stuffScore_lowSupport = ppre.stuffScore_lowSupport;
+        // Raw Stuff+ is season-level (no micro atoms): filtered views carry the season value
+        if (ppre.rawStuffScore !== undefined) { rows[pmi].rawStuffScore = ppre.rawStuffScore; rows[pmi].rawStuffScore_pctl = ppre.rawStuffScore_pctl; }
         if (rows[pmi].locPlus == null && ppre.locPlus !== undefined) {
           rows[pmi].locPlus = ppre.locPlus;
           if (ppre.locPlusN !== undefined) rows[pmi].locPlusN = ppre.locPlusN;

@@ -65,12 +65,25 @@ except ImportError as e:
     print(f'  WARNING: pipeline.utils.AAA_TEAMS unavailable ({e}); using {{"ROC"}}')
     AAA_TEAMS = {'ROC'}
 from pipeline.utils import MLB_TEAMS  # noqa: E402  (combined-row pools: club stints only)
-# Stuff+ reads the six weather-sensitive metrics AS TRACKED (`_tracked`), not the neutral
-# values that every display reads since 2026-11-21 (pipeline/neutral_move.py, the read
-# boundary). The bundle was trained on tracked values, and an input change owes a retrain
-# with a version bump and a gate result first. Movement is the exception that already
-# moved: xIndVrtBrk / xHorzBrk are neutral since v19.
-from pipeline.neutral_move import raw_metric as _tracked  # noqa: E402
+# v20 (2026-11-21, per Wally): Stuff+ reads EVERY input as a neutral-environment value.
+# Movement has been neutral since v19; velocity, spin rate, extension, arm angle and the
+# approach angle follow (pipeline/neutral_move.py, model wm1). The plain column name holds
+# the neutral value at every source: the sheet read swaps it in, and the 2021-2025 training
+# pickles carry it (scripts/builders/augment_training_neutral_movement.py). The tracked
+# values stay under `<column>_raw` and feed Raw Stuff+ only (`_raw_view` below).
+from pipeline import neutral_move as _NM  # noqa: E402
+
+
+def _raw_view(p):
+    """A shallow copy of a pitch with every weather-sensitive input AS TRACKED: the real
+    IndVertBrk / HorzBrk in the movement keys and the `_raw` value of the six metrics.
+    Raw Stuff+ is the SAME model and the SAME scale on this view, so the gap between
+    Stuff+ and Raw Stuff+ is the game's air and nothing else."""
+    q = dict(p)
+    q['xIndVrtBrk'], q['xHorzBrk'] = p.get('IndVertBrk'), p.get('HorzBrk')
+    for c in _NM.METRIC_COLUMNS:
+        q[c] = _NM.raw_metric(p, c)
+    return q
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC', 'KN'}
 # Types whose per-type anchor pool is too thin to trust borrow a donor pool
@@ -114,7 +127,7 @@ def _harmonize_tags(prior, current):
     def cents(pitches, mv_keys):
         acc = _dd(lambda: [0.0, 0.0, 0.0, 0])
         for p in pitches:
-            v = sf(_tracked(p, 'Velocity'))
+            v = sf(p.get('Velocity'))
             iv = sf(p.get(mv_keys[0]))
             hb = sf(p.get(mv_keys[1]))
             thr = p.get('Throws')
@@ -267,7 +280,7 @@ HEIGHT_CLIP = (70.0, 80.0)
 # bundle the new columns move a pitcher x pitch grade by sd .48 points, Colorado staff
 # +.80 on average and sweepers +2 to +4. The version changes because a bundle trained
 # on the old columns must not score the new ones.
-BUNDLE_VERSION = 'v19'
+BUNDLE_VERSION = 'v20'     # v19 design, every input neutral (see the v20 note at the imports)
 
 # Bundle FRESHNESS (2026-09-23). The version string guards the config, not
 # the data: a retrain on more data keeps the version, so the local
@@ -557,7 +570,7 @@ def _arm_means(pitches):
     pt = defaultdict(lambda: [0.0, 0])
     al = defaultdict(lambda: [0.0, 0])
     for p in pitches:
-        aa = sf(_tracked(p, 'ArmAngle'))
+        aa = sf(p.get('ArmAngle'))
         if aa is None:
             continue
         pit, pt0 = p.get('Pitcher'), p.get('Pitch Type')
@@ -615,7 +628,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     for p in pitches:
         pt, thr = p.get('Pitch Type'), p.get('Throws')
         if pt not in FB_TYPES or thr not in ('L', 'R'): continue
-        v, iv, hb, vaa = sf(_tracked(p, 'Velocity')), sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk')), sf(_tracked(p, 'VAA'))
+        v, iv, hb, vaa = sf(p.get('Velocity')), sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk')), sf(p.get('VAA'))
         vaa = _nvaa(pt, vaa, sf(p.get('PlateZ')))   # v12: reference is nVAA too
         if None in (v, iv, hb): continue
         s = 1.0 if thr == 'R' else -1.0
@@ -653,7 +666,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     # see the per-pitch _arm mask in the ROC scoring block.)
     arm_pt = defaultdict(lambda: [0.0, 0]); arm_all = defaultdict(lambda: [0.0, 0])
     for p in pitches:
-        aa = sf(_tracked(p, 'ArmAngle'))
+        aa = sf(p.get('ArmAngle'))
         if aa is None: continue
         pit = p.get('Pitcher'); pt0 = p.get('Pitch Type')
         arm_pt[(pit, pt0)][0] += aa; arm_pt[(pit, pt0)][1] += 1
@@ -668,13 +681,13 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     for p in pitches:
         pt, thr, bats = p.get('Pitch Type'), p.get('Throws'), p.get('Bats')
         if pt not in SUPPORTED or thr not in ('L', 'R') or bats not in ('L', 'R'): continue
-        v, spin = sf(_tracked(p, 'Velocity')), sf(_tracked(p, 'Spin Rate'))
+        v, spin = sf(p.get('Velocity')), sf(p.get('Spin Rate'))
         # density-adjusted movement (pipeline_fetch backfills these from raw
         # when the adjustment hasn't landed, so coverage matches raw)
         iv, hb_raw = sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk'))
-        vaa_raw, ext = sf(_tracked(p, 'VAA')), sf(_tracked(p, 'Extension'))
+        vaa_raw, ext = sf(p.get('VAA')), sf(p.get('Extension'))
         vaa = _nvaa(pt, vaa_raw, sf(p.get('PlateZ')))   # v12: nVAA
-        arm, rel_z = sf(_tracked(p, 'ArmAngle')), sf(p.get('RelPosZ'))
+        arm, rel_z = sf(p.get('ArmAngle')), sf(p.get('RelPosZ'))
         rel_x_raw = sf(p.get('RelPosX'))
         if arm is None:                       # real-time placeholder until backfill
             arm = _arm_placeholder(p.get('Pitcher'), pt)
@@ -760,7 +773,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
             # passthroughs for the battery's post-hoc transforms (location-
             # adjusted approach angles, HAA reconstruction validation)
             'plate_x': sf(p.get('PlateX')), 'plate_z': sf(p.get('PlateZ')),
-            'haa_meas': sf(_tracked(p, 'HAA')),
+            'haa_meas': sf(p.get('HAA')),
             # per-pitch 9P kinematics (augment_kinematics / the 2026 sidecar;
             # None on rows not yet backfilled)
             'kin_eff': sf(p.get('KinEff')), 'kin_dev': sf(p.get('KinDev')),
@@ -1570,6 +1583,45 @@ def main():
 
     agg = _apply_atom_means(agg, ['pitcher', 'team', 'pitch_type'])
     overall = _apply_atom_means(overall, ['pitcher', 'team', 'throws'])
+
+    # ── Raw Stuff+ (2026-11-21, per Wally): what the stuff looked like in the game's air.
+    #    MLB rows only. Same fold models (each pitcher scored by the model that never saw
+    #    him), same no-arm companion, same league anchors as Stuff+, on the tracked view of
+    #    each pitch. Aggregated as Stuff+ is: the plain mean of the integer atoms. ──
+    _rv = fill_arm_prior(build_df([_raw_view(p) for p in pitches]), arm_prior)
+    _fmR = B['fold_models'] if B is not None else fold_models
+    _fpR = B['fold_pitchers'] if B is not None else fold_pitchers
+    _fmR_na = B['fold_models_na'] if B is not None else fold_models_na
+    _foldR = {pp_: k for k, ps in enumerate(_fpR) for pp_ in ps}
+    _pfR = np.array([_foldR.get(pp_, 0) for pp_ in _rv['pitcher']])
+    _XR = design(_rv).reindex(columns=X.columns, fill_value=0)
+    _rawR = np.full(len(_rv), np.nan)
+    for k, mm in enumerate(_fmR):
+        mask = _pfR == k
+        if mask.any():
+            _rawR[mask] = -mm.predict(_XR[mask])
+    _naR = _rv['arm_angle'].isna().values
+    if _naR.any():
+        _XRn = design(_rv[_naR], NOARM_FEATS).reindex(columns=Xna.columns, fill_value=0)
+        _rn = np.full(int(_naR.sum()), np.nan)
+        for k, mm in enumerate(_fmR_na):
+            mask = _pfR[_naR] == k
+            if mask.any():
+                _rn[mask] = -mm.predict(_XRn[mask])
+        _eqR = _noarm_equiv(_rv.loc[_naR, 'pitch_type'], pd.Series(_rn, index=_rv.index[_naR]))
+        _okR = np.isfinite(_eqR)
+        _rawR[np.flatnonzero(_naR)[_okR]] = _eqR[_okR]
+    _rv = _rv.assign(stuff_raw=_rawR)
+    _rv['_ai'] = _atom_series(_rv, league, 'stuff_raw')
+    _rv = _rv.dropna(subset=['_ai'])
+    raw_pt = {k: (float(g_['_ai'].sum()), int(len(g_))) for k, g_ in _rv.groupby(['pitcher', 'team', 'pitch_type'])}
+    raw_ov = {k: (float(g_['_ai'].sum()), int(len(g_))) for k, g_ in _rv.groupby(['pitcher', 'team', 'throws'])}
+    _n_adj = int(_mlb_disp['_ai'].notna().sum())
+    print(f'  Raw Stuff+: {len(_rv)} MLB pitches graded on tracked inputs ({_n_adj} on neutral inputs), '
+          f'mean atom {_rv["_ai"].mean():.2f} against {_mlb_disp["_ai"].mean():.2f}')
+    if _n_adj and abs(len(_rv) - _n_adj) > 0.01 * _n_adj:
+        sys.exit(f'ABORT: Raw Stuff+ graded {len(_rv)} pitches against {_n_adj} for Stuff+; the two views '
+                 f'must cover the same pitches (a tracked input is missing where the neutral one is not).')
     # re-save the CSV so it carries the displayed (atom-mean) values; the
     # exact mean is an in-run helper for the stored value, not a CSV column
     agg.drop(columns=['stuff_exact']).to_csv(os.path.join(HERE, 'pitcher_stuff.csv'), index=False)
@@ -1720,7 +1772,8 @@ def main():
             df, pitches, roc_df=roc_df, roc_pitches=roc_pitches, by_hand=True)
         inject(agg, overall, league, xrvoe_pt=xrvoe_pt, xrvoe_ov=xrvoe_ov,
                mlb_pitches=pitches, roc_pitches=roc_pitches,
-               xrvoe_hand=(xrvoe_pt_h, xrvoe_ov_h))
+               xrvoe_hand=(xrvoe_pt_h, xrvoe_ov_h),
+               raw_stuff=(raw_pt, raw_ov))
     else:
         print('  (skipped leaderboard injection; run with --inject to surface)')
 
@@ -1966,8 +2019,15 @@ def compute_xrvoe(df, pitches, roc_df=None, roc_pitches=None, by_hand=False):
             _units(['pitcher', 'team', 'bats'], XRVOE_MIN_OV, dh))
 
 
+def _raw_stuff_value(parts):
+    """Raw Stuff+ of a row from (atom_sum, atom_n) pairs: one pair for a club row, every MLB
+    stint for a combined row. None when there is no graded pitch."""
+    n = sum(x[1] for x in parts) if parts else 0
+    return round(sum(x[0] for x in parts) / n, STUFF_STORE_DECIMALS) if n > 0 else None
+
+
 def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
-           mlb_pitches=None, roc_pitches=None, xrvoe_hand=None):
+           mlb_pitches=None, roc_pitches=None, xrvoe_hand=None, raw_stuff=None):
     """Write stuffScore into BOTH leaderboards.
 
     Percentile convention (site standard, aligned 2026-07-02): the pool that
@@ -2029,6 +2089,22 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
             row['stuffScore_pctl'] = _pctl(sc, qual_by_pt[pt])
         else:
             row['stuffScore_pctl'] = None
+    # Raw Stuff+ (season-level, MLB rows; ROC rows have none). Ranked on the STUFF+ pool, so
+    # the two columns share one ruler and one colour scale.
+    if raw_stuff:
+        _rpt = raw_stuff[0]
+        _rpool = defaultdict(list)
+        for (pit_, tm_, pt_), v_ in _rpt.items():
+            if tm_ in MLB_TEAMS:
+                _rpool[(pit_, pt_)].append(v_)
+        for row in pl:
+            key = (row['pitcher'], row['team'], row['pitchType'])
+            parts = ([_rpt[key]] if key in _rpt else
+                     _rpool.get((row['pitcher'], row['pitchType'])) if _is_combined_team(row['team']) else None)
+            v = _raw_stuff_value(parts)
+            row['rawStuffScore'] = v
+            row['rawStuffScore_pctl'] = (_pctl(round(v, 1), qual_by_pt[row['pitchType']])
+                                         if v is not None and qual_by_pt.get(row['pitchType']) else None)
     # ── xRVOE -> pitch rows. ROC/AAA now carries it too (its RunExp was
     # backfilled 2026-07-25); the pools below still exclude AAA, so ROC is
     # ranked against MLB without defining the distribution. Combined rows
@@ -2101,6 +2177,22 @@ def inject(agg, overall, league, xrvoe_pt=None, xrvoe_ov=None,
             row['stuffScore_pctl'] = _pctl(sc, qpool)
         else:
             row['stuffScore_pctl'] = None
+    if raw_stuff:
+        _rov = raw_stuff[1]
+        _ropool = defaultdict(list)
+        for (pit_, tm_, th_), v_ in _rov.items():
+            if tm_ in MLB_TEAMS:
+                _ropool[(pit_, th_)].append(v_)
+        n_raw = 0
+        for row in pp:
+            key = (row['pitcher'], row['team'], row.get('throws'))
+            parts = ([_rov[key]] if key in _rov else
+                     _ropool.get((row['pitcher'], row.get('throws'))) if _is_combined_team(row['team']) else None)
+            v = _raw_stuff_value(parts)
+            row['rawStuffScore'] = v
+            row['rawStuffScore_pctl'] = _pctl(round(v, 1), qpool) if v is not None and qpool else None
+            n_raw += v is not None
+        print(f'  rawStuffScore: {n_raw} pitcher rows')
     n_x = 0
     if xrvoe_ov:
         pools_o = {f: [] for f in XRVOE_FIELDS}

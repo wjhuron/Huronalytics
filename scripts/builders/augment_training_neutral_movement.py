@@ -35,6 +35,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pipeline import neutral_move as NM
+from scrapers import sheet_precision as SP
 from backfill_neutral_movement import upgrade_sidecar
 
 STORE = os.path.join(ROOT, 'data', 'game_weather_2025.json')
@@ -66,7 +67,7 @@ def apply_to_pitches(D, store, label=''):
     throws = np.array([p.get('Throws') or '' for p in D])
     hand_ok = np.isin(throws, ('L', 'R')); rhp = throws == 'R'
     ivb = np.array([sf(p.get('IndVertBrk')) for p in D]); hb = np.array([sf(p.get('HorzBrk')) for p in D])
-    axis = np.array([sf(p.get('SpinAxis')) for p in D]); velo = np.array([sf(p.get('Velocity')) for p in D])
+    axis = np.array([sf(p.get('SpinAxis')) for p in D]); velo = np.array([sf(NM.raw_metric(p, 'Velocity')) for p in D])      # the TRACKED speed
     run = np.where(rhp, hb, -hb)
     ok = has_air & hand_ok
     z = np.zeros(n)
@@ -85,6 +86,23 @@ def apply_to_pitches(D, store, label=''):
             p['xIndVrtBrk'] = round(float(new_ivb[i]), 1)
         if np.isfinite(hb[i]):
             p['xHorzBrk'] = round(float(new_hb[i]), 1)
+    # The six neutral metrics (model wm1), with the SAME key rule as the sheet read
+    # (pipeline/neutral_move.py): the plain key holds the neutral value, `<column>_raw` the
+    # tracked one. Idempotent: a second run reads the tracked value back from `_raw`.
+    raw = {c: np.array([sf(NM.raw_metric(p, c)) for p in D]) for c in NM.METRIC_COLUMNS}
+    xm, mmodes = NM.neutral_metric_table(raw, throws, np.round(new_ivb, 1), np.round(new_hb, 1),
+                                         np.where(has_air, ln_p, np.nan), ln_t)
+    for c, (xcol, _) in NM.METRIC_COLUMNS.items():
+        dec, v, r = SP.PRECISION[xcol], xm[xcol], raw[c]
+        for i, p in enumerate(D):
+            if not np.isfinite(r[i]):
+                continue
+            p[c + NM.RAW_SUFFIX] = float(r[i])
+            # an approach angle with no neutral movement keeps its tracked value: the sheets
+            # leave that x cell blank, but a blank here would drop the pitch from training
+            p[c] = round(float(v[i]), dec) if np.isfinite(v[i]) else float(r[i])
+    print(f'{label}: neutral metrics: ' + ', '.join(f'{v} {k}' for k, v in mmodes.items()) + ' | mean x - tracked: '
+          + ', '.join(f'{c} {np.nanmean(xm[NM.METRIC_COLUMNS[c][0]] - raw[c]):+.3f}' for c in NM.METRIC_COLUMNS))
     d_ride = new_ivb - old_ivb; d_run = np.where(rhp, new_hb - old_hb, -(new_hb - old_hb))
     venue = np.array([(store.get(str(int(k))) or {}).get('venueId') or -1 for k in pk])
     ff = tracked & np.array([p.get('Pitch Type') == 'FF' for p in D])
