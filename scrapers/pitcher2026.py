@@ -195,6 +195,35 @@ class BaseballSavantFocusedDownloader:
         got = weather_obs.fetch_measured(lat, lon, elevation_ft, start_iso, game_pk)
         return got or prev
 
+    _air_by_pk = {}       # str(game_pk) -> NM.game_air result (None = no elevation), this run
+
+    def _add_neutral_metrics(self, df):
+        """Fill the six neutral-environment metric columns (xVelocity, xSpinRate, xExtension,
+        xArmAngle, xVAA, xHAA) on a finished frame. The math is pipeline/neutral_move.py
+        (model wm1); this only gathers inputs. It runs AFTER the Statcast merge, because
+        ArmAngle arrives there, and it reads the values at the depth the sheet will hold,
+        so scripts/builders/backfill_neutral_metrics.py reproduces every cell from the sheet.
+        A game with no air keeps x equal to raw, and says so."""
+        from scrapers.sheet_precision import PRECISION as _PREC, fmt as _fmt
+        if df is None or len(df) == 0 or 'PitchID' not in df.columns:
+            return df
+        num = lambda c: (pd.to_numeric(df[c], errors='coerce').to_numpy(dtype='float64', na_value=np.nan)
+                         if c in df.columns else np.full(len(df), np.nan))
+        pks = df['PitchID'].astype(str).str.split('_').str[0]
+        air = [self._air_by_pk.get(k) for k in pks]
+        ln_p = np.array([a['lnP'] if a else np.nan for a in air], dtype=float)
+        ln_t = np.array([a['lnT'] if a else np.nan for a in air], dtype=float)
+        raw = {c: np.round(num(c), _PREC[c]) for c in NM.METRIC_COLUMNS}
+        out, modes = NM.neutral_metric_table(raw, df['Throws'].to_numpy(dtype=object), num('xIndVrtBrk'),
+                                             num('xHorzBrk'), ln_p, ln_t)
+        for xcol, v in out.items():
+            df[xcol] = [_fmt(xcol, x) for x in v]
+        if modes['raw'] or modes['no_shape']:
+            print(f"  WARNING: neutral metrics: {modes['raw']} pitches have no game air (x = raw), "
+                  f"{modes['no_shape']} approach angles have no neutral movement (x blank). "
+                  f"Repair: scripts/builders/backfill_neutral_metrics.py")
+        return df
+
     def _record_game_weather(self, game_pk, info):
         """Append/refresh one game's density inputs in data/game_weather_rs.json.
 
@@ -865,6 +894,7 @@ class BaseballSavantFocusedDownloader:
                       f"elevation; xIndVrtBrk/xHorzBrk are left equal to the raw values. Add the park "
                       f"to VENUE_ELEVATION_FT_OVERRIDE in scrapers/pitcher2026.py.")
 
+            self._air_by_pk[str(game_pk)] = game_air      # read by _add_neutral_metrics
             # Persist the per-game inputs so the columns can be audited and rebuilt.
             # tempF is the FEED reading as reported (the roof rule is applied in the
             # model, not here; until 2026-11 this field held the clamped 72 F).
@@ -1412,7 +1442,7 @@ class BaseballSavantFocusedDownloader:
                     live_df[col] = np.nan
             # Drop merge keys
             live_df = live_df.drop(columns=['_game_pk', '_at_bat_number', '_pitch_number'])
-            return live_df
+            return self._add_neutral_metrics(live_df)
 
         # Rename supplement columns to match our naming convention
         supplement_df = supplement_df.rename(columns=rename_map)
@@ -1532,7 +1562,7 @@ class BaseballSavantFocusedDownloader:
         # Drop merge keys so they don't appear in the final CSV
         merged = merged.drop(columns=merge_keys)
 
-        return merged
+        return self._add_neutral_metrics(merged)
 
     def download_savant_gf(self, game_pk):
         """
@@ -1744,6 +1774,7 @@ class BaseballSavantFocusedDownloader:
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
+            'xVelocity', 'xSpinRate', 'xExtension', 'xArmAngle', 'xVAA', 'xHAA',
         ]
 
         # Keep the full column schema regardless of data availability so every
@@ -1844,6 +1875,7 @@ class BaseballSavantFocusedDownloader:
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
+            'xVelocity', 'xSpinRate', 'xExtension', 'xArmAngle', 'xVAA', 'xHAA',
         ]
         # Keep the full column schema regardless of data availability so every
         # CSV matches the MLB/ROC/AAA layout; missing columns come out empty
@@ -2117,6 +2149,7 @@ class BaseballSavantFocusedDownloader:
             'BatSpeed', 'SwingLength',
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
+            'xVelocity', 'xSpinRate', 'xExtension', 'xArmAngle', 'xVAA', 'xHAA',
         ]
         # Keep the full column schema regardless of data availability so every
         # CSV matches the MLB/ROC/AAA layout; missing columns come out empty

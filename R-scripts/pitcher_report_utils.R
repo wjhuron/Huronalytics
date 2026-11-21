@@ -97,8 +97,32 @@ load_pitch_data <- function(input) {
     stop("load_pitch_data: file not found: ", input,
          "\n  Export the team's tab from its division workbook to ~/Downloads first.")
   }
-  readr::read_csv(input, col_types = readr::cols(RTilt = readr::col_character(),
-                                                 OTilt = readr::col_character()))
+  d <- readr::read_csv(input, col_types = readr::cols(RTilt = readr::col_character(),
+                                                      OTilt = readr::col_character()))
+  swap_in_neutral_metrics(d)
+}
+
+# Neutral-environment metrics (pipeline/neutral_move.py, model wm1). The sheet holds each
+# of these six twice: the value as tracked in that game's air, and the x column, the value
+# with the weather effect removed. Every report shows the x value under the plain column
+# name; the tracked value stays as "<column>_raw". One swap, at the load, the same rule
+# as the pipeline's read (swap_in_neutral_metrics in pipeline/neutral_move.py). A CSV
+# exported before the columns existed is shown as tracked, and says so.
+NEUTRAL_METRIC_COLS <- c(Velocity = "xVelocity", `Spin Rate` = "xSpinRate",
+                         Extension = "xExtension", ArmAngle = "xArmAngle",
+                         VAA = "xVAA", HAA = "xHAA")
+swap_in_neutral_metrics <- function(d) {
+  if (!all(NEUTRAL_METRIC_COLS %in% names(d))) {
+    message("NOTE: this CSV has no neutral metric columns (xVelocity ... xHAA). ",
+            "The report shows TRACKED values. Export the tab again to get them.")
+    return(d)
+  }
+  for (raw in names(NEUTRAL_METRIC_COLS)) {
+    if (!raw %in% names(d)) next
+    d[[paste0(raw, "_raw")]] <- d[[raw]]
+    d[[raw]] <- d[[NEUTRAL_METRIC_COLS[[raw]]]]
+  }
+  d
 }
 
 # ---- Shared Helper Functions ----
