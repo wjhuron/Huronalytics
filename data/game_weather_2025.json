@@ -110,8 +110,8 @@
 "632192": {
 "condition": "Drizzle",
 "elevationFt": 10.0,
-"lnP": -0.010914,
-"lnT": 0.004804,
+"lnP": -0.013696,
+"lnT": -0.021033,
 "model": "nm1",
 "obs": {
 "p_hpa": 1007.75,
@@ -119,7 +119,7 @@
 "source": "archive",
 "tempF": 83.72
 },
-"rho": 1.18772,
+"rho": 1.15421,
 "source": "measured",
 "tempF": 56.0,
 "venueId": 3289,
@@ -84102,8 +84102,8 @@
 "663277": {
 "condition": "Partly Cloudy",
 "elevationFt": 21.0,
-"lnP": -0.00697,
-"lnT": -0.01152,
+"lnP": -0.00952,
+"lnT": -0.034614,
 "model": "nm1",
 "obs": {
 "p_hpa": 1012.1,
@@ -84111,7 +84111,7 @@
 "source": "archive",
 "tempF": 91.15
 },
-"rho": 1.17311,
+"rho": 1.14341,
 "source": "measured",
 "tempF": 66.0,
 "venueId": 3,
