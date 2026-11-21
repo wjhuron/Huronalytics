@@ -104,6 +104,8 @@ def build_statcast(yr, path=None, store=None):
                 spin=f64(df['release_spin_rate']), venue=venue, elev=elev, temp=temp,
                 feed_temp=feed_temp, closed=closed, rho=rho, kdrag=kdrag, vaa=vaa,
                 haa_arm=haa_arm, tflight=t, axis=f64(df['spin_axis']), dlift=dlift,
+                pz=f64(df['plate_z']), px_arm=np.where(rhp, -f64(df['plate_x']), f64(df['plate_x'])),
+                ext=f64(df['release_extension']),
                 dside_arm=np.where(rhp, -dside, dside), pfz_chk=pfz_chk,
                 date=df['game_date'].astype(str).str[:10].to_numpy(dtype='U10'))
 
@@ -150,7 +152,8 @@ def build_2026():
                      sf(p.get('xHorzBrk')), sf(p.get('Velocity')), sf(p.get('Spin Rate')),
                      sf(p.get('VAA')), sf(p.get('HAA')), 0 if src == 'MLB' else 1,
                      (p.get('Game Date') or '')[:10], tilt_axis(p.get('RTilt')),
-                     sf(pid_s.split('_')[1]) if pid_s.count('_') >= 2 else np.nan))
+                     sf(pid_s.split('_')[1]) if pid_s.count('_') >= 2 else np.nan,
+                     sf(p.get('PlateZ')), sf(p.get('PlateX')), sf(p.get('Extension'))))
     del D
     a = list(zip(*rows))
     pks = np.array(a[0], dtype=np.int64)
@@ -167,7 +170,9 @@ def build_2026():
                 minors=np.array(a[12], dtype=np.int8), venue=venue, elev=elev, temp=temp,
                 feed_temp=feed_temp, closed=closed, rho=rho, in_store=in_store,
                 date=np.array(a[13], dtype='U10'), axis=np.array(a[14], dtype=float),
-                ab=np.array(a[15], dtype=float))
+                ab=np.array(a[15], dtype=float), pz=np.array(a[16], dtype=float),
+                px_arm=np.where(rhp, -np.array(a[17], dtype=float), np.array(a[17], dtype=float)),
+                ext=np.array(a[18], dtype=float))
 
 
 if __name__ == '__main__':
