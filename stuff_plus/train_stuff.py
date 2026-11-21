@@ -249,7 +249,19 @@ HEIGHT_CLIP = (70.0, 80.0)
 # gain is FF +.018, SI +.034, FC +.028, SL +.021, CU +.073, CH -.008; the sweeper
 # is not helped. Stuff+ is therefore physics PLUS pitcher hand: the same shape
 # from the left side gets better results, and the grade now says so.
-BUNDLE_VERSION = 'v18'
+#
+# v19 (2026-11-20) = v18 with NO design change, on new movement inputs: xIndVrtBrk /
+# xHorzBrk are the neutral-environment columns of pipeline/neutral_move.py (model nm1)
+# in every training season and in the live season. The old single density exponent
+# left a fastball 0.4 in short of ride and a sinker 0.8 in short of run at Coors.
+# Gate v2, three seeds, five pairs, the v18 design on the new columns against a control
+# on the same rows (scripts/research/weather/wx_gate_frames.py): pooled next-season r
+# -.0020 (se .0015, z -1.3, 2/5 pairs), within hand -.0019, within role -.0028. A tie;
+# adopted for the column definition, per Wally, as v17 was. Scored on the shipped v18
+# bundle the new columns move a pitcher x pitch grade by sd .48 points, Colorado staff
+# +.80 on average and sweepers +2 to +4. The version changes because a bundle trained
+# on the old columns must not score the new ones.
+BUNDLE_VERSION = 'v19'
 
 # Bundle FRESHNESS (2026-09-23). The version string guards the config, not
 # the data: a retrain on more data keeps the version, so the local
