@@ -60,7 +60,12 @@ SLATE = (66 / 255, 100 / 255, 138 / 255)
 ROC_ARMS = {'Perales, Luis': ['ROC'], 'Kent, Jackson': ['ROC'],
             'Sinclair, Jack': ['ROC'], 'Tolman, Erik': ['ROC']}
 NEW_TAB_ARMS = {'Bird, Jake', 'Cruz, Yovanny', 'Dion, Will'}
-NEW_TAB_WORKBOOK = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
+
+
+def _new_tab_workbook_id():
+    """The workbook that holds the NEW tab. pipeline/fetch.py is its only home."""
+    from pipeline.fetch import DIVISION_WORKBOOK_IDS, NEW_TAB_WORKBOOK
+    return DIVISION_WORKBOOK_IDS[NEW_TAB_WORKBOOK]
 
 PITCH_NAMES = {'FF': 'Fastball', 'SI': 'Sinker', 'FC': 'Cutter', 'SL': 'Slider',
                'ST': 'Sweeper', 'SV': 'Slurve', 'CU': 'Curveball',
@@ -116,7 +121,7 @@ def reference_type(name, df):
 
 def load_new_tab_pitches():
     import gspread
-    ws = gspread.service_account().open_by_key(NEW_TAB_WORKBOOK).worksheet('NEW')
+    ws = gspread.service_account().open_by_key(_new_tab_workbook_id()).worksheet('NEW')
     out = defaultdict(list)
     for r in ws.get_all_records():
         if r.get('Pitcher') in NEW_TAB_ARMS:

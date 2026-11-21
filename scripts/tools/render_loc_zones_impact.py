@@ -74,7 +74,12 @@ PITCHERS = {
 # pitches are fetched from the tab and Loc+ atoms re-scored live, exactly as
 # Cards.py does for scratch tabs.
 NEW_TAB_ARMS = {'Bird, Jake', 'Cruz, Yovanny', 'Dion, Will'}
-NEW_TAB_WORKBOOK = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
+
+
+def _new_tab_workbook_id():
+    """The workbook that holds the NEW tab. pipeline/fetch.py is its only home."""
+    from pipeline.fetch import DIVISION_WORKBOOK_IDS, NEW_TAB_WORKBOOK
+    return DIVISION_WORKBOOK_IDS[NEW_TAB_WORKBOOK]
 
 ZONES = ['heart', 'shadow_in', 'shadow_out', 'chase', 'waste']
 ZONE_NAMES = {'heart': 'Heart', 'shadow_in': 'Shadow-In',
@@ -269,7 +274,7 @@ def main():
         from pipeline.locplus import (compute_loc_plus, group_of, LOC_SCALE_K,
                                       score_pitch, _is_scorable)
         print('Fetching NEW tab ...')
-        ws = gspread.service_account().open_by_key(NEW_TAB_WORKBOOK).worksheet('NEW')
+        ws = gspread.service_account().open_by_key(_new_tab_workbook_id()).worksheet('NEW')
         new_rows = defaultdict(list)
         for r in ws.get_all_records():
             if r.get('Pitcher') in NEW_TAB_ARMS:

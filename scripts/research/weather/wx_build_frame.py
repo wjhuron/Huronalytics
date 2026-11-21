@@ -159,7 +159,8 @@ def build_2026():
                      sf(p.get('VAA')), sf(p.get('HAA')), 0 if src == 'MLB' else 1,
                      (p.get('Game Date') or '')[:10], tilt_axis(p.get('RTilt')),
                      sf(pid_s.split('_')[1]) if pid_s.count('_') >= 2 else np.nan,
-                     sf(p.get('PlateZ')), sf(p.get('PlateX')), sf(p.get('Extension'))))
+                     sf(p.get('PlateZ')), sf(p.get('PlateX')), sf(p.get('Extension')),
+                     sf(p.get('RelPosZ')), sf(p.get('RelPosX')), sf(p.get('ArmAngle'))))
     del D
     a = list(zip(*rows))
     pks = np.array(a[0], dtype=np.int64)
@@ -178,7 +179,9 @@ def build_2026():
                 date=np.array(a[13], dtype='U10'), axis=np.array(a[14], dtype=float),
                 ab=np.array(a[15], dtype=float), pz=np.array(a[16], dtype=float),
                 px_arm=np.where(rhp, -np.array(a[17], dtype=float), np.array(a[17], dtype=float)),
-                ext=np.array(a[18], dtype=float))
+                ext=np.array(a[18], dtype=float), relz=np.array(a[19], dtype=float),
+                relx_arm=np.where(rhp, -np.array(a[20], dtype=float), np.array(a[20], dtype=float)),
+                arm_angle=np.array(a[21], dtype=float))
 
 
 if __name__ == '__main__':
