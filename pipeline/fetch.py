@@ -512,8 +512,10 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None, only_tabs=None):
             pitches.append(pitch)
         if _stale_x:
             print(f"    WARNING: {tab_name}: {_stale_x} cells have a tracked value and a BLANK neutral "
-                  f"value (an ArmAngle that arrived after the scrape, most often). They read as "
-                  f"missing. Repair: APPLY=1 scripts/builders/backfill_neutral_metrics.py")
+                  f"value. They read as missing. Two causes: an approach angle on a pitch with no "
+                  f"tracked movement (permanent, about 0.3% of pitches), or a value that arrived after "
+                  f"the scrape (ArmAngle). Repair for the second: APPLY=1 "
+                  f"scripts/builders/backfill_neutral_metrics.py")
     return pitches
 
 

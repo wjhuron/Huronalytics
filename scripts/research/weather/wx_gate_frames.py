@@ -54,7 +54,8 @@ def new_x_2026(p26):
         try:
             ivb = None if p.get('IndVertBrk') in (None, '') else float(p['IndVertBrk'])
             hb = None if p.get('HorzBrk') in (None, '') else float(p['HorzBrk'])
-            v = None if p.get('Velocity') in (None, '') else float(p['Velocity'])
+            _v = NM.raw_metric(p, 'Velocity')      # the movement model reads the TRACKED speed
+            v = None if _v in (None, '') else float(_v)
         except (TypeError, ValueError):
             continue
         if ivb is None and hb is None:
