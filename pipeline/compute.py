@@ -5,6 +5,7 @@ import math
 from collections import defaultdict
 
 from pipeline.hwar import gdp_extra_cost
+from pipeline.neutral_move import raw_metric
 from pipeline.utils import (
     safe_float, median, percentile, is_barrel, barrel_flag, is_swing, round_half_up,
     BB_PLUS_EV_MIN_LA,
@@ -725,7 +726,9 @@ def compute_hitter_stats(pitches):
         if aa is not None and 5 <= aa <= 20:
             n_ideal_aa += 1
         ev = safe_float(p.get('ExitVelo'))
-        velo = safe_float(p.get('Velocity'))
+        # The collision happened at the TRACKED pitch speed, in that game's air: the neutral
+        # value (what every display reads since 2026-11-21) is not the ball the bat met.
+        velo = safe_float(raw_metric(p, 'Velocity'))
         if ev is not None and velo is not None:
             n_blast_eligible += 1
             # Statcast max EV = 1.23 * bat speed + 0.23 * pitch speed AT THE

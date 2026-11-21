@@ -30,6 +30,7 @@ from datetime import date
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, 'data', 'neutral_movement_rs.json')
 DEFAULT_SRC = os.path.join(ROOT, 'data', '_weather_audit', 'final_fit_smooth.json')
+METRICS_SRC = os.path.join(ROOT, 'data', '_weather_audit', 'all_metrics_temp.json')
 
 ROOF_K = {'14': 0.4, '32': 0.5, '680': 0.6}      # Rogers Centre, American Family Field, T-Mobile Park
 
@@ -55,6 +56,26 @@ def main():
                         bP=b[:k], bT=b[k:2 * k],
                         crosswind_in_per_mph=b[2 * k] if lab == 'run' else 0.0,
                         headwind_pct_per_mph=b[2 * k + 1])
+    # The other pitch metrics (model wm1). Source: all_metrics_temp.json, written by
+    # scripts/research/weather/wx_all_metrics.py temp. Six-season fit; each term passed the
+    # held-out Coors, in-month heat and Triple-A altitude tests there. The pressure term of
+    # the four pitcher-output metrics was fitted and rejected (it fails at Triple-A altitude).
+    if not os.path.exists(METRICS_SRC):
+        raise SystemExit(f'{METRICS_SRC} is missing. Run scripts/research/weather/wx_all_metrics.py temp first.')
+    with open(METRICS_SRC) as f:
+        mf = json.load(f)
+    if mf.get('mode') != 'temp':
+        raise SystemExit(f'{METRICS_SRC} is not the temp-mode fit')
+    want = {'velo': ('aT',), 'spin': ('aT',), 'ext': ('aT',), 'arm_angle': ('aT',),
+            'vaa': ('aP', 'aT', 'bP', 'bT'), 'haa_arm': ('aP', 'aT', 'bP', 'bT')}
+    out['metrics_version'] = 'wm1'
+    out['metrics'] = {}
+    for key, terms in want.items():
+        got = mf['fit'][key]
+        extra = set(got) - set(terms) - {'loc', 'velo'}
+        if extra or any(t not in got for t in terms):
+            raise SystemExit(f'metric {key}: fit terms {sorted(got)} do not match the shipped form {terms}')
+        out['metrics'][key] = {t: got[t] for t in terms}
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(OUT), suffix='.tmp')
     with os.fdopen(fd, 'w') as f:
         json.dump(out, f, indent=1)

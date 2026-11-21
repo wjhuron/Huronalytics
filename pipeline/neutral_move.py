@@ -229,3 +229,160 @@ def neutral_movement(ivb, hb, throws, rtilt, velo, air, coef=None):
     x_ivb = None if ivb is None else float(n_ride)
     mode = 'standard' if air.get('source') != 'measured' else ('full' if bool(has_cell) else 'no_cell')
     return x_ivb, x_hb, mode
+
+
+# ---------------------------------------------------------------------------------------
+# The other pitch metrics (model `wm1`, 2026-11-21). Same idea as the movement columns:
+# the raw column is what happened in that game's air, the x column is what the pitch
+# would have read with no weather effect.
+#
+#     x = raw - (aP + bP * z) * lnP - (aT + bT * z) * lnT
+#
+# Release velocity, spin rate, extension and arm angle are what the PITCHER does, and only
+# the temperature moves them (a warm arm throws harder): they carry aT alone. A pressure
+# term was fitted and REJECTED for them: it closed the Coors gap and then failed at the
+# Triple-A altitude parks with the opposite sign (velocity -0.10 mph at Coors, +0.23 mph
+# there), so that gap is the park and not the air. The approach angles are FLIGHT: thin
+# air drags less and bends less, so they carry all four terms, with z = the pitch's own
+# neutral ride (VAA) or neutral arm-side run (HAA). Release height and release side were
+# measured too and have no weather effect, so they have no x column.
+# Fit and tests: scripts/research/weather/wx_all_metrics.py. Constants:
+# data/neutral_movement_rs.json, block `metrics` (scripts/builders/build_neutral_movement.py).
+# ---------------------------------------------------------------------------------------
+# raw sheet column -> (x sheet column, key in the `metrics` block)
+METRIC_COLUMNS = {'Velocity': ('xVelocity', 'velo'), 'Spin Rate': ('xSpinRate', 'spin'),
+                  'Extension': ('xExtension', 'ext'), 'ArmAngle': ('xArmAngle', 'arm_angle'),
+                  'VAA': ('xVAA', 'vaa'), 'HAA': ('xHAA', 'haa_arm')}
+X_METRIC_COLUMNS = [v[0] for v in METRIC_COLUMNS.values()]
+
+
+def metric_coefficients(coef=None):
+    """The `metrics` block. Raises when the constants file predates it: there is no default."""
+    c = coef or load_coefficients()
+    m = c.get('metrics')
+    if not m or any(k not in m for _, k in METRIC_COLUMNS.values()):
+        raise RuntimeError(f'{COEF_PATH} has no complete `metrics` block. Run '
+                           'scripts/builders/build_neutral_movement.py.')
+    return m
+
+
+def neutral_metric_arrays(raw, rhp, x_ivb, x_hb, ln_p, ln_t, coef=None):
+    """Vectorized. `raw` maps a raw sheet column (a key of METRIC_COLUMNS) to a float array;
+    rhp is a bool array; x_ivb / x_hb are the NEUTRAL movement columns in sheet convention
+    (HorzBrk positive = a right-hander's arm side); ln_p / ln_t come from game_air.
+    Returns {x column: array}. NaN in gives NaN out; nothing is rounded.
+
+    HAA: the model is fitted on the arm-side angle, which is the sheet HAA times -1 for a
+    right-hander and +1 for a left-hander, so the correction takes that sign back out."""
+    m = metric_coefficients(coef)
+    rhp = np.asarray(rhp, dtype=bool)
+    ln_p, ln_t = np.asarray(ln_p, dtype=float), np.asarray(ln_t, dtype=float)
+    out = {}
+    for col, (xcol, key) in METRIC_COLUMNS.items():
+        if col not in raw:
+            continue
+        v = np.asarray(raw[col], dtype=float)
+        k = m[key]
+        if key == 'vaa':
+            z, sign = np.asarray(x_ivb, dtype=float), 1.0
+        elif key == 'haa_arm':
+            z, sign = np.where(rhp, 1.0, -1.0) * np.asarray(x_hb, dtype=float), np.where(rhp, -1.0, 1.0)
+        else:
+            z, sign = 0.0, 1.0
+        shift = (k.get('aP', 0.0) + k.get('bP', 0.0) * z) * ln_p + (k['aT'] + k.get('bT', 0.0) * z) * ln_t
+        out[xcol] = v - sign * shift
+    return out
+
+
+def neutral_metrics(raw, throws, x_ivb, x_hb, air, coef=None):
+    """One pitch. `raw` maps raw sheet columns to values (None = missing). Returns
+    ({x column: value or None}, mode). Not rounded: the caller rounds with the sheet
+    precision map.
+
+    mode 'raw'      no air for the game, or no hand: every x value equals the raw value
+         'no_shape' an approach angle is present and its neutral movement is not: that x
+                    value is None (a correction without the shape term would be a different
+                    model, not a smaller one)
+         'full'     every present metric was corrected
+    """
+    cols = [c for c in METRIC_COLUMNS if c in raw]
+    if air is None or throws not in ('L', 'R'):
+        return {METRIC_COLUMNS[c][0]: (None if raw[c] is None else float(raw[c])) for c in cols}, 'raw'
+    f = lambda v: float('nan') if v is None else float(v)
+    arr = neutral_metric_arrays({c: f(raw[c]) for c in cols}, throws == 'R', f(x_ivb), f(x_hb),
+                                air['lnP'], air['lnT'], coef)
+    out, mode = {}, 'full'
+    for c in cols:
+        xcol = METRIC_COLUMNS[c][0]
+        v = float(arr[xcol])
+        if raw[c] is None:
+            out[xcol] = None
+        elif math.isnan(v):
+            out[xcol], mode = None, 'no_shape'
+        else:
+            out[xcol] = v
+    return out, mode
+
+
+def neutral_metric_table(raw, throws, x_ivb, x_hb, ln_p, ln_t, coef=None):
+    """A table of pitches (the scraper's frame, a sheet tab, a corpus chunk).
+
+    raw      {raw sheet column: float array, NaN = missing}
+    throws   array of 'L' / 'R' / anything else
+    x_ivb, x_hb   the neutral movement columns, float arrays
+    ln_p, ln_t    per pitch, from game_air; NaN = the game has no air (no elevation)
+
+    Returns ({x column: float array}, {mode: pitch count}). A pitch with no air or no hand
+    keeps x equal to raw (mode 'raw'). An approach angle whose neutral movement is missing
+    comes back NaN (mode 'no_shape'). Nothing is rounded.
+    """
+    throws = np.asarray(throws, dtype=object)
+    ln_p, ln_t = np.asarray(ln_p, dtype=float), np.asarray(ln_t, dtype=float)
+    ok = np.isfinite(ln_p) & np.isfinite(ln_t) & np.isin(throws, ('L', 'R'))
+    zero = np.zeros(len(throws))
+    arr = neutral_metric_arrays(raw, throws == 'R', x_ivb, x_hb, np.where(ok, ln_p, zero),
+                                np.where(ok, ln_t, zero), coef)
+    out, no_shape, tracked = {}, np.zeros(len(throws), dtype=bool), np.zeros(len(throws), dtype=bool)
+    for col, (xcol, key) in METRIC_COLUMNS.items():
+        if col not in raw:
+            continue
+        v = np.asarray(raw[col], dtype=float)
+        out[xcol] = np.where(ok, arr[xcol], v)
+        tracked |= np.isfinite(v)
+        no_shape |= ok & np.isfinite(v) & ~np.isfinite(arr[xcol])
+    modes = {'raw': int((tracked & ~ok).sum()), 'no_shape': int(no_shape.sum()),
+             'full': int((tracked & ok & ~no_shape).sum())}
+    return out, modes
+
+
+# ---------------------------------------------------------------------------------------
+# The read boundary. Since 2026-11-21 (per Wally: adjusted replaces raw) every reader of a
+# pitch row sees the NEUTRAL value under the plain column name, and the value as tracked
+# under `<column>_raw`. One swap, at the read (pipeline/fetch.py), so no consumer chooses.
+# A consumer whose constants were fitted on tracked values reads raw_metric() instead and
+# says why at the call.
+# ---------------------------------------------------------------------------------------
+RAW_SUFFIX = '_raw'
+
+
+def swap_in_neutral_metrics(pitch):
+    """In place, for a row from a tab that HAS the x metric columns: `Velocity` becomes the
+    xVelocity cell and the tracked value moves to `Velocity_raw` (the same for all six).
+    A blank x cell stays blank: there is no fall-back to the tracked value, the rule the
+    movement columns have had since 2026-08-05. Returns the number of blank x cells whose
+    tracked value is present, so the caller can report them."""
+    stale = 0
+    for col, (xcol, _) in METRIC_COLUMNS.items():
+        raw, x = pitch.get(col), pitch.get(xcol)
+        pitch[col + RAW_SUFFIX] = raw
+        pitch[col] = x
+        if x is None and raw is not None:
+            stale += 1
+    return stale
+
+
+def raw_metric(pitch, col):
+    """The metric as tracked in that game's air. Falls through to the plain column for a row
+    that never went through the swap (the 2021-2025 training pickles hold tracked values)."""
+    k = col + RAW_SUFFIX
+    return pitch[k] if k in pitch else pitch.get(col)

@@ -33,6 +33,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pipeline import neutral_move as NM
+from scrapers import sheet_precision as SP
 from backfill_neutral_movement import upgrade_sidecar
 
 OUT = os.path.join(ROOT, 'data', '_milb2026')
@@ -72,6 +73,7 @@ def main():
     if no_elev:
         print(f'WARNING: venues with NO elevation (their pitches stay raw): {no_elev}')
     modes, deltas = Counter(), []
+    metric_modes = Counter()
     out_tmp = CORPUS + '.tmp'
     writer = None if a.dry else gzip.open(out_tmp, 'wt', newline='')
     first = True
@@ -94,20 +96,28 @@ def main():
         old = num(ch['xIndVrtBrk'])
         d = np.round(new_ivb, 1) - old
         deltas.append(d[np.isfinite(d)])
+        # The six neutral metric columns (model wm1), from the row's raw values and the
+        # x movement at the depth the file holds. No air for the game: x equals raw.
+        xm, mm = NM.neutral_metric_table({c: num(ch[c]) for c in NM.METRIC_COLUMNS}, thr, np.round(new_ivb, 1),
+                                         np.round(new_hb, 1), np.where(np.isfinite(ln_p), ln_p, np.nan), ln_t)
+        metric_modes.update(mm)
         if writer is not None:
             ch['xIndVrtBrk'] = fmt(new_ivb, ~np.isfinite(ivb)); ch['xHorzBrk'] = fmt(new_hb, ~np.isfinite(hb))
+            for xcol, v in xm.items():
+                ch[xcol] = [SP.fmt(xcol, x) for x in v]
             ch.to_csv(writer, index=False, header=first)
             first = False
     if writer is not None:
         writer.close()
     d = np.concatenate(deltas)
     print('modes (pitches): ' + ', '.join(f"{v} '{k}'" for k, v in modes.items()))
+    print('neutral metric modes (pitches): ' + ', '.join(f"{v} '{k}'" for k, v in metric_modes.items()))
     print(f'xIndVrtBrk change vs the stored column, inches: mean {d.mean():+.2f} sd {d.std():.2f} p5 {np.percentile(d, 5):+.1f} p95 {np.percentile(d, 95):+.1f}')
     if a.dry:
         print('DRY RUN: the corpus was not written.')
         return
-    if not os.path.exists(CORPUS + '.pre_nm1.bak'):
-        shutil.copy2(CORPUS, CORPUS + '.pre_nm1.bak')
+    if not os.path.exists(CORPUS + '.pre_wm1.bak'):
+        shutil.copy2(CORPUS, CORPUS + '.pre_wm1.bak')
     os.replace(out_tmp, CORPUS)
     print('corpus written. Owed next: scripts/research/cards/aaa_pitcher_pool.py')
 

@@ -13,6 +13,7 @@ from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from scrapers.sheet_precision import merge_rendered
+from pipeline import neutral_move as _NM
 from pipeline.guts import scrape_guts
 from pipeline.utils import (
     DATA_DIR, MLB_TEAMS, ALL_TEAMS, TEAM_ABBREV_TO_ID,
@@ -460,6 +461,14 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None, only_tabs=None):
             continue
         header = rows[0]
         col_idx = {name: idx for idx, name in enumerate(header) if name}
+        # Neutral-environment metric columns (pipeline/neutral_move.py). A tab that has them
+        # is read ADJUSTED; a tab that does not is read as tracked, and says so.
+        _has_x = all(x in col_idx for x in _NM.X_METRIC_COLUMNS)
+        _stale_x = 0
+        if not _has_x:
+            print(f"    WARNING: {tab_name} has no neutral metric columns; Velocity, Spin Rate, "
+                  f"Extension, ArmAngle, VAA and HAA are read AS TRACKED. "
+                  f"Repair: APPLY=1 scripts/builders/backfill_neutral_metrics.py")
 
         for row_num, row in enumerate(rows[1:], start=2):
             pitcher = row[col_idx['Pitcher']] if 'Pitcher' in col_idx else None
@@ -498,7 +507,13 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None, only_tabs=None):
                 pitch['_barrelSource'] = 'recomputed'
             else:
                 pitch['_barrelSource'] = 'official'
+            if _has_x:
+                _stale_x += _NM.swap_in_neutral_metrics(pitch)
             pitches.append(pitch)
+        if _stale_x:
+            print(f"    WARNING: {tab_name}: {_stale_x} cells have a tracked value and a BLANK neutral "
+                  f"value (an ArmAngle that arrived after the scrape, most often). They read as "
+                  f"missing. Repair: APPLY=1 scripts/builders/backfill_neutral_metrics.py")
     return pitches
 
 

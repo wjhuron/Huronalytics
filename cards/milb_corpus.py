@@ -149,6 +149,27 @@ def _mlb_rows(role, mid, mlb_pitches):
     return rows, max(official_pa - pitch_pa, 0), official
 
 
+def _swap_neutral_metrics(rows, name):
+    """Corpus rows read ADJUSTED, as every sheet row does (pipeline/neutral_move.py, the
+    read boundary). A corpus built before the x metric columns existed is read as tracked,
+    and says so; scripts/builders/milb2026_neutral_movement.py adds the columns."""
+    from pipeline import neutral_move as NM
+    if not rows:
+        return
+    if not all(x in rows[0] for x in NM.X_METRIC_COLUMNS):
+        print(f'  WARNING: {name}: the MiLB corpus has no neutral metric columns; velocity, spin, '
+              'extension, arm angle, VAA and HAA are AS TRACKED. '
+              'Repair: scripts/builders/milb2026_neutral_movement.py')
+        return
+    blank = lambda v: v is None or v == '' or (isinstance(v, float) and v != v)
+    for r in rows:
+        for col, (xcol, _) in NM.METRIC_COLUMNS.items():
+            for k in (col, xcol):
+                if blank(r.get(k)):
+                    r[k] = None
+        NM.swap_in_neutral_metrics(r)
+
+
 def load_players(role, names, levels=None, player_id=None, scope='all', mlb_pitches=None):
     """{requested name: {'mlbId', 'club', 'levels', 'label', 'rows', ...}} for the named players.
 
@@ -201,6 +222,7 @@ def load_players(role, names, levels=None, player_id=None, scope='all', mlb_pitc
             sel = sel[sel._gameType.isin(_REGULAR_TYPES) & (sel._level != 'AFL')]
         rows = sel.drop(columns=['_pk', 'mlbId']).to_dict('records')
         _to_mlb_currency(rows)
+        _swap_neutral_metrics(rows, name)
         mlb_ibb, official = 0, None
         if want_mlb:
             mlb, mlb_ibb, official = _mlb_rows(role, mid, mlb_pitches)

@@ -65,6 +65,12 @@ except ImportError as e:
     print(f'  WARNING: pipeline.utils.AAA_TEAMS unavailable ({e}); using {{"ROC"}}')
     AAA_TEAMS = {'ROC'}
 from pipeline.utils import MLB_TEAMS  # noqa: E402  (combined-row pools: club stints only)
+# Stuff+ reads the six weather-sensitive metrics AS TRACKED (`_tracked`), not the neutral
+# values that every display reads since 2026-11-21 (pipeline/neutral_move.py, the read
+# boundary). The bundle was trained on tracked values, and an input change owes a retrain
+# with a version bump and a gate result first. Movement is the exception that already
+# moved: xIndVrtBrk / xHorzBrk are neutral since v19.
+from pipeline.neutral_move import raw_metric as _tracked  # noqa: E402
 
 SUPPORTED = {'FF', 'SI', 'SL', 'CH', 'ST', 'FC', 'CU', 'FS', 'SV', 'KC', 'KN'}
 # Types whose per-type anchor pool is too thin to trust borrow a donor pool
@@ -108,7 +114,7 @@ def _harmonize_tags(prior, current):
     def cents(pitches, mv_keys):
         acc = _dd(lambda: [0.0, 0.0, 0.0, 0])
         for p in pitches:
-            v = sf(p.get('Velocity'))
+            v = sf(_tracked(p, 'Velocity'))
             iv = sf(p.get(mv_keys[0]))
             hb = sf(p.get(mv_keys[1]))
             thr = p.get('Throws')
@@ -551,7 +557,7 @@ def _arm_means(pitches):
     pt = defaultdict(lambda: [0.0, 0])
     al = defaultdict(lambda: [0.0, 0])
     for p in pitches:
-        aa = sf(p.get('ArmAngle'))
+        aa = sf(_tracked(p, 'ArmAngle'))
         if aa is None:
             continue
         pit, pt0 = p.get('Pitcher'), p.get('Pitch Type')
@@ -609,7 +615,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     for p in pitches:
         pt, thr = p.get('Pitch Type'), p.get('Throws')
         if pt not in FB_TYPES or thr not in ('L', 'R'): continue
-        v, iv, hb, vaa = sf(p.get('Velocity')), sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk')), sf(p.get('VAA'))
+        v, iv, hb, vaa = sf(_tracked(p, 'Velocity')), sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk')), sf(_tracked(p, 'VAA'))
         vaa = _nvaa(pt, vaa, sf(p.get('PlateZ')))   # v12: reference is nVAA too
         if None in (v, iv, hb): continue
         s = 1.0 if thr == 'R' else -1.0
@@ -647,7 +653,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     # see the per-pitch _arm mask in the ROC scoring block.)
     arm_pt = defaultdict(lambda: [0.0, 0]); arm_all = defaultdict(lambda: [0.0, 0])
     for p in pitches:
-        aa = sf(p.get('ArmAngle'))
+        aa = sf(_tracked(p, 'ArmAngle'))
         if aa is None: continue
         pit = p.get('Pitcher'); pt0 = p.get('Pitch Type')
         arm_pt[(pit, pt0)][0] += aa; arm_pt[(pit, pt0)][1] += 1
@@ -662,13 +668,13 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
     for p in pitches:
         pt, thr, bats = p.get('Pitch Type'), p.get('Throws'), p.get('Bats')
         if pt not in SUPPORTED or thr not in ('L', 'R') or bats not in ('L', 'R'): continue
-        v, spin = sf(p.get('Velocity')), sf(p.get('Spin Rate'))
+        v, spin = sf(_tracked(p, 'Velocity')), sf(_tracked(p, 'Spin Rate'))
         # density-adjusted movement (pipeline_fetch backfills these from raw
         # when the adjustment hasn't landed, so coverage matches raw)
         iv, hb_raw = sf(p.get('xIndVrtBrk')), sf(p.get('xHorzBrk'))
-        vaa_raw, ext = sf(p.get('VAA')), sf(p.get('Extension'))
+        vaa_raw, ext = sf(_tracked(p, 'VAA')), sf(_tracked(p, 'Extension'))
         vaa = _nvaa(pt, vaa_raw, sf(p.get('PlateZ')))   # v12: nVAA
-        arm, rel_z = sf(p.get('ArmAngle')), sf(p.get('RelPosZ'))
+        arm, rel_z = sf(_tracked(p, 'ArmAngle')), sf(p.get('RelPosZ'))
         rel_x_raw = sf(p.get('RelPosX'))
         if arm is None:                       # real-time placeholder until backfill
             arm = _arm_placeholder(p.get('Pitcher'), pt)
@@ -754,7 +760,7 @@ def build_df(pitches, prefer_true_fastball=True, arm_fallback=None):
             # passthroughs for the battery's post-hoc transforms (location-
             # adjusted approach angles, HAA reconstruction validation)
             'plate_x': sf(p.get('PlateX')), 'plate_z': sf(p.get('PlateZ')),
-            'haa_meas': sf(p.get('HAA')),
+            'haa_meas': sf(_tracked(p, 'HAA')),
             # per-pitch 9P kinematics (augment_kinematics / the 2026 sidecar;
             # None on rows not yet backfilled)
             'kin_eff': sf(p.get('KinEff')), 'kin_dev': sf(p.get('KinDev')),

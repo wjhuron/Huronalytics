@@ -62,6 +62,12 @@ PRECISION = {
     # source-quantized — measured
     'Velocity': 1, 'IndVertBrk': 1, 'HorzBrk': 1,
     'xIndVrtBrk': 1, 'xHorzBrk': 1,
+    # The neutral-environment copies of six pitch metrics (pipeline/neutral_move.py, model
+    # wm1). xVelocity and xArmAngle carry ONE MORE decimal than their raw columns: the
+    # correction is a few tenths of a mph or of a degree, and at the raw depth the rounding
+    # step would be as large as the correction. The other four keep the raw depth, which
+    # already resolves it. Convention, 2026-11-21.
+    'xVelocity': 2, 'xSpinRate': 0, 'xExtension': 4, 'xArmAngle': 2, 'xVAA': 3, 'xHAA': 3,
     'ExitVelo': 1,
     'ArmAngle': 1, 'BatSpeed': 1,
     # SwingLength is 2, not 1. The Savant minors export reports it to a

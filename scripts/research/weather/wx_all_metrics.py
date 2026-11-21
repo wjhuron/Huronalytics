@@ -46,6 +46,10 @@ METRICS = [('velo', 'release velocity', 'mph', None, None), ('spin', 'spin rate'
 TEMP_ONLY = {'velo', 'spin', 'ext', 'relz', 'relx_arm', 'arm_angle'}
 MODE = sys.argv[1] if len(sys.argv) > 1 else 'all'
 HOT = -0.037
+# `zpitch` as a second argument: APPLY the angle models with the pitch's own neutral movement
+# (what production has, with no pitcher state) while the FIT keeps the group mean, so shape
+# inside a group cannot pose as weather.
+ZPITCH = len(sys.argv) > 2 and sys.argv[2] == 'zpitch'
 
 
 def month_groups(d):
@@ -60,6 +64,7 @@ def add_shape(d):
     cnt = np.bincount(g, minlength=ng)
     d['n_ride'] = (np.bincount(g, weights=d['ivb'] - d['w_ride'], minlength=ng) / cnt)[g]
     d['n_run'] = (np.bincount(g, weights=d['hb_arm'] - d['w_run'], minlength=ng) / cnt)[g]
+    d['p_ride'] = d['ivb'] - d['w_ride']; d['p_run'] = d['hb_arm'] - d['w_run']      # the pitch's own neutral movement
 
 
 def design(d, key, zkey, loc):
@@ -84,7 +89,7 @@ def fe_sums(y, X, g):
 
 
 def neutral(d, key, zkey, coef):
-    z = d[zkey] if zkey else 0.0
+    z = d[zkey.replace('n_', 'p_') if ZPITCH else zkey] if zkey else 0.0
     return d[key] - (coef.get('aP', 0.0) + coef.get('bP', 0.0) * z) * d['lnP'] - (coef['aT'] + coef.get('bT', 0.0) * z) * d['lnT']
 
 
@@ -178,4 +183,4 @@ if __name__ == '__main__':
     for key, label, unit, zkey, loc in METRICS:
         r = R[key]
         print(f"  {label:26s} {unit:4s} | {mean(r['coors'], 0):+12.3f} -> {mean(r['coors'], 1):+8.3f}      | {mean(r['heat'], 0):+9.3f} -> {mean(r['heat'], 1):+8.3f} | {mean(r['aaa'], 0):+9.3f} -> {mean(r['aaa'], 1):+8.3f}")
-    json.dump(dict(fit=FULL, per_season=per, tests=R, mode=MODE), open(os.path.join(OUT, f'all_metrics_{MODE}.json'), 'w'), indent=1)
+    json.dump(dict(fit=FULL, per_season=per, tests=R, mode=MODE), open(os.path.join(OUT, f"all_metrics_{MODE}{'_zpitch' if ZPITCH else ''}.json"), 'w'), indent=1)

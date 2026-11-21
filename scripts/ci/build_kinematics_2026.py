@@ -28,6 +28,7 @@ import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
+from pipeline.neutral_move import raw_metric as _tracked  # noqa: E402
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 from kinematics_lib import compute_kinematics
 
@@ -154,7 +155,7 @@ def join_population(pitches, raw, kin, side, label):
         cl = cands.get(key, [])
         used = [False] * len(cl)
         for p in mine:
-            mv, mx, mz = sf(p.get('Velocity')), sf(p.get('PlateX')), sf(p.get('PlateZ'))
+            mv, mx, mz = sf(_tracked(p, 'Velocity')), sf(p.get('PlateX')), sf(p.get('PlateZ'))   # matched to Savant's tracked speed
             best_j, best_d = None, 1e9
             if mv is not None:
                 for j, i in enumerate(cl):
