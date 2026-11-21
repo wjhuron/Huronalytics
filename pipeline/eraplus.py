@@ -303,8 +303,15 @@ DH_B_AAA = 1.069
 # REFIT 2026-11-19 for the Loc+ far-miss rule (key loc_far, arm 'f@0'): held out against the set
 # above NEXT -0.006% (4/5), ROS +0.022% (2/6): a tie; every weight within .002. The shape-class
 # set: stuff .222 loc .065 k .152 izwh .077 xrv .147 gb .135 gs -.019 park .156.
-W_PH = {'stuff': 0.221, 'loc': 0.063, 'k': 0.153, 'izwh': 0.076,
-        'xrv': 0.147, 'gb': 0.135, 'gs': -0.019, 'park': 0.157}
+# REFIT 2026-11-21 for Stuff+ v19 (the neutral-movement columns; scripts/research/era/
+# hpera_nm1_refit.py, final fit on every replicate). Same rows and design as the far-miss
+# refit, whose reference arm reproduces the set below it to the third decimal. The stuff
+# input correlates .995-.998 with the v18 one. Held out by year against the v18 input:
+# NEXT +0.106% (1/5, z +1.8), ROS +0.168% (2/6, z +1.0): a tie that leans slightly worse,
+# as on the Stuff+ gate; adopted because the live Stuff+ is v19 (per Wally). The far-miss
+# set: stuff .221 loc .063 k .153 izwh .076 xrv .147 gb .135 gs -.019 park .157.
+W_PH = {'stuff': 0.211, 'loc': 0.066, 'k': 0.171, 'izwh': 0.079,
+        'xrv': 0.142, 'gb': 0.142, 'gs': -0.012, 'park': 0.159}
 # Pitcher-hand term. ZERO since Stuff+ v18 (2026-11-18): the Stuff+ channel now holds
 # pitcher hand, and the hand weight fits to -.017 when it is left in. History: added
 # 2026-09-05 as ERA credit for a left-hander on the RAW indicator centered at the pool's
