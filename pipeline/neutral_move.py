@@ -49,6 +49,12 @@ ROOF_CLOSED_CONDITIONS = {'dome', 'roof closed'}
 ROOF_CLOSED_TEMP_F = 72.0       # convention: conditioned indoor air (see the research note)
 ROOF_CLOSED_RH = 50.0           # convention: indoor relative humidity
 DEFAULT_TEMP_F = 70.0           # used only when the feed has no temperature
+# A feed temperature this far from the measured game mean is a feed error, not weather,
+# and the measured value is used alone. CONVENTION, not a fitted constant: over 13,489
+# open-air games 2021-2026 the feed runs 2.6 F above the measured mean with sd 4.0, and
+# 4 games sit beyond 20 F. One of them reports 8 F on an August night in Florida
+# (measured 79 F), which a 50/50 blend would still carry at half strength.
+FEED_TEMP_MAX_GAP_F = 20.0
 
 # Feed wind words -> (head, cross) unit parts. Head is positive when the wind blows
 # out (against the pitch); cross is positive from left field toward right field.
@@ -119,6 +125,7 @@ def game_air(elevation_ft, feed_temp_f, condition, venue_id=None, measured=None,
     closed = (condition or '').strip().lower() in ROOF_CLOSED_CONDITIONS
     feed_t = float(feed_temp_f) if feed_temp_f is not None else DEFAULT_TEMP_F
     have = bool(measured) and all(measured.get(k) is not None for k in ('p_hpa', 'tempF', 'rh'))
+    feed_rejected = False
     if have:
         if closed:
             k = float(coef['roof_k'].get(str(venue_id), 0.0))
@@ -126,6 +133,9 @@ def game_air(elevation_ft, feed_temp_f, condition, venue_id=None, measured=None,
             rho = float(moist_density(measured['p_hpa'], temp, ROOF_CLOSED_RH))
         else:
             w = float(coef['temp_blend_feed'])
+            if feed_temp_f is None or abs(feed_t - float(measured['tempF'])) > FEED_TEMP_MAX_GAP_F:
+                w = 0.0                      # no feed reading, or a feed error: measured alone
+                feed_rejected = feed_temp_f is not None
             temp = w * feed_t + (1.0 - w) * float(measured['tempF'])
             rho = float(moist_density(measured['p_hpa'], temp, measured['rh']))
         source = 'measured'
@@ -137,7 +147,7 @@ def game_air(elevation_ft, feed_temp_f, condition, venue_id=None, measured=None,
     ln_p = math.log(rho / float(coef['rho0'])) - ln_t
     head, cross, wind_ok = (0.0, 0.0, False) if closed else parse_wind(wind)
     return dict(lnP=ln_p, lnT=ln_t, head=head, cross=cross, rho=rho, temp_used=temp,
-                closed=closed, source=source, wind_ok=wind_ok)
+                closed=closed, source=source, wind_ok=wind_ok, feed_temp_rejected=feed_rejected)
 
 
 def tilt_to_axis(val):

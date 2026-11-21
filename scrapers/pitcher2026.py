@@ -846,6 +846,10 @@ class BaseballSavantFocusedDownloader:
                                                   game_data.get('datetime', {}).get('dateTime'))
                 game_air = NM.game_air(game_elevation, game_temp, weather.get('condition'),
                                        venue.get('id'), measured, weather.get('wind'))
+                if game_air.get('feed_temp_rejected'):
+                    print(f"  WARNING: game {game_pk}: feed temperature {game_temp} F is more than "
+                          f"{NM.FEED_TEMP_MAX_GAP_F:.0f} F from the measured {measured['tempF']} F; "
+                          f"the measured value is used alone")
                 if game_air['source'] != 'measured':
                     print(f"  WARNING: game {game_pk}: no measured weather; x movement uses "
                           f"standard-atmosphere pressure and the feed temperature")

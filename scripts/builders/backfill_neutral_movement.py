@@ -48,6 +48,13 @@ APPLY = os.environ.get('APPLY') == '1'
 HELD_CSV = os.path.expanduser('~/Downloads/neutral_backfill_held_rows.csv')
 
 
+# Games whose held cells were reviewed and RELEASED (Wally, 2026-11-20): the x value was
+# the wrong side. 816387 (2026-08-27, NEW tab): the feed reported 8 F, the old model
+# turned that into a factor of 0.875, and all 61 held cells there equal 0.875 x raw
+# while the raw values match the feed.
+RELEASED_GAMES = {'816387'}
+
+
 def old_x_disagrees(raw, old):
     """True when the x value on the sheet is not the raw value times any factor the old
     density model could produce (0.90 to 1.40; Mexico City is about 1.35). Such a cell was
@@ -217,7 +224,7 @@ def main():
                     continue
                 val = round(val, 1)
                 was_f = sf(was)
-                if old_x_disagrees(raw, was_f):
+                if pk not in RELEASED_GAMES and old_x_disagrees(raw, was_f):
                     held.append((tab, pid, cell('Game Date') if 'Game Date' in ci else '', cell('Pitcher') if 'Pitcher' in ci else '',
                                  cell('Pitch Type') if 'Pitch Type' in ci else '', key, raw, was_f, val))
                     new[key].append([was_f])
