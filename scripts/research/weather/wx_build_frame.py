@@ -106,6 +106,12 @@ def build_statcast(yr, path=None, store=None):
                 haa_arm=haa_arm, tflight=t, axis=f64(df['spin_axis']), dlift=dlift,
                 pz=f64(df['plate_z']), px_arm=np.where(rhp, -f64(df['plate_x']), f64(df['plate_x'])),
                 ext=f64(df['release_extension']),
+                relz=f64(df['release_pos_z']), relx_arm=np.where(rhp, -f64(df['release_pos_x']), f64(df['release_pos_x'])),
+                arm_angle=f64(df['arm_angle']), vplate=np.sqrt(vxf * vxf + vyf * vyf + vzf * vzf) * 0.681818,
+                ev=f64(df['launch_speed']), la=f64(df['launch_angle']), dist=f64(df['hit_distance_sc']),
+                xwoba=f64(df['estimated_woba_using_speedangle']), bip=df['bb_type'].notna().to_numpy(),
+                whiff=df['description'].isin(['swinging_strike', 'swinging_strike_blocked', 'foul_tip']).to_numpy(),
+                swing=df['description'].isin(['swinging_strike', 'swinging_strike_blocked', 'foul_tip', 'foul', 'hit_into_play']).to_numpy(),
                 dside_arm=np.where(rhp, -dside, dside), pfz_chk=pfz_chk,
                 date=df['game_date'].astype(str).str[:10].to_numpy(dtype='U10'))
 
