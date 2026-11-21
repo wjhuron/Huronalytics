@@ -141,6 +141,11 @@ VENUE_ELEVATION_FT_OVERRIDE = {
     2518: 1112,  # American Family Fields of Phoenix, Phoenix AZ
     2500: 1168,  # Tempe Diablo Stadium, Tempe AZ
     2507: 1263,  # Hohokam Stadium, Mesa AZ
+    # Added 2026-11-21: three parks the feed gives neither elevation nor coordinates for
+    # (coordinates in scrapers/weather_obs.py VENUE_COORDS_OVERRIDE; DEM at those points)
+    2517: 20,    # Holman Stadium, Vero Beach FL
+    3049: 167,   # Estadio Quisqueya Juan Marichal, Santo Domingo
+    6118: 1040,  # Camelback Ranch complex field (LAD), Glendale AZ
 }
 
 

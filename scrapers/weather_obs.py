@@ -36,6 +36,9 @@ VENUE_COORDS_OVERRIDE = {
     5340: (19.4040, -99.0855),    # Estadio Alfredo Harp Helu, Mexico City (feed has none)
     6130: (36.5157, -82.2570),    # Bristol Motor Speedway, Bristol TN (feed points at Georgia)
     5381: (51.5387, -0.0166),     # London Stadium (feed points at central London)
+    2517: (27.6479, -80.4279),    # Holman Stadium, Vero Beach FL (feed has none)
+    3049: (18.4869, -69.9257),    # Estadio Quisqueya Juan Marichal, Santo Domingo (feed has none)
+    6118: (33.5145, -112.2955),   # Camelback Ranch complex field, Glendale AZ (feed has none)
 }
 
 
