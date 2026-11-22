@@ -310,8 +310,12 @@ DH_B_AAA = 1.069
 # NEXT +0.106% (1/5, z +1.8), ROS +0.168% (2/6, z +1.0): a tie that leans slightly worse,
 # as on the Stuff+ gate; adopted because the live Stuff+ is v19 (per Wally). The far-miss
 # set: stuff .221 loc .063 k .153 izwh .076 xrv .147 gb .135 gs -.019 park .157.
-W_PH = {'stuff': 0.211, 'loc': 0.066, 'k': 0.171, 'izwh': 0.079,
-        'xrv': 0.142, 'gb': 0.142, 'gs': -0.012, 'park': 0.159}
+# Refit 2026-11-21 on Stuff+ v20 (every input neutral; scripts/research/era/hpera_wm1_refit.py),
+# against the v19 input on the same rows: NEXT -0.075% (3/5, z -1.6), ROS -0.006% (4/6, z -0.1).
+# A tie; adopted because the live Stuff+ is v20 (per Wally). The v19 set: stuff .211 loc .066
+# k .171 izwh .079 xrv .142 gb .142 gs -.012 park .159.
+W_PH = {'stuff': 0.214, 'loc': 0.067, 'k': 0.171, 'izwh': 0.079,
+        'xrv': 0.141, 'gb': 0.141, 'gs': -0.013, 'park': 0.160}
 # Pitcher-hand term. ZERO since Stuff+ v18 (2026-11-18): the Stuff+ channel now holds
 # pitcher hand, and the hand weight fits to -.017 when it is left in. History: added
 # 2026-09-05 as ERA credit for a left-hander on the RAW indicator centered at the pool's
