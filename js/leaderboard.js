@@ -100,6 +100,7 @@ const COLUMNS = {
     { key: 'count',       label: 'Pitches',  format: Utils.formatInt, sortType: 'numeric', noPercentile: true, group: 'info' },
     { key: 'nBip',        label: 'BIP',      format: Utils.formatInt, sortType: 'numeric', noPercentile: true, desc: 'Balls in play — every non-bunt batted ball, home runs included', group: 'info' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA against (Statcast, EV + LA)', group: 'batted_ball' },
+    { key: 'nwOBA',       label: 'nwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weather-neutral wOBA against: wOBA against with the part that the air added to each ball in play taken out. This is the wOBA against in neutral air (sea level, 72 F). Air only: the size of the field of a park stays in the number. Season value, hidden by default', group: 'batted_ball' },
     { key: 'xBA',         label: 'xBA',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected BA against (Statcast, EV + LA)', group: 'batted_ball' },
     { key: 'xSLG',        label: 'xSLG',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected SLG against (Statcast, EV + LA)', group: 'batted_ball' },
     { key: 'xwOBAcon',   label: 'xwOBAcon', format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA on contact — avg xwOBA on BIP only', group: 'batted_ball' },
@@ -153,6 +154,7 @@ const COLUMNS = {
     { key: 'hpWAR_pt',    label: 'Proj PA',  format: Utils.formatDecimal(0), sortType: 'numeric', desc: 'Projected 2027 major league plate appearances, the playing time behind hpWAR. It is an expected value that includes the chance of zero PA, so an everyday player projects below his usual total.', group: 'projected' },
     { key: 'processPlus', label: 'Process+', format: Utils.formatInt, sortType: 'numeric', desc: 'Process+: a descriptive grade of the process behind the production. Weighted blend of BB+ (contact quality), SD+ (swing decisions) and CT+ (contact rate), built from the unshrunk, prior-free values so a small sample reads as what it was rather than as league average. 100 = league avg and one point is one percent, on the wRC+ ruler: the spread is deflated to r x SD(wRC+) with r measured live each run, which is what makes the slope exactly 1 (at the FULL wRC+ spread a 115 would be worth only ~12%). A gap vs wRC+ reads as results ahead of or behind process: luck, speed, spray and park live in the gap.', group: 'expected' },
     { key: 'wOBA',        label: 'wOBA',     format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weighted on-base average — plate outcomes weighted by run value', group: 'stats' },
+    { key: 'nwOBA',       label: 'nwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Weather-neutral wOBA: wOBA with the part that the air added to each ball in play taken out. Thin or warm air carries a fly ball farther; this is the wOBA in neutral air (sea level, 72 F). Air only: the size of the field of a park stays in the number. Season value, hidden by default', group: 'stats' },
     { key: 'xwOBA',       label: 'xwOBA',    format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'Expected wOBA (Statcast, EV + LA)', group: 'expected' },
     { key: 'avg',         label: 'AVG',      format: Utils.formatDecimal(3), sortType: 'numeric', sectionStart: true, desc: 'Batting average', group: 'stats' },
     { key: 'obp',         label: 'OBP',      format: Utils.formatDecimal(3), sortType: 'numeric', desc: 'On-base percentage', group: 'stats' },
@@ -384,6 +386,8 @@ const Leaderboard = {
     // Raw Stuff+ (2026-11-21, per Wally): hidden by default on every leaderboard, in the
     // picker for a reader who wants to compare it with Stuff+. Persists like vaa/haa.
     this.hiddenColumns['rawStuffScore'] = true;
+    // Weather-neutral wOBA (2026-11-22, per Wally): hidden by default, in the picker
+    this.hiddenColumns['nwOBA'] = true;
     // Pitcher+ Proj (2026-07-28, per Wally): hidden across every leaderboard.
     // Not deleted — the column stays in the picker and on the player page, so
     // the projection is still reachable; it just isn't a default leaderboard

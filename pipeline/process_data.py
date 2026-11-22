@@ -2231,8 +2231,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
 
     PITCHER_METRIC_COLS = ['RelPosZ', 'RelPosX', 'Extension', 'ArmAngle', 'VAA', 'HAA']
     PITCHER_METRIC_PCTL_KEYS = [METRIC_KEYS[c] for c in PITCHER_METRIC_COLS]
-    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon']
-    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon'}
+    EXPECTED_KEYS = ['wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'nwOBA']
+    EXPECTED_PITCHER_INVERT = {'wOBA', 'xBA', 'xSLG', 'xwOBA', 'xwOBAcon', 'nwOBA'}
     pitcher_leaderboard = []
     for (pitcher, team, throws), pitches in pitcher_groups.items():
         # Latest game date in this pitcher's pitch data. The client resolves a
@@ -3246,7 +3246,7 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
     hitter_league_avgs = {}
     # Rate stats weighted by PA
     pa_stats = {'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kPct', 'bbPct', 'bbToK', 'hrFbPct',
-                'wOBA', 'xBA', 'xSLG', 'xwOBA', 'rv100', 'xRv100',
+                'wOBA', 'xBA', 'xSLG', 'xwOBA', 'nwOBA', 'rv100', 'xRv100',
                 'swingPct', 'izSwingPct', 'chasePct', 'izSwChase', 'contactPct', 'izContactPct', 'whiffPct'}
     # Batted ball stats weighted by nBip
     bip_stats = {'avgEVAll', 'ev50', 'medEV', 'ev95', 'ev95Air', 'maxEV', 'medLA', 'hardHitPct', 'barrelPct',
@@ -4354,8 +4354,12 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                                     WOBA_WEIGHTS['1B'] * box_1b + WOBA_WEIGHTS['2B'] * box_2b +
                                     WOBA_WEIGHTS['3B'] * box_3b + WOBA_WEIGHTS['HR'] * box_hr)
                         row['wOBA'] = round(woba_num / woba_denom, 3)
+                        # neutral wOBA follows the official line: the same air part, off the official wOBA
+                        if row.get('airWOBA') is not None:
+                            row['nwOBA'] = round(woba_num / woba_denom - row['airWOBA'], 6)
                     else:
                         row['wOBA'] = None
+                        row['nwOBA'] = None
             else:
                 row['g'] = None
                 row['tb'] = None
@@ -4485,6 +4489,8 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
                         for _fgk, _rk in (('wOBA', 'wOBA'), ('iso', 'iso'), ('g', 'g')):
                             if fg_player.get(_fgk) is not None:
                                 row[_rk] = fg_player[_fgk]
+                        if row.get('airWOBA') is not None and row.get('wOBA') is not None:
+                            row['nwOBA'] = round(row['wOBA'] - row['airWOBA'], 6)
             else:
                 n_mlb += 1
                 fg_player = _fg_mlb_h.get(mid_str)

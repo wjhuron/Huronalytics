@@ -113,6 +113,8 @@ def compute_expected_stats(pitches, woba_weights=None, xwoba_key='xwOBA'):
     xslg_denom = 0  # AB-events with a Statcast xSLG value
     xwoba_sum = 0.0
     xwoba_denom = 0
+    air_sum = 0.0   # wOBA points the air added, summed over balls in play
+    air_n = 0
     xwobacon_sum = 0.0
     xwobacon_denom = 0
     nonbunt_ab = 0  # AB denominator for xBA/xSLG, excluding bunt ABs (Savant convention)
@@ -124,6 +126,12 @@ def compute_expected_stats(pitches, woba_weights=None, xwoba_key='xwOBA'):
 
         if event == 'Intent Walk':
             continue
+
+        # The wOBA the air added to this ball in play (pipeline/neutral_move.py, AirwOBA)
+        _air = safe_float(p.get('AirwOBA'))
+        if _air is not None:
+            air_sum += _air
+            air_n += 1
 
         # Savant drops bunt ABs from expected stats entirely; xBA/xSLG/
         # xwOBAcon below already follow that — xwOBA joined 2026-08-15.
@@ -193,6 +201,15 @@ def compute_expected_stats(pitches, woba_weights=None, xwoba_key='xwOBA'):
         result['wOBA'] = round(woba_num / woba_denom, 3)
     else:
         result['wOBA'] = None
+    # Weather-neutral wOBA (2026-11-22): wOBA with the air's part taken out, AIR ONLY. The
+    # size of a park's field stays in it (Coors still reads low), because that is the park
+    # and not the weather. airWOBA is the part removed. None when no ball carries the value.
+    if air_n and woba_denom > 0 and weights:
+        result['airWOBA'] = round(air_sum / woba_denom, 6)
+        result['nwOBA'] = round(woba_num / woba_denom - air_sum / woba_denom, 6)
+    else:
+        result['airWOBA'] = None
+        result['nwOBA'] = None
 
     # xBA/xSLG are Statcast-only — denominator is non-bunt AB (Savant drops bunts;
     # Ks contribute an implicit 0). Return None when no AB had any Statcast data,

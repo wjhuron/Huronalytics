@@ -811,6 +811,8 @@ const Aggregator = {
                      'locPlusRaw', 'stuffScore_lowSupport',
                      // Raw Stuff+ is season-level: the micro rows carry no raw atoms
                      'rawStuffScore', 'rawStuffScore_pctl',
+                     // weather-neutral wOBA is season-level: the air value is per ball, not in micro
+                     'nwOBA', 'nwOBA_pctl', 'airWOBA',
                      'xrvoe100', 'xrvoe100_pctl', 'rvoe100', 'rvoe100_pctl',
                      'rvoe', 'rvoe_pctl', 'xrvoe', 'xrvoe_pctl',
                      // Pitcher+ is season-level like SIERA/FIP/xRV100: its
@@ -2810,6 +2812,7 @@ const Aggregator = {
                         'batSpeed', 'swingLength', 'attackAngle', 'attackDirection', 'swingPathTilt', 'nCompSwings', 'blastPct', 'squaredUpPct', 'idealAAPct',
                         'sprintSpeed', 'nCompRuns', 'sprintQual',
                         'wOBA', 'wRC', 'wRCplus', 'xWRCplus',
+                        'nwOBA', 'nwOBA_pctl', 'airWOBA',      // weather-neutral wOBA: season-level
                         // SD+, CT+, and Process+ are precomputed against the
                         // full season (need the 360-cell / 60-cell RV weight
                         // tables and hitter-standardization SDs that aren't
