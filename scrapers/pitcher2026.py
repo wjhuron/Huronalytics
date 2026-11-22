@@ -216,6 +216,12 @@ class BaseballSavantFocusedDownloader:
         raw = {c: np.round(num(c), _PREC[c]) for c in NM.METRIC_COLUMNS}
         out, modes = NM.neutral_metric_table(raw, df['Throws'].to_numpy(dtype=object), num('xIndVrtBrk'),
                                              num('xHorzBrk'), ln_p, ln_t)
+        # The hitter side (model hm1): carry distance, bat speed, swing length, and the wOBA
+        # the air added to each ball in play.
+        hraw = {c: np.round(num(c), _PREC[c]) for c in NM.HITTER_METRIC_COLUMNS}
+        bip = (df['BBType'].fillna('').astype(str).str.strip() != '').to_numpy() if 'BBType' in df.columns else np.zeros(len(df), dtype=bool)
+        hout, _hm = NM.neutral_hitter_table(hraw, np.round(num('ExitVelo'), _PREC['ExitVelo']), num('LaunchAngle'), bip, ln_p, ln_t)
+        out.update(hout)
         for xcol, v in out.items():
             df[xcol] = [_fmt(xcol, x) for x in v]
         if modes['raw'] or modes['no_shape']:
@@ -1775,6 +1781,7 @@ class BaseballSavantFocusedDownloader:
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
             'xVelocity', 'xSpinRate', 'xExtension', 'xArmAngle', 'xVAA', 'xHAA',
+            'xDistance', 'xBatSpeed', 'xSwingLength', 'AirwOBA',
         ]
 
         # Keep the full column schema regardless of data availability so every
@@ -1876,6 +1883,7 @@ class BaseballSavantFocusedDownloader:
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
             'xVelocity', 'xSpinRate', 'xExtension', 'xArmAngle', 'xVAA', 'xHAA',
+            'xDistance', 'xBatSpeed', 'xSwingLength', 'AirwOBA',
         ]
         # Keep the full column schema regardless of data availability so every
         # CSV matches the MLB/ROC/AAA layout; missing columns come out empty
@@ -2150,6 +2158,7 @@ class BaseballSavantFocusedDownloader:
             'AttackAngle', 'AttackDirection', 'SwingPathTilt',
             'PitchID', 'Barrel',
             'xVelocity', 'xSpinRate', 'xExtension', 'xArmAngle', 'xVAA', 'xHAA',
+            'xDistance', 'xBatSpeed', 'xSwingLength', 'AirwOBA',
         ]
         # Keep the full column schema regardless of data availability so every
         # CSV matches the MLB/ROC/AAA layout; missing columns come out empty
