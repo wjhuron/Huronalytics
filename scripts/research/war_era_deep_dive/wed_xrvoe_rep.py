@@ -70,7 +70,14 @@ def measure(d, keys, grid):
 def main():
     frames = {y: G.load_frame(y) for y in G.SEASONS}; G.set_arm_side_sign(list(frames.values()))
     out = {}
+    done = []
     for Y in (2026, 2021, 2022, 2023, 2024, 2025):
+        # A frame with no location term cannot give a residual (the 2026 frame installed with the
+        # neutral inputs on 2026-11-21 has an empty l_loc until build-loc runs): say so, do not crash.
+        if not np.isfinite(frames[Y]['l_loc'].values.astype(float)).any():
+            print(f"{Y}: SKIPPED, the frame has no l_loc; measure this season with wed_xrvoe.py (the production path)", flush=True)
+            continue
+        done.append(Y)
         d = residual_frame(Y, frames)
         for tag, keys, grid in (('pitcher', ['pitcher', 'team'], (300, 500, 800)), ('pitch type', ['pitcher', 'team', 'pitch_type'], (150, 300))):
             res, n0v, tsd, osd = measure(d, keys, grid)
@@ -78,7 +85,7 @@ def main():
             out[f'{Y} {tag}'] = dict(samples={n: v[1] for n, v in res.items()}, variance=n0v, true_sd=tsd)
         json.dump(out, open(os.path.join(OUT, 'res_xrvoe_rep.json'), 'w'), indent=1, default=float)
     for tag in ('pitcher', 'pitch type'):
-        v = [out[f'{Y} {tag}']['variance'] for Y in G.SEASONS]; s = [np.mean(list(out[f'{Y} {tag}']['samples'].values())) for Y in G.SEASONS]
+        v = [out[f'{Y} {tag}']['variance'] for Y in done]; s = [np.mean(list(out[f'{Y} {tag}']['samples'].values())) for Y in done]
         print(f"\n{tag}: variance-method N0 by season {np.round(v).astype(int).tolist()} median {np.median(v):.0f}, mean {np.mean(v):.0f} (SE {np.std(v, ddof=1)/np.sqrt(len(v)):.0f}) | sample-method mean by season {np.round(s).astype(int).tolist()} median {np.median(s):.0f}")
 
 
