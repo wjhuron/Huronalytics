@@ -607,6 +607,17 @@ const Leaderboard = {
     avg.wRCplus = 100;
     avg.xWRCplus = 100;
     avg.stuffScore = 100;
+    // Raw Stuff+ shares the Stuff+ ruler, so its league value is 100 plus the mean gap
+    // (Raw Stuff+ minus Stuff+) of the rows shown, weighted by pitches. It reads about 99:
+    // the neutral reference air is denser than the air of an average game.
+    var rawGap = 0, rawW = 0;
+    for (var ri = 0; ri < data.length; ri++) {
+      var rr = data[ri];
+      if (rr.rawStuffScore == null || rr.stuffScore == null) continue;
+      var rw = rr.count || 0;
+      if (rw > 0) { rawGap += (rr.rawStuffScore - rr.stuffScore) * rw; rawW += rw; }
+    }
+    avg.rawStuffScore = rawW > 0 ? 100 + rawGap / rawW : null;
     avg.pitcherPlus = 100;
     avg.pitcherPlusProj = 100;
     avg.hdERAPlus = 100;

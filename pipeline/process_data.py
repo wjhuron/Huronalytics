@@ -4542,6 +4542,10 @@ def process_game_type(all_pitches, label, mlb_id_cache, mlb_id_cache_path,
         if stat != 'wOBA' and hitter_league_avgs.get(stat) is not None:
             continue
         _compute_hitter_lg_avg(stat)
+    # Weather-neutral wOBA follows the official wOBA row by row, so its league average is
+    # taken here too, after the merge (it is not in HITTER_STAT_KEYS; the League Avg row of
+    # the site showed "--" for it until 2026-11-22).
+    _compute_hitter_lg_avg('nwOBA')
 
     # ── Process+ → run-truth scale (LIVE r since 2026-08-18) ──
     # THE CONTRACT: Process+ is a "+" stat, so one point must be one percent.
