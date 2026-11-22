@@ -78,6 +78,7 @@ def main():
         for mid, g in df.groupby('mlbId'):
             rows = g.drop(columns=['mlbId']).to_dict('records')
             mc._to_mlb_currency(rows)
+            mc._swap_neutral_metrics(rows, str(mid))      # adjusted, as every card and the site read
             rows.sort(key=lambda r: (r['Game Date'], r['PitchID']))
             groups[mid] = [q for q in mc.as_pickle_rows(rows, all_pitches)
                            if (q.get('Pitcher'), q.get('PTeam')) not in ep]

@@ -101,6 +101,10 @@ def main():
         xm, mm = NM.neutral_metric_table({c: num(ch[c]) for c in NM.METRIC_COLUMNS}, thr, np.round(new_ivb, 1),
                                          np.round(new_hb, 1), np.where(np.isfinite(ln_p), ln_p, np.nan), ln_t)
         metric_modes.update(mm)
+        # The hitter side (model hm1): carry distance, bat speed, swing length, air value.
+        hx, _hm = NM.neutral_hitter_table({c: num(ch[c]) for c in NM.HITTER_METRIC_COLUMNS}, num(ch['ExitVelo']), num(ch['LaunchAngle']),
+                                          (ch['BBType'].to_numpy() != ''), np.where(np.isfinite(ln_p), ln_p, np.nan), ln_t)
+        xm.update(hx)
         if writer is not None:
             ch['xIndVrtBrk'] = fmt(new_ivb, ~np.isfinite(ivb)); ch['xHorzBrk'] = fmt(new_hb, ~np.isfinite(hb))
             for xcol, v in xm.items():

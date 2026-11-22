@@ -465,6 +465,10 @@ def read_pitches_from_sheet(gc, sheet_id, extra_tabs=None, only_tabs=None):
         # is read ADJUSTED; a tab that does not is read as tracked, and says so.
         _has_x = all(x in col_idx for x in _NM.X_METRIC_COLUMNS)
         _stale_x = 0
+        if _has_x and not all(x in col_idx for x in _NM.X_HITTER_COLUMNS):
+            print(f"    WARNING: {tab_name} has no neutral HITTER columns (xDistance, xBatSpeed, xSwingLength, "
+                  f"AirwOBA); those read AS TRACKED and the air value is absent. "
+                  f"Repair: APPLY=1 scripts/builders/backfill_neutral_metrics.py")
         if not _has_x:
             print(f"    WARNING: {tab_name} has no neutral metric columns; Velocity, Spin Rate, "
                   f"Extension, ArmAngle, VAA and HAA are read AS TRACKED. "

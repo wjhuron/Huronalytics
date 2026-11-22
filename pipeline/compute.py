@@ -703,7 +703,10 @@ def compute_hitter_stats(pitches):
     spt_vals = []
     for p in pitches:
         bs = safe_float(p.get('BatSpeed'))
-        if bs is not None and bs >= 50:
+        # A competitive swing is 50 mph or more AS TRACKED: the neutral value must not move
+        # a swing in or out of the set (it changed nCompSwings on 57 hitters when it did).
+        _bs_gate = safe_float(raw_metric(p, 'BatSpeed'))
+        if bs is not None and _bs_gate is not None and _bs_gate >= 50:
             bs_vals.append(bs)
             sl = safe_float(p.get('SwingLength'))
             if sl is not None: sl_vals.append(sl)
@@ -719,7 +722,7 @@ def compute_hitter_stats(pitches):
     n_blast_eligible = 0
     n_ideal_aa = 0
     for p in pitches:
-        bs = safe_float(p.get('BatSpeed'))
+        bs = safe_float(raw_metric(p, 'BatSpeed'))      # the TRACKED swing: squared-up and blast are collision physics
         if bs is None or bs < 50:
             continue
         aa = safe_float(p.get('AttackAngle'))

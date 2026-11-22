@@ -1,9 +1,11 @@
-"""backfill_neutral_metrics.py -- the sheet writer of the six neutral-environment metric columns.
+"""backfill_neutral_metrics.py -- the sheet writer of the ten neutral-environment metric columns.
 
 Columns (appended after the last column of every pitch tab, in this order):
-    xVelocity  xSpinRate  xExtension  xArmAngle  xVAA  xHAA
-Each is the raw column with the weather effect removed (pipeline/neutral_move.py, model
-wm1; the math is there and nowhere else). The raw columns are never written.
+    xVelocity  xSpinRate  xExtension  xArmAngle  xVAA  xHAA          (pitch side, model wm1)
+    xDistance  xBatSpeed  xSwingLength  AirwOBA                      (hitter side, model hm1)
+Each x column is the raw column with the weather effect removed; AirwOBA is the wOBA the
+air added to a ball in play (pipeline/neutral_move.py; the math is there and nowhere
+else). The raw columns are never written.
 
 The tool is idempotent. Every run recomputes every row of every tab from the row's own raw
 values, the row's xIndVrtBrk / xHorzBrk and the game's air (data/game_weather_rs.json), and
@@ -45,8 +47,9 @@ from scrapers.sheet_precision import NUMBER_FORMATS, PRECISION, fmt
 
 SIDECAR = os.path.join(ROOT, 'data', 'game_weather_rs.json')
 APPLY = os.environ.get('APPLY') == '1'
-XCOLS = NM.X_METRIC_COLUMNS
-NEED = ('PitchID', 'Throws', 'xIndVrtBrk', 'xHorzBrk') + tuple(NM.METRIC_COLUMNS)
+XCOLS = NM.X_METRIC_COLUMNS + NM.X_HITTER_COLUMNS          # sheet order: the six pitch columns, then the four hitter ones
+NEED = (('PitchID', 'Throws', 'xIndVrtBrk', 'xHorzBrk') + tuple(NM.METRIC_COLUMNS)
+        + ('ExitVelo', 'LaunchAngle', 'BBType') + tuple(NM.HITTER_METRIC_COLUMNS))
 COORS = 19
 CHUNK = 15000                     # rows per write request
 
@@ -81,18 +84,19 @@ def plan_tab(rows, ci, air_by_pk):
     raw = {c: num(get(c)) for c in NM.METRIC_COLUMNS}
     throws = np.array(get('Throws'), dtype=object)
     out, modes = NM.neutral_metric_table(raw, throws, num(get('xIndVrtBrk')), num(get('xHorzBrk')), ln_p, ln_t)
+    hraw = {c: num(get(c)) for c in NM.HITTER_METRIC_COLUMNS}
+    bip = np.array([v not in ('', None) for v in get('BBType')])
+    hout, hmodes = NM.neutral_hitter_table(hraw, num(get('ExitVelo')), num(get('LaunchAngle')), bip, ln_p, ln_t)
+    out.update(hout); raw.update(hraw)
+    modes = dict(modes, hitter_raw=hmodes['raw'], hitter_full=hmodes['full'])
     block = [[fmt(x, out[x][i]) for x in XCOLS] for i in range(len(body))]
     changed = 0
-    have = all(x in ci for x in XCOLS)
-    if have:
-        for i, r in enumerate(body):
-            for j, x in enumerate(XCOLS):
-                was = r[ci[x]] if ci[x] < len(r) else ''
-                if was != block[i][j]:
-                    changed += 1
-    else:
-        changed = sum(1 for row in block for v in row if v != '')
-    return block, changed, modes, dict(pks=pks, throws=throws, raw=raw, out=out,
+    for j, x in enumerate(XCOLS):
+        if x in ci:
+            changed += sum(1 for i, r in enumerate(body) if (r[ci[x]] if ci[x] < len(r) else '') != block[i][j])
+        else:
+            changed += sum(1 for row in block if row[j] != '')
+    return block, changed, modes, dict(pks=pks, throws=throws, raw=raw, out=out, bip=bip, la=num(get('LaunchAngle')),
                                        pitcher=get('Pitcher') if 'Pitcher' in ci else [''] * len(body),
                                        pt=get('Pitch Type') if 'Pitch Type' in ci else [''] * len(body))
 
@@ -132,26 +136,29 @@ def add_columns(ws, header):
     missing = [x for x in XCOLS if x not in header]
     if not missing:
         return header
-    if missing != XCOLS:
-        raise SystemExit(f'{ws.title}: has only some of the x metric columns ({[x for x in XCOLS if x in header]}). '
-                         f'Repair the header by hand before a write.')
+    have = [x for x in XCOLS if x in header]
+    # The tab may hold a leading part of XCOLS (the six pitch columns came first). Anything
+    # else (a gap, another order, columns after them) is repaired by hand, never guessed.
+    if have + missing != XCOLS or (have and header[-len(have):] != have):
+        raise SystemExit(f'{ws.title}: the x columns on the tab ({have}) are not a leading part of {XCOLS} at the end of '
+                         f'the header. Repair the header by hand before a write.')
     start = len(header)
-    need = start + len(XCOLS)
+    need = start + len(missing)
     if ws.col_count < need:
         sheets_call_with_retry(lambda: ws.add_cols(need - ws.col_count))
     rng = f'{col_letter(start)}1:{col_letter(need - 1)}1'
-    sheets_call_with_retry(lambda: ws.update(values=[XCOLS], range_name=rng, value_input_option='USER_ENTERED'))
+    sheets_call_with_retry(lambda: ws.update(values=[missing], range_name=rng, value_input_option='USER_ENTERED'))
     reqs = [{'copyPaste': {                                   # the look of the last old column, header and data
         'source': {'sheetId': ws.id, 'startColumnIndex': start - 1, 'endColumnIndex': start},
         'destination': {'sheetId': ws.id, 'startColumnIndex': start, 'endColumnIndex': need},
         'pasteType': 'PASTE_FORMAT', 'pasteOrientation': 'NORMAL'}}]
-    for j, x in enumerate(XCOLS):
+    for j, x in enumerate(missing):
         reqs.append({'repeatCell': {
             'range': {'sheetId': ws.id, 'startRowIndex': 1, 'startColumnIndex': start + j, 'endColumnIndex': start + j + 1},
             'cell': {'userEnteredFormat': {'numberFormat': NUMBER_FORMATS[x]}},
             'fields': 'userEnteredFormat.numberFormat'}})
     sheets_call_with_retry(lambda: ws.spreadsheet.batch_update({'requests': reqs}))
-    return header + XCOLS
+    return header + missing
 
 
 def main():
@@ -202,15 +209,21 @@ def main():
         modes.update(m); total += changed
         plans.append((ws, rows, ci, block, changed)); parts.append(part)
         print(f'  planned {ws.title}: {changed} cells to write / {len(XCOLS) * (len(rows) - 1)}'
-              f'{"" if all(x in ci for x in XCOLS) else "  (columns to add)"}')
+              f'{"" if all(x in ci for x in XCOLS) else "  (columns to add: " + str(len([x for x in XCOLS if x not in ci])) + ")"}')
     print(f'\nTOTAL: {total} cells to write across {len(plans)} tabs')
     print('modes (pitches): ' + ', '.join(f"{v} '{k}'" for k, v in sorted(modes.items())))
-    for col, (xcol, _) in NM.METRIC_COLUMNS.items():
+    pairs = [(c, x) for c, (x, _) in NM.METRIC_COLUMNS.items()] + list(NM.HITTER_METRIC_COLUMNS.items())
+    for col, xcol in pairs:
         d = np.concatenate([p['out'][xcol] - p['raw'][col] for p in parts])
         d = d[np.isfinite(d)]
         if len(d):
             print(f'  {xcol:10s} x - raw: mean {d.mean():+.4f}  sd {d.std():.4f}  p1 {np.percentile(d, 1):+.3f}  p99 {np.percentile(d, 99):+.3f}  n {len(d)}')
     coors_check(parts, venue_by_pk)
+    av = np.concatenate([p['out'][NM.AIR_VALUE_COLUMN] for p in parts])
+    at = np.concatenate([[venue_by_pk.get(k) == COORS for k in p['pks']] for p in parts])
+    la = np.concatenate([p['la'] for p in parts]); ok = np.isfinite(av)
+    print(f'\n{NM.AIR_VALUE_COLUMN}: {int(ok.sum())} balls in play, mean {np.mean(av[ok]):+.4f}; air balls (LA 10+) mean '
+          f'{np.mean(av[ok & (la >= 10)]):+.4f}, at Coors {np.mean(av[ok & (la >= 10) & at]):+.4f}, elsewhere {np.mean(av[ok & (la >= 10) & ~at]):+.4f}')
     if not APPLY:
         print('\nDRY RUN: no sheet was written. Set APPLY=1 to write.')
         return

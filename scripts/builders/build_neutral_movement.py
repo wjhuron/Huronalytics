@@ -31,6 +31,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 OUT = os.path.join(ROOT, 'data', 'neutral_movement_rs.json')
 DEFAULT_SRC = os.path.join(ROOT, 'data', '_weather_audit', 'final_fit_smooth.json')
 METRICS_SRC = os.path.join(ROOT, 'data', '_weather_audit', 'all_metrics_temp.json')
+FLIGHT_SRC = os.path.join(ROOT, 'data', '_weather_audit', 'flight_final.json')
+SWING_SRC = os.path.join(ROOT, 'data', '_weather_audit', 'swing_models.json')
+VALUE_LAYOUT = 'la8 x ev6 (85..105 by 5, 110)'
+VALUE_KAPPA = 0.85
 
 ROOF_K = {'14': 0.4, '32': 0.5, '680': 0.6}      # Rogers Centre, American Family Field, T-Mobile Park
 
@@ -76,6 +80,34 @@ def main():
         if extra or any(t not in got for t in terms):
             raise SystemExit(f'metric {key}: fit terms {sorted(got)} do not match the shipped form {terms}')
         out['metrics'][key] = {t: got[t] for t in terms}
+    # The hitter side (model hm1). Sources, all written by scripts/research/weather/:
+    #   flight_final.json  (wx_flight_final.py)  carry exponents (quadratic in launch angle; held-out
+    #                      error flat past quadratic) and the ball-value sensitivities s per contact
+    #                      band (layout la8 x ev6: INTERIOR optimum of the held-out error over 4 to
+    #                      280 bands, flat from 35 to 105)
+    #   swing_models.json  (wx_swing_models.py)  bat speed (3 seasons) and swing length (2), aT only
+    # KAPPA 0.85 = the share of the pressure carry that reaches results, measured on Triple-A
+    # altitude parks with the MLB fit unchanged: the altitude gap crosses zero at 0.86 (seasons
+    # 0.64, 1.0, 1.0; physics says 1.0). The per-ball error objective there reads 0.5 to 0.6, but
+    # noise in s pulls that optimum down; the gap is the unbiased objective for a mean. In MLB the
+    # number cannot be measured: pressure is Coors, and Coors was built around its air.
+    for src_ in (FLIGHT_SRC, SWING_SRC):
+        if not os.path.exists(src_):
+            raise SystemExit(f'{src_} is missing. Run the research script that writes it.')
+    with open(FLIGHT_SRC) as f:
+        ff = json.load(f)
+    with open(SWING_SRC) as f:
+        sw = json.load(f)
+    lay = ff['layouts'][VALUE_LAYOUT]
+    if ff['pick'] != VALUE_LAYOUT:
+        raise SystemExit(f"the held-out search now picks {ff['pick']!r}, not {VALUE_LAYOUT!r}: read the curve before shipping")
+    dfit = ff['distance']['fit']
+    if ff['distance']['form'] != 'quadratic' or len(dfit) != 6 or len(lay['s']) != (len(lay['la']) - 1) * (len(lay['ev']) + 1):
+        raise SystemExit('unexpected carry form or value layout')
+    out['hitter_version'] = 'hm1'
+    out['flight'] = dict(la_min=ff['distance']['la_min'], u_centre=ff['distance']['u_centre'], u_scale=ff['distance']['u_scale'],
+                         eP=dfit[:3], eT=dfit[3:], value=dict(la_edges=lay['la'], ev_edges=lay['ev'], s=lay['s'], kappa=VALUE_KAPPA))
+    out['swing'] = {'bat_speed': {'aT': sw['bs|T']['fit'][0]}, 'swing_length': {'aT': sw['sl|T']['fit'][0]}}
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(OUT), suffix='.tmp')
     with os.fdopen(fd, 'w') as f:
         json.dump(out, f, indent=1)

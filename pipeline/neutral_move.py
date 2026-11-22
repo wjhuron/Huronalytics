@@ -378,6 +378,16 @@ def swap_in_neutral_metrics(pitch):
         pitch[col] = x
         if x is None and raw is not None:
             stale += 1
+    # The hitter columns (model hm1), when the row has them. Distance, BatSpeed and SwingLength
+    # follow the same rule; AirwOBA has no tracked twin and stays under its own name.
+    for col, xcol in HITTER_METRIC_COLUMNS.items():
+        if xcol not in pitch:
+            continue
+        raw, x = pitch.get(col), pitch.get(xcol)
+        pitch[col + RAW_SUFFIX] = raw
+        pitch[col] = x
+        if x is None and raw is not None:
+            stale += 1
     return stale
 
 
@@ -386,3 +396,80 @@ def raw_metric(pitch, col):
     that never went through the swap (the 2021-2025 training pickles hold tracked values)."""
     k = col + RAW_SUFFIX
     return pitch[k] if k in pitch else pitch.get(col)
+
+
+# ---------------------------------------------------------------------------------------
+# The hitter side (model `hm1`, 2026-11-22). Three things the weather does to a swing and a
+# batted ball, and nothing else:
+#   CARRY   a ball hit at launch angle 10 or more flies farther in thin or warm air:
+#               neutral distance = distance / exp(zP + zT)
+#           zP = eP(u) * lnP, zT = eT(u) * lnT, u = (LA - 25) / 10, eP / eT quadratic in u.
+#   VALUE   the wOBA that the air added to that ball: AirwOBA = s[band] * (zT + kappa * zP),
+#           s = the value of a unit of log carry for the ball's (launch angle, exit velocity)
+#           band, measured on temperature (every park has hot and cold days, so its fences
+#           cancel). kappa is the share of the PRESSURE carry that reaches results; it is
+#           measured on Triple-A altitude parks, because in MLB pressure is Coors and Coors's
+#           field was built around its air. What is left at Coors after this is the field's
+#           size, a park effect, not weather (per Wally 2026-11-22: air only).
+#   SWING   a hitter swings faster on a warm day: bat speed and swing length, temperature only.
+# Exit velocity, launch angle, whiffs and strikeouts also change at altitude, through the
+# PITCH (it moves less). That is the matchup, not the air, and it is not adjusted.
+# Fit and tests: scripts/research/weather/wx_flight_*.py and wx_swing_models.py.
+# ---------------------------------------------------------------------------------------
+# raw sheet column -> x sheet column (the same swap rule as METRIC_COLUMNS)
+HITTER_METRIC_COLUMNS = {'Distance': 'xDistance', 'BatSpeed': 'xBatSpeed', 'SwingLength': 'xSwingLength'}
+AIR_VALUE_COLUMN = 'AirwOBA'          # wOBA the air added to a ball in play; no raw twin
+X_HITTER_COLUMNS = list(HITTER_METRIC_COLUMNS.values()) + [AIR_VALUE_COLUMN]
+
+
+def hitter_coefficients(coef=None):
+    c = coef or load_coefficients()
+    if 'flight' not in c or 'swing' not in c:
+        raise RuntimeError(f'{COEF_PATH} has no hitter blocks. Run scripts/builders/build_neutral_movement.py.')
+    return c['flight'], c['swing']
+
+
+def carry_log(la, ln_p, ln_t, coef=None):
+    """(zP, zT): the log carry the air added, from pressure and from temperature. Zero below
+    the minimum launch angle; NaN where the launch angle or the air is missing."""
+    fl, _ = hitter_coefficients(coef)
+    la = np.asarray(la, dtype=float)
+    u = (la - fl['u_centre']) / fl['u_scale']
+    air = np.where(la >= fl['la_min'], 1.0, 0.0)
+    poly = lambda k: k[0] + k[1] * u + k[2] * u * u
+    return air * poly(fl['eP']) * np.asarray(ln_p, dtype=float), air * poly(fl['eT']) * np.asarray(ln_t, dtype=float)
+
+
+def neutral_hitter_table(raw, ev, la, bip, ln_p, ln_t, coef=None):
+    """A table of pitches. raw = {'Distance' | 'BatSpeed' | 'SwingLength': float array};
+    ev / la = exit velocity and launch angle; bip = bool array, the row is a ball in play.
+    ln_p / ln_t per pitch (NaN = the game has no air: x equals raw and AirwOBA is blank).
+    Returns ({x column: float array}, {mode: count}). Nothing is rounded.
+      xDistance     NaN where the distance or the launch angle is missing
+      AirwOBA       balls in play only; 0 for a ball outside the value bands (a grounder);
+                    NaN when the ball has no exit velocity or launch angle
+    """
+    fl, sw = hitter_coefficients(coef)
+    ln_p, ln_t = np.asarray(ln_p, dtype=float), np.asarray(ln_t, dtype=float)
+    ok = np.isfinite(ln_p) & np.isfinite(ln_t)
+    lp, lt = np.where(ok, ln_p, 0.0), np.where(ok, ln_t, 0.0)
+    ev, la, bip = np.asarray(ev, dtype=float), np.asarray(la, dtype=float), np.asarray(bip, dtype=bool)
+    z_p, z_t = carry_log(la, lp, lt, coef)
+    out = {}
+    if 'Distance' in raw:
+        dist = np.asarray(raw['Distance'], dtype=float)
+        out['xDistance'] = np.where(ok, dist / np.exp(z_p + z_t), dist)
+    v = fl['value']
+    la_e, ev_e = np.asarray(v['la_edges'], dtype=float), np.asarray(v['ev_edges'], dtype=float)
+    a = np.digitize(la, la_e) - 1
+    inb = np.isfinite(la) & np.isfinite(ev) & (la >= la_e[0]) & (la < la_e[-1])
+    band = np.where(inb, np.clip(a, 0, len(la_e) - 2) * (len(ev_e) + 1) + np.digitize(np.nan_to_num(ev), ev_e), 0)
+    s = np.where(inb, np.asarray(v['s'], dtype=float)[band], 0.0)
+    air_v = s * (np.nan_to_num(z_t) + v['kappa'] * np.nan_to_num(z_p))
+    out[AIR_VALUE_COLUMN] = np.where(bip & ok & np.isfinite(la) & np.isfinite(ev), air_v, np.nan)
+    for col, key in (('BatSpeed', 'bat_speed'), ('SwingLength', 'swing_length')):
+        if col in raw:
+            x = np.asarray(raw[col], dtype=float)
+            out[HITTER_METRIC_COLUMNS[col]] = np.where(ok, x - sw[key]['aT'] * lt, x)
+    tracked = bip | np.isfinite(np.asarray(raw.get('BatSpeed', np.full(len(ok), np.nan)), dtype=float))
+    return out, {'raw': int((tracked & ~ok).sum()), 'full': int((tracked & ok).sum())}

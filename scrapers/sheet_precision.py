@@ -68,6 +68,10 @@ PRECISION = {
     # step would be as large as the correction. The other four keep the raw depth, which
     # already resolves it. Convention, 2026-11-21.
     'xVelocity': 2, 'xSpinRate': 0, 'xExtension': 4, 'xArmAngle': 2, 'xVAA': 3, 'xHAA': 3,
+    # The hitter side (model hm1). xDistance keeps the raw depth (whole feet; the correction is
+    # feet, not fractions). xBatSpeed and xSwingLength carry one more decimal than raw, for the
+    # reason given above. AirwOBA is wOBA points on one ball, at the depth of xwOBA.
+    'xDistance': 0, 'xBatSpeed': 2, 'xSwingLength': 3, 'AirwOBA': 3,
     'ExitVelo': 1,
     'ArmAngle': 1, 'BatSpeed': 1,
     # SwingLength is 2, not 1. The Savant minors export reports it to a
