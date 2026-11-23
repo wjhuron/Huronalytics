@@ -2145,6 +2145,74 @@ def _social_captions(config, pitches, types):
         if best:
             caps[pt] = best[1:]
     return caps
+# Evidence tint for Strike%, Whiff% and the per-hand Loc+ chip of the season social card
+# (2026-11-23, per Wally), the rule the xRV/100 column already uses: the colour is where the
+# cell's value, shrunk by n / (n + K), sits on the SD of real differences of its group
+# (pitcher hand, batter hand, pitch type). The printed number stays the cell's own, and a cell
+# under its gate still fades. K is the interior optimum of a sweep (half of a cell, shrunk,
+# scored against the other half; scripts/research/cards/social_evidence_tint.py): Strike% 110
+# pitches (flat 90-150, 100-120 by season, 2021-2026), Whiff% 40 swings (flat 35-50, 40-45 by
+# season). Chosen on five seasons, the rule beats the raw value over a gate on the sixth in
+# 6/6 for both. Loc+ 130 pitches (flat 100-170) is measured on 2026 ONLY, the one season with
+# per-pitch Loc+: it has no replicate. The spread is measured on the cells at each gate.
+SOCIAL_STRIKE_SHRINK_K = 110.0
+SOCIAL_WHIFF_SHRINK_K = 40.0
+SOCIAL_LOC_SHRINK_K = 130.0
+
+
+def _evid_groups(cells, k, min_n):
+    """cells: ((throws, bats, pitch type), denominator, summed value). Returns {group: {'mu':
+    the group mean over every event, 'sd': the SD of real differences between cells, 'cells',
+    'own'}}, the estimator of _xrv_pools_from_cells: sd^2 is the mean of deviation^2 x
+    n / (n + k) over the cells at min_n; a group under 30 such cells borrows the spread of its
+    pitch type, then of all pitches (30 is a floor on the estimate, a convention)."""
+    tot = defaultdict(lambda: [0.0, 0])
+    for key, n, x in cells:
+        if x is not None and n:
+            tot[key][0] += x
+            tot[key][1] += n
+    out = {key: {'mu': t[0] / t[1], 'sd': None, 'cells': 0, '_ss': 0.0} for key, t in tot.items() if t[1]}
+    for key, n, x in cells:
+        if x is not None and n >= min_n:
+            g = out[key]
+            g['_ss'] += (x / n - g['mu']) ** 2 * n / (n + k)
+            g['cells'] += 1
+    by_pt, every = defaultdict(lambda: [0.0, 0]), [0.0, 0]
+    for key, g in out.items():
+        for acc in (by_pt[key[2]], every):
+            acc[0] += g['_ss']
+            acc[1] += g['cells']
+    for key, g in out.items():
+        ss, c = next(((a, b) for a, b in ((g['_ss'], g['cells']), tuple(by_pt[key[2]]), tuple(every)) if b >= 30), (0.0, 0))
+        g['sd'] = math.sqrt(ss / c) if c else None
+        g['own'] = g['cells'] >= 30
+        del g['_ss']
+    return out
+
+
+def _evid_pctl(v, n, g, k):
+    """0-100, high = a higher value: where the cell's shrunk value sits on the normal spread of
+    real differences of its group. None when the group has no measured spread."""
+    if v is None or not n or not g or not g.get('sd'):
+        return None
+    z = (v - g['mu']) * n / (n + k) / g['sd']
+    return 50.0 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _attach_evid(pools, cells):
+    """Add the Strike% and Whiff% evidence groups ('strike_g', 'whiff_g') to the tint pools.
+    cells: (throws, bats, pitch type, pitches, strikes, swings, whiffs)."""
+    sg = _evid_groups([((th, bh, pt), n, st) for th, bh, pt, n, st, sw, wh in cells],
+                      SOCIAL_STRIKE_SHRINK_K, SOCIAL_STRIKE_MIN_PITCHES)
+    wg = _evid_groups([((th, bh, pt), sw, wh) for th, bh, pt, n, st, sw, wh in cells],
+                      SOCIAL_WHIFF_SHRINK_K, SOCIAL_WHIFF_MIN_SWINGS)
+    for key in set(sg) | set(wg):
+        q = pools.setdefault(key, {'strike': [], 'whiff': []})
+        q['strike_g'], q['whiff_g'] = sg.get(key), wg.get(key)
+    print(f"  Evidence tint groups: Strike% {sum(1 for g in sg.values() if g['own'])} of {len(sg)} with their own spread, "
+          f"Whiff% {sum(1 for g in wg.values() if g['own'])} of {len(wg)} (the rest borrow)")
+
+
 _SOCIAL_TINT_POOLS = None
 
 
@@ -2172,9 +2240,36 @@ def _social_tint_pools():
     for q in pools.values():
         q['strike'].sort()
         q['whiff'].sort()
+    _attach_evid(pools, [(th, bh, pt, n, st, sw, wh) for (_nm, _tm, th, bh, pt), (n, st, sw, wh) in cells.items()])
     _SOCIAL_TINT_POOLS = pools
     print(f"  Social tint pools: {len(pools)} type x hand groups")
     return pools
+
+
+_SOCIAL_LOC_POOLS = None
+
+
+def _social_loc_pools():
+    """{(pitcher hand, batter hand, pitch type): evidence group} for the per-hand Loc+ chip,
+    one cell per pitcher and club (_evid_groups). Always MLB: Loc+ is a pitch metric
+    (AAA_MLB_RULED), so the AAA ruler never swaps this pool."""
+    global _SOCIAL_LOC_POOLS
+    if _SOCIAL_LOC_POOLS is None:
+        cells = defaultdict(lambda: [0.0, 0])
+        for p in _load_mlb_pickle() or []:
+            if p.get('_source', 'MLB') != 'MLB' or not p.get('Pitch Type'):
+                continue
+            v = sf(p.get('Loc+'))
+            if v is not None:
+                c = cells[(p.get('Pitcher'), p.get('PTeam'), p.get('Throws'), p.get('Bats'), p.get('Pitch Type'))]
+                c[0] += v
+                c[1] += 1
+        _SOCIAL_LOC_POOLS = _evid_groups([((th, bh, pt), k, tot) for (_nm, _tm, th, bh, pt), (tot, k) in cells.items()],
+                                         SOCIAL_LOC_SHRINK_K, SOCIAL_LOC_MIN_PITCHES)
+        print(f"  Social Loc+ groups: {sum(g['cells'] for g in _SOCIAL_LOC_POOLS.values())} cells at "
+              f"{SOCIAL_LOC_MIN_PITCHES}+ pitches, {sum(1 for g in _SOCIAL_LOC_POOLS.values() if g['own'])} of "
+              f"{len(_SOCIAL_LOC_POOLS)} groups with their own spread")
+    return _SOCIAL_LOC_POOLS
 
 
 # Season extension of every pitcher in the Savant percentile pool (pctl_pool_rows), for
@@ -2520,6 +2615,15 @@ def render_social_card(config, pitches, output_file):
         if not is_season:
             txt(_hx_meta + _mw, 0.913, _dec, 11, _dc, 'black', ha='left')
 
+    # Percentile text under each season tile (2026-11-23, per Wally): the percentile that sets
+    # the tile's colour. The table and the chips carry none: their colour is the read there.
+    _pc_on = bool(config.get('social_pctl')) and is_season
+
+    def _ord(p):
+        n = int(max(1, min(100, half_up(p))))
+        sfx = 'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+        return f'{n}{sfx} pctl'
+
     def _ink_on(fc):
         # White text unless it falls under the usual 3:1 minimum for a large mark on
         # this fill (2026-11-03, per Wally): white failed on the pale near-league tints.
@@ -2559,6 +2663,8 @@ def render_social_card(config, pitches, output_file):
             txt(x + w / 2, cy - 0.015, c['k'], ksize, ink)
             if c.get('sub'):
                 txt(x + w / 2, y - 0.0075, c['sub'], ssize, TEXT_SECONDARY, 'normal')
+            elif _pc_on and c.get('p') is not None:
+                txt(x + w / 2, y - 0.0075, _ord(c['p']), ssize, TEXT_SECONDARY, 'normal')
         for g, lab in (glabels or {}).items():
             if g not in _gx:
                 continue
@@ -2647,7 +2753,8 @@ def render_social_card(config, pitches, output_file):
         def _num(key, fmt, pctl_key=None):
             v = prow.get(key)
             return {'v': '—' if v is None else fmt(v), 'k': None,
-                    'fc': _tint(prow.get(pctl_key or (key + '_pctl')))}
+                    'fc': _tint(prow.get(pctl_key or (key + '_pctl'))),
+                    'p': prow.get(pctl_key or (key + '_pctl'))}
 
         # Three tile groups since 2026-11-17, per Wally: the card shows how he
         # fared in 2026 AND what he projects to in 2027. 2026 (ERA, hdERA, K%,
@@ -2672,7 +2779,7 @@ def render_social_card(config, pitches, output_file):
         # GOOD end high (a 3.4% walk rate scores 96), so _percentile_color
         # tints them the right way round — verified 2026-09-01.
         _erav = sv[sh.index('ERA')] if 'ERA' in sh else '—'
-        line = [{'v': _erav, 'k': 'ERA', 'fc': _tint(prow.get('era_pctl'))}]
+        line = [{'v': _erav, 'k': 'ERA', 'fc': _tint(prow.get('era_pctl')), 'p': prow.get('era_pctl')}]
         # hdERA -> xFIP when the row has no hdERA. Gated on the DATA, never on
         # team == ROC: the bat-speed bubble and the rocHide arm angle both
         # encoded "this can never happen" and went stale silently, so if hdERA
@@ -2708,9 +2815,14 @@ def render_social_card(config, pitches, output_file):
             cell['g'] = g
             if key == 'hpWAR' and prow.get('hpWAR') is not None and prow.get('hpWAR_unit'):
                 # The leaderboard carries no hpWAR percentile; rank inside the role here.
-                cell['fc'] = _tint(_hpwar_role_pctl(prow['hpWAR'], prow['hpWAR_unit']))
+                cell['p'] = _hpwar_role_pctl(prow['hpWAR'], prow['hpWAR_unit'])
+                cell['fc'] = _tint(cell['p'])
             if key == 'hpWAR' and _hu:
-                cell['sub'] = f"per {_hu} IP"
+                # One line fits under a tile. With the percentile there, the unit joins the key.
+                if _pc_on:
+                    cell['k'] = f"hpWAR/{_hu}"
+                else:
+                    cell['sub'] = f"per {_hu} IP"
             if key == 'hpERA' and config.get('hp_src'):
                 continue
             line.append(cell)
@@ -3295,6 +3407,13 @@ def render_social_card(config, pitches, output_file):
                         # Faded and slanted, so an unqualified grade does not read as a blank
                         # or a league-average cell (2026-11-05, per Wally).
                         _gec, _gink = SUBTLE_BORDER, None
+                        # A season per-hand Loc+ chip at its gate takes the evidence tint.
+                        _lep = None
+                        if k == 'loc' and is_season and bats and not _gated and g is not None:
+                            _lep = _evid_pctl(g, r_['n'], _social_loc_pools().get(
+                                (pitches[0].get('Throws'), bats, r_['pt'])), SOCIAL_LOC_SHRINK_K)
+                            if _lep is not None:
+                                fc = _percentile_color(_lep)[0]
                         if _gated:
                             fc, _gink = BG, '#7F786B'
                         # Chip HEIGHT already tracks the row, so on a dense
@@ -3334,7 +3453,10 @@ def render_social_card(config, pitches, output_file):
                             if r_['n'] < SOCIAL_STRIKE_MIN_PITCHES:
                                 _faded_right(cx, ry, v, fs)
                                 continue
-                            _tint_cell(cx, ry, rh, r_, 'strike', bats, v, fs)
+                            _ep = _evid_pctl(r_['strike'], r_['n'], (_social_tint_pools().get(
+                                (pitches[0].get('Throws'), bats, r_['pt'])) or {}).get('strike_g'), SOCIAL_STRIKE_SHRINK_K)
+                            if _ep is not None:
+                                _tint_cell(cx, ry, rh, r_, 'strike', bats, v, fs, pctl=_ep)
                         c_ = TEXT_PRIMARY
                     elif k == 'whiff':
                         # No small-sample fade (2026-08-28, per Wally).
@@ -3344,7 +3466,10 @@ def render_social_card(config, pitches, output_file):
                             if r_['whiff'] is not None and r_['sw'] < SOCIAL_WHIFF_MIN_SWINGS:
                                 _faded_right(cx, ry, v, fs)
                                 continue
-                            _tint_cell(cx, ry, rh, r_, 'whiff', bats, v, fs)
+                            _ep = _evid_pctl(r_['whiff'], r_['sw'], (_social_tint_pools().get(
+                                (pitches[0].get('Throws'), bats, r_['pt'])) or {}).get('whiff_g'), SOCIAL_WHIFF_SHRINK_K)
+                            if _ep is not None:
+                                _tint_cell(cx, ry, rh, r_, 'whiff', bats, v, fs, pctl=_ep)
                         c_ = TEXT_PRIMARY
                     elif k == 'xwobacon':
                         # Three-decimal rate: no leading zero (display rule).
@@ -5884,6 +6009,7 @@ def _install_aaa_pools(ctx, pool):
         t['whiff'].sort()
     for v in xwc.values():
         v.sort()
+    _attach_evid(tint, [tuple(c[:7]) for c in pool['socialCells']])
     _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS = tint, dict(xwc)
     # The summed xRV of a cell is the tenth item of a social cell since 2026-11-23.
     _SOCIAL_XRV_POOLS = _xrv_pools_from_cells([(c[0], c[1], c[2], c[3], c[9]) for c in pool['socialCells'] if len(c) > 9])
@@ -6226,6 +6352,7 @@ def main(new_level=None):
     card_height     = "fit"              # Season social card height: "fit" (follows the rows) or "fixed" (1350 px)
     stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
     xmove_basis     = "hitter"           # Expected-movement rings on the social card: "hitter" (slot, extension, velocity per pitch type; the default) or "physics" (the pitch itself, no pitch type read)
+    social_pctl     = True               # Season social card: print each tile's percentile under it ("18th pctl")
     social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xrv" (xRV/100); force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
@@ -6255,6 +6382,8 @@ def main(new_level=None):
                              'always show cumulative xPitchRV.')
     parser.add_argument('--xmove-basis', default=None, choices=['physics', 'hitter'],
                         help='Expected-movement rings on the social card: physics (default) or hitter')
+    parser.add_argument('--no-social-pctl', action='store_true',
+                        help='Season social card: leave out the percentile text under the tiles')
     parser.add_argument('--social-rv', default=None, choices=['xrv', 'rv', 'both', 'xwobacon'],
                         help='Social-table run-value slot(s); default: both (RV, xRV) on '
                              'a daily card, xwobacon (xwOBAcon) on a season card')
@@ -6325,6 +6454,7 @@ def main(new_level=None):
     bats_filter = bats
     if args.rv_mode is not None: rv_mode = args.rv_mode
     if args.social_rv is not None: social_rv = args.social_rv
+    if args.no_social_pctl: social_pctl = False
     if args.xmove_basis is not None: xmove_basis = args.xmove_basis
     if args.stuff_place: stuff_place = args.stuff_place
     if args.card_height: card_height = args.card_height
@@ -7241,6 +7371,7 @@ def main(new_level=None):
                          else pitch_lb_by_pitcher.get((pitcher_name, eff_team), {})),
             'rv_mode': rv_mode,
             'social_rv': social_rv,
+            'social_pctl': social_pctl,
             'social_xmove': xmove_models,
             'social_xmove_physics': xmove_physics,
             'xmove_basis': xmove_basis,
