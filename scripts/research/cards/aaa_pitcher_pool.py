@@ -217,7 +217,8 @@ def score_batch(path, ibb):
             wh = sum(p.get('Description') in WHIFF_DESCRIPTIONS for p in pp)
             bip = [p for p in pp if p.get('Description') == 'In Play']
             xw = compute_expected_stats(bip, None).get('xwOBAcon') if bip else None
-            soc.append([rec['throws'], bh, pt, n, st, sw, wh, len(bip), xw])
+            # Tenth item (2026-11-23): the cell's summed xRV, for the social card's xRV/100 tint pool.
+            soc.append([rec['throws'], bh, pt, n, st, sw, wh, len(bip), xw, P._social_xrv(pp)[0]])
         out[mid] = {'rec': rec, 'pts': pts, 'soc': soc, 'grades': grades}
     return out
 

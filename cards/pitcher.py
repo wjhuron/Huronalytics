@@ -2029,6 +2029,122 @@ _AA_RAY_HB = 20.0
 # the same run reads 43-44 on the old grade, whose gate was 50). 135 is that k at a round number.
 # 125 with the far-miss rule on (2026-11-19, locplus_shape_gates.py: 134 with the rule off, 125 on).
 SOCIAL_LOC_MIN_PITCHES = 125
+
+# Captions under the Stuff+ chips of the SEASON social card (2026-11-23, per Wally). A
+# four-seam and a sinker always show nVAA, coloured by the leaderboard's own percentile
+# (flatter is better for a four-seam, steeper for a sinker, as on the site). Another pitch
+# type shows a note only when a metric that adds information for THAT type is far from
+# normal. The list is measured (scripts/research/cards/pitch_type_metric_importance.py:
+# next-season run value with Whiff%, Strike% and xwOBAcon held equal, 2021-2025): cutter spin
+# rate; curveball two-strike whiff% and chase%; changeup chase% and velocity gap to the
+# fastball. No slider, sweeper or splitter metric passed, so those chips carry no note.
+# A note always ranks against MLB, on an AAA card too.
+SOCIAL_NOTE_RULES = {'FC': ('spin',), 'CU': ('k2', 'chase'), 'KC': ('k2', 'chase'), 'CH': ('chase', 'dvelo')}
+SOCIAL_NOTE_POOL_TYPE = {'KC': 'CU'}     # the curveball metrics were measured on CU and KC together
+SOCIAL_NOTE_PCTL = 10                    # a note prints at or beyond the 10th / 90th MLB percentile: a display convention
+# Minimum denominator. k2 (two-strike swings) and chase (pitches out of the zone): the
+# split-half .50 point on the widest 2026 pool (scripts/research/cards/social_note_gates.py:
+# 52 and 36-38; both rise with the pool's floor, so each is a convention at that reading).
+# Spin, velocity and nVAA repeat at once (k under 1); 25 pitches only keeps a stray type out.
+SOCIAL_NOTE_MIN = {'k2': 52, 'chase': 38, 'spin': 25, 'dvelo': 25, 'nvaa': 25}
+SOCIAL_NOTE_HIGH_GOOD = {'k2': True, 'chase': True, 'spin': True, 'dvelo': False}   # dvelo is negative: a larger gap is better
+SOCIAL_NOTE_LABEL = {'k2': '2K WHIFF', 'chase': 'CHASE', 'spin': 'SPIN', 'dvelo': 'VELO GAP'}
+_SOCIAL_NOTE_POOLS = None
+
+
+def _social_note_stats(plist):
+    """{pitch type: {metric: (value, denominator)}} for the caption metrics of ONE pitcher's
+    pitches. Definitions follow pipeline/compute.py: chase is swings at pitches out of the
+    zone; two-strike whiff is whiffs over two-strike swings with bunt contact out."""
+    from pipeline.utils import BUNT_BB_TYPES
+    by = defaultdict(list)
+    for p in plist:
+        if p.get('Pitch Type'):
+            by[p['Pitch Type']].append(p)
+
+    def mean(pp, k):
+        v = [x for x in (sf(q.get(k)) for q in pp) if x is not None]
+        return (sum(v) / len(v), len(v)) if v else (None, 0)
+
+    def out_of_zone(q):
+        iz = q.get('InZone')
+        return iz == 'No' if iz in ('Yes', 'No') else compute_iz(q) is False
+
+    fb = max((t for t in ('FF', 'SI', 'FC') if t in by), key=lambda t: len(by[t]), default=None)
+    fb_v = mean(by[fb], 'Velocity')[0] if fb else None
+    out = {}
+    for pt, pp in by.items():
+        v, n = mean(pp, 'Velocity')
+        ooz = [q for q in pp if out_of_zone(q)]
+        two = [q for q in pp if '-' in (q.get('Count') or '') and q['Count'].split('-')[1] == '2'
+               and q.get('Description') in SWING_DESCRIPTIONS and q.get('BBType') not in BUNT_BB_TYPES]
+        out[pt] = {
+            'spin': mean(pp, 'Spin Rate'),
+            'dvelo': (v - fb_v, n) if v is not None and fb_v is not None and pt != fb else (None, 0),
+            'chase': (sum(1 for q in ooz if q.get('Description') in SWING_DESCRIPTIONS) / len(ooz), len(ooz)) if ooz else (None, 0),
+            'k2': (sum(1 for q in two if q.get('Description') in WHIFF_DESCRIPTIONS) / len(two), len(two)) if two else (None, 0),
+        }
+    return out
+
+
+def _social_note_pools():
+    """{(pitch type, metric): sorted MLB values}, one value per pitcher with the metric's
+    minimum sample, from the season pickle. Loaded once per process."""
+    global _SOCIAL_NOTE_POOLS
+    if _SOCIAL_NOTE_POOLS is None:
+        need = set(SOCIAL_NOTE_RULES) | {'FF', 'SI', 'FC'}     # the fastballs set the velocity gap
+        by = defaultdict(list)
+        for p in _load_mlb_pickle() or []:
+            if p.get('Pitch Type') in need:
+                by[p.get('Pitcher')].append(p)
+        pools = defaultdict(list)
+        for pl in by.values():
+            for pt, d in _social_note_stats(pl).items():
+                for m in SOCIAL_NOTE_RULES.get(pt, ()):
+                    v, n = d[m]
+                    if v is not None and n >= SOCIAL_NOTE_MIN[m]:
+                        pools[(SOCIAL_NOTE_POOL_TYPE.get(pt, pt), m)].append(v)
+        _SOCIAL_NOTE_POOLS = {k: sorted(v) for k, v in pools.items()}
+        print("  Social note pools: " + ', '.join(f"{k[0]} {k[1]} {len(v)}" for k, v in sorted(_SOCIAL_NOTE_POOLS.items())))
+    return _SOCIAL_NOTE_POOLS
+
+
+def _social_captions(config, pitches, types):
+    """{pitch type: (label, value text, percentile with high = good or None)} for the chips
+    of the season social card: nVAA for FF and SI, a standout note for the types in
+    SOCIAL_NOTE_RULES, nothing for the rest."""
+    import bisect
+    lb = config.get('pitch_lb') or {}
+    counts = defaultdict(int)
+    for p in pitches:
+        counts[p.get('Pitch Type')] += 1
+    caps, stats, pools = {}, None, None
+    for pt in types:
+        if pt in ('FF', 'SI'):
+            r = lb.get(pt) or {}
+            if r.get('nVAA') is not None and counts[pt] >= SOCIAL_NOTE_MIN['nvaa']:
+                caps[pt] = ('nVAA', f"{r['nVAA']:.1f}\u00b0", r.get('nVAA_pctl'))
+            continue
+        if pt not in SOCIAL_NOTE_RULES:
+            continue
+        if stats is None:
+            stats, pools = _social_note_stats(pitches), _social_note_pools()
+        best = None
+        for m in SOCIAL_NOTE_RULES[pt]:
+            v, n = (stats.get(pt) or {}).get(m, (None, 0))
+            pool = pools.get((SOCIAL_NOTE_POOL_TYPE.get(pt, pt), m)) or []
+            if v is None or n < SOCIAL_NOTE_MIN[m] or len(pool) < 30:
+                continue
+            pc = 100.0 * (bisect.bisect_left(pool, v) + bisect.bisect_right(pool, v)) / (2 * len(pool))
+            if SOCIAL_NOTE_PCTL < pc < 100 - SOCIAL_NOTE_PCTL:
+                continue
+            if best is None or abs(pc - 50) > best[0]:
+                text = (f"{half_up(v)}" if m == 'spin' else f"{abs(v):.1f} mph" if m == 'dvelo'
+                        else f"{half_up(100 * v)}%")
+                best = (abs(pc - 50), SOCIAL_NOTE_LABEL[m], text, pc if SOCIAL_NOTE_HIGH_GOOD[m] else 100 - pc)
+        if best:
+            caps[pt] = best[1:]
+    return caps
 _SOCIAL_TINT_POOLS = None
 
 
@@ -2110,6 +2226,116 @@ def _social_xwc_pools():
     return pools
 
 
+# hpWAR is a rate per 180 IP for a starter and per 60 IP for a reliever (hpWAR_unit), so the
+# two roles are on different scales: the tile ranks a pitcher inside his own role (2026-11-23,
+# per Wally). The pool is Savant's percentile line, the pool of the card's other tiles.
+_HPWAR_ROLE_POOLS = None
+
+
+def _hpwar_role_pctl(value, unit):
+    """Percentile of an hpWAR among the pool's pitchers with the same hpWAR_unit, or None."""
+    global _HPWAR_ROLE_POOLS
+    if _HPWAR_ROLE_POOLS is None:
+        from pipeline.utils import pctl_pool_rows
+        _d = os.path.dirname(METADATA_PATH)
+        with open(os.path.join(_d, 'pitcher_leaderboard_rs.json')) as f:
+            _rows = json.load(f)
+        with open(METADATA_PATH) as f:
+            _tg = json.load(f).get('teamGamesPlayed')
+        pools = defaultdict(list)
+        for r in pctl_pool_rows(_rows, 'pitcher', _tg, True):
+            if r.get('hpWAR') is not None and r.get('hpWAR_unit'):
+                pools[r['hpWAR_unit']].append(r['hpWAR'])
+        _HPWAR_ROLE_POOLS = {k: sorted(v) for k, v in pools.items()}
+        print("  hpWAR role pools: " + ', '.join(f"{k} {len(v)}" for k, v in sorted(_HPWAR_ROLE_POOLS.items())))
+    pool = _HPWAR_ROLE_POOLS.get(unit) or []
+    return _rank_in_mlb_pool(value, pool) if value is not None and len(pool) >= 30 else None
+
+
+# xRV/100 on the season social table's cell (pitcher x batter hand x type). The NUMBER is the
+# cell's own value. The TINT reads the value shrunk toward the mean of its group (pitcher hand,
+# batter hand, type) by the evidence behind it, n / (n + SOCIAL_XRV_SHRINK_K), and places it on
+# the spread of REAL differences between cells of that group (2026-11-23, per Wally): a large
+# cell shows a strong colour, a small one a pale colour, with no hard gate on the colour. A
+# rank among the shrunk values of other cells would not do that: most cells are small, so a
+# small cell would still rank at an extreme among its equals.
+# SOCIAL_XRV_SHRINK_K: the cell size at which split-half reliability is .50, measured on
+# 2021-2026 (scripts/research/cards/social_xrv_gate.py: 525 pitches pooled, a bracketed
+# crossing; k is about flat across cell-size bands, 419-618; 431-611 in the four seasons whose
+# bands cross). Under SOCIAL_XRV_MIN_PITCHES the number fades like Strike% does: the Strike%
+# gate, a CONVENTION chosen so one row fades its two rate cells together (reliability at 100
+# pitches is .16).
+SOCIAL_XRV_SHRINK_K = 525.0
+SOCIAL_XRV_MIN_PITCHES = SOCIAL_STRIKE_MIN_PITCHES
+_SOCIAL_XRV_POOLS = None
+
+
+def _xrv_shrunk(v100, n, mu):
+    """A cell's xRV/100 pulled toward its group mean by its evidence."""
+    return mu + (v100 - mu) * n / (n + SOCIAL_XRV_SHRINK_K)
+
+
+def _xrv_pools_from_cells(cells):
+    """cells: (throws, bats, pitch type, pitches, summed xRV in runs). Returns
+    {(throws, bats, pitch type): {'mu': group mean per 100, 'sd': the SD of real differences
+    between cells, 'cells': how many cells set it}}. The mean counts every pitch of the group.
+    With reliability n / (n + K), a cell's squared deviation is on average sd^2 x (1 + K / n),
+    so sd^2 is the mean of deviation^2 x n / (n + K) over the cells at SOCIAL_XRV_MIN_PITCHES."""
+    tot = defaultdict(lambda: [0.0, 0])
+    for th, bh, pt, n, x in cells:
+        if x is not None and n:
+            t = tot[(th, bh, pt)]
+            t[0] += x
+            t[1] += n
+    out = {k: {'mu': t[0] / t[1] * 100, 'sd': None, 'cells': 0, '_ss': 0.0} for k, t in tot.items() if t[1]}
+    for th, bh, pt, n, x in cells:
+        if x is not None and n >= SOCIAL_XRV_MIN_PITCHES:
+            g = out[(th, bh, pt)]
+            g['_ss'] += (x / n * 100 - g['mu']) ** 2 * n / (n + SOCIAL_XRV_SHRINK_K)
+            g['cells'] += 1
+    # A group under 30 cells (a left-hander's changeup to left-handed batters) has no spread of
+    # its own: it borrows the spread of its pitch type over all hands, then of all pitches.
+    # 30 is a floor on the estimate, a convention. The group keeps its own mean.
+    by_pt, every = defaultdict(lambda: [0.0, 0]), [0.0, 0]
+    for (th, bh, pt), g in out.items():
+        for acc in (by_pt[pt], every):
+            acc[0] += g['_ss']
+            acc[1] += g['cells']
+    for (th, bh, pt), g in out.items():
+        ss, c = next(((a, b) for a, b in ((g['_ss'], g['cells']), tuple(by_pt[pt]), tuple(every)) if b >= 30), (0.0, 0))
+        g['sd'] = math.sqrt(ss / c) if c else None
+        g['own'] = g['cells'] >= 30
+        del g['_ss']
+    return out
+
+
+def _xrv_tint_pctl(v100, n, g):
+    """0-100, high = good for the pitcher: where the cell's shrunk value sits on the normal
+    spread of real differences of its group. None when the group has no measured spread."""
+    if not g or not g.get('sd'):
+        return None
+    z = (_xrv_shrunk(v100, n, g['mu']) - g['mu']) / g['sd']
+    return 50.0 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _social_xrv_pools():
+    """The MLB groups of _xrv_pools_from_cells, through the same _social_xrv the card's own
+    cells use. Loaded once per process; the AAA ruler replaces it (_install_aaa_pools)."""
+    global _SOCIAL_XRV_POOLS
+    if _SOCIAL_XRV_POOLS is None:
+        by = defaultdict(list)
+        for p in _load_mlb_pickle() or []:
+            if p.get('_source') == 'MLB' and p.get('Pitch Type'):
+                by[(p.get('Pitcher'), p.get('PTeam'), p.get('Throws'), p.get('Bats'), p.get('Pitch Type'))].append(p)
+        _SOCIAL_XRV_POOLS = _xrv_pools_from_cells(
+            [(th, bh, pt, len(pl), _social_xrv(pl)[0]) for (_nm, _tm, th, bh, pt), pl in by.items()])
+        print(f"  xRV/100 pools: {sum(g['cells'] for g in _SOCIAL_XRV_POOLS.values())} cells at "
+              f"{SOCIAL_XRV_MIN_PITCHES}+ pitches, {sum(1 for g in _SOCIAL_XRV_POOLS.values() if g['own'])} of "
+              f"{len(_SOCIAL_XRV_POOLS)} type x hand groups with their own spread (the rest borrow); tint on the value "
+              f"shrunk with k {SOCIAL_XRV_SHRINK_K:.0f}")
+    return _SOCIAL_XRV_POOLS
+
+
 def render_social_card(config, pitches, output_file):
     """Consolidated 1080-wide social card (2026-08-27, per Wally; 1350 tall on a daily card,
     height follows the rows on a season card). The full
@@ -2186,12 +2412,11 @@ def render_social_card(config, pitches, output_file):
     def gtint(g, kind='stuff', mix=None):
         # Grade tint on the print scale. The 4-points-per-percentile map is a
         # display convention (a +/-12.5 grade spans the full ramp), not a
-        # measured constant. The centre is 100 on an MLB-ruled card; under the
-        # AAA ruler it is the AAA average on the MLB scale, for the pitch type
-        # or the mix (_aaa_grade_center), so the tint still reads against AAA.
+        # measured constant. The centre is 100, the MLB average, at every level
+        # (2026-11-23, per Wally): the grade is on the MLB scale, so its colour is too.
         if g is None:
             return DARK_CELL
-        f, _ = _percentile_color(max(0, min(100, 50 + (g - _aaa_grade_center(kind, mix)) * 4)))
+        f, _ = _percentile_color(max(0, min(100, 50 + (g - 100.0) * 4)))
         return f
 
     # usage from the card's own pitches, largest first
@@ -2475,8 +2700,15 @@ def render_social_card(config, pitches, output_file):
                 (2, 'hpERA',      'hpERA',  lambda v: f"{v:.2f}"),
                 (2, 'hpWAR',      'hpWAR',  lambda v: f"{v:.1f}")):
             cell = _num(key, fmt)
+            # Under the AAA ruler the two grades are on the MLB scale, so their tile takes
+            # the MLB value tint (gtint), not the AAA percentile (2026-11-23, per Wally).
+            if key in ('stuffScore', 'locPlus') and config.get('aaa_ruler') and prow.get(key) is not None:
+                cell['fc'] = gtint(prow[key])
             cell['k'] = lab
             cell['g'] = g
+            if key == 'hpWAR' and prow.get('hpWAR') is not None and prow.get('hpWAR_unit'):
+                # The leaderboard carries no hpWAR percentile; rank inside the role here.
+                cell['fc'] = _tint(_hpwar_role_pctl(prow['hpWAR'], prow['hpWAR_unit']))
             if key == 'hpWAR' and _hu:
                 cell['sub'] = f"per {_hu} IP"
             if key == 'hpERA' and config.get('hp_src'):
@@ -2498,6 +2730,10 @@ def render_social_card(config, pitches, output_file):
     # card and lets the card's height follow the row count. The canvas axes stay a 1350 px
     # box anchored at the top, so y below 0 is below that box. Rows use May's size, the
     # 13-line table that fills 1350 px exactly; a display convention, not a measured value.
+    # Captions under the Stuff+ chips (season card). Built here because the fit height reads them.
+    _caps = (_social_captions(config, pitches, [t_ for t_ in mix if t_])
+             if is_season and config.get('stuff_place') == 'strip' else {})
+    _cap_h = 0.018 if _caps else 0.0    # the caption line's height, a display convention
     _fit_rh, _fit_vb = None, 0.0
     if is_season and config.get('card_height') == 'fit' and config.get('stuff_place') == 'strip':
         _fit_rh = 0.325 / 12.0
@@ -2508,7 +2744,7 @@ def render_social_card(config, pitches, output_file):
             if _c:
                 _n = sum(_c.values())
                 _fit_lines += 1 + sum(1 for v in _c.values() if v / _n >= 0.01)
-        _fit_vb = (mv_bot - SOCIAL_XLABEL_STACK + 0.010 - 0.036) - (_fit_lines - 1) * _fit_rh - 0.040
+        _fit_vb = (mv_bot - SOCIAL_XLABEL_STACK + 0.010 - 0.036 - _cap_h) - (_fit_lines - 1) * _fit_rh - 0.040
         _fit_in = round(1350 * (1 - _fit_vb)) / 135.0
         fig.set_size_inches(8, _fit_in)
         ax.set_position([0, 1 - 10.0 / _fit_in, 1, 10.0 / _fit_in])
@@ -2906,9 +3142,11 @@ def render_social_card(config, pitches, output_file):
         # keeps xRV/100 alone, the measured pick above. social_rv forces a
         # slot set on either card. 'both' closes the numeral spacing from
         # 0.115 to 0.0925 for the fifth slot; the chips do not move.
-        # xwOBAcon replaces xRV/100 on the SEASON card (2026-11-03, per Wally):
-        # the measured pick above stays xRV/100, so this is a readability call.
-        _srv = config.get('social_rv') or ('xwobacon' if is_season else 'both')
+        # xwOBAcon replaced xRV/100 on the SEASON card from 2026-11-03 to 2026-11-23 (a
+        # readability call). xRV/100 is back, per Wally: on 2021-2025 it repeats year to year
+        # at .23-.48 by pitch type against .04-.30 for xwOBAcon, and adds more beyond Strike%
+        # and Whiff% for every type (scripts/research/cards/pitch_type_metric_importance.py).
+        _srv = config.get('social_rv') or ('xrv' if is_season else 'both')
         if _srv == 'both':
             _num_cols = [('USAGE', 0.310, 'r', 'usepct'),
                          ('STRIKE%', 0.4025, 'r', 'strike'),
@@ -2953,18 +3191,20 @@ def render_social_card(config, pitches, output_file):
                 txt(cx, hy, lab, 9.2, TEXT_PRIMARY, 'black',
                     ha='right' if al == 'r' else 'center')
 
-        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs, pool=None, invert=False):
+        def _tint_cell(cx, ry, rh, r_, k, bats, label, fs, pool=None, invert=False, pctl=None):
             # Percentile tint behind Strike% and Whiff%, season card only, inside the
             # pitcher's own type and hands. Lighter than the grade chips so those stay
             # the main read. A cell under its gate gets no tint and is not in the pool.
             if pool is None:
                 pool = (_social_tint_pools().get((pitches[0].get('Throws'), bats, r_['pt'])) or {}).get(k)
             _open = (r_['bip'] >= XWC_COLOR_MIN_BIP if k == 'xwobacon'
+                     else r_['n'] >= SOCIAL_XRV_MIN_PITCHES if k == 'xrv100'
                      else r_['n'] >= SOCIAL_STRIKE_MIN_PITCHES if k == 'strike'
                      else r_['sw'] >= SOCIAL_WHIFF_MIN_SWINGS)
-            if not pool or not _open or r_.get(k) is None:
+            # pctl: a percentile the caller computed itself (xRV/100); no pool is ranked then.
+            if (pctl is None and not pool) or not _open or r_.get(k) is None:
                 return
-            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool, invert=invert))[0]
+            fc = _percentile_color(_rank_in_mlb_pool(r_[k], pool, invert=invert) if pctl is None else pctl)[0]
             from matplotlib.colors import to_rgb
             bg = to_rgb(BG)
             fc = tuple(0.55 * fc[i] + 0.45 * bg[i] for i in range(3))
@@ -3124,6 +3364,17 @@ def render_social_card(config, pitches, output_file):
                         # +0.0 turns a rounded '-0.0' into '0.0'.
                         v = ('—' if r_[k] is None
                              else '%.1f' % (round(r_[k], 1) + 0.0))
+                        # Season xRV/100: the number is the cell's own; the tint is the shrunk
+                        # value's place on the real spread of its group (_xrv_tint_pctl), higher =
+                        # better for the pitcher. Under the gate the number fades.
+                        if k == 'xrv100' and is_season and bats and not is_total and r_[k] is not None:
+                            if r_['n'] < SOCIAL_XRV_MIN_PITCHES:
+                                _faded_right(cx, ry, v, fs)
+                                continue
+                            _xp = _social_xrv_pools().get((pitches[0].get('Throws'), bats, r_['pt']))
+                            _tp = _xrv_tint_pctl(r_[k], r_['n'], _xp)
+                            if _tp is not None:
+                                _tint_cell(cx, ry, rh, r_, k, bats, v, fs, pctl=_tp)
                         c_ = TEXT_PRIMARY
                     txt(cx, ry, v, fs, c_, '500',
                         ha='right' if al == 'r' else 'center')
@@ -3191,6 +3442,9 @@ def render_social_card(config, pitches, output_file):
                 _st_cw = min(0.054, (_st_x1 - _st_x0) / _st_n - _st_code - 0.008)
                 _st_cell = _st_code + _st_cw
                 _st_step = min(0.150, (_st_x1 - _st_x0 - _st_cell) / max(_st_n - 1, 1))
+                # Captions (season card): nVAA under FF and SI, a standout note under a type
+                # in SOCIAL_NOTE_RULES, each centred under its own code and chip.
+                _cap_drop = 0.0245   # caption baseline under the chip row, a display convention
                 for _i, (pt_, _h, _v, _n) in enumerate(_cents):
                     _x = _st_x0 + _i * _st_step
                     txt(_x, _st_y, pt_, _st_fs, PITCH_COLORS.get(pt_, '#777'), 'bold', ha='left')
@@ -3200,12 +3454,39 @@ def render_social_card(config, pitches, output_file):
                     rrect(_cx - 0.5 * _st_cw, _st_y - 0.5 * _st_h, _st_cw, _st_h, _fc, r=0.007)
                     txt(_cx, _st_y, '—' if _g is None else f'{half_up(_g)}', _st_fs,
                         _ink_on(_fc), 'black', family='Bitter')
-                yb = _st_y - 0.036
+                    if pt_ in _caps:
+                        _lab, _val, _good = _caps[pt_]
+                        # Value colour: slate to brick by the percentile (high = good), neutral
+                        # ink in the middle; the label stays muted. Display conventions.
+                        _vc = (TEXT_PRIMARY if _good is None or 35 <= _good <= 65
+                               else '#a83628' if _good > 65 else '#567698')
+                        # Label, value, percentile (high = good, as on the site), centred as one
+                        # run under the pitch's code and chip: each piece is measured, then placed.
+                        _parts = [(_lab, 7.6, TEXT_MUTED, 'semibold'), (_val, 8.4, _vc, 'bold')]
+                        if _good is not None:
+                            _pn = int(max(1, min(100, half_up(_good))))
+                            _sfx = 'th' if 10 <= _pn % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(_pn % 10, 'th')
+                            # 'pctl' needs the full step between chips. Six or more pitch types
+                            # narrow the step, and then every caption of the card drops the word.
+                            _parts.append((f'{_pn}{_sfx}' + ('' if _st_step < 0.1495 else ' pctl'),
+                                           7.2, TEXT_MUTED, 'medium'))
+                        _objs = [ax.text(0, _st_y - _cap_drop - 0.0035, t_, fontsize=s_, color=c_, fontweight=w_,
+                                         fontfamily='IBM Plex Sans', ha='left', va='baseline')
+                                 for t_, s_, c_, w_ in _parts]
+                        _rd, _iv = fig.canvas.get_renderer(), ax.transData.inverted()
+                        _ws = [(lambda b_: _iv.transform((b_.x1, 0))[0] - _iv.transform((b_.x0, 0))[0])(
+                                   o_.get_window_extent(_rd)) for o_ in _objs]
+                        _gap = 0.006
+                        _cx0 = _x + 0.5 * _st_cell - 0.5 * (sum(_ws) + _gap * (len(_ws) - 1))
+                        for o_, w_ in zip(_objs, _ws):
+                            o_.set_x(_cx0)
+                            _cx0 += w_ + _gap
+                yb = _st_y - 0.036 - _cap_h
             rh_ = _fit_rh or min(SOCIAL_ROW_H, (yb - 0.040) / max(_nlines - 1, 1))
             if _sp_place:
                 # Same rule as the one between the two hand sections, centered between the
                 # STUFF+ text and the first section title (2026-11-05, per Wally).
-                _ly = 0.5 * (_st_y + yb)
+                _ly = 0.5 * (_st_y - (_cap_drop if _caps else 0.0) + yb)
                 ax.plot([L, R], [_ly, _ly], color=SUBTLE_BORDER, lw=1.1,
                         transform=ax.transAxes, zorder=2, solid_capstyle='butt')
             fs_ = min(12.0, rh_ * 430.0)
@@ -3254,7 +3535,7 @@ def render_social_card(config, pitches, output_file):
         note_r = (('Data: MLB, Baseball Savant, FanGraphs' if _fg_src else 'Data: MLB, Baseball Savant')
                   + '  ·  disc size = usage  ·  '
                   + ('ring = expected movement  ·  ' if _expected else '')
-                  + ('100 = MLB avg, tints vs AAA' if config.get('aaa_ruler')
+                  + ('pitch vs MLB, rest vs AAA' if config.get('aaa_ruler')
                      else '100 = league avg'))
 
     # Footer height, tuned by measured clearance from the card's bottom edge
@@ -4617,8 +4898,8 @@ def render_card(config, pitches, output_file):
                     continue
             row_bg = DARKER if r == len(cell_data) else (DARK_CELL if r % 2 == 1 else ALT_ROW_BG)
             val_str = cell_data[r - 1][lp_col_idx]
-            # 100 on an MLB-ruled card; the AAA average on the MLB scale under the AAA ruler.
-            _ctr = _aaa_grade_center('loc', pitch_counts if r == len(cell_data) else pt_codes[r - 1])
+            # 100 = the MLB average at every level (2026-11-23, per Wally).
+            _ctr = 100.0
             tinted = _pitcher_stat_cell_color(val_str, _ctr, 10.0, True, row_bg, False)
             if tinted:
                 table.get_celld()[(r, lp_col_idx)].set_facecolor(tinted)
@@ -4636,8 +4917,8 @@ def render_card(config, pitches, output_file):
                     continue
             row_bg = DARKER if r == len(cell_data) else (DARK_CELL if r % 2 == 1 else ALT_ROW_BG)
             val_str = cell_data[r - 1][sp_col_idx]
-            # 100 on an MLB-ruled card; the AAA average on the MLB scale under the AAA ruler.
-            _ctr = _aaa_grade_center('stuff', pitch_counts if r == len(cell_data) else pt_codes[r - 1])
+            # 100 = the MLB average at every level (2026-11-23, per Wally).
+            _ctr = 100.0
             tinted = _pitcher_stat_cell_color(val_str, _ctr, 10.0, True, row_bg, False)
             if tinted:
                 table.get_celld()[(r, sp_col_idx)].set_facecolor(tinted)
@@ -5531,8 +5812,8 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
 # SHOW on the MLB scale since 2026-11-17 (per Wally): both models grade a pitch
 # against MLB outcomes, and the AAA mean only relabels the zero, by a different
 # amount per type, so a AAA arm's 97 mph sinker reads what it would in MLB. They
-# rank against the pool's MLB-scale grades, and a value tint centres on the type's
-# AAA mean on the MLB scale (_aaa_grade_center). Pitcher+ still reads 100 = AAA
+# rank against MLB and tint against 100 since 2026-11-23 (per Wally), like every pitch
+# metric (AAA_MLB_RULED); only an outcome reads against AAA. Pitcher+ still reads 100 = AAA
 # average: it scores the AAA-shifted grades on the AAA pool's (mu, sigma). The chip pools are Savant's line,
 # 1.25 batters faced per AAA team game; the per-type, split and HR/FB pools
 # keep the conventions their MLB twins use. The pool is one season, built by
@@ -5541,29 +5822,6 @@ def _build_scratch_league_context(norm_by_pitcher, stuff_k_shrink=None, aaa=None
 AAA_PITCHER_POOL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 'data', '_milb2026', 'pitcher_pool_AAA.json')
 AAA_POOL_BUILD_CMD = 'PYTHONHASHSEED=0 .venv/bin/python scripts/research/cards/aaa_pitcher_pool.py'
-
-# The pool's grade shift ({'stuff': {pt: AAA mean - 100}, 'loc': {group: ...}}), set
-# by _install_aaa_pools. The grades SHOW on the MLB scale; the shift only moves the
-# centre a value tint reads against, so a tint still says better or worse than AAA.
-_AAA_GRADE_SHIFT = None
-
-
-def _aaa_grade_center(kind, mix):
-    """The MLB-scale value of the AAA average for kind 'stuff' or 'loc': 100 on an
-    MLB-ruled card, else 100 plus the shift of the pitch type, or the count-weighted
-    shift of a {pitch type: count} mix. Loc+ shifts by location group."""
-    sh = (_AAA_GRADE_SHIFT or {}).get(kind)
-    if not sh or not mix:
-        return 100.0
-    if isinstance(mix, str):
-        mix = {mix: 1}
-    from pipeline.locplus import group_of_code
-    tot = sum(n for pt, n in mix.items() if pt)
-    if not tot:
-        return 100.0
-    return 100.0 + sum(n * sh.get(group_of_code(pt) if kind == 'loc' else pt, 0.0)
-                       for pt, n in mix.items() if pt) / tot
-
 
 def load_aaa_pitcher_pool():
     """The AAA pitcher pool, or stop: a card asked for the AAA ruler must never
@@ -5587,43 +5845,33 @@ def aaa_qualified(pool):
             if tg.get(r['club']) and (r.get('tbf') or 0) >= PCTL_BF_PER_GAME_MLB * tg[r['club']]]
 
 
+# Pitch metrics: what the pitch IS (speed, spin, movement, release, approach angle) and the
+# two grades built from it. Under the AAA ruler they keep the MLB pool and the MLB league
+# average; every outcome (K%, Whiff%, Strike%, xwOBAcon, ...) reads against AAA.
+AAA_MLB_RULED = frozenset({'velocity', 'maxVelo', 'fbVelo', 'spinRate', 'indVertBrk', 'horzBrk', 'vaa', 'haa',
+                           'nVAA', 'nHAA', 'armAngle', 'extension', 'relPosX', 'relPosZ', 'breakTilt',
+                           'breakTiltMinutes', 'stuffScore', 'locPlus'})
+
+
 def _install_aaa_pools(ctx, pool):
-    """Swap every MLB ruler the scratch card reads for its AAA twin: the chip
-    pools, Pitcher+'s baseline and pool, the per-type pools, and the social
-    card's split, xwOBAcon and extension pools plus the HR/FB and PU pools."""
-    global _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS, _SOCIAL_EXT_POOL, _HRFB_PU_POOLS, _AAA_GRADE_SHIFT
-    from pipeline.locplus import group_of_code
+    """Swap the MLB ruler of every OUTCOME the scratch card reads for its AAA twin:
+    the chip pools, Pitcher+'s baseline and pool, and the social card's split and
+    xwOBAcon pools plus the HR/FB and PU pools. A PITCH metric (AAA_MLB_RULED) keeps
+    its MLB ruler: the pitch is the same pitch at any level (2026-11-23, per Wally)."""
+    global _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS, _SOCIAL_XRV_POOLS, _HRFB_PU_POOLS
     q = aaa_qualified(pool)
-    _AAA_GRADE_SHIFT = pool['shift']
-    s_sh, l_sh = pool['shift']['stuff'], pool['shift']['loc']
-    # Stuff+ and Loc+ show on the MLB scale (2026-11-17, per Wally), so they rank
-    # against the pool's MLB-scale grades: a AAA percentile of an MLB-scale value.
-    _mlb_key = {'stuffScore': 'stuffScoreMLB', 'locPlus': 'locPlusMLB'}
+    _mlb_pools = ctx.get('pitcher_pools') or {}
     ctx['pitcher_pools'] = {
-        s: sorted(v for v in ((_stuff_rank_key(r.get(_mlb_key[s])) if s == 'stuffScore'
-                               else r.get(_mlb_key.get(s, s))) for r in q) if v is not None)
+        s: (_mlb_pools.get(s) or [] if s in AAA_MLB_RULED
+            else sorted(v for v in (r.get(s) for r in q) if v is not None))
         for s in list(_SCRATCH_POOL_STATS) + list(_SCRATCH_LINE_STATS)}
     ctx['pitcher_plus_pool'] = sorted(r['pitcherPlus'] for r in q if r.get('pitcherPlus') is not None)
     base = pool.get('pitcherPlusBase')
     ctx['pitcher_plus_base'] = {k: tuple(v) for k, v in base.items()} if base else None
-    pt_pools = defaultdict(lambda: defaultdict(list))
-    for by_pt in pool['pitchTypes'].values():
-        for pt, d in by_pt.items():
-            for s in ('velocity', 'nVAA', 'stuffScore', 'locPlus'):
-                v = d.get(s)
-                if v is None:
-                    continue
-                # The pool stores per-type grades on the AAA shift; add it back for
-                # the MLB scale (exact up to each atom's half-point rounding).
-                if s == 'stuffScore':
-                    v = _stuff_rank_key(v + s_sh.get(pt, 0.0))
-                elif s == 'locPlus':
-                    v = v + l_sh.get(group_of_code(pt), 0.0)
-                pt_pools[pt][s].append(v)
-    ctx['pitch_pools'] = {pt: {s: sorted(v) for s, v in d.items()} for pt, d in pt_pools.items()}
+    # ctx['pitch_pools'] (velocity, nVAA, Stuff+ and Loc+ by pitch type) stays the MLB pool.
     tint = {}
     xwc = defaultdict(list)
-    for th, bh, pt, n, st, sw, wh, nbip, xw in pool['socialCells']:
+    for th, bh, pt, n, st, sw, wh, nbip, xw, *_xr in pool['socialCells']:
         t = tint.setdefault((th, bh, pt), {'strike': [], 'whiff': []})
         if n >= SOCIAL_STRIKE_MIN_PITCHES:
             t['strike'].append(st / n)
@@ -5637,12 +5885,21 @@ def _install_aaa_pools(ctx, pool):
     for v in xwc.values():
         v.sort()
     _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS = tint, dict(xwc)
-    _SOCIAL_EXT_POOL = sorted(r['extension'] for r in q if r.get('extension') is not None)
+    # The summed xRV of a cell is the tenth item of a social cell since 2026-11-23.
+    _SOCIAL_XRV_POOLS = _xrv_pools_from_cells([(c[0], c[1], c[2], c[3], c[9]) for c in pool['socialCells'] if len(c) > 9])
+    if not _SOCIAL_XRV_POOLS:
+        print('  WARNING: the AAA pool holds no xRV per cell, so the xRV/100 column has no tint. '
+              f'Rebuild it: {AAA_POOL_BUILD_CMD}')
     hb = [r['hrfb'] for r in pool['pitchers'].values() if r.get('hrfb')]
     _HRFB_PU_POOLS = {'hrfb': sorted(a[1] / a[0] * 100 for a in hb if a[0] >= 20),
                       'pu': sorted(a[2] / a[3] * 100 for a in hb if a[3] >= 50)}
-    ctx['league_avgs'] = pool['leagueAverages']
-    ctx['overall_avgs'] = pool['pitcherLeagueAverages']
+    # League averages: the AAA value for an outcome, the MLB value for a pitch metric.
+    with open(METADATA_PATH) as f:
+        _meta = json.load(f)
+    _mla, _mov = _meta.get('leagueAverages') or {}, _meta.get('pitcherLeagueAverages') or {}
+    ctx['league_avgs'] = {pt: {**d, **{k: v for k, v in (_mla.get(pt) or {}).items() if k in AAA_MLB_RULED}}
+                          for pt, d in pool['leagueAverages'].items()}
+    ctx['overall_avgs'] = {**pool['pitcherLeagueAverages'], **{k: v for k, v in _mov.items() if k in AAA_MLB_RULED}}
     print(f"  AAA ruler: {len(q)} pitchers clear 1.25 BF per team game; "
           f"Pitcher+ pool {len(ctx['pitcher_plus_pool'])}; "
           f"{len(ctx['pitch_pools'])} pitch types; {len(tint)} split cells")
@@ -5969,7 +6226,7 @@ def main(new_level=None):
     card_height     = "fit"              # Season social card height: "fit" (follows the rows) or "fixed" (1350 px)
     stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
     xmove_basis     = "hitter"           # Expected-movement rings on the social card: "hitter" (slot, extension, velocity per pitch type; the default) or "physics" (the pitch itself, no pitch type read)
-    social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xwobacon"; force "xrv", "rv", "both", or "xwobacon"
+    social_rv       = None               # Social-table run-value slot: None = daily "both" (RV, xRV) / season "xrv" (xRV/100); force "xrv", "rv", "both", or "xwobacon"
     pitch_qual      = None               # Min pitches for a pitch type's RV coloring (None = default 50)
     milb_corpus     = False              # True = read data/_milb2026 instead of Sheets; needs filter_pitchers. team is ignored
     milb_scope      = "all"              # Corpus games: "all" (spring and AFL included) or "regular" (regular season + playoffs)
@@ -6052,7 +6309,7 @@ def main(new_level=None):
                         help='Corpus only: the mlbId when one name is two players')
     parser.add_argument('--aaa-ruler', action='store_true',
                         help='Rank and grade against 2026 AAA instead of MLB: AAA percentiles, '
-                             'AAA tints, Pitcher+ at 100 = AAA average; Stuff+/Loc+ stay on the MLB scale. Scratch-tab '
+                             'AAA tints for outcomes, Pitcher+ at 100 = AAA average; pitch metrics, Stuff+ and Loc+ read against MLB. Scratch-tab '
                              'or MiLB-corpus season and date-range cards only')
     args = parser.parse_args()
 
@@ -6464,10 +6721,13 @@ def main(new_level=None):
     # all card pitchers. Heavy (loads the MLB pitch pickle) — scratch only.
     scratch_ctx = None
     _aaa_pool = None
-    # NEW runs its AAA, MLB and AFL passes in one process: clear the AAA tint centre
-    # so a pass without the ruler never reads the previous pass's shift.
-    global _AAA_GRADE_SHIFT
-    _AAA_GRADE_SHIFT = None
+    # NEW runs its AAA, MLB and AFL passes in one process, and _install_aaa_pools swaps four
+    # module-level pools for their AAA twins. Clear them at the start of every pass: a pass
+    # without the ruler then builds its MLB pools again. Until 2026-11-23 nothing cleared them,
+    # so the MLB card of a NEW run tinted Strike%, Whiff%, the run-value cell and the HR/FB
+    # and PU bubbles against AAA (measured: a different image from a clean MLB render).
+    global _SOCIAL_TINT_POOLS, _SOCIAL_XWC_POOLS, _SOCIAL_XRV_POOLS, _HRFB_PU_POOLS
+    _SOCIAL_TINT_POOLS = _SOCIAL_XWC_POOLS = _SOCIAL_XRV_POOLS = _HRFB_PU_POOLS = None
     if aaa_ruler and _new_lv == 'MLB':
         # The NEW MLB pass is the MLB card: MLB rows on MLB averages.
         print("  AAA ruler off: NEW MLB pass (MLB rows on the MLB ruler)")
