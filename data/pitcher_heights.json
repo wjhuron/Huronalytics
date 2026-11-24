@@ -983,6 +983,7 @@
 "Harvey, Matt": 76.0,
 "Hassell III, Robert": 73.0,
 "Hatch, Thomas": 73.0,
+"Hawkins, Garrett": 77.0,
 "Hayes, Ke'Bryan": 71.0,
 "Hayes, Kyle": 73.0,
 "Hays, Austin": 70.0,
@@ -5631,6 +5632,9 @@
 ],
 "Hatch, Thomas": [
 641672
+],
+"Hawkins, Garrett": [
+678184
 ],
 "Hayes, Ke'Bryan": [
 663647
@@ -10721,6 +10725,6 @@
 594798
 ]
 },
-"league_mean": 73.74,
-"n": 2678
+"league_mean": 73.75,
+"n": 2679
 }
