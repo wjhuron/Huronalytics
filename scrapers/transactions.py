@@ -268,11 +268,17 @@ def scrape_transactions(start_date, end_date):
             last_name = parts[1] + suffix
             return f"{last_name}, {first_name}"
 
-        # For 3+ parts, scan from the second token forward to find where
+        # A middle initial ("José A. Ferrer") belongs to the first name, so
+        # the last name can start only after it: "Ferrer, José A.".
+        first_end = 1
+        while first_end < len(parts) - 1 and re.fullmatch(r'[A-Za-z]\.?', parts[first_end]):
+            first_end += 1
+
+        # For 3+ parts, scan from the token after the first name to find where
         # the last name begins. A token that is a known prefix starts the last name.
         # We assume the first token is always part of the first name.
         last_name_start = None
-        for i in range(1, len(parts)):
+        for i in range(first_end, len(parts)):
             if parts[i].lower().rstrip('.') in last_name_prefixes:
                 last_name_start = i
                 break
@@ -281,7 +287,7 @@ def scrape_transactions(start_date, end_date):
         # This handles cases like "Simeon Woods Richardson" where "Woods Richardson"
         # is the last name but has no standard prefix.
         if last_name_start is None:
-            last_name_start = 1
+            last_name_start = first_end
 
         first_name = ' '.join(parts[:last_name_start])
         last_name = ' '.join(parts[last_name_start:]) + suffix
