@@ -2070,7 +2070,14 @@ def _social_note_stats(plist):
         iz = q.get('InZone')
         return iz == 'No' if iz in ('Yes', 'No') else compute_iz(q) is False
 
-    fb = max((t for t in ('FF', 'SI', 'FC') if t in by), key=lambda t: len(by[t]), default=None)
+    # The fastball of the velocity gap is Stuff+'s reference (build_df in train_stuff.py): the
+    # most-thrown of four-seam and sinker; the cutter only for a pitcher with neither, or on
+    # the cutter-anchor list. Until 2026-11-23 a cutter thrown more than both was the reference,
+    # and Herget's changeup read a 0.8 mph gap against his 86 mph cutter.
+    from stuff_plus.train_stuff import FC_ANCHOR_PITCHERS
+    _who = next((q.get('Pitcher') for q in plist if q.get('Pitcher')), None)
+    _cand = ('FC',) if _who in FC_ANCHOR_PITCHERS and 'FC' in by else (tuple(t for t in ('FF', 'SI') if t in by) or ('FC',))
+    fb = max((t for t in _cand if t in by), key=lambda t: len(by[t]), default=None)
     fb_v = mean(by[fb], 'Velocity')[0] if fb else None
     out = {}
     for pt, pp in by.items():

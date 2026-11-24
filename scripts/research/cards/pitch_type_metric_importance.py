@@ -117,8 +117,13 @@ def season(y):
     u['xwcon'] = (f['xw'].where(bip)).groupby([f['pitcher'], f['pt']]).mean()
     u['k2'] = P('wh', 'two') / S('two')
     u['n_sw'], u['n_bip'], u['n_two'] = S('sw'), S('bip'), S('two')
-    # gaps to the pitcher's primary fastball (most thrown of FF / SI / FC)
-    fb = u[u.index.get_level_values('pt').isin(['FF', 'SI', 'FC'])].reset_index().sort_values('n').drop_duplicates('pitcher', keep='last').set_index('pitcher')
+    # gaps to the pitcher's primary fastball, Stuff+'s rule (build_df in train_stuff.py): the most
+    # thrown of FF / SI, and FC only for a pitcher with neither. The three names on Stuff+'s
+    # cutter-anchor list are not applied here (this frame holds ids). Until 2026-11-23 the
+    # reference was the most thrown of FF / SI / FC.
+    fbu = u[u.index.get_level_values('pt').isin(['FF', 'SI', 'FC'])].reset_index()
+    fbu['true'] = fbu['pt'].isin(['FF', 'SI'])
+    fb = fbu.sort_values(['true', 'n']).drop_duplicates('pitcher', keep='last').set_index('pitcher')
     pid = u.index.get_level_values('pitcher')
     for a in ('velo', 'ivb', 'hb'):
         u['d' + a] = u[a].values - fb[a].reindex(pid).values
