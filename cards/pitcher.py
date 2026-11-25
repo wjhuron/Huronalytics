@@ -3092,6 +3092,12 @@ def render_social_card(config, pitches, output_file):
         mv.scatter([mh], [mvv], s=_disc_s(n_), color=col,
                    edgecolors=BG, linewidths=1.8,
                    zorder=5 + (_nmax - n_) * 1e-4)
+        if config.get('velo_in_plot') and velo_by_type.get(pt_) is not None:
+            # Digits scale with the disc: ~0.33 x diameter, 5.2-7.5 pt.
+            _dia = math.sqrt(_disc_s(n_))
+            ink_txt(mh, mvv, f"{velo_by_type[pt_]:.1f}",
+                    min(7.5, max(5.2, 0.33 * _dia)), '#ffffff',
+                    zorder=5.5 + (_nmax - n_) * 1e-4, ax_=mv)
 
     # One Stuff+ per pitch, the mean of its atoms over all pitches: a number that moves with
     # the batter's hand read as confusing (2026-11-05, per Wally).
@@ -3108,7 +3114,10 @@ def render_social_card(config, pitches, output_file):
         # Velo on the centroid label for every card type now that season and
         # range share the daily layout (2026-09-01, per Wally).
         _vt = velo_by_type.get(pt_)
-        _lab = f"{pt_} {_vt:.1f}" if _vt is not None else pt_
+        # PROTOTYPE (2026-09-16): velo_in_plot prints the velo inside the
+        # plot disc and leaves the label as the type only.
+        _vip = bool(config.get('velo_in_plot'))
+        _lab = pt_ if _vip else (f"{pt_} {_vt:.1f}" if _vt is not None else pt_)
         # The stacked vs-season velo delta ('(+1.4)' under the velo, added
         # 2026-09-05) is gone per Wally 2026-09-10: one line, the day's
         # average only. The merged season baseline (season_pitch_lb) still
@@ -6359,6 +6368,7 @@ def main(new_level=None):
     social          = True              # True = consolidated social card (daily/season by date mode) instead of the full card
     bats            = None               # Batter-handedness filter: "L", "R", or None for both
     rv_mode         = "per100"           # Season-card RV columns: "per100", "totals", or "both"
+    velo_in_plot    = False              # PROTOTYPE: velo inside the plot discs, labels type-only
     card_height     = "fit"              # Season social card height: "fit" (follows the rows) or "fixed" (1350 px)
     stuff_place     = "strip"            # Social Stuff+: "strip" (once per pitch, under the plot) or "split" (a column in each hand table)
     xmove_basis     = "hitter"           # Expected-movement rings on the social card: "hitter" (slot, extension, velocity per pitch type; the default) or "physics" (the pitch itself, no pitch type read)
@@ -6401,6 +6411,8 @@ def main(new_level=None):
                         help='Season social card height follows the row count, or stays 1350 px')
     parser.add_argument('--stuff-place', default=None, choices=['strip', 'split'],
                         help='Social Stuff+: once per pitch under the plot, or a column in each hand table')
+    parser.add_argument('--velo-in-plot', action='store_true',
+                        help='PROTOTYPE: velo inside the plot discs, labels type-only')
     parser.add_argument('--pitch-qual', type=int, default=None,
                         help='Min pitches for a pitch type\'s RV COLORING '
                              f'(default {CARD_COLOR_MIN_PITCHES}; values always render)')
@@ -6466,6 +6478,7 @@ def main(new_level=None):
     if args.social_rv is not None: social_rv = args.social_rv
     if args.no_social_pctl: social_pctl = False
     if args.xmove_basis is not None: xmove_basis = args.xmove_basis
+    if args.velo_in_plot: velo_in_plot = True
     if args.stuff_place: stuff_place = args.stuff_place
     if args.card_height: card_height = args.card_height
     if args.pitch_qual is not None: pitch_qual = args.pitch_qual
@@ -7391,6 +7404,7 @@ def main(new_level=None):
             'social_xmove': xmove_models,
             'social_xmove_physics': xmove_physics,
             'xmove_basis': xmove_basis,
+            'velo_in_plot': velo_in_plot,
             'stuff_place': stuff_place,
             'card_height': card_height,
             'pitch_qual': pitch_qual,
