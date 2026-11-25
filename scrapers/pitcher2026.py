@@ -1961,6 +1961,7 @@ class BaseballSavantFocusedDownloader:
         13: 'High-A',
         14: 'Single-A',
         16: 'Rookie',
+        17: 'Winter/AFL',
         22: 'College',
         51: 'International',
     }
@@ -1989,7 +1990,9 @@ class BaseballSavantFocusedDownloader:
                 "stats": "gameLog",
                 "season": season,
                 "group": group,
-                "gameType": "E,S,R,F,D,L,W",
+                # MiLB playoffs are gameType P, not F/D/L/W; all-star games
+                # (e.g. the AFL Fall Stars game) are gameType A.
+                "gameType": "E,S,R,F,D,L,W,P,A",
                 "sportId": sport_id,
             }
 
