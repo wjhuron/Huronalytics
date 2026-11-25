@@ -2039,7 +2039,10 @@ SOCIAL_LOC_MIN_PITCHES = 125
 # rate; curveball two-strike whiff% and chase%; changeup chase% and velocity gap to the
 # fastball. No slider, sweeper or splitter metric passed, so those chips carry no note.
 # A note always ranks against MLB, on an AAA card too.
-SOCIAL_NOTE_RULES = {'FC': ('spin',), 'CU': ('k2', 'chase'), 'KC': ('k2', 'chase'), 'CH': ('chase', 'dvelo')}
+# The changeup's velocity gap is no longer a caption (2026-11-24, per Wally): it ran into the
+# next chip's caption, and on Stuff+'s fastball rule it adds little beyond the results
+# (-.04, SE .03, 3 of 4 pairs). _social_note_stats still measures it ('dvelo').
+SOCIAL_NOTE_RULES = {'FC': ('spin',), 'CU': ('k2', 'chase'), 'KC': ('k2', 'chase'), 'CH': ('chase',)}
 SOCIAL_NOTE_POOL_TYPE = {'KC': 'CU'}     # the curveball metrics were measured on CU and KC together
 SOCIAL_NOTE_PCTL = 10                    # a note prints at or beyond the 10th / 90th MLB percentile: a display convention
 # Minimum denominator. k2 (two-strike swings) and chase (pitches out of the zone): the
