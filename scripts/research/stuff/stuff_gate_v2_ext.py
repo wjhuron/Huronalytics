@@ -107,6 +107,14 @@ ARMS = {
     # a type in none of the three takes the pooled model.
     'GRP2': {'groups': 2},
     'GRP3': {'groups': 3},
+    # outcome chain (2026-11-24). PitchingBot and StuffPro do not regress run value in one step:
+    # they model each outcome (swing, whiff, ball in play, called strike, hit by pitch) and price it.
+    # chain_pred(). CHAIN prices a class at its pooled mean target; CHAIN_MIX at its mean by count,
+    # weighted by the league count mix (same classifiers); CHAIN_CNT also gives every model the
+    # count as an input and scores each pitch at all twelve counts, league-weighted (the public form).
+    'CHAIN': {'chain': 'pooled'},
+    'CHAIN_MIX': {'chain': 'mix'},
+    'CHAIN_CNT': {'chain': 'count'},
 }
 BRK, OFF, FBT = ('SL', 'ST', 'CU', 'KC', 'SV'), ('CH', 'FS'), ('FF', 'SI', 'FC')
 ARS_MIN_N, ARS_MIN_SHARE = 30, 0.03             # a type is part of the arsenal from 30 pitches and 3% usage (conventions)
@@ -278,6 +286,89 @@ def fit_clf(Xtr, ytr, XY, spec, seed):
     return out
 
 
+SW3, TK3 = ('whiff', 'foul', 'bip'), ('ball', 'cs', 'hbp')
+COUNTS = [(b, k) for b in range(4) for k in range(3)]
+
+
+def chain_pred(Xtr, cls, ytr, btr, ktr, XY, clsY, yY, spec, seed, cache):
+    """Run value as a chain of outcome models on the shipped design.
+    P(swing); P(whiff | swing); P(in play | contact); P(called strike | take); P(hit by pitch |
+    take, not a strike); value of a ball in play (regression on the target). Every other class
+    is priced at the training mean of the target (see the arm notes). No monotone velocity rule:
+    it is a rule on total value and has no meaning for one link. Bunts ('other') are left out."""
+    mode = spec['chain']
+    isin = lambda *c: np.isin(cls, c)
+    links = [('sw', isin(*SW3, *TK3), isin(*SW3)), ('wh', isin(*SW3), cls == 'whiff'),
+             ('bip', isin('foul', 'bip'), cls == 'bip'), ('cs', isin(*TK3), cls == 'cs'),
+             ('hbp', isin('ball', 'hbp'), cls == 'hbp'), ('vbip', cls == 'bip', None)]
+    cnt = btr * 10 + ktr
+    tab = pd.DataFrame({'c': cls, 'k': cnt, 'y': ytr})
+    tab = tab[np.isfinite(tab['y'])]
+    vc = tab.groupby('c')['y'].mean()
+    known = tab[tab['k'].notna() & tab['c'].isin(SW3 + TK3)]
+    wk = known.groupby('k').size() / len(known)
+    g = known.groupby(['c', 'k'])['y'].agg(['mean', 'size'])
+    vck = {(c, b * 10 + k): (g.loc[(c, b * 10 + k), 'mean'] if (c, b * 10 + k) in g.index
+                             and g.loc[(c, b * 10 + k), 'size'] >= EV_MIN else vc[c])
+           for c in SW3 + TK3 for b, k in COUNTS}
+    w = {b * 10 + k: float(wk.get(b * 10 + k, 0.0)) for b, k in COUNTS}
+
+    def models(Xa, rows_ok):
+        out = {}
+        for nm, rows, lab in links:
+            r = rows & rows_ok
+            if lab is None:
+                r = r & np.isfinite(ytr)
+                m = xgb.XGBRegressor(**params_for(Xa, spec, seed, clf=True))
+                m.fit(Xa[r], ytr[r])
+            else:
+                m = xgb.XGBClassifier(**params_for(Xa, spec, seed, clf=True))
+                m.fit(Xa[r], lab[r].astype(int))
+            out[nm] = m
+        return out
+
+    def probs(p):
+        con = p['sw'] * (1.0 - p['wh'])
+        tk = 1.0 - p['sw']
+        return {'whiff': p['sw'] * p['wh'], 'foul': con * (1.0 - p['bip']), 'bip': con * p['bip'],
+                'cs': tk * p['cs'], 'hbp': tk * (1.0 - p['cs']) * p['hbp'], 'ball': tk * (1.0 - p['cs']) * (1.0 - p['hbp'])}
+
+    score = lambda ms, X: {nm: (m.predict(X) if nm == 'vbip' else m.predict_proba(X)[:, 1]).astype('float64') for nm, m in ms.items()}
+    if mode in ('pooled', 'mix'):
+        if 'parts' not in cache:
+            ms = models(Xtr, np.ones(len(cls), bool))
+            cache['parts'] = score(ms, XY)
+            del ms
+        p = cache['parts']
+        pr = probs(p)
+        if mode == 'pooled':
+            val = {c: float(vc[c]) for c in pr}
+            vb = p['vbip']
+        else:
+            val = {c: sum(w[k] * vck[(c, k)] for k in w) for c in pr}
+            vb = p['vbip'] + (val['bip'] - float(vc['bip']))
+        pred = sum(pr[c] * val[c] for c in pr if c != 'bip') + pr['bip'] * vb
+    else:
+        Xa = Xtr.assign(balls=btr.astype('float32'), strikes=ktr.astype('float32'))
+        ms = models(Xa, np.isfinite(cnt))
+        pred = np.zeros(len(XY))
+        pr = {c: np.zeros(len(XY)) for c in SW3 + TK3}
+        for b, k in COUNTS:
+            p = score(ms, XY.assign(balls=np.float32(b), strikes=np.float32(k)))
+            q = probs(p)
+            wt = w[b * 10 + k]
+            pred += wt * (sum(q[c] * vck[(c, b * 10 + k)] for c in q if c != 'bip') + q['bip'] * p['vbip'])
+            for c in q:
+                pr[c] += wt * q[c]
+        del ms, Xa
+    # held-out check: class shares and the mean value, predicted against actual in season Y
+    okY = np.isin(clsY, SW3 + TK3)
+    print('    chain ' + mode + ': share pred/actual ' + ' '.join(
+        f'{c} {pr[c][okY].mean():.3f}/{(clsY[okY] == c).mean():.3f}' for c in SW3 + TK3)
+        + f' | value pred {pred[okY].mean():+.4f} actual {np.nanmean(yY[okY]):+.4f}', flush=True)
+    return pred.astype('float32')
+
+
 def run(arms, pairs, seed):
     os.makedirs(EXT, exist_ok=True)
     frames = {y: G.load_frame(y) for y in G.SEASONS}
@@ -292,6 +383,7 @@ def run(arms, pairs, seed):
         slopes = G.fit_vaa_slopes([frames[y] for y in train_years])
         P = {y: attach_sidecar(G.prepare(frames[y], slopes, 'true'), y) for y in train_years + [Y, Y1]}
         PH = PA = None
+        chain_cache = {}
         gc.collect()
         for name in todo:
             spec = ARMS[name]
@@ -346,6 +438,11 @@ def run(arms, pairs, seed):
                     known = ms | mt
                     p_sw = fit_clf(Xtr[known], sw[known].astype(int), XY, spec, seed)
                     pred = p_sw * v_sw + (1.0 - p_sw) * v_tk
+            elif spec.get('chain'):
+                cat = lambda c, t=float: np.concatenate([Q[y][c].values.astype(t) for y in train_years])
+                pred = chain_pred(Xtr, cat('cls', str), ytr, cat('balls'), cat('strikes'), XY,
+                                  dY['cls'].values.astype(str), dY['target_xrv'].values.astype(float),
+                                  spec, seed, chain_cache)
             elif spec.get('identity'):
                 K = int(spec['identity'])
                 rng = np.random.default_rng(1000 + seed)

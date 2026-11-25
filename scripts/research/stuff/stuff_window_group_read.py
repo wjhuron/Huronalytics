@@ -10,6 +10,8 @@ Question 1 (window): does a Stuff+ model trained on fewer, nearer seasons grade 
   PAST_D1 - PAST_R1, D2 - R2       the window effect with the sample size held equal
 Question 2 (groups): do separate models for pitch groups grade better?
   GRP2 / GRP3                      against SHIPPED
+Question 3 (target): does a chain of outcome models grade better than one run-value model?
+  CHAIN / CHAIN_MIX / CHAIN_CNT    against SHIPPED
 
 Reads are the ext summary's own (stuff_gate_ext_summary.compare): pool 'gate' (300 pitches in
 Y and Y+1) and 'free' (300 in Y, weighted by Y+1 pitches), pooled / within hand / within role,
@@ -63,7 +65,8 @@ def main():
     ext = lambda a: (lambda y: E.agg_path(a, y, seed))
     ship = lambda s: (lambda y: G.agg_path('SHIPPED', y, s))
     plan = [('SEED1', ship(1), ship(0)), ('SEED2', ship(2), ship(0))]
-    plan += [(f'{a} - SHIPPED', ext(a), ship(seed)) for a in ('NEAR2', 'NEAR3', 'REC08', 'REC06', 'PAST', 'GRP2', 'GRP3')]
+    plan += [(f'{a} - SHIPPED', ext(a), ship(seed)) for a in ('NEAR2', 'NEAR3', 'REC08', 'REC06', 'PAST', 'GRP2', 'GRP3',
+                                                                 'CHAIN', 'CHAIN_MIX', 'CHAIN_CNT')]
     plan += [(f'{a} - PAST', ext(a), ext('PAST')) for a in ('PAST_D1', 'PAST_R1', 'PAST_D2', 'PAST_R2')]
     plan += [('PAST_D1 - PAST_R1', ext('PAST_D1'), ext('PAST_R1')), ('PAST_D2 - PAST_R2', ext('PAST_D2'), ext('PAST_R2'))]
     res = {}
