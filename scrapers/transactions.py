@@ -31,7 +31,7 @@ def scrape_transactions(start_date, end_date):
         'Worcester Red Sox': 'Boston Red Sox', 'Portland Sea Dogs': 'Boston Red Sox',
         'Greenville Drive': 'Boston Red Sox', 'Salem RidgeYaks': 'Boston Red Sox',
         'FCL Red Sox': 'Boston Red Sox',
-        'Scranton/Wilkes-Barre RailRiders': 'New York Yankees', 'Somerset Patriots': 'New York Yankees',
+        'Scranton/Wilkes-Barre Highlanders': 'New York Yankees', 'Somerset Patriots': 'New York Yankees',
         'Hudson Valley Renegades': 'New York Yankees', 'Tampa Tarpons': 'New York Yankees',
         'FCL Yankees': 'New York Yankees',
         'Durham Bulls': 'Tampa Bay Rays', 'Montgomery Biscuits': 'Tampa Bay Rays',
@@ -146,7 +146,7 @@ def scrape_transactions(start_date, end_date):
     # Level mapping for MiLB teams
     level_mapping = {
         # AAA Teams
-        'Norfolk Tides': 'AAA', 'Worcester Red Sox': 'AAA', 'Scranton/Wilkes-Barre RailRiders': 'AAA',
+        'Norfolk Tides': 'AAA', 'Worcester Red Sox': 'AAA', 'Scranton/Wilkes-Barre Highlanders': 'AAA',
         'Durham Bulls': 'AAA', 'Buffalo Bisons': 'AAA', 'Charlotte Knights': 'AAA',
         'Columbus Clippers': 'AAA', 'Toledo Mud Hens': 'AAA', 'Omaha Storm Chasers': 'AAA',
         'St. Paul Saints': 'AAA', 'Sugar Land Space Cowboys': 'AAA', 'Salt Lake Bees': 'AAA',
