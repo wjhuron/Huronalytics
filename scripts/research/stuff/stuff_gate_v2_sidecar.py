@@ -99,7 +99,12 @@ def build(y):
         dv = np.abs(v0 - fr['velocity'].values.astype('float32'))
         nbad, mx = int(np.nansum(dv > 1e-4)), float(np.nanmax(dv))
         print(f'{y}: velocity differs on {nbad} of {len(d)} rows (max {mx:.2f} mph)', flush=True)
-        same_v = (y == 2026 and nbad < 0.005 * len(d))
+        # Measured 2026-11-24 against the frames of 2026-11-21: almost every row differs, by
+        # 0.01 mph at most in 2021 and under 0.005 mph in 2022-2025. The cause is not
+        # established (stored precision, or a neutral-value rebuild). A row shift moves
+        # velocities by several mph, so a largest difference under 0.05 mph with the pitcher
+        # sequence identical on every row is still an aligned frame.
+        same_v = (y == 2026 and nbad < 0.005 * len(d)) or mx < 0.05
     if not (same_v and same_p):
         sys.exit(f'{y}: rebuilt rows do not match the stored frame on pitcher/velocity '
                  f'(velocity {same_v}, pitcher {same_p}). Not written.')

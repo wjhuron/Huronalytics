@@ -90,6 +90,23 @@ ARMS = {
     'MLP': {'model': 'mlp'},                      # sklearn neural net, two hidden layers
     'ENS_HGB': {'model': 'hgb', 'ens': True},     # mean of the shipped xgboost and HGB predictions
     'ENS_MLP': {'model': 'mlp', 'ens': True},
+    # training window (2026-11-24). FanGraphs dropped 2020 and 2021 from its Stuff+ training set in
+    # 2026 because hitters adapt (the sweeper). The gate trains on every season but Y and Y+1,
+    # later ones included, so 'near' keeps the seasons within k of Y, and 'past' is the production
+    # direction: seasons before Y only. 'drop_old' then removes the oldest n of those, and
+    # 'rows_like' is its sample-size control (a random share of the PAST rows, the size of drop_old n).
+    'NEAR2': {'near': 2},
+    'NEAR3': {'near': 3},
+    'PAST': {'past': True},
+    'PAST_D1': {'past': True, 'drop_old': 1},
+    'PAST_D2': {'past': True, 'drop_old': 2},
+    'PAST_R1': {'past': True, 'rows_like': 1},
+    'PAST_R2': {'past': True, 'rows_like': 2},
+    # pitch-group models (2026-11-24). FanGraphs runs three mini-models with cutters in the
+    # fastball group. GRP2: fastballs (FF SI FC) and the rest. GRP3: fastballs, breaking, offspeed;
+    # a type in none of the three takes the pooled model.
+    'GRP2': {'groups': 2},
+    'GRP3': {'groups': 3},
 }
 BRK, OFF, FBT = ('SL', 'ST', 'CU', 'KC', 'SV'), ('CH', 'FS'), ('FF', 'SI', 'FC')
 ARS_MIN_N, ARS_MIN_SHARE = 30, 0.03             # a type is part of the arsenal from 30 pitches and 3% usage (conventions)
@@ -289,6 +306,26 @@ def run(arms, pairs, seed):
                     PA = {y: arsenal(P[y]) for y in P}
                 Q = PA
             feats = G.variant_feats(spec)
+            all_train = train_years
+            tyears = list(all_train)
+            if spec.get('near'):
+                tyears = [y for y in tyears if abs(y - Y) <= int(spec['near'])]
+            if spec.get('past'):
+                tyears = [y for y in tyears if y < Y]
+            n_like = None
+            if spec.get('rows_like'):
+                if len(tyears) <= int(spec['rows_like']):
+                    tyears = []
+                else:
+                    n_like = sum(len(Q[y]) for y in tyears[int(spec['rows_like']):])
+            if spec.get('drop_old'):
+                tyears = tyears[int(spec['drop_old']):]
+            if not tyears:
+                print(f'  {name:<12} s{seed} no training season for this pair, left out', flush=True)
+                continue
+            if tyears != list(all_train):
+                print(f'    {name}: train {tyears}', flush=True)
+            train_years = tyears
             Xtr = pd.concat([G.design(Q[y], spec, feats) for y in train_years], ignore_index=True)
             col = {'cneutral': 't_cn', 'evcount': 't_ev'}.get(spec.get('label'), 'target_xrv')
             ytr = np.concatenate([Q[y][col].values.astype(float) for y in train_years])
@@ -324,6 +361,27 @@ def run(arms, pairs, seed):
             elif spec.get('rows'):
                 keep = np.random.default_rng(1000 + seed).random(len(Xtr)) < float(spec['rows'])
                 pred = fit_reg(Xtr[keep], ytr[keep], XY, spec, seed)
+            elif n_like is not None:
+                keep = np.random.default_rng(1000 + seed).random(len(Xtr)) < n_like / len(Xtr)
+                print(f'    {name}: {keep.sum():,} of {len(Xtr):,} training rows', flush=True)
+                pred = fit_reg(Xtr[keep], ytr[keep], XY, spec, seed)
+            elif spec.get('groups'):
+                ptt = np.concatenate([Q[y]['pitch_type'].astype(str).values for y in train_years])
+                pty = dY['pitch_type'].astype(str).values
+                gl = [FBT] + ([BRK, OFF] if int(spec['groups']) == 3 else [])
+                pred = np.full(len(dY), np.nan, dtype='float32')
+                seen_t, seen_y = np.zeros(len(ptt), bool), np.zeros(len(dY), bool)
+                for g in gl:
+                    mt, my = np.isin(ptt, g), np.isin(pty, g)
+                    pred[my] = fit_reg(Xtr[mt], ytr[mt], XY[my], spec, seed)
+                    seen_t |= mt
+                    seen_y |= my
+                    print(f'    {name}: group {"/".join(g)} train {mt.sum():,} score {my.sum():,}', flush=True)
+                if (~seen_y).any():
+                    # GRP2: the rest is its own model. GRP3: the few other types take the pooled model.
+                    mt = ~seen_t if int(spec['groups']) == 2 else np.ones(len(ptt), bool)
+                    pred[~seen_y] = fit_reg(Xtr[mt], ytr[mt], XY[~seen_y], spec, seed)
+                    print(f'    {name}: rest train {mt.sum():,} score {(~seen_y).sum():,}', flush=True)
             elif spec.get('model'):
                 keep = np.isfinite(ytr)
                 pred = fit_other(Xtr[keep], ytr[keep], XY, spec, seed)
@@ -348,6 +406,7 @@ def run(arms, pairs, seed):
             print(f'  {name:<12} s{seed} nxt raw {met["nxt_r"]:.4f} rend {met["nxt_r_rend"]:.4f} '
                   f'rv {met["nxt_rv_r"]:.4f} rel {met["rel"]:.4f} [{time.time() - t0:.0f}s]', flush=True)
             del Xtr, XY, agg, ytr, pred
+            train_years = all_train
             gc.collect()
         del P, PH, PA
         gc.collect()

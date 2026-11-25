@@ -126,6 +126,7 @@ sys.path.insert(0, ROOT)
 import stuff_plus.train_stuff as T                      # noqa: E402
 from pipeline import locplus as LOC                     # noqa: E402
 from pipeline.utils import get_count                    # noqa: E402
+from pipeline.neutral_move import raw_metric           # noqa: E402
 
 SEASONS = (2021, 2022, 2023, 2024, 2025, 2026)
 PAIRS = [(y, y + 1) for y in (2021, 2022, 2023, 2024, 2025)]
@@ -317,7 +318,9 @@ def _rows_ordered(pk, df, y):
     vel = _col(sub, 'release_speed')
     bad = 0
     for i, p in enumerate(pk):
-        v = T.sf(p.get('Velocity'))
+        # The training pickles hold the NEUTRAL velocity under the plain key since Stuff+ v20
+        # (2026-11-21); the Statcast cache holds the tracked one. Compare tracked with tracked.
+        v = T.sf(raw_metric(p, 'Velocity'))
         if v is not None and np.isfinite(vel[i]) and abs(v - vel[i]) > 1e-9:
             bad += 1
     if bad:
@@ -349,7 +352,7 @@ def _rows_fingerprint(pk, df):
         used = set()
         for i in idxs:
             p = pk[i]
-            v = T.sf(p.get('Velocity'))
+            v = T.sf(raw_metric(p, 'Velocity'))     # tracked: the Statcast cache holds no neutral value
             x, z = T.sf(p.get('PlateX')), T.sf(p.get('PlateZ'))
             if v is None:
                 unmatched += 1
