@@ -6481,10 +6481,12 @@ def main(new_level=None):
     # Teams: a comma-separated --team (e.g. TOR,LAD) combines a multi-team
     # pitcher's full season. Pitch data is read from each team's worksheet; the
     # bubbles use the pipeline's synthetic 2TM/3TM combined leaderboard row.
-    # team = "NEW" selects the scratch tab of the same name in the MiLB2026
-    # workbook (never read by the pipeline, so it cannot reach the site);
+    # team = "NEW" or "R5" selects the scratch tab of the same name in the MiLB2026
+    # workbook (pipeline.fetch.SCRATCH_TABS; neither can reach the site);
     # --tab overrides for other scratch tab names.
-    scratch_tab = args.tab or ('NEW' if str(team).strip().upper() == 'NEW' else None)
+    from pipeline.fetch import SCRATCH_TABS as _SCRATCH_TABS, R5_TAB_NAME as _R5
+    _team_up = str(team).strip().upper()
+    scratch_tab = args.tab or (_team_up if _team_up in _SCRATCH_TABS else None)
     # NEW holds three levels in PTeam (AAA, MLB, AFL). With new_levels "both" the run makes
     # one pass per level (2026-11-13, per Wally; AFL added 2026-11-17 for an AFL-only arm,
     # Huggins): the AAA card from the AAA rows on the AAA ruler, the MLB card from the MLB
@@ -6501,7 +6503,9 @@ def main(new_level=None):
                         raise
             return
         new_level = new_levels
-    _new_lv = new_level if scratch_tab == 'NEW' else None
+    # R5 (2026-11-24, per Wally) is one level: PTeam there is the PARENT CLUB, not a level,
+    # and every game is Triple-A. It takes the NEW tab's AAA pass, with no PTeam filter.
+    _new_lv = new_level if scratch_tab == 'NEW' else ('AAA' if scratch_tab == _R5 else None)
     # The corpus takes the scratch-tab path: pitches from outside the team tabs,
     # boxscores by PitchID gamePk, grades computed against the MLB pool.
     if milb_corpus:
@@ -6708,9 +6712,11 @@ def main(new_level=None):
         if t == 'NEW':
             # The NEW tab holds both levels for an arm like Bryse Wilson (PTeam AAA and
             # MLB). Each pass keeps its own level's rows (new_levels in the settings).
+            # R5 has no such filter: its PTeam is the parent club.
             _n_all = len(t_rows)
             t_rows = [r for r in t_rows if str(r.get('PTeam', '')).strip().upper() == _new_lv]
             print(f"  NEW: kept {len(t_rows)} PTeam {_new_lv} rows, left out {_n_all - len(t_rows)} other rows")
+        if t in ('NEW', _R5):
             # A player-ID pull tags every non-MLB game PTeam AAA, so a rehab or
             # assignment start at a lower level rode along: Cornielle's Single-A start
             # (820266) made his card 18 G / 17 GS against an official 17 / 16 and put
@@ -6722,7 +6728,7 @@ def main(new_level=None):
             if _drop:
                 _n_aaa = len(t_rows)
                 t_rows = [r for r in t_rows if str(r.get('PitchID', '')).split('_')[0] not in _drop]
-                print(f"  NEW: left out {_n_aaa - len(t_rows)} rows from {len(_drop)} games not at "
+                print(f"  {t}: left out {_n_aaa - len(t_rows)} rows from {len(_drop)} games not at "
                       f"the {_new_lv} level: " + ', '.join(f"{pk} (sportId {_lvl[pk]})" for pk in sorted(_drop)))
             # A blank xwOBA on NEW that the MiLB corpus has priced is filled from the
             # corpus by PitchID (2026-11-13, per Wally): two blanks put Cornielle's NEW
@@ -6736,15 +6742,15 @@ def main(new_level=None):
                     _cx = corpus_xwoba(r['PitchID'] for r in _blank)
                 except FileNotFoundError as _e:
                     _cx = None
-                    print(f"  NEW: {len(_blank)} blank xwOBA cells left blank; the MiLB corpus "
+                    print(f"  {t}: {len(_blank)} blank xwOBA cells left blank; the MiLB corpus "
                           f"is absent ({_e}). Rebuild it with scripts/builders/milb2026_pull.py.")
                 if _cx:
                     for r in _blank:
                         if str(r['PitchID']) in _cx:
                             r['xwOBA'] = float(_cx[str(r['PitchID'])])
-                    print(f"  NEW: filled {len(_cx)} blank xwOBA cells from the MiLB corpus "
+                    print(f"  {t}: filled {len(_cx)} blank xwOBA cells from the MiLB corpus "
                           f"({len(_blank) - len(_cx)} blank cells have no corpus value). Write them "
-                          f"to the tab: scripts/ops/fill_new_xwoba_from_corpus.py --apply")
+                          f"to the tab: scripts/ops/fill_new_xwoba_from_corpus.py --tab {t} --apply")
         for r in t_rows:
             r['_card_team'] = t      # tag source team for per-team boxscore fetch
         all_rows.extend(t_rows)
@@ -6876,7 +6882,7 @@ def main(new_level=None):
         aaa_ruler = False
     if aaa_ruler:
         if not (scratch_tab and is_multi_game):
-            sys.exit('AAA ruler: scratch-tab (team NEW or a tab) or MiLB-corpus season and '
+            sys.exit('AAA ruler: scratch-tab (team NEW, R5 or a tab) or MiLB-corpus season and '
                      'date-range cards only. A single game reads the MLB outing pool, and a '
                      'team-tab card reads the shipped leaderboard.')
         _aaa_pool = load_aaa_pitcher_pool()

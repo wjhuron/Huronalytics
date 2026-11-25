@@ -110,16 +110,32 @@ def collect_new_pitchers():
         p = os.path.join(DATA, 'scoring_only_rs_cache.pkl')
         if not os.path.exists(p):
             print('  WARNING: no NEW-tab source; NEW arms stay unresolved')
-            return {}
-        with open(p, 'rb') as f:
-            rows = pickle.load(f)
-        src = p
+            rows = []
+        else:
+            with open(p, 'rb') as f:
+                rows = pickle.load(f)
+            src = p
+    # The other scratch tabs (R5, 2026-11-24). They have no cache: a failed read leaves
+    # their arms unresolved this run, and says so.
+    try:
+        from pipeline.fetch import SCRATCH_TABS, NEW_TAB_NAME, read_scratch_tab_pitches
+        for tab in SCRATCH_TABS:
+            if tab != NEW_TAB_NAME:
+                extra = read_scratch_tab_pitches(tab)
+                print(f'  {tab}: {len(extra)} rows')
+                rows = rows + extra
+                src += f' and the {tab} tab'
+    except Exception as e:  # same read as above
+        print(f'  WARNING: scratch tab read failed ({type(e).__name__}: {e}); '
+              f'its arms stay unresolved this run')
+    if not rows:
+        return {}
     out = {}
     for x in rows:
         pk = str(x.get('PitchID', '')).split('_')[0]
         if x.get('Pitch Type') != 'EP' and x.get('Pitcher') and pk.isdigit():
             out.setdefault(x['Pitcher'], set()).add(int(pk))
-    print(f'  {len(out)} NEW-tab pitchers from {src}')
+    print(f'  {len(out)} scratch-tab pitchers from {src}')
     return out
 
 

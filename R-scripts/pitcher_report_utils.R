@@ -50,7 +50,7 @@ TEAM_LEAGUE <- c(
   ARI = "NL", ATL = "NL", CHC = "NL", CIN = "NL", COL = "NL",
   LAD = "NL", MIA = "NL", MIL = "NL", NYM = "NL", PHI = "NL",
   PIT = "NL", SDP = "NL", SFG = "NL", STL = "NL", WSH = "NL",
-  ROC = "NL", AAA = "NL", FCL = "NL"
+  ROC = "NL", AAA = "NL", FCL = "NL", R5 = "NL"
 )
 
 # 2026 layout: each team's data lives in its division workbook. The CSV you
@@ -61,6 +61,7 @@ TEAM_WORKBOOK <- c(
   ATH="ALW2026", HOU="ALW2026", LAA="ALW2026", SEA="ALW2026", TEX="ALW2026",
   ATL="NLE2026", MIA="NLE2026", NYM="NLE2026", PHI="NLE2026", WSH="NLE2026",
   ROC="MiLB2026", AAA="MiLB2026", FCL="MiLB2026",
+  R5="MiLB2026",   # scratch tab, 2026-11-24 (pipeline/fetch.py SCRATCH_TABS)
   CHC="NLC2026", CIN="NLC2026", MIL="NLC2026", PIT="NLC2026", STL="NLC2026",
   ARI="NLW2026", COL="NLW2026", LAD="NLW2026", SDP="NLW2026", SFG="NLW2026"
 )

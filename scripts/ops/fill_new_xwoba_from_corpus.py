@@ -17,6 +17,7 @@ moved, so a row shift can never write into the wrong row.
 Usage:
     python3 scripts/ops/fill_new_xwoba_from_corpus.py            # DRY RUN
     python3 scripts/ops/fill_new_xwoba_from_corpus.py --apply    # write for real
+    python3 scripts/ops/fill_new_xwoba_from_corpus.py --tab R5   # the R5 scratch tab (default NEW)
 """
 import argparse
 import os
@@ -30,14 +31,17 @@ from scrapers.sheet_precision import fmt, domain_problem
 from scrapers.sheets_append import _get_client, _col_letter, _sheets_retry
 
 MILB2026 = '164irdfToUA15BWVpGiDTYmji8koKKalqoFV33rSaRZQ'
-TAB = 'NEW'
+TABS = ('NEW', 'R5')     # pipeline.fetch.SCRATCH_TABS; kept literal so this tool needs no pipeline import
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--apply', action='store_true',
                     help='write the cells; without it nothing is written')
+    ap.add_argument('--tab', default='NEW', choices=TABS,
+                    help='the scratch tab to fill (default NEW)')
     a = ap.parse_args()
+    TAB = a.tab
 
     ws = _sheets_retry(lambda: _get_client().open_by_key(MILB2026).worksheet(TAB),
                        label=f'{TAB} open')

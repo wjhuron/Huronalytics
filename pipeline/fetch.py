@@ -638,6 +638,27 @@ def _gspread_client():
 EXTRA_TABS_WORKBOOK = 'MiLB2026'
 NEW_TAB_WORKBOOK = EXTRA_TABS_WORKBOOK
 NEW_TAB_NAME = 'NEW'
+# R5 (2026-11-24, per Wally): a second scratch tab in the same workbook. Its PTeam is the
+# PARENT CLUB, not a level, and every game is Triple-A. The cards, the R reports and the
+# scratch tools read it; the PIPELINE does not (read_new_tab_pitches reads NEW only), so CI
+# writes no Stuff+ / Loc+ into it.
+R5_TAB_NAME = 'R5'
+SCRATCH_TABS = (NEW_TAB_NAME, R5_TAB_NAME)
+
+
+def read_scratch_tab_pitches(tab, gc=None):
+    """Read one scratch tab of the MiLB2026 workbook for a TOOL (heights, audits). Rows are
+    tagged like read_new_tab_pitches tags NEW rows, so no MLB-only filter can take them.
+    The pipeline does not call this."""
+    if tab not in SCRATCH_TABS:
+        raise ValueError(f'{tab!r} is not a scratch tab; expected one of {SCRATCH_TABS}')
+    gc = gc or _gspread_client()
+    rows = read_pitches_from_sheet(gc, DIVISION_WORKBOOK_IDS[NEW_TAB_WORKBOOK], only_tabs={tab})
+    for p in rows:
+        p['_source'] = 'NEW'
+        p['_sheetPTeam'] = p.get('PTeam')
+        p['PTeam'] = 'NEW'
+    return rows
 
 
 def read_new_tab_pitches(gc=None):

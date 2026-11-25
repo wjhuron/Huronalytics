@@ -36,7 +36,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, ROOT)
 
 from pipeline import neutral_move as NM
-from pipeline.fetch import (_gspread_client, DIVISION_WORKBOOK_IDS, EXTRA_TABS_WORKBOOK,
+from pipeline.fetch import (_gspread_client, DIVISION_WORKBOOK_IDS, EXTRA_TABS_WORKBOOK, SCRATCH_TABS,
                             read_sheet_with_retry)
 from pipeline.utils import MLB_TEAMS
 from scrapers import weather_obs
@@ -161,7 +161,7 @@ def main():
         store = {}
     tab_rows, all_pks = [], set()
     for name, wid in DIVISION_WORKBOOK_IDS.items():
-        extra = {'ROC', 'AAA', 'NEW'} if name == EXTRA_TABS_WORKBOOK else set()
+        extra = ({'ROC', 'AAA'} | set(SCRATCH_TABS)) if name == EXTRA_TABS_WORKBOOK else set()
         sh = gc.open_by_key(wid)
         print(f'{sh.title}:')
         for ws in sh.worksheets():

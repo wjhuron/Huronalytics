@@ -40,7 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, ROOT)
 
 from pipeline import neutral_move as NM
-from pipeline.fetch import (_gspread_client, DIVISION_WORKBOOK_IDS, EXTRA_TABS_WORKBOOK,
+from pipeline.fetch import (_gspread_client, DIVISION_WORKBOOK_IDS, EXTRA_TABS_WORKBOOK, SCRATCH_TABS,
                             read_sheet_with_retry, sheets_call_with_retry)
 from pipeline.utils import MLB_TEAMS
 from scrapers.sheet_precision import NUMBER_FORMATS, PRECISION, fmt
@@ -168,7 +168,7 @@ def main():
     gc = _gspread_client()
     tabs = []
     for name, wid in DIVISION_WORKBOOK_IDS.items():
-        extra = {'ROC', 'AAA', 'NEW'} if name == EXTRA_TABS_WORKBOOK else set()
+        extra = ({'ROC', 'AAA'} | set(SCRATCH_TABS)) if name == EXTRA_TABS_WORKBOOK else set()
         sh = sheets_call_with_retry(lambda: gc.open_by_key(wid))
         print(f'{sh.title}:', flush=True)
         for ws in sheets_call_with_retry(sh.worksheets):

@@ -129,6 +129,7 @@
 "Bae, Jihwan": 71.0,
 "Baez, Michel": 80.0,
 "Bailey, Patrick": 72.0,
+"Baker, Andrew": 73.0,
 "Baker, Bryan": 78.0,
 "Baker, Dru": 70.0,
 "Baker, Luken": 76.0,
@@ -252,6 +253,7 @@
 "Bolte, Henry": 75.0,
 "Bolton, Cody": 74.0,
 "Booser, Cam": 75.0,
+"Bormie, Wilian": 75.0,
 "Borucki, Ryan": 76.0,
 "Bosacker, Ethan": 74.0,
 "Bostick, Akeem": 78.0,
@@ -571,12 +573,14 @@
 "Del Pozo, Miguel": 73.0,
 "Delay, Jason": 71.0,
 "Delgado, Raynel": 72.0,
+"Denholm, Trenton": 71.0,
 "Dermody, Matt": 77.0,
 "Detmers, Reid": 74.0,
 "Detwiler, Ross": 77.0,
 "Devenski, Chris": 75.0,
 "Devers, Rafael": 72.0,
 "Dezenzo, Zach": 77.0,
+"Diamond, Derek": 74.0,
 "Diaz, Yainer": 71.0,
 "Dickerson, Corey": 73.0,
 "Dickson, Brandon": 77.0,
@@ -1040,6 +1044,7 @@
 "Hicks, Aaron": 73.0,
 "Hicks, Jordan": 74.0,
 "Hicks, Liam": 69.0,
+"Hidalgo, Alejandro": 73.0,
 "Higashioka, Kyle": 73.0,
 "Higgins, P.J.": 70.0,
 "Hildenberger, Trevor": 74.0,
@@ -1072,6 +1077,7 @@
 "Holmes, Grant": 72.0,
 "Holt, Brock": 70.0,
 "Holton, Tyler": 74.0,
+"Holub, Blake": 77.0,
 "Honeywell, Brent": 74.0,
 "Hopkins, Brody": 76.0,
 "Hoppe, Alex": 73.0,
@@ -1341,6 +1347,7 @@
 "Llovera, Mauricio": 71.0,
 "Lloyd, Matt": 72.0,
 "Lobstein, Kyle": 75.0,
+"Lobus, Ryan": 74.0,
 "Locklear, Tyler": 74.0,
 "Lockridge, Brandon": 72.0,
 "Lodolo, Nick": 78.0,
@@ -1691,6 +1698,7 @@
 "Newsome, Ljay": 71.0,
 "Nicolas, Kyle": 75.0,
 "Nido, Tom\u00e1s": 72.0,
+"Nielson, Cy": 75.0,
 "Nikhazy, Doug": 72.0,
 "Nimmo, Brandon": 73.0,
 "Nishida, Rikuu": 66.0,
@@ -1773,7 +1781,9 @@
 "Paredes, Mike": 71.0,
 "Parker, Blake": 75.0,
 "Parker, Mitchell": 76.0,
+"Parks, Hunter": 74.0,
 "Parsons, Wes": 77.0,
+"Pasqualotto, Paulshawn": 73.0,
 "Pasquantino, Vinnie": 75.0,
 "Pati\u00f1o, Luis": 73.0,
 "Patrick, Chad": 73.0,
@@ -2576,12 +2586,14 @@
 "Whitley, Forrest": 79.0,
 "Whitley, Kodi": 75.0,
 "Whitlock, Garrett": 77.0,
+"Whitman, Joe": 76.0,
 "Wick, Rowan": 75.0,
 "Wicks, Jordan": 75.0,
 "Widener, Taylor": 72.0,
 "Wieck, Brad": 80.0,
 "Wiemer, Joey": 76.0,
 "Wilcox, Cole": 77.0,
+"Wild, Owen": 74.0,
 "Wiles, Collin": 76.0,
 "Wiles, Nathan": 76.0,
 "Wilkerson, Stevie": 74.0,
@@ -3069,6 +3081,9 @@
 "Bailey, Patrick": [
 672275
 ],
+"Baker, Andrew": [
+687900
+],
 "Baker, Bryan": [
 641329
 ],
@@ -3437,6 +3452,9 @@
 ],
 "Booser, Cam": [
 592155
+],
+"Bormie, Wilian": [
+693781
 ],
 "Borucki, Ryan": [
 621366
@@ -4396,6 +4414,9 @@
 "Delgado, Raynel": [
 669384
 ],
+"Denholm, Trenton": [
+671143
+],
 "Dermody, Matt": [
 571616
 ],
@@ -4413,6 +4434,9 @@
 ],
 "Dezenzo, Zach": [
 701305
+],
+"Diamond, Derek": [
+682981
 ],
 "Diaz, Yainer": [
 673237
@@ -5804,6 +5828,9 @@
 "Hicks, Liam": [
 689414
 ],
+"Hidalgo, Alejandro": [
+691576
+],
 "Higashioka, Kyle": [
 543309
 ],
@@ -5899,6 +5926,9 @@
 ],
 "Holton, Tyler": [
 663947
+],
+"Holub, Blake": [
+700183
 ],
 "Honeywell, Brent": [
 641703
@@ -6706,6 +6736,9 @@
 ],
 "Lobstein, Kyle": [
 543456
+],
+"Lobus, Ryan": [
+815590
 ],
 "Locklear, Tyler": [
 682988
@@ -7758,6 +7791,9 @@
 "Nido, Tom\u00e1s": [
 621512
 ],
+"Nielson, Cy": [
+686951
+],
 "Nikhazy, Doug": [
 680951
 ],
@@ -8005,8 +8041,14 @@
 "Parker, Mitchell": [
 680730
 ],
+"Parks, Hunter": [
+688609
+],
 "Parsons, Wes": [
 641149
+],
+"Pasqualotto, Paulshawn": [
+695308
 ],
 "Pasquantino, Vinnie": [
 686469
@@ -10415,6 +10457,9 @@
 "Whitlock, Garrett": [
 676477
 ],
+"Whitman, Joe": [
+802126
+],
 "Wick, Rowan": [
 592858
 ],
@@ -10432,6 +10477,9 @@
 ],
 "Wilcox, Cole": [
 677961
+],
+"Wild, Owen": [
+801643
 ],
 "Wiles, Collin": [
 621079
@@ -10726,5 +10774,5 @@
 ]
 },
 "league_mean": 73.75,
-"n": 2679
+"n": 2691
 }
