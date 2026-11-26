@@ -115,7 +115,20 @@ ARMS = {
     'CHAIN': {'chain': 'pooled'},
     'CHAIN_MIX': {'chain': 'mix'},
     'CHAIN_CNT': {'chain': 'count'},
+    # velocity split (2026-11-25). Between pitchers the shipped model's velocity slope is about
+    # twice the outcome slope (stuff_velocity_within_between.py): one velocity effect serves both
+    # a pitcher's harder pitches and a harder thrower. vsplit() adds the pitcher's own mean
+    # velocity for the type (v_mean) and the pitch's deviation from it (v_dev). VS_CTRL adds the
+    # columns and uses none: it must reproduce SHIPPED. VSPLIT replaces velocity with the pair,
+    # both monotone as velocity is. VMEAN_ADD keeps velocity and adds v_mean with no constraint.
+    'VS_CTRL': {'vsplit': True},
+    'VSPLIT': {'vsplit': True, 'replace': {'velocity': 'v_mean'}, 'add': ['v_dev'], 'mono': ['v_mean', 'v_dev']},
+    'VMEAN_ADD': {'vsplit': True, 'add': ['v_mean']},
+    'IDENT3_VSPLIT': {'identity': 3, 'vsplit': True, 'replace': {'velocity': 'v_mean'}, 'add': ['v_dev'],
+                      'mono': ['v_mean', 'v_dev']},
+    'IDENT3_VMEAN_ADD': {'identity': 3, 'vsplit': True, 'add': ['v_mean']},
 }
+CHK_ARMS = ('SHIPPED_CHK', 'VS_CTRL')            # arms that must reproduce the gate's SHIPPED aggregate
 BRK, OFF, FBT = ('SL', 'ST', 'CU', 'KC', 'SV'), ('CH', 'FS'), ('FF', 'SI', 'FC')
 ARS_MIN_N, ARS_MIN_SHARE = 30, 0.03             # a type is part of the arsenal from 30 pitches and 3% usage (conventions)
 ARS_SCALE = (5.0, 7.0, 9.0)                     # mph, in IVB, in HB per unit of the nearest-type distance (conventions,
@@ -173,6 +186,17 @@ def fbhand(d):
     for c, a, r in (('ivb_diff', 'ivb', 'r_iv'), ('hb_diff', 'hb', 'r_hb'), ('vaa_diff', 'vaa', 'r_vaa')):
         d[c] = np.where(ok, (j[a] - j[r]).values, d[c].values).astype('float32')
     print(f'    fbhand: {ok.mean():.1%} of rows take a batter-hand reference', flush=True)
+    return d
+
+
+def vsplit(d):
+    """v_mean: the pitcher's mean velocity for the pitch type in this season frame.
+    v_dev: the pitch's velocity minus that mean. The unit is (pitcher, throws, pitch_type),
+    with no minimum: a one-pitch unit reads v_dev 0."""
+    d = d.copy()
+    m = d.groupby(['pitcher', 'throws', 'pitch_type'], observed=True)['velocity'].transform('mean')
+    d['v_mean'] = m.astype('float32')
+    d['v_dev'] = (d['velocity'] - m).astype('float32')
     return d
 
 
@@ -265,7 +289,8 @@ def fit_other(Xtr, ytr, XY, spec, seed):
 def params_for(X, spec, seed, clf=False):
     p = T._params_for(X)
     p.update(spec.get('params') or {})
-    p['monotone_constraints'] = tuple(0 if clf else (-1 if c == T.MONO_FEAT else 0) for c in X.columns)
+    mono = {T.MONO_FEAT, *(spec.get('mono') or [])}
+    p['monotone_constraints'] = tuple(0 if clf else (-1 if c in mono else 0) for c in X.columns)
     p['random_state'] = seed
     return p
 
@@ -382,7 +407,7 @@ def run(arms, pairs, seed):
         print(f'\n=== pair {Y}->{Y1} (train {train_years}) ===', flush=True)
         slopes = G.fit_vaa_slopes([frames[y] for y in train_years])
         P = {y: attach_sidecar(G.prepare(frames[y], slopes, 'true'), y) for y in train_years + [Y, Y1]}
-        PH = PA = None
+        PH = PA = PV = None
         chain_cache = {}
         gc.collect()
         for name in todo:
@@ -397,6 +422,10 @@ def run(arms, pairs, seed):
                 if PA is None:
                     PA = {y: arsenal(P[y]) for y in P}
                 Q = PA
+            if spec.get('vsplit'):
+                if PV is None:
+                    PV = {y: vsplit(P[y]) for y in P}
+                Q = PV
             feats = G.variant_feats(spec)
             all_train = train_years
             tyears = list(all_train)
@@ -490,7 +519,7 @@ def run(arms, pairs, seed):
             met = G.metrics_from(agg)
             d1 = Q[Y1]
             agg['py1x'] = d1.assign(_cn=-d1['t_cn']).groupby('pitcher').agg(tcn=('_cn', 'mean'))
-            if name == 'SHIPPED_CHK' and os.path.exists(G.agg_path('SHIPPED', Y, seed)):
+            if name in CHK_ARMS and os.path.exists(G.agg_path('SHIPPED', Y, seed)):
                 ref = G.metrics_from(pd.read_pickle(G.agg_path('SHIPPED', Y, seed)))
                 diff = abs(met['nxt_r'] - ref['nxt_r'])
                 print(f'  VALIDATION {Y}: ext nxt_r {met["nxt_r"]:.5f} vs gate SHIPPED {ref["nxt_r"]:.5f} '
@@ -505,7 +534,7 @@ def run(arms, pairs, seed):
             del Xtr, XY, agg, ytr, pred
             train_years = all_train
             gc.collect()
-        del P, PH, PA
+        del P, PH, PA, PV
         gc.collect()
 
 
